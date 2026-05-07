@@ -32,13 +32,16 @@ disallow_untyped_decorators = false
 [[tool.mypy.overrides]]
 # GA is an external project without type stubs. We treat its modules as
 # opaque (Any) and rely on our own tests to catch interface drift.
-module = ["agent_loop", "ga"]
+module = ["agent_loop", "ga", "agentmain"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["bridge/tests"]
 python_files = "test_*.py"
-addopts = "-v"
+addopts = "-v -m \"not e2e\""
+markers = [
+    "e2e: end-to-end tests that spawn a real bridge subprocess and call real LLM (run with `pytest -m e2e`)",
+]
 
 [tool.ruff]
 line-length = 100
