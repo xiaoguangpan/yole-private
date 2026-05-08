@@ -1,7 +1,13 @@
 import { create } from "zustand";
 
 import type { ApprovalConfig } from "@/components/screens/settings/Settings";
+import {
+  type BridgeClient,
+  type BridgeSpawnArgs,
+  spawnBridge as spawnBridgeProcess,
+} from "@/lib/bridge";
 import { loadSessions, persistSession } from "@/lib/db";
+import { dispatchIPCEvent } from "@/lib/ipc-handlers";
 import {
   DEMO_APPROVAL_CONFIG,
   DEMO_APPROVAL_RECORDS,
@@ -12,8 +18,21 @@ import {
 } from "@/stores/demo";
 import type { AppError } from "@/types/app-error";
 import type { ApprovalRecord, RuntimeInfo } from "@/types/inspector";
-import type { ApprovalDecision } from "@/types/ipc";
+import type { ApprovalDecision, IPCCommand } from "@/types/ipc";
 import type { Session } from "@/types/session";
+
+/**
+ * Module-level reference to the active bridge subprocess. Bridge
+ * client objects aren't serializable (hold function refs to write/
+ * kill), so they live outside the Zustand state. The store's
+ * `bridgeStatus` field remains the source of truth for "is bridge
+ * alive"; this ref is just the IO handle.
+ */
+let _bridgeClient: BridgeClient | null = null;
+
+export function getBridgeClient(): BridgeClient | null {
+  return _bridgeClient;
+}
 
 export type Screen = "onboarding" | "empty" | "main";
 
@@ -22,6 +41,13 @@ export interface LLMOption {
   displayName: string;
   isCurrent: boolean;
 }
+
+export type BridgeStatus =
+  | "idle"
+  | "spawning"
+  | "connected"
+  | "closed"
+  | "error";
 
 interface State {
   // ---- UI ----
@@ -44,6 +70,11 @@ interface State {
 
   // ---- Errors ----
   toasts: AppError[];
+
+  // ---- Bridge runtime ----
+  bridgeStatus: BridgeStatus;
+  bridgeError: string | null;
+  bridgePid: number | null;
 }
 
 interface Actions {
@@ -70,6 +101,15 @@ interface Actions {
   // Errors
   pushToast: (e: AppError) => void;
   dismissToast: (id: string) => void;
+
+  // LLMs (replaceLLMs is called by ipc-handlers on ready/llm_changed)
+  replaceLLMs: (llms: LLMOption[]) => void;
+
+  // Bridge runtime
+  setBridgeStatus: (status: BridgeStatus) => void;
+  spawnBridge: (args: BridgeSpawnArgs) => Promise<void>;
+  shutdownBridge: () => Promise<void>;
+  sendIPCCommand: (cmd: IPCCommand) => Promise<void>;
 
   // Persistence
   hydrateFromDB: () => Promise<void>;
@@ -110,6 +150,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   approvalRecords: DEMO_APPROVAL_RECORDS,
 
   toasts: [],
+
+  bridgeStatus: "idle",
+  bridgeError: null,
+  bridgePid: null,
 
   // ---- UI actions ----
   setScreen: (s) => set({ screen: s }),
@@ -166,6 +210,71 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       toasts: state.toasts.filter((t) => t.id !== id),
     })),
+
+  // ---- LLMs ----
+  replaceLLMs: (llms) => set({ llms }),
+
+  // ---- Bridge runtime ----
+  setBridgeStatus: (status) => set({ bridgeStatus: status }),
+
+  spawnBridge: async (args) => {
+    if (_bridgeClient) {
+      console.warn(
+        "[store] spawnBridge called while another bridge is alive; shutting down first.",
+      );
+      await useAppStore.getState().shutdownBridge();
+    }
+
+    set({ bridgeStatus: "spawning", bridgeError: null });
+    try {
+      _bridgeClient = await spawnBridgeProcess(args, {
+        onEvent: (event) => dispatchIPCEvent(event, useAppStore),
+        onStderr: (line) => console.warn("[bridge stderr]", line),
+        onClose: (code, signal) => {
+          console.info("[bridge] closed", { code, signal });
+          _bridgeClient = null;
+          set({ bridgeStatus: "closed", bridgePid: null });
+        },
+        onError: (msg) => {
+          console.error("[bridge] error", msg);
+          set({ bridgeStatus: "error", bridgeError: msg });
+        },
+        onMalformedLine: (line) =>
+          console.warn("[bridge] malformed stdout line:", line),
+      });
+      // Status flips to "connected" only after the bridge sends its
+      // ready event (handled in ipc-handlers). Keep "spawning" here
+      // so the UI knows to show a loading affordance.
+      set({ bridgePid: _bridgeClient.pid });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      _bridgeClient = null;
+      set({ bridgeStatus: "error", bridgeError: msg, bridgePid: null });
+    }
+  },
+
+  shutdownBridge: async () => {
+    const client = _bridgeClient;
+    if (!client) return;
+    try {
+      await client.shutdown();
+    } finally {
+      _bridgeClient = null;
+      set({ bridgeStatus: "closed", bridgePid: null });
+    }
+  },
+
+  sendIPCCommand: async (cmd) => {
+    const client = _bridgeClient;
+    if (!client) {
+      console.warn(
+        "[store] sendIPCCommand called but no bridge is alive:",
+        cmd,
+      );
+      return;
+    }
+    await client.send(cmd);
+  },
 
   // ---- Persistence ----
   //

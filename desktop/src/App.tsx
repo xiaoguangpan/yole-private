@@ -67,6 +67,11 @@ function App() {
   const pushToast = useAppStore((s) => s.pushToast);
   const dismissToast = useAppStore((s) => s.dismissToast);
 
+  const bridgeStatus = useAppStore((s) => s.bridgeStatus);
+  const spawnBridge = useAppStore((s) => s.spawnBridge);
+  const shutdownBridge = useAppStore((s) => s.shutdownBridge);
+  const sendIPCCommand = useAppStore((s) => s.sendIPCCommand);
+
   const hydrateFromDB = useAppStore((s) => s.hydrateFromDB);
 
   // Hydrate sessions from SQLite on mount. Falls through to the demo
@@ -131,6 +136,11 @@ function App() {
             screen={screen}
             setScreen={setScreen}
             onTriggerToast={() => pushToast(makeDemoToast())}
+            bridgeStatus={bridgeStatus}
+            onSpawnBridge={() => spawnBridge(DEMO_BRIDGE_ARGS)}
+            onShutdownBridge={() => {
+              void shutdownBridge();
+            }}
           />
         )}
       </>
@@ -158,11 +168,17 @@ function App() {
               llmDisplayName={llmDisplayName}
               onSubmit={(t) => {
                 console.info("[empty] submit:", t);
+                if (bridgeStatus === "connected") {
+                  sendIPCCommand({ kind: "user_message", text: t, images: [] });
+                }
                 setActiveSession("s-today-1");
                 setScreen("main");
               }}
               onQuickPrompt={(p) => {
                 console.info("[empty] quick-prompt:", p);
+                if (bridgeStatus === "connected") {
+                  sendIPCCommand({ kind: "user_message", text: p, images: [] });
+                }
                 setActiveSession("s-today-1");
                 setScreen("main");
               }}
@@ -173,12 +189,31 @@ function App() {
               llmDisplayName={llmDisplayName}
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}
-              onSubmit={(t) => console.info("[main] submit:", t)}
-              onApprove={recordApprovalDecision}
+              onSubmit={(t) => {
+                console.info("[main] submit:", t);
+                if (bridgeStatus === "connected") {
+                  sendIPCCommand({ kind: "user_message", text: t, images: [] });
+                }
+              }}
+              onApprove={(approvalId, decision) => {
+                recordApprovalDecision(approvalId, decision);
+                if (bridgeStatus === "connected") {
+                  sendIPCCommand({
+                    kind: "approval_response",
+                    approvalId,
+                    decision,
+                  });
+                }
+              }}
               onAdvanceApproval={(next) =>
                 console.info("[main] advance to:", next.approvalId)
               }
-              onStop={() => console.info("[main] stop")}
+              onStop={() => {
+                console.info("[main] stop");
+                if (bridgeStatus === "connected") {
+                  sendIPCCommand({ kind: "abort" });
+                }
+              }}
               isRunning={isRunning}
             />
           )
@@ -269,6 +304,18 @@ export default App;
 
 // ---------------- dev-only screen toggle ----------------
 
+// Hardcoded for #10a so the DEV "spawn bridge" button has something
+// to call without an Onboarding round-trip. Real values come from
+// the prefs table once #10b wires Onboarding step 1's path picker
+// + Settings → Runtime back to SQLite. If your machine has GA at a
+// different path, change DEMO_BRIDGE_ARGS.gaPath / bridgeCwd here.
+const DEMO_BRIDGE_ARGS = {
+  python: "python3",
+  gaPath: "/Users/inkstone/Documents/GenericAgent",
+  bridgeCwd: "/Users/inkstone/Documents/genericagent-webui",
+  sessionId: "sess_demo_v0_1_a",
+};
+
 const SCREEN_TOGGLE_LABEL: Record<Screen, string> = {
   onboarding: "intro",
   empty: "empty",
@@ -279,10 +326,16 @@ function DevScreenToggle({
   screen,
   setScreen,
   onTriggerToast,
+  bridgeStatus,
+  onSpawnBridge,
+  onShutdownBridge,
 }: {
   screen: Screen;
   setScreen: (s: Screen) => void;
   onTriggerToast?: () => void;
+  bridgeStatus?: import("@/stores/useAppStore").BridgeStatus;
+  onSpawnBridge?: () => void;
+  onShutdownBridge?: () => void;
 }) {
   return (
     <div className="pointer-events-none fixed right-4 top-14 z-[60] flex gap-1.5">
@@ -296,6 +349,28 @@ function DevScreenToggle({
       {onTriggerToast && (
         <DevSegment>
           <DevButton onClick={onTriggerToast}>+ toast</DevButton>
+        </DevSegment>
+      )}
+      {bridgeStatus !== undefined && onSpawnBridge && onShutdownBridge && (
+        <DevSegment>
+          <span
+            className={cn(
+              "self-center px-1 font-mono text-[10px] uppercase tracking-wider",
+              bridgeStatus === "connected" && "text-success",
+              bridgeStatus === "spawning" && "text-warning",
+              bridgeStatus === "error" && "text-error",
+              (bridgeStatus === "idle" || bridgeStatus === "closed") &&
+                "text-ink-muted",
+            )}
+            title={`bridge: ${bridgeStatus}`}
+          >
+            br: {bridgeStatus}
+          </span>
+          {bridgeStatus === "connected" || bridgeStatus === "spawning" ? (
+            <DevButton onClick={onShutdownBridge}>kill</DevButton>
+          ) : (
+            <DevButton onClick={onSpawnBridge}>spawn</DevButton>
+          )}
         </DevSegment>
       )}
     </div>

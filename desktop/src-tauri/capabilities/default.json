@@ -21,6 +21,58 @@
     {
       "identifier": "sql:allow-close",
       "allow": [{ "url": "sqlite:workbench.db" }]
+    },
+    "shell:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "python-bridge-py3",
+          "cmd": "python3",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "python-bridge-py",
+          "cmd": "python",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-stdin-write",
+      "allow": [
+        {
+          "name": "python-bridge-py3",
+          "cmd": "python3",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "python-bridge-py",
+          "cmd": "python",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-kill",
+      "allow": [
+        {
+          "name": "python-bridge-py3",
+          "cmd": "python3",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "python-bridge-py",
+          "cmd": "python",
+          "args": true,
+          "sidecar": false
+        }
+      ]
     }
   ]
 }
