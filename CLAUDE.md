@@ -70,8 +70,8 @@ genericagent-workbench/
 |---|---|---|
 | 0. 基础设施 | ✅ 完成 | git init、目录、CLAUDE.md、LICENSE、README |
 | 1. Bridge POC | ✅ 完成 | IPC 协议、WorkbenchHandler、主入口、e2e |
-| 2. 桌面端骨架 | ⏸ DESIGN 讨论中 | Tauri + React + shadcn、SQLite schema、Session Manager |
-| 3. V0.1 六件事 | ⏸ 阶段 2 后 | Attach / 多 session / Tool Timeline / Approval / 历史恢复 / Session Row 状态 |
+| 2. 桌面端骨架 | 🔨 进行中 | Tauri v2 + React 19 + Tailwind v4 + DESIGN tokens（#1 ✅）、各组件、SQLite、Session Manager |
+| 3. V0.1 七件事 | ⏸ 阶段 2 后 | Attach / 多 session / Tool Timeline / Approval / 历史恢复 / Session Row 状态 / LLM 切换 |
 
 ## 工程规范
 
@@ -83,9 +83,86 @@ genericagent-workbench/
 - 不引入 GA 之外的第三方包，除非必要（首选标准库）
 - pytest 覆盖：schema 验证、hook 行为、子进程隔离
 
-### TypeScript（desktop/，阶段 2+）
+### TypeScript（desktop/）
 
-阶段 2 落地时补。
+工具链：
+
+- **Tauri v2** + **Vite 7** + **React 19** + **TypeScript 5.8 strict**
+- **Tailwind v4**（CSS-first，`@theme` 在 `src/styles/globals.css`）
+- **Phosphor Icons** thin weight 全局唯一 icon set
+- **Self-hosted 字体**：`@fontsource/newsreader` / `@fontsource/inter` / `@fontsource/jetbrains-mono`（npm 包，无运行时网络依赖）
+- **macOS-first**：`bundle.targets = ["app", "dmg"]`；`titleBarStyle: "Overlay"` 自定义 chrome 集成 traffic light
+- 包管理器：**pnpm**（必须）
+
+目录结构：
+
+```
+desktop/
+├── src/
+│   ├── main.tsx                 # 入口（import globals.css）
+│   ├── App.tsx                  # 根组件
+│   ├── styles/globals.css       # Tailwind v4 + DESIGN tokens（@theme block）
+│   ├── components/
+│   │   ├── layout/              # AppShell（三栏） / TopBar
+│   │   ├── ui/                  # shadcn copy-paste 组件（按需引入）
+│   │   ├── conversation/        # 主对话区（Conversation / Tool callout / Composer）
+│   │   ├── approval/            # Approval Dock / Approval Card
+│   │   ├── overlay/             # Command Palette / Health Check / Error
+│   │   └── settings/            # Settings 独立窗口
+│   ├── lib/
+│   │   ├── utils.ts             # cn() + 通用 helpers
+│   │   └── ipc.ts               # bridge 通信封装（Stage 2 #10 加）
+│   ├── hooks/                   # custom hooks
+│   ├── stores/                  # state 管理（Zustand，Stage 2 #9 加）
+│   └── types/
+│       └── ipc.ts               # IPC 协议 TypeScript 镜像（必须跟 bridge/ipc.py 同步）
+├── src-tauri/                    # Rust 端
+│   ├── tauri.conf.json
+│   └── src/main.rs
+├── public/
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+├── eslint.config.js              # ESLint flat config
+├── .prettierrc.json
+└── components.json               # shadcn 配置（首次 add 时创建）
+```
+
+token 命名约定（Tailwind v4 友好）：
+
+- 颜色：`--color-app` / `--color-surface` / `--color-elevated` / `--color-brand` / `--color-success` 等 → utility `bg-app` / `text-brand` / `border-brand`
+- 文字色用 `--color-ink` / `--color-ink-soft` / `--color-ink-muted`（避开 Tailwind 的 `text-text-*` 双重命名）
+- 边框用 `--color-line` / `--color-line-strong` / `--color-line-subtle`（避开 `border-border`）
+- 字体：`--font-serif` / `--font-sans` / `--font-mono` → utility `font-serif` 等
+
+shadcn 引入策略：
+
+- **按需 add**，不 init 时一次性装。第一次需要的是 `command` (Command Palette)
+- shadcn 组件 copy 到 `src/components/ui/`，可改可控
+- **不让 shadcn init 改 `globals.css`**（避免跟我们的 token 冲突）；首次 add 时手写 `components.json`
+
+shadcn vs 自研判断：
+
+- **用 shadcn**：a11y 复杂 / 行为标准（command / dialog / dropdown-menu / popover / tabs / tooltip / sonner / button / input）
+- **自研**：prototype 已定型 / 视觉 specific（Sidebar / Composer / Tool callout / Approval Dock / Health Check / Error Card / Onboarding / Empty state）
+
+命令清单：
+
+- `pnpm dev` — Vite dev server (无 Tauri 窗口，浏览器调试用)
+- `pnpm tauri dev` — Tauri 桌面 dev（出 macOS 窗口）
+- `pnpm build` — TypeScript 编译 + Vite 打包
+- `pnpm tauri build` — 出 .app / .dmg
+- `pnpm typecheck` — 仅 TS 检查（必须 0 error）
+- `pnpm lint` — ESLint flat config（必须 0 warning）
+- `pnpm format` — Prettier 写入
+
+### IPC types 同步规则
+
+`desktop/src/types/ipc.ts` 必须跟 `bridge/ipc.py` 字段一一对应。任何协议变更：
+
+1. 改 `docs/ipc-protocol.md`（先）
+2. 改 `bridge/ipc.py` 的 dataclass + 测试
+3. 改 `desktop/src/types/ipc.ts` 同 commit 内同步
 
 ### Git 提交
 
@@ -138,6 +215,6 @@ genericagent-workbench/
 
 ## 设计文档状态
 
-DESIGN.md v0.2 正在迭代中（基础已对齐：Light-first 色板 / 字体 / Sidebar / Tool callout / Conversation / Composer / Approval Dock / Top Bar / Inspector）。剩下的（Onboarding / Settings / Card 类）讨论完后一次性写到 [docs/DESIGN.md](./docs/DESIGN.md) 作为 v0.2 完整版。
+DESIGN.md v0.2 完整版已定稿（[docs/DESIGN.md](./docs/DESIGN.md)）。Stage 2 #1 落地时实际工程命名（Tailwind v4 友好的 `--color-app` / `--color-ink` / `--color-line`）跟 DESIGN.md 描述命名（语义化的 `bg-app` / `text-primary` / `border-default`）有 mapping 关系，semantically 一致。Stage 2 #2 实现 Sidebar 时一并做 DESIGN.md token 命名 patch，对齐工程实际。
 
-阶段 2 桌面端骨架启动前，DESIGN.md v0.2 必须完成。
+参考 prototype 在 `docs/GenericAgent Workbench-handoff/`（design agent 出品的 5 张关键界面静态实现），实现各组件时对照视觉。

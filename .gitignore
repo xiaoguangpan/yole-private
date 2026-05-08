@@ -31,9 +31,13 @@ ENV/
 *.swp
 *.swo
 
-# Node (for desktop/, stage 2)
+# Node (for desktop/)
 node_modules/
-dist-tauri/
+
+# Tauri / desktop build artifacts
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
 
 # Local
 .env

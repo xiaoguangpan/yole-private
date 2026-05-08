@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Self-hosted fonts (npm packages, no runtime network) */
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "@fontsource/newsreader/400-italic.css";
+@import "@fontsource/newsreader/500-italic.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/*
+ * GA Workbench design tokens — see docs/DESIGN.md §2.
+ *
+ * Naming notes (Tailwind v4 utility-friendly):
+ *   --color-app       → bg-app
+ *   --color-surface   → bg-surface
+ *   --color-elevated  → bg-elevated
+ *   --color-ink       → text-ink, bg-ink (primary CTA)
+ *   --color-line      → border-line
+ *   --color-brand     → bg-brand, text-brand, border-brand
+ *
+ * "ink" replaces "text" / "line" replaces "border" to avoid
+ * Tailwind's `text-text-primary` / `border-border-default` ugliness.
+ */
+@theme {
+  /* --- surface layers --- */
+  --color-app: #faf7f2;
+  --color-surface: #fdfaf5;
+  --color-elevated: #ffffff;
+
+  /* --- borders / dividers (named "line" to avoid border-border) --- */
+  --color-line: #ede6d8;
+  --color-line-strong: #d9cfb8;
+  --color-line-subtle: rgba(31, 27, 23, 0.06);
+
+  /* --- text (named "ink" to avoid text-text) --- */
+  --color-ink: #1f1b17;
+  --color-ink-soft: #5c544a;
+  --color-ink-muted: #8e867a;
+
+  /* --- interaction states --- */
+  --color-hover: #f2ede3;
+  --color-selected: #f8edda;
+
+  /* --- brand (apricot sand) --- */
+  --color-brand: #d9a78a;
+  --color-brand-soft: #f8edda;
+  --color-brand-strong: #c68762;
+
+  /* --- semantic states --- */
+  --color-success: #5a8c5a;
+  --color-warning: #bf7a1f;
+  --color-error: #b14545;
+  --color-info: #7a7a8e;
+
+  /* --- type registers (3 families per DESIGN.md "方案 C") --- */
+  --font-serif:
+    "Newsreader", "Source Han Serif SC", "Songti SC", Georgia, serif;
+  --font-sans:
+    "Inter", "PingFang SC", "Source Han Sans SC", -apple-system,
+    BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* --- radii (overrides Tailwind defaults; we only use these three) --- */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+
+  /* --- shadows (additive; Tailwind defaults remain available) --- */
+  --shadow-card: 0 1px 2px rgba(31, 27, 23, 0.04);
+  --shadow-elevated: 0 8px 24px rgba(31, 27, 23, 0.12);
+
+  /* --- overlay (for ⌘K palette / modals) --- */
+  --color-overlay: rgba(31, 27, 23, 0.4);
+}
+
+/* Light-only at V0.1; dark mode tokens reserved for V0.2+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-app);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Spinning helper for status icons (CircleNotch etc.) */
+@keyframes spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 1.4s linear infinite;
+  display: inline-flex;
+  transform-origin: 50% 50%;
+}
