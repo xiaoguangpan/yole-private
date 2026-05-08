@@ -8,6 +8,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 
+import { ApprovalRenderer } from "@/components/conversation/approval-renderers";
 import { cn } from "@/lib/utils";
 import type {
   ConversationToolEvent,
@@ -27,10 +28,12 @@ interface ApprovalFormProps {
  * Inline form rendered inside a `waiting_approval` ToolCallout body.
  * Per DESIGN.md §4.6 (Approval Card).
  *
- * #3 ships the generic structure: risk pill, action sentence, args
- * fallback (mono block), four decision buttons, post-decision lock-in
- * pill. #6 adds tool-specific renderers (file_patch split diff,
- * file_write path+mode, code_run language-highlighted command).
+ * #3 shipped the generic structure (risk pill, action sentence, args
+ * fallback, four decision buttons, post-decision lock-in pill); #6
+ * routes the body through ApprovalRenderer for tool-specific views
+ * (file_patch split diff via PatchView, file_write path+mode +
+ * disclaimer, code_run mono command + language pill,
+ * start_long_term_update memory key + content preview).
  *
  * The "Always allow globally" button is disabled for high-sensitivity
  * tools that should never be globally auto-approved (per PRD §11.3:
@@ -65,22 +68,12 @@ export function ApprovalForm({
       </div>
 
       {/*
-       * Tool-specific renderer slot. #6 will branch here on tool.name:
-       *   file_patch  → SplitDiff (@pierre/diffs)
-       *   file_write  → path + mode pill + muted disclaimer
-       *   code_run    → mono command block with language highlight
-       *   default     → generic args mono block (this branch)
+       * Tool-specific renderer slot — dispatches by tool.name. See
+       * components/conversation/approval-renderers.tsx for the
+       * file_patch / file_write / code_run / start_long_term_update
+       * branches and the generic args fallback.
        */}
-      {tool.args && Object.keys(tool.args).length > 0 && (
-        <pre className="mb-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-[8px] border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
-          {Object.entries(tool.args).map(([k, v]) => (
-            <div key={k}>
-              <span className="text-ink-muted">{k}: </span>
-              <span>{JSON.stringify(v)}</span>
-            </div>
-          ))}
-        </pre>
-      )}
+      <ApprovalRenderer tool={tool} />
 
       {!decided ? (
         <div className="flex flex-wrap gap-2">

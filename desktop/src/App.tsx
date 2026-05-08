@@ -268,6 +268,30 @@ const DEMO_FINAL_ANSWER_ALLOWED =
 const DEMO_FINAL_ANSWER_DENIED =
   "收到 denied 信号。已切换方案 — 把 schema 输出为 markdown 放在回复里，由你手动落盘。";
 
+// New-file content used by the file_patch demo so the split diff has
+// real lines to render. Mirrors the prototype's MOCK_PATCH but as
+// raw text (PatchView line-diffs it itself).
+const DEMO_PATCH_NEW_CONTENT = `-- 001_init.sql · GA Workbench v0.1
+-- Created by GA agent · 2026-05-08
+
+CREATE TABLE projects (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  root_path   TEXT,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE sessions (
+  id                TEXT PRIMARY KEY,
+  project_id        TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  title             TEXT NOT NULL,
+  status            TEXT NOT NULL CHECK (status IN
+    ('idle','running','waiting_approval','error','completed','archived')),
+  last_activity_at  TEXT NOT NULL
+);
+`;
+
 function buildDemoTurns(decisions: Record<string, ApprovalDecision>): Turn[] {
   const decision = decisions["appr_demo1"];
 
@@ -301,8 +325,7 @@ function buildDemoTurns(decisions: Record<string, ApprovalDecision>): Turn[] {
       args: {
         path: "desktop/src/db/migrations/001_init.sql",
         old_content: "",
-        new_content:
-          "CREATE TABLE projects (...);\nCREATE TABLE sessions (...);",
+        new_content: DEMO_PATCH_NEW_CONTENT,
       },
     };
   } else if (decision === "deny") {

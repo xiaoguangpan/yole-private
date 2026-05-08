@@ -331,15 +331,16 @@ Context Window / 价格 / token estimate（V0.1 拿不到 + 信息噪音）
 
 ##### `file_patch` — split diff 视图（V0.1 必做）
 
-- 用 **`@pierre/diffs`** 开源组件 + Shiki 语法高亮
+- **V0.1 实现**：自研 PatchView（`diff` npm 包计算 line-level changes + Tailwind 渲染 split layout），无语法高亮
 - 数据来源：`args.path` / `args.old_content` / `args.new_content`（GA `file_patch(path, old_content, new_content)` 签名）
 - 视觉：
   - Header：path（mono）+ 文件 size delta（`+12 / -3 lines`，13px muted）
   - Split layout（左旧右新）/ 行号显示
-  - 高亮主题 light：使用 Shiki `github-light` theme（跟暖米白底协调）
+  - +/- 行用 success/error 8% tint 背景；空 placeholder 行用 hover-tint 斜纹
   - max-height 480px，超出 scroll
   - 折叠时只显示 header + `View diff`
 - 为什么 V0.1 必做：file_patch 是审批高频工具，没 diff 视图等于"审批黑盒"，违反"不要让用户思考"原则
+- 为什么不用 `@pierre/diffs`：试过，其 Shiki backend 拉所有语言包进 bundle（+400 KB gzip）。V0.1 审批界面不需要工业级语法高亮，line-level +/- 已足够。`@pierre/diffs` 留 V0.2 候选 —— 真需要 hover/highlight + scoped 语言时再切换
 
 ##### `file_write` — 仅 path + mode
 
