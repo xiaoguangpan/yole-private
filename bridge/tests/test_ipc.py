@@ -11,10 +11,12 @@ from bridge.ipc import (
     ApprovalResponseCommand,
     AskUserResponseCommand,
     IPCProtocolError,
+    LLMChangedEvent,
     LoadHistoryCommand,
     ReadyEvent,
     RunCompleteEvent,
     SetApprovalRulesCommand,
+    SetLLMCommand,
     ShutdownCommand,
     ToolCallEndEvent,
     ToolCallPendingEvent,
@@ -45,7 +47,49 @@ def test_ready_round_trip() -> None:
     assert payload["kind"] == "ready"
     assert payload["sessionId"] == "s1"
     assert payload["protocolVersion"] == "0.1"
+    assert payload["availableLLMs"] == []  # default empty
     decoded = decode_event(line)
+    assert decoded == ev
+
+
+def test_ready_round_trip_with_available_llms() -> None:
+    ev = ReadyEvent(
+        sessionId="s1",
+        protocolVersion=PROTOCOL_VERSION,
+        gaCommit="6a3eecc",
+        gaPath="/tmp/ga",
+        llmName="NativeClaudeSession/glm-5.1",
+        cwd="/tmp/ga/temp",
+        pid=42,
+        availableLLMs=[
+            {
+                "index": 0,
+                "name": "NativeClaudeSession/glm-5.1",
+                "displayName": "GLM 5.1",
+                "isCurrent": True,
+            },
+            {
+                "index": 1,
+                "name": "NativeOAISession/gpt-4o",
+                "displayName": "GPT 4o",
+                "isCurrent": False,
+            },
+        ],
+    )
+    decoded = decode_event(encode(ev))
+    assert decoded == ev
+    assert len(decoded.availableLLMs) == 2
+    assert decoded.availableLLMs[0]["isCurrent"] is True
+
+
+def test_llm_changed_round_trip() -> None:
+    ev = LLMChangedEvent(
+        sessionId="s1",
+        index=2,
+        name="NativeOAISession/gpt-4o",
+        displayName="GPT 4o",
+    )
+    decoded = decode_event(encode(ev))
     assert decoded == ev
 
 
@@ -203,6 +247,13 @@ def test_set_approval_rules_round_trip() -> None:
     )
     decoded = decode_command(encode(cmd))
     assert decoded == cmd
+
+
+def test_set_llm_round_trip() -> None:
+    cmd = SetLLMCommand(llmIndex=2)
+    decoded = decode_command(encode(cmd))
+    assert decoded == cmd
+    assert decoded.llmIndex == 2
 
 
 # ---------------- Error paths ----------------

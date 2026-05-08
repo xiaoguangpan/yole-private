@@ -40,10 +40,12 @@ from bridge.ipc import (
     ErrorEvent,
     HistoryLoadedEvent,
     IPCProtocolError,
+    LLMChangedEvent,
     LoadHistoryCommand,
     ReadyEvent,
     RunCompleteEvent,
     SetApprovalRulesCommand,
+    SetLLMCommand,
     ShutdownCommand,
     ToolCallPendingEvent,
     TurnEndEvent,
@@ -111,6 +113,46 @@ def _compact_args(args: dict[str, Any], max_len: int = 200) -> str:
     if len(s) > max_len:
         s = s[: max_len - 3] + "..."
     return s
+
+
+# LLM brand name standardization for the Composer's LLM switcher dropdown.
+# Maps lowercase brand keys to their canonical display form.
+_LLM_BRAND_NAMES: dict[str, str] = {
+    "glm": "GLM",
+    "gpt": "GPT",
+    "oai": "OAI",
+    "claude": "Claude",
+    "gemini": "Gemini",
+    "llama": "Llama",
+    "mistral": "Mistral",
+    "deepseek": "DeepSeek",
+    "qwen": "Qwen",
+    "kimi": "Kimi",
+    "minimax": "MiniMax",
+    "doubao": "Doubao",
+    "yi": "Yi",
+    "phi": "Phi",
+}
+
+
+def _simplify_llm_name(raw: str) -> str:
+    """Prettify GA's 'ClassName/model-name' raw LLM identifier.
+
+    GA's get_llm_name returns f"{type(backend).__name__}/{backend.name}", e.g.
+    "NativeClaudeSession/glm-5.1". We strip the class prefix and capitalize
+    the brand keyword so the Composer LLM switcher reads naturally.
+
+    Examples:
+        NativeClaudeSession/glm-5.1     -> GLM 5.1
+        ClaudeSession/claude-3-5-sonnet -> Claude 3-5-sonnet
+        NativeOAISession/gpt-4o          -> GPT 4o
+        LLMSession/qwen-max              -> Qwen max
+        BADCONFIG_MIXIN                  -> BADCONFIG_MIXIN  (unchanged)
+    """
+    model = raw.split("/", 1)[1] if "/" in raw else raw
+    parts = model.split("-", 1)
+    brand = _LLM_BRAND_NAMES.get(parts[0].lower(), parts[0])
+    return f"{brand} {parts[1]}" if len(parts) > 1 else brand
 
 
 def _resolve_ga_commit(ga_path: str) -> str:
@@ -268,8 +310,26 @@ class Bridge:
                 llmName=self.agent.get_llm_name(),
                 cwd=os.getcwd(),
                 pid=os.getpid(),
+                availableLLMs=self._collect_available_llms(),
             )
         )
+
+    def _collect_available_llms(self) -> list[dict[str, Any]]:
+        """Snapshot the agent's LLM list for the Composer LLM switcher."""
+        out: list[dict[str, Any]] = []
+        try:
+            for index, name, is_current in self.agent.list_llms():
+                out.append(
+                    {
+                        "index": index,
+                        "name": name,
+                        "displayName": _simplify_llm_name(name),
+                        "isCurrent": bool(is_current),
+                    }
+                )
+        except Exception as e:
+            self._emit_error(f"list_llms failed: {e}", traceback.format_exc())
+        return out
 
     def _emit(self, ev: Any) -> None:
         self.event_queue.put(encode(ev))
@@ -443,8 +503,52 @@ class Bridge:
             self.state.always_allow_global.update(cmd.alwaysAllowGlobal)
             self.state.always_allow_project.clear()
             self.state.always_allow_project.update(cmd.alwaysAllowProject)
+        elif isinstance(cmd, SetLLMCommand):
+            self._handle_set_llm(cmd)
         elif isinstance(cmd, ShutdownCommand):
             self.shutdown_event.set()
+
+    def _handle_set_llm(self, cmd: SetLLMCommand) -> None:
+        """Switch the agent's active LLM. Should only be called when the
+        agent is idle; the desktop UI is responsible for enforcing that
+        constraint, but we double-check here.
+
+        GA's next_llm() copies backend.history from the old client to the
+        new one, so conversation context is preserved across the switch.
+        """
+        if self.run_in_progress.is_set():
+            self._emit_error(
+                "Cannot switch LLM while a run is in progress", "set_llm"
+            )
+            return
+        try:
+            count = len(self.agent.llmclients)
+        except Exception as e:
+            self._emit_error(
+                f"Cannot read LLM list: {e}", traceback.format_exc()
+            )
+            return
+        if not 0 <= cmd.llmIndex < count:
+            self._emit_error(
+                f"llmIndex {cmd.llmIndex} out of range [0, {count})", "set_llm"
+            )
+            return
+        try:
+            self.agent.next_llm(cmd.llmIndex)
+        except Exception as e:
+            self._emit_error(
+                f"next_llm({cmd.llmIndex}) failed: {e}", traceback.format_exc()
+            )
+            return
+        raw_name = self.agent.get_llm_name()
+        self._emit(
+            LLMChangedEvent(
+                sessionId=self.session_id,
+                index=cmd.llmIndex,
+                name=raw_name,
+                displayName=_simplify_llm_name(raw_name),
+            )
+        )
 
     def _load_history(self, messages: list[dict[str, Any]]) -> None:
         """Inject conversation history into the backend.

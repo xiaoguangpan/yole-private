@@ -149,6 +149,33 @@ def test_bridge_starts_and_emits_ready(bridge_proc: _BridgeProc) -> None:
     assert ev["protocolVersion"] == "0.1"
     assert ev["pid"] > 0
     assert ev["gaCommit"], "gaCommit missing"
+    assert isinstance(ev.get("availableLLMs"), list)
+    assert ev["availableLLMs"], "availableLLMs should not be empty"
+    current = [llm for llm in ev["availableLLMs"] if llm.get("isCurrent")]
+    assert len(current) == 1, "exactly one LLM must be marked isCurrent"
+    for llm in ev["availableLLMs"]:
+        assert "index" in llm and "name" in llm and "displayName" in llm
+
+
+def test_set_llm_switches_active_model(bridge_proc: _BridgeProc) -> None:
+    """If the user's mykey.py exposes 2+ LLMs, switching should work and
+    emit llm_changed. With only 1 LLM configured, this test skips."""
+    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
+    assert ready["kind"] == "ready"
+    llms = ready["availableLLMs"]
+    if len(llms) < 2:
+        pytest.skip(f"need >=2 LLMs to test switching; user has {len(llms)}")
+
+    current_idx = next(llm["index"] for llm in llms if llm["isCurrent"])
+    target_idx = next(llm["index"] for llm in llms if llm["index"] != current_idx)
+
+    bridge_proc.send({"kind": "set_llm", "llmIndex": target_idx})
+
+    ev = bridge_proc.next_event(timeout=10)
+    assert ev["kind"] == "llm_changed", ev
+    assert ev["index"] == target_idx
+    assert ev["name"]
+    assert ev["displayName"]
 
 
 def test_bridge_full_message_round_trip(bridge_proc: _BridgeProc) -> None:

@@ -32,6 +32,7 @@ class ReadyEvent:
     llmName: str
     cwd: str
     pid: int
+    availableLLMs: list[dict[str, Any]] = field(default_factory=list)
     timestamp: str = field(default_factory=_now_iso)
     kind: str = "ready"
 
@@ -140,6 +141,16 @@ class HistoryLoadedEvent:
     kind: str = "history_loaded"
 
 
+@dataclass
+class LLMChangedEvent:
+    sessionId: str
+    index: int
+    name: str
+    displayName: str
+    timestamp: str = field(default_factory=_now_iso)
+    kind: str = "llm_changed"
+
+
 Event = (
     ReadyEvent
     | TurnStartEvent
@@ -152,6 +163,7 @@ Event = (
     | RunCompleteEvent
     | ErrorEvent
     | HistoryLoadedEvent
+    | LLMChangedEvent
 )
 
 
@@ -197,6 +209,12 @@ class SetApprovalRulesCommand:
 
 
 @dataclass
+class SetLLMCommand:
+    llmIndex: int
+    kind: str = "set_llm"
+
+
+@dataclass
 class ShutdownCommand:
     kind: str = "shutdown"
 
@@ -208,6 +226,7 @@ Command = (
     | AbortCommand
     | LoadHistoryCommand
     | SetApprovalRulesCommand
+    | SetLLMCommand
     | ShutdownCommand
 )
 
@@ -227,6 +246,7 @@ EVENT_KINDS: dict[str, type] = {
     "run_complete": RunCompleteEvent,
     "error": ErrorEvent,
     "history_loaded": HistoryLoadedEvent,
+    "llm_changed": LLMChangedEvent,
 }
 
 COMMAND_KINDS: dict[str, type] = {
@@ -236,6 +256,7 @@ COMMAND_KINDS: dict[str, type] = {
     "abort": AbortCommand,
     "load_history": LoadHistoryCommand,
     "set_approval_rules": SetApprovalRulesCommand,
+    "set_llm": SetLLMCommand,
     "shutdown": ShutdownCommand,
 }
 
