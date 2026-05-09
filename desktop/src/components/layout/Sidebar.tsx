@@ -4,6 +4,7 @@ import {
   MagnifyingGlass,
   PauseCircle,
   Plus,
+  SidebarSimple,
   Trash,
   WarningCircle,
 } from "@phosphor-icons/react";
@@ -27,6 +28,15 @@ export interface SidebarProps {
   onSelectSession?: (id: string) => void;
   onNewChat?: () => void;
   onSearch?: () => void;
+  /**
+   * Collapse the sidebar. Lives on the Sidebar itself (in the header
+   * row, right of the logo) rather than in the TopBar — co-locating the
+   * affordance with its target avoids visual collision with the macOS
+   * traffic light cluster. Wiring (collapse state + ⌘\ shortcut +
+   * width persistence) lands together with the resizable panel work,
+   * since both share the same sidebar visibility surface.
+   */
+  onToggle?: () => void;
 }
 
 /**
@@ -50,13 +60,14 @@ export function Sidebar({
   onSelectSession,
   onNewChat,
   onSearch,
+  onToggle,
 }: SidebarProps) {
   const isEmpty = sessions.length === 0;
   const buckets = groupSessions(sessions);
 
   return (
     <div className="flex h-full flex-col bg-app text-[13px] text-ink">
-      <SidebarHeader runtimeStatus={runtimeStatus} />
+      <SidebarHeader runtimeStatus={runtimeStatus} onToggle={onToggle} />
       <SidebarQuickActions onNewChat={onNewChat} onSearch={onSearch} />
 
       {isEmpty ? (
@@ -90,14 +101,31 @@ export function Sidebar({
 
 // ---------- subcomponents ----------
 
-function SidebarHeader({ runtimeStatus }: { runtimeStatus: RuntimeStatus }) {
+function SidebarHeader({
+  runtimeStatus,
+  onToggle,
+}: {
+  runtimeStatus: RuntimeStatus;
+  onToggle?: () => void;
+}) {
   // No top padding for traffic light here: the full-width TopBar above
   // the shell already covers it. The sidebar starts at y=44px (below
   // the TopBar's bottom border).
   return (
     <div className="border-b border-line px-4 py-3.5">
-      <div className="font-serif text-[16px] font-medium tracking-[0.01em] text-ink">
-        GA Workbench
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-serif text-[16px] font-medium tracking-[0.01em] text-ink">
+          GA Workbench
+        </div>
+        <button
+          type="button"
+          title="Toggle sidebar · ⌘\\"
+          aria-label="Toggle sidebar"
+          onClick={onToggle}
+          className="flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
+        >
+          <SidebarSimple size={16} weight="thin" />
+        </button>
       </div>
       <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-ink-soft">
         <RuntimeDot status={runtimeStatus} />

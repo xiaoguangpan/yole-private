@@ -164,36 +164,41 @@ GA Workbench 的视觉与交互气质 = **Notion + Claude**。
 #### 结构（自上而下）
 
 ```
-┌────────────────────────┐
-│ [GA Workbench logo]    │  16px Newsreader medium
-│ Runtime: ● healthy     │  13px Inter, 点击弹 Health Check Card popover
-├────────────────────────┤
-│ + New Chat       ⌘N    │  Quick action
-│ Search           ⌘K    │  打开 Command Palette
-├────────────────────────┤
-│ PINNED                 │  仅有 pin session 时显示
-│   ◐ Session A          │
-├────────────────────────┤
-│ TODAY                  │
-│   ◐ Session 1          │
-│   ◐ Session 2          │
-│ THIS WEEK              │
-│ EARLIER                │
-├────────────────────────┤
-│ PROJECTS               │  折叠列表
-│   📁 Project X         │  默认 emoji（无 cwd → Folder / 有 cwd → FolderOpen）
-│     ◐ Session in proj  │  双重显示：project 内 session 也在时间流出现
-├────────────────────────┤
-│ Trash         (隐蔽)    │  底部
-└────────────────────────┘
+┌──────────────────────────────────┐
+│ [GA Workbench logo]              │  16px Newsreader medium
+│ Runtime: ● healthy               │  13px Inter, 点击弹 Health Check Card popover
+├──────────────────────────────────┤
+│ + New Chat                 ⌘N    │  Quick action
+│ Search                     ⌘K    │  打开 Command Palette
+├──────────────────────────────────┤
+│ PINNED                           │  仅有 pin session 时显示
+│   ◐ Session A                    │
+├──────────────────────────────────┤
+│ TODAY                            │
+│   ◐ Session 1            📂      │  session 属于某 project 时行尾带 emoji tag
+│   ◐ Session 2                    │
+│ THIS WEEK                        │
+│ EARLIER                          │
+├──────────────────────────────────┤
+│ PROJECTS                  [+]    │  section header `+` = New project
+│   📁 GA Workbench   12 · 2h ago  │  collapsed default
+│   📂 Marketing Site  5 · now ●   │  active project 自动展开 + 圆点指示当前 session
+│     ◐ landing redesign    Turn 3 │
+│     ⏸ pricing copy        Turn 1 │
+│     ✓ SEO meta audit             │
+│     View all 5 sessions →        │  > 5 时出现，跳到 Project view
+│   📁 写作笔记         3 · 3d ago │
+├──────────────────────────────────┤
+│ Trash                  (隐蔽)    │  底部
+└──────────────────────────────────┘
 ```
 
 #### 关键决策
 
 - **去掉 ACTIVE / WAITING FOR YOU 区块**：状态由 row icon 颜色对比 + Approval Dock 兜底
 - **去掉 "UNFILED" 命名**：通用 Agent 工作台 80%+ 对话本就 free-floating，时间分组就是主体
-- **PINNED section** 仅在有 pin 时显示，空时不占位
-- **PROJECTS** 是 V0.1 可选归类容器（PRD §7.3）；session 双重显示（project 内 + 时间流）
+- **PINNED section** 仅在有 pin session 时显示，空时不占位
+- **PROJECTS** 是 V0.1 纯归类容器（PRD §7.3）；session 双重显示（project 内 + 时间流），timeline 内的归属 session 行尾带 project emoji tag
 - **Trash** 整行清空需输入 `delete` 三字符确认；单条永久删用 modal 但不要求字符
 - ⌘\\ 折叠 sidebar / ⌘K 全局 Command Palette / 右键 + hover `...` 双入口
 
@@ -206,6 +211,100 @@ GA Workbench 的视觉与交互气质 = **Notion + Claude**。
 - **Title**（13px Inter medium，1 行 truncate）
 - **下一行**：`Turn N · {summary}`（11px Inter muted，1 行 truncate）
 - **角标**：pending approval count（深琥珀点 + 数字）/ error count（深红点）
+- **Project tag**（仅在 timeline section 内）：行尾 12px project emoji（无 cwd → 📁，有 cwd → 📂），hover tooltip 显示 project name；project section 内的 session row 不带此 tag
+
+#### Project Section Spec
+
+PROJECTS 是 sidebar 的次要 section（保持在 timeline 之下），但 coding agent 用户的真实使用频率把它推到比 v0.2 初稿设想更核心。本节细化 row、展开行为、入口、操作菜单。
+
+**A. Project Row 折叠行为**
+
+- 每个 project 默认 collapsed，只显示一行：emoji + name + session count + last activity time
+  - count = 该 project 下非 archived session 数量；为 0 时省略数字
+  - last activity = `max(sessions.lastActivityAt)`，friendly format（`now` / `2h ago` / `3d ago` / `2026-05-01`）
+- **当前 active session 所属的 project 自动展开**（同 OS file tree 行为：你在哪我打开哪）
+- 用户手动点击其他 project header 可临时展开/收起，**不持久化**——切换 active 后状态自动复位（active 永远展开，其他永远默认收起）
+- 收起态视觉：emoji 16px + name 13px Inter medium + count·time 11px Inter muted（行尾右对齐）
+- 展开态视觉：collapsed row 不变 + 下方 indent 16px 渲染 session list，无连接线（保持留白克制）
+
+**B. 展开后显示规则**
+
+- 展开后最多渲染 **5 条 session**（按 lastActivityAt desc 排序）
+- 超过 5 条时底部出现 `View all N sessions →`（11px Inter muted，杏沙 hover）
+  - 点击进入 **Project View**：sidebar 不变，主区切换为该 project 的完整 sessions list + project meta header（项目名 / cwd / created / 总 session 数）
+  - Project View 是 V0.1 唯一的"sidebar 不变、主区切到次级页面"模式；ESC 或 sidebar 任意 session row 点击退出
+- 不超过 5 条时不显示 `View all`
+
+**C. Project Row Hover Affordance**
+
+- Hover Project row 时行尾出现两个 16px Phosphor thin icon：
+  - **`Plus`**：在该 project 下新建 session（spawn bridge with `cwd = project.rootPath`，新 session 自动 `projectId` 归属）
+  - **`DotsThree`**：弹出菜单
+    - Rename project
+    - Change cwd…（`@tauri-apps/plugin-dialog` folder picker）
+    - Pin to top / Unpin
+    - Delete project（confirm modal："Delete project? Its N sessions will be moved back to timeline."）
+- 非 hover 态隐藏，避免视觉噪声
+- collapsed 与 expanded 两态行为一致
+
+**D. Session 双重显示与 Project Tag**
+
+- 同一 session 同时出现在 timeline section（按 created 时间分组）+ project section（如归属）
+- **Timeline 内**：session row 行尾添加 project tag（12px emoji），hover tooltip 显示 project name；点击 tag 不跳转（避免误触），点击 row 主体进入 session
+- **Project 内**：session row 不带 tag（上下文已知，避免冗余）
+- **Active session 高亮策略（默认 X）**：active session 在 timeline 与 project section **两处都 highlighted**（杏沙背景 4% + 左侧 2px brand 竖条）
+  - Rationale：Claude 网页版即此模式；用户从任一 view 都能立刻定位"我在哪"
+  - 反对意见已知：sidebar 两处同时亮起视觉噪声偏大
+  - **此为内测前默认假设**，等真实使用收集到"两处同亮"的具体抱怨再切换至 Y（仅 project 高亮）或 Z（仅 timeline 高亮）
+
+**E. 移动 Session 到 Project**
+
+- V0.1 仅支持右键菜单：session row right-click → `Move to project ▸` submenu → 列出全部 project + `(no project)` 选项
+- 已属某 project 的 session 在 submenu 中该 project 名前打勾
+- **不做拖拽**（V0.2 候选，sidebar drag/drop 工程坑较深）
+- 移动后：UI 立即重渲染（timeline 内 session tag 更新 + 原/新 project 内 session list 更新）；DB 异步双写
+
+**F. Project 排序**
+
+- 默认排序：`pinned desc, lastActivityAt desc`（pin 永远置顶，pin 内部和非 pin 内部都按最近活动倒序）
+- 不做用户手动拖拽排序（V0.1）
+- pin 切换通过 `[...]` 菜单
+- pin/unpin 后立即重排，不做动画过渡（避免视觉跳动）
+
+**G. New Project 流程**
+
+- PROJECTS section header 行尾 `Plus` icon（16px Phosphor thin），hover 显示 "New project"
+- 点击弹 Radix Dialog（同 Settings modal frame，~480x320）：
+  - **Name**（required，autofocus）
+  - **Working directory**（optional，folder picker via `@tauri-apps/plugin-dialog`，留空 = 无 cwd）
+  - **Emoji**（默认 `📁`，有 cwd 时默认 `📂`；用户可改任意 emoji）
+- Submit 后：`INSERT INTO projects`，sidebar 立即出现该 project（自动展开，session count = 0），dialog 关闭
+- Empty project 显示："No sessions yet · [+ New session here]"（杏沙 ghost button）
+
+**Project View（次级页面）spec**
+
+进入路径：Project row 展开后底部 `View all` 链接，或 collapsed row 双击。
+
+```
+┌── 主区 ───────────────────────────────────────┐
+│  📂 Marketing Site                            │
+│  ~/code/marketing  ·  Created 2026-04-12      │
+│  12 sessions                                  │
+│                                                │
+│  [+ New session in this project]              │
+│  ─────────────────────────────────────────    │
+│  ◐ landing redesign         Turn 3 · 写文案    │
+│  ⏸ pricing copy             Turn 1 · 等审批    │
+│  ✓ SEO meta audit           completed         │
+│  ...                                          │
+└────────────────────────────────────────────────┘
+```
+
+- Sidebar **不变**（PROJECTS section 该 project 仍展开 + active 高亮在 project 名上）
+- 主区 header：emoji + name（点击 inline rename）+ cwd 路径（点击 change）+ meta 行
+- Session list 全量、按 lastActivityAt desc，row 跟 sidebar session row 同样视觉但稍宽
+- ESC / 点击 sidebar 任意 session / `+ New Chat` 退出 Project View 回到 conversation 模式
+- Project View 不是模态，导航栈深度 = 1（不嵌套）
 
 ### 4.3 Conversation 主区
 

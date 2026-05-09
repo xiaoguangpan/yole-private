@@ -7,13 +7,20 @@
 -- the IPC wire format (every IPC event ships an ISO 8601 timestamp).
 
 CREATE TABLE projects (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  root_path   TEXT,
-  icon        TEXT,
-  color       TEXT,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
+  id                TEXT PRIMARY KEY,
+  name              TEXT NOT NULL,
+  root_path         TEXT,
+  icon              TEXT,
+  color             TEXT,
+  -- PRD §8.2: pin to top in sidebar PROJECTS section.
+  pinned            INTEGER NOT NULL DEFAULT 0,
+  -- PRD §8.2: max(sessions.last_activity_at) for sessions in this
+  -- project; falls back to created_at when project has no session.
+  -- Drives default sort (pinned desc, last_activity_at desc) in
+  -- DESIGN.md §4.2 Project Section Spec / "F. Project 排序".
+  last_activity_at  TEXT NOT NULL,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL
 );
 
 CREATE TABLE sessions (

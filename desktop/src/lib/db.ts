@@ -111,8 +111,10 @@ export async function deleteSession(id: string): Promise<void> {
 
 export async function loadProjects(): Promise<Project[]> {
   const db = await getDB();
+  // Sort order matches DESIGN.md §4.2 "F. Project 排序":
+  //   pinned desc, last_activity_at desc.
   const rows = await db.select<ProjectRow[]>(
-    "SELECT * FROM projects ORDER BY name",
+    "SELECT * FROM projects ORDER BY pinned DESC, last_activity_at DESC",
   );
   return rows.map(projectFromRow);
 }
@@ -121,20 +123,25 @@ export async function persistProject(p: Project): Promise<void> {
   const db = await getDB();
   await db.execute(
     `INSERT INTO projects (
-       id, name, root_path, icon, color, created_at, updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       id, name, root_path, icon, color, pinned, last_activity_at,
+       created_at, updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT(id) DO UPDATE SET
-       name       = excluded.name,
-       root_path  = excluded.root_path,
-       icon       = excluded.icon,
-       color      = excluded.color,
-       updated_at = excluded.updated_at`,
+       name             = excluded.name,
+       root_path        = excluded.root_path,
+       icon             = excluded.icon,
+       color            = excluded.color,
+       pinned           = excluded.pinned,
+       last_activity_at = excluded.last_activity_at,
+       updated_at       = excluded.updated_at`,
     [
       p.id,
       p.name,
       p.rootPath ?? null,
       p.icon ?? null,
       p.color ?? null,
+      p.pinned ? 1 : 0,
+      p.lastActivityAt,
       p.createdAt,
       p.updatedAt,
     ],
@@ -170,6 +177,8 @@ function projectFromRow(r: ProjectRow): Project {
     rootPath: r.root_path ?? undefined,
     icon: r.icon ?? undefined,
     color: r.color ?? undefined,
+    pinned: r.pinned === 1,
+    lastActivityAt: r.last_activity_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

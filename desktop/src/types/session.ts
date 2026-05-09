@@ -60,9 +60,15 @@ export interface Project {
   /** Bound cwd; sessions launched in this project use it as their
    * subprocess working dir. PRD §7.3 "B. cwd". */
   rootPath?: string;
-  /** Optional emoji or icon identifier. */
+  /** Default emoji: 📁 when no cwd, 📂 when cwd is set. */
   icon?: string;
   color?: string;
+  /** Pin to top in sidebar PROJECTS section. PRD §8.2. */
+  pinned: boolean;
+  /** max(sessions.lastActivityAt where projectId = this.id),
+   * fallback to createdAt when project has no session.
+   * Drives default sort (pinned desc, lastActivityAt desc). */
+  lastActivityAt: string;
   createdAt: string;
   updatedAt: string;
 }

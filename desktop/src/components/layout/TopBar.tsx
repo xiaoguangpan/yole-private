@@ -1,8 +1,4 @@
-import {
-  DotsThreeOutline,
-  MagnifyingGlass,
-  SidebarSimple,
-} from "@phosphor-icons/react";
+import { DotsThreeOutline, MagnifyingGlass } from "@phosphor-icons/react";
 
 import { cn } from "@/lib/utils";
 
@@ -13,7 +9,6 @@ export interface TopBarProps {
    * italic muted "新对话" placeholder so the bar always has a title slot.
    */
   sessionTitle?: string;
-  onToggleSidebar?: () => void;
   onOpenCommandPalette?: () => void;
   /**
    * Padding on the left to clear the macOS traffic light (which is
@@ -26,35 +21,48 @@ export interface TopBarProps {
 /**
  * Top bar — full-window-width, 44px tall. Per DESIGN.md §4.1.
  *
- *   [ traffic light reserved | toggle | title (inline edit later) | ⌘K | ... ]
+ *   [ traffic light reserved | title (inline edit later) | ⌘K | ... ]
+ *
+ * Sidebar toggle lives inside Sidebar.tsx header (next to the logo) —
+ * placing it here would visually collide with the macOS traffic light
+ * cluster (16-68px) and feel cramped. Standard macOS apps (Notion,
+ * Linear, Arc, Cursor) all keep the sidebar toggle on the sidebar
+ * itself, which is the affordance it acts on.
+ *
+ * Window dragging: the root div opts in via `data-tauri-drag-region`,
+ * which makes the whole bar (including the title slot) a drag handle.
+ * Tauri auto-excludes interactive elements (buttons), so the IconButton
+ * children remain clickable without extra escape hatches.
  *
  * V0.1 #2: title is read-only display; inline edit lands in #3 when
- * conversation state has a place to live.
+ * conversation state has a place to live. When inline edit lands, the
+ * editing <input> must opt out of the drag region (otherwise mousedown
+ * gets captured by the OS for window drag instead of focusing the
+ * input).
  */
 export function TopBar({
   sessionTitle,
-  onToggleSidebar,
   onOpenCommandPalette,
   trafficLightPadding = 70,
 }: TopBarProps) {
   return (
     <div
+      data-tauri-drag-region
       className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-app pr-3 text-[13px]"
       style={{ paddingLeft: trafficLightPadding }}
     >
-      <IconButton
-        title="Toggle sidebar · ⌘\\"
-        onClick={onToggleSidebar}
-        ariaLabel="Toggle sidebar"
-      >
-        <SidebarSimple size={16} weight="thin" />
-      </IconButton>
-
-      <div className="min-w-0 flex-1 truncate">
+      <div data-tauri-drag-region className="min-w-0 flex-1 truncate">
         {sessionTitle ? (
-          <span className="font-medium text-ink">{sessionTitle}</span>
+          <span data-tauri-drag-region className="font-medium text-ink">
+            {sessionTitle}
+          </span>
         ) : (
-          <span className="font-serif italic text-ink-muted">新对话</span>
+          <span
+            data-tauri-drag-region
+            className="font-serif italic text-ink-muted"
+          >
+            新对话
+          </span>
         )}
       </div>
 

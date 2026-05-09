@@ -33,6 +33,8 @@ export interface ProjectRow {
   root_path: string | null;
   icon: string | null;
   color: string | null;
+  pinned: 0 | 1;
+  last_activity_at: string;
   created_at: string;
   updated_at: string;
 }
