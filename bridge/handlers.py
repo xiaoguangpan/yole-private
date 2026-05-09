@@ -66,6 +66,7 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
         approval_tools: frozenset[str] = DEFAULT_APPROVAL_TOOLS,
         always_allow_global: set[str] | None = None,
         always_allow_project: set[str] | None = None,
+        yolo_check: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(parent, last_history, cwd)
         self._request_approval = request_approval
@@ -81,6 +82,13 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
         self._always_allow_project: set[str] = (
             always_allow_project if always_allow_project is not None else set()
         )
+        # YOLO mode (PRD §11.5): when this callable returns True, every
+        # tool dispatch bypasses the approval gate. Stored as a callable
+        # rather than a bool so the bridge can flip it at runtime via
+        # SetYoloModeCommand without rebuilding the handler — matches the
+        # mutable-set pattern used for always_allow_* above. Default to
+        # "always False" when not provided (test paths, legacy callers).
+        self._yolo_check: Callable[[], bool] = yolo_check or (lambda: False)
 
     def update_approval_rules(
         self,
@@ -100,7 +108,18 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
             self._always_allow_project.update(always_allow_project)
 
     def needs_approval(self, tool_name: str) -> bool:
-        """Return True iff this tool requires user approval right now."""
+        """Return True iff this tool requires user approval right now.
+
+        Order matters:
+
+        1. YOLO mode short-circuits everything — the user has explicitly
+           opted out of approvals globally (PRD §11.5).
+        2. Tool not in the approval list → never gated.
+        3. Always-allow rules (global / project) → not gated.
+        4. Otherwise gate.
+        """
+        if self._yolo_check():
+            return False
         if tool_name not in self._approval_tools:
             return False
         if tool_name in self._always_allow_global:

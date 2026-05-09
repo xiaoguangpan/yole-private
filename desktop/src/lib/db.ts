@@ -183,3 +183,59 @@ function projectFromRow(r: ProjectRow): Project {
     updatedAt: r.updated_at,
   };
 }
+
+// ---------------- prefs ----------------
+//
+// Generic key/value preference store backed by the `prefs` table
+// (PRD §8 / 001_init.sql). Values are stored as JSON strings so any
+// JSON-serialisable type round-trips cleanly. Keys live in the
+// caller's namespace — there's no schema for what's allowed.
+
+interface PrefRow {
+  key: string;
+  value: string;
+  updated_at: string;
+}
+
+/**
+ * Load a typed pref by key. Returns `undefined` when missing or when
+ * SQLite isn't available (callers fall back to their default state).
+ *
+ * Note: `T` is a type assertion — JSON has no type system, so a
+ * caller asking for `boolean` on a key that was written as a string
+ * gets an unsafe cast. Keep keys consistent with their types.
+ */
+export async function getPref<T>(key: string): Promise<T | undefined> {
+  const db = await getDB();
+  const rows = await db.select<PrefRow[]>(
+    "SELECT * FROM prefs WHERE key = $1",
+    [key],
+  );
+  if (rows.length === 0) return undefined;
+  try {
+    return JSON.parse(rows[0].value) as T;
+  } catch {
+    // Corrupted JSON — treat as missing. Logging upstream is the
+    // store's job; we surface `undefined` to keep this primitive thin.
+    return undefined;
+  }
+}
+
+/**
+ * Persist a pref by key. UPSERT on conflict so subsequent writes
+ * replace earlier values. `updated_at` is stamped with the current
+ * ISO timestamp; column is required by the schema and useful for
+ * future sync / debugging.
+ */
+export async function setPref<T>(key: string, value: T): Promise<void> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  await db.execute(
+    `INSERT INTO prefs (key, value, updated_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT(key) DO UPDATE SET
+       value      = excluded.value,
+       updated_at = excluded.updated_at`,
+    [key, JSON.stringify(value), now],
+  );
+}

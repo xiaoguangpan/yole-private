@@ -237,3 +237,77 @@ def test_update_approval_rules_mutates_in_place(fake_parent: MagicMock) -> None:
     h.update_approval_rules(always_allow_global={"file_write"})
     # Same set object, content replaced.
     assert shared_global == {"file_write"}
+
+
+# ---------------- YOLO mode (PRD §11.5) ----------------
+
+
+def test_yolo_mode_skips_request_for_approval_tools(fake_parent: MagicMock) -> None:
+    """When the yolo_check returns True, gated tools run without
+    consulting the approval requester. This is the core promise of
+    YOLO mode (PRD §11.5)."""
+    approval = MagicMock()
+    h = _make_handler(fake_parent, approval, yolo_check=lambda: True)
+    yielded, ret = _drain(h.dispatch("code_run", {"type": "python"}, response=MagicMock()))
+    approval.assert_not_called()
+    assert ret.data["status"] == "success"
+    assert any("code_run ran" in y for y in yielded)
+
+
+def test_yolo_mode_does_not_affect_non_approval_tools(fake_parent: MagicMock) -> None:
+    """Non-gated tools were already passing through; YOLO is a no-op
+    for them. Mostly a sanity guard against regressions."""
+    approval = MagicMock()
+    h = _make_handler(fake_parent, approval, yolo_check=lambda: True)
+    _drain(h.dispatch("test_tool", {"a": 1}, response=MagicMock()))
+    approval.assert_not_called()
+
+
+def test_yolo_check_evaluated_per_dispatch(fake_parent: MagicMock) -> None:
+    """The yolo flag must be read on each dispatch (closure semantics),
+    not snapshot at handler construction. The bridge flips
+    SessionState.yolo_mode at runtime via SetYoloModeCommand and
+    expects the next tool call to honour the new value."""
+    flag = {"on": False}
+    approval = MagicMock(return_value="allow_once")
+    h = _make_handler(fake_parent, approval, yolo_check=lambda: flag["on"])
+
+    # First dispatch: yolo off → approval consulted.
+    _drain(h.dispatch("code_run", {"type": "python"}, response=MagicMock()))
+    assert approval.call_count == 1
+
+    # Flip flag mid-session.
+    flag["on"] = True
+    _drain(h.dispatch("code_run", {"type": "python"}, response=MagicMock()))
+    # Approval not called again.
+    assert approval.call_count == 1
+
+    # Flip back off.
+    flag["on"] = False
+    _drain(h.dispatch("code_run", {"type": "python"}, response=MagicMock()))
+    assert approval.call_count == 2
+
+
+def test_yolo_mode_overrides_always_allow_lists(fake_parent: MagicMock) -> None:
+    """YOLO is upper priority — it short-circuits before the
+    always_allow checks. Behaviorally indistinguishable from the
+    always_allow path, but verifies needs_approval order."""
+    h = _make_handler(
+        fake_parent,
+        MagicMock(),
+        always_allow_global={"file_write"},
+        yolo_check=lambda: True,
+    )
+    # code_run is in DEFAULT_APPROVAL_TOOLS but not in always_allow_*.
+    # Without YOLO this would hit the approval requester. With YOLO it
+    # bypasses everything.
+    assert not h.needs_approval("code_run")
+    assert not h.needs_approval("file_write")  # always_allow path also bypassed
+    assert not h.needs_approval("file_read")  # not gated to begin with
+
+
+def test_yolo_off_by_default(fake_parent: MagicMock) -> None:
+    """Handlers built without an explicit yolo_check default to "off"
+    (callers using older constructor signatures keep working)."""
+    h = _make_handler(fake_parent, MagicMock())
+    assert h.needs_approval("code_run")  # gated as before

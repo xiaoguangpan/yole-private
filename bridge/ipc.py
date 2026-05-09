@@ -216,6 +216,21 @@ class SetApprovalRulesCommand:
 
 
 @dataclass
+class SetYoloModeCommand:
+    """Toggle YOLO mode (PRD §11.5).
+
+    When enabled, every dispatched tool call bypasses the approval
+    gate — no `tool_call_pending` is emitted; the tool runs as if
+    every approval were `allow_once`. The desktop is expected to
+    keep the user informed via the persistent TopBar indicator
+    (DESIGN.md §4.1).
+    """
+
+    enabled: bool
+    kind: str = "set_yolo_mode"
+
+
+@dataclass
 class SetLLMCommand:
     llmIndex: int
     kind: str = "set_llm"
@@ -233,6 +248,7 @@ Command = (
     | AbortCommand
     | LoadHistoryCommand
     | SetApprovalRulesCommand
+    | SetYoloModeCommand
     | SetLLMCommand
     | ShutdownCommand
 )
@@ -263,6 +279,7 @@ COMMAND_KINDS: dict[str, type] = {
     "abort": AbortCommand,
     "load_history": LoadHistoryCommand,
     "set_approval_rules": SetApprovalRulesCommand,
+    "set_yolo_mode": SetYoloModeCommand,
     "set_llm": SetLLMCommand,
     "shutdown": ShutdownCommand,
 }

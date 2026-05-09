@@ -25,11 +25,14 @@ export interface SettingsProps {
 
   runtimeInfo: RuntimeInfo;
   approval: ApprovalConfig;
+  /** PRD §11.5 / DESIGN.md §9 Approval. */
+  yoloMode: boolean;
 
   defaultTab?: SettingsTab;
 
   onChangeRequiredTools?: (tools: string[]) => void;
   onRemoveAlwaysAllow?: (scope: "project" | "global", tool: string) => void;
+  onChangeYoloMode: (enabled: boolean) => void;
   onChangeGAPath?: () => void;
   onChangeBridgePython?: () => void;
   onReRunHealthCheck?: () => void;
@@ -60,9 +63,11 @@ export function Settings({
   onOpenChange,
   runtimeInfo,
   approval,
+  yoloMode,
   defaultTab = "runtime",
   onChangeRequiredTools,
   onRemoveAlwaysAllow,
+  onChangeYoloMode,
   onChangeGAPath,
   onChangeBridgePython,
   onReRunHealthCheck,
@@ -105,6 +110,8 @@ export function Settings({
               {tab === "approval" && (
                 <SettingsApproval
                   config={approval}
+                  yoloMode={yoloMode}
+                  onChangeYoloMode={onChangeYoloMode}
                   onChangeRequiredTools={onChangeRequiredTools}
                   onRemoveAlwaysAllow={onRemoveAlwaysAllow}
                 />

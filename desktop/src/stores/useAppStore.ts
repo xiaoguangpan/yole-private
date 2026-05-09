@@ -6,7 +6,12 @@ import {
   type BridgeSpawnArgs,
   spawnBridge as spawnBridgeProcess,
 } from "@/lib/bridge";
-import { loadSessions, persistSession } from "@/lib/db";
+import {
+  getPref,
+  loadSessions,
+  persistSession,
+  setPref,
+} from "@/lib/db";
 import { dispatchIPCEvent } from "@/lib/ipc-handlers";
 import {
   DEMO_APPROVAL_CONFIG,
@@ -77,6 +82,13 @@ interface State {
   approvalDecisions: Record<string, ApprovalDecision>;
   approvalConfig: ApprovalConfig;
   approvalRecords: ApprovalRecord[];
+  /**
+   * YOLO mode (PRD §11.5). When true, every tool dispatch on the
+   * bridge bypasses the approval gate. Persisted to prefs (sticky
+   * across launches). The TopBar must show a persistent indicator
+   * while this is on (DESIGN.md §4.1).
+   */
+  yoloMode: boolean;
 
   // ---- Errors ----
   toasts: AppError[];
@@ -107,6 +119,14 @@ interface Actions {
   ) => void;
   setApprovalRequiredTools: (tools: string[]) => void;
   removeAlwaysAllow: (scope: "project" | "global", tool: string) => void;
+
+  /**
+   * Set the YOLO mode flag. Persists to prefs and notifies the bridge
+   * over IPC if one is alive. The Settings UI is responsible for
+   * showing the activation confirm modal (DESIGN.md §9 Approval tab)
+   * before calling this with `true`; the store does not gate it.
+   */
+  setYoloMode: (enabled: boolean) => Promise<void>;
 
   // Errors
   pushToast: (e: AppError) => void;
@@ -165,6 +185,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   approvalDecisions: {},
   approvalConfig: DEMO_APPROVAL_CONFIG,
   approvalRecords: DEMO_APPROVAL_RECORDS,
+  yoloMode: false,
 
   turns: [],
   pendingApprovals: [],
@@ -219,6 +240,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ),
             },
     })),
+
+  setYoloMode: async (enabled) => {
+    set({ yoloMode: enabled });
+    // Best-effort persist: SQLite may be absent in Vite-only dev. The
+    // in-memory state still drives UI + IPC for the current session.
+    try {
+      await setPref("yolo_mode", enabled);
+    } catch (e) {
+      console.warn("[store] setYoloMode: pref persistence failed.", e);
+    }
+    // Notify the bridge if one is alive. If not, the next bridge spawn
+    // syncs via the on-`ready` handler in lib/ipc-handlers.ts.
+    if (_bridgeClient) {
+      try {
+        await _bridgeClient.send({ kind: "set_yolo_mode", enabled });
+      } catch (e) {
+        console.warn("[store] setYoloMode: bridge notify failed.", e);
+      }
+    }
+  },
 
   // ---- Errors actions ----
   pushToast: (e) =>
@@ -350,6 +391,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
         "[store] hydrateFromDB: SQLite unavailable, using demo seed.",
         e,
       );
+    }
+    // YOLO mode (PRD §11.5) — sticky preference. Best-effort load;
+    // defaults to `false` from the initial state when SQLite is
+    // unavailable. We don't call setYoloMode() here so as not to
+    // double-persist on startup or attempt to notify a bridge that
+    // doesn't exist yet — the on-`ready` IPC handler does that sync
+    // when a bridge does spawn.
+    try {
+      const yolo = await getPref<boolean>("yolo_mode");
+      if (yolo === true) set({ yoloMode: true });
+    } catch (e) {
+      console.warn("[store] hydrateFromDB: yolo pref load failed.", e);
     }
   },
 }));

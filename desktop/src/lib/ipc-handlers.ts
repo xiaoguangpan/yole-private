@@ -58,6 +58,14 @@ export function dispatchIPCEvent(
         })),
       );
       s.setBridgeStatus("connected");
+      // Sync session-scoped state to the freshly-spawned bridge.
+      // YOLO mode (PRD §11.5): the bridge boots with yolo_mode=false;
+      // if the user has it persisted as on, push the override now —
+      // it's queued in the bridge's command pipeline and processed
+      // before any subsequent user message can trigger a tool call.
+      if (s.yoloMode) {
+        void s.sendIPCCommand({ kind: "set_yolo_mode", enabled: true });
+      }
       return;
     }
 

@@ -18,6 +18,7 @@ from bridge.ipc import (
     RunCompleteEvent,
     SetApprovalRulesCommand,
     SetLLMCommand,
+    SetYoloModeCommand,
     ShutdownCommand,
     ToolCallEndEvent,
     ToolCallPendingEvent,
@@ -300,6 +301,20 @@ def test_set_llm_round_trip() -> None:
     decoded = decode_command(encode(cmd))
     assert decoded == cmd
     assert decoded.llmIndex == 2
+
+
+def test_set_yolo_mode_round_trip_enabled() -> None:
+    cmd = SetYoloModeCommand(enabled=True)
+    decoded = decode_command(encode(cmd))
+    assert decoded == cmd
+    assert decoded.enabled is True
+
+
+def test_set_yolo_mode_round_trip_disabled() -> None:
+    cmd = SetYoloModeCommand(enabled=False)
+    decoded = decode_command(encode(cmd))
+    assert decoded == cmd
+    assert decoded.enabled is False
 
 
 # ---------------- Error paths ----------------

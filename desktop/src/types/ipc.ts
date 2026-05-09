@@ -241,6 +241,20 @@ export interface SetApprovalRulesCommand {
   alwaysAllowProject: string[];
 }
 
+/**
+ * Toggle YOLO mode on the bridge (PRD §11.5).
+ *
+ * When enabled, every dispatched tool call bypasses the approval gate
+ * — bridge does not emit `tool_call_pending`. The desktop is expected
+ * to keep the user informed via the persistent TopBar indicator
+ * (DESIGN.md §4.1). YOLO is upper-priority over `always_allow_*`
+ * lists; toggling it back off does not clear those lists.
+ */
+export interface SetYoloModeCommand {
+  kind: "set_yolo_mode";
+  enabled: boolean;
+}
+
 export interface SetLLMCommand {
   kind: "set_llm";
   llmIndex: number;
@@ -257,5 +271,6 @@ export type IPCCommand =
   | AbortCommand
   | LoadHistoryCommand
   | SetApprovalRulesCommand
+  | SetYoloModeCommand
   | SetLLMCommand
   | ShutdownCommand;

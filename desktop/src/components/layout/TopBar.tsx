@@ -1,4 +1,9 @@
-import { DotsThreeOutline, MagnifyingGlass } from "@phosphor-icons/react";
+import * as Popover from "@radix-ui/react-popover";
+import {
+  DotsThreeOutline,
+  Lightning,
+  MagnifyingGlass,
+} from "@phosphor-icons/react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,6 +15,16 @@ export interface TopBarProps {
    */
   sessionTitle?: string;
   onOpenCommandPalette?: () => void;
+  /**
+   * YOLO mode (PRD §11.5). When true, render a persistent badge in
+   * the right cluster — clicking it opens a popover with a one-click
+   * disable. Required for V0.1 release; without it users forget the
+   * mode is on and trigger high-risk operations unintentionally
+   * (DESIGN.md §4.1 YOLO Indicator).
+   */
+  yoloMode?: boolean;
+  onDisableYolo?: () => void;
+  onOpenSettings?: () => void;
   /**
    * Padding on the left to clear the macOS traffic light (which is
    * positioned at {16, 16} via tauri.conf.json titleBarStyle "Overlay").
@@ -58,6 +73,9 @@ export interface TopBarProps {
 export function TopBar({
   sessionTitle,
   onOpenCommandPalette,
+  yoloMode = false,
+  onDisableYolo,
+  onOpenSettings,
   trafficLightPadding = 70,
 }: TopBarProps) {
   return (
@@ -97,19 +115,105 @@ export function TopBar({
 
       {/* Right: action cluster. Buttons are auto-excluded from drag
           region by Tauri so they remain clickable. */}
-      <div className="flex shrink-0 items-center gap-1">
-        <IconButton
-          title="Search · ⌘K"
-          onClick={onOpenCommandPalette}
-          ariaLabel="Open command palette"
-        >
-          <MagnifyingGlass size={16} weight="thin" />
-        </IconButton>
-        <IconButton title="More" ariaLabel="More options">
-          <DotsThreeOutline size={16} weight="thin" />
-        </IconButton>
+      <div className="flex shrink-0 items-center gap-2">
+        {yoloMode && (
+          <YoloIndicator
+            onDisable={onDisableYolo}
+            onOpenSettings={onOpenSettings}
+          />
+        )}
+        <div className="flex items-center gap-1">
+          <IconButton
+            title="Search · ⌘K"
+            onClick={onOpenCommandPalette}
+            ariaLabel="Open command palette"
+          >
+            <MagnifyingGlass size={16} weight="thin" />
+          </IconButton>
+          <IconButton title="More" ariaLabel="More options">
+            <DotsThreeOutline size={16} weight="thin" />
+          </IconButton>
+        </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Persistent YOLO indicator (DESIGN.md §4.1 / PRD §11.5).
+ *
+ * Visible only while yoloMode is true. Click → Radix Popover with:
+ *   - Status line ("YOLO 模式已开启")
+ *   - "立即关闭" warning-tinted button (calls onDisable)
+ *   - Secondary link to Settings → Approval tab
+ *
+ * Visual: warning-tinted pill, 1px border, ⚡ icon. No animation —
+ * users tune out blinking; static colour reads "this is a state, be
+ * aware" without becoming background noise.
+ */
+function YoloIndicator({
+  onDisable,
+  onOpenSettings,
+}: {
+  onDisable?: () => void;
+  onOpenSettings?: () => void;
+}) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="YOLO 模式已开启 · 点击查看"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1",
+            "text-[12px] font-medium uppercase text-warning",
+            "transition-colors hover:bg-warning/20",
+          )}
+        >
+          <Lightning size={14} weight="thin" />
+          YOLO
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={8}
+          className={cn(
+            "z-50 w-[280px] rounded-[10px] border border-line bg-elevated p-4 shadow-elevated",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Lightning size={16} weight="thin" className="text-warning" />
+            <div className="text-[13px] font-medium text-ink">
+              YOLO 模式已开启
+            </div>
+          </div>
+          <p className="mt-1.5 text-[12px] text-ink-muted">
+            所有 tool 调用跳过审批直接执行
+          </p>
+          <button
+            type="button"
+            onClick={onDisable}
+            className={cn(
+              "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-sm bg-warning px-3 py-2",
+              "text-[12.5px] font-medium text-elevated transition-colors hover:bg-warning/90",
+            )}
+          >
+            <Lightning size={14} weight="thin" />
+            立即关闭
+          </button>
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="mt-2 w-full rounded-sm px-3 py-1.5 text-[12px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
+            >
+              在 Settings 中查看 →
+            </button>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

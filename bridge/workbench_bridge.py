@@ -46,6 +46,7 @@ from bridge.ipc import (
     RunCompleteEvent,
     SetApprovalRulesCommand,
     SetLLMCommand,
+    SetYoloModeCommand,
     ShutdownCommand,
     ToolCallPendingEvent,
     TurnEndEvent,
@@ -247,6 +248,12 @@ class SessionState:
     def __init__(self) -> None:
         self.always_allow_global: set[str] = set()
         self.always_allow_project: set[str] = set()
+        # YOLO mode (PRD §11.5). Default off; desktop syncs the user's
+        # persisted preference via SetYoloModeCommand right after `ready`.
+        # Read by WorkbenchHandler.needs_approval through the yolo_check
+        # closure on every dispatch — toggling here takes effect on the
+        # very next tool call.
+        self.yolo_mode: bool = False
         self._pending: dict[str, _PendingApproval] = {}
         self._lock = threading.Lock()
 
@@ -343,6 +350,10 @@ class Bridge:
                     request_approval=bridge_self._request_approval,
                     always_allow_global=bridge_self.state.always_allow_global,
                     always_allow_project=bridge_self.state.always_allow_project,
+                    # Closure over bridge_self.state so SetYoloModeCommand
+                    # can flip the flag at runtime without rebuilding the
+                    # handler. needs_approval() calls this on every dispatch.
+                    yolo_check=lambda: bridge_self.state.yolo_mode,
                 )
 
         # agentmain bound the name at import time (`from ga import
@@ -595,6 +606,12 @@ class Bridge:
             self.state.always_allow_global.update(cmd.alwaysAllowGlobal)
             self.state.always_allow_project.clear()
             self.state.always_allow_project.update(cmd.alwaysAllowProject)
+        elif isinstance(cmd, SetYoloModeCommand):
+            # YOLO mode (PRD §11.5). Read by WorkbenchHandler through a
+            # closure that reaches into self.state, so this single
+            # assignment takes effect on the next tool dispatch — no
+            # need to rebuild the handler or notify it explicitly.
+            self.state.yolo_mode = cmd.enabled
         elif isinstance(cmd, SetLLMCommand):
             self._handle_set_llm(cmd)
         elif isinstance(cmd, ShutdownCommand):

@@ -62,6 +62,8 @@ function App() {
     (s) => s.setApprovalRequiredTools,
   );
   const removeAlwaysAllow = useAppStore((s) => s.removeAlwaysAllow);
+  const yoloMode = useAppStore((s) => s.yoloMode);
+  const setYoloMode = useAppStore((s) => s.setYoloMode);
 
   const toasts = useAppStore((s) => s.toasts);
   const pushToast = useAppStore((s) => s.pushToast);
@@ -165,7 +167,16 @@ function App() {
   return (
     <>
       <AppShell
-        topBar={<TopBar sessionTitle={activeSession?.title} />}
+        topBar={
+          <TopBar
+            sessionTitle={activeSession?.title}
+            yoloMode={yoloMode}
+            onDisableYolo={() => {
+              void setYoloMode(false);
+            }}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        }
         sidebar={
           <Sidebar
             sessions={visibleSessions}
@@ -293,6 +304,12 @@ function App() {
         onOpenChange={setSettingsOpen}
         runtimeInfo={runtimeInfo}
         approval={approvalConfig}
+        yoloMode={yoloMode}
+        onChangeYoloMode={(enabled) => {
+          // Fire-and-forget: setYoloMode persists + notifies bridge,
+          // but the UI updates synchronously from the store action.
+          void setYoloMode(enabled);
+        }}
         onChangeRequiredTools={setApprovalRequiredTools}
         onRemoveAlwaysAllow={removeAlwaysAllow}
         onChangeGAPath={() =>
