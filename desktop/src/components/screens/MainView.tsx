@@ -1,6 +1,7 @@
 import { ApprovalDock } from "@/components/conversation/ApprovalDock";
 import { Composer } from "@/components/conversation/Composer";
 import { Conversation } from "@/components/conversation/Conversation";
+import { ThinkingSummary } from "@/components/conversation/ThinkingSummary";
 import { ToolCallout } from "@/components/conversation/ToolCallout";
 import type {
   ConversationToolEvent,
@@ -78,6 +79,16 @@ export function MainView({
                 />
               ))}
             </div>
+          )}
+
+          {/* Thinking placeholder (DESIGN.md §4.3). User sent a
+              message; the bridge is dispatching but turn_end hasn't
+              come back yet (LLM TTFT can be several seconds). Without
+              this the conversation looks frozen. We hide it once an
+              Approval Card shows up — that already covers the "agent
+              waiting on you" state. */}
+          {isRunning && !stillWaiting && (
+            <ThinkingSummary>思考中…</ThinkingSummary>
           )}
         </div>
       </div>

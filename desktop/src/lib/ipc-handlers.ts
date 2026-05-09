@@ -86,6 +86,11 @@ export function dispatchIPCEvent(
     case "error": {
       console.warn("[ipc] error", event);
       s.pushToast(fromIPCError(event));
+      // Bridge errors usually mean turn_end won't arrive — clear the
+      // running flag so the thinking placeholder + Stop-mode Composer
+      // don't get stuck on. Categories like `quota_exceeded` /
+      // `network` show the error toast instead.
+      s.setAgentRunning(false);
       return;
     }
 
@@ -118,8 +123,16 @@ export function dispatchIPCEvent(
       return;
     }
 
+    case "run_complete": {
+      console.debug("[ipc] run_complete", event);
+      // Last-resort clear: turn_end already cleared agentRunning for
+      // the normal happy path; this catches ABORTED / DENIED exits
+      // where turn_end_callback didn't fire on the GA side.
+      s.setAgentRunning(false);
+      return;
+    }
+
     case "ask_user":
-    case "run_complete":
     case "history_loaded":
     case "turn_start":
     case "tool_call_start":

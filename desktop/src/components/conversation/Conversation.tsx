@@ -48,7 +48,10 @@ export function Conversation({
               onApprove={onApprove}
             />
           )}
-          {i < turns.length - 1 && <SoftHr />}
+          {/* SoftHr separates turns. The label is the *next* turn's
+              number — the divider visually announces "Turn N below".
+              First turn gets no marker (it's already on screen). */}
+          {i < turns.length - 1 && <SoftHr label={`Turn ${i + 2}`} />}
         </Fragment>
       ))}
     </div>
@@ -99,11 +102,36 @@ function StrongHr() {
   );
 }
 
-function SoftHr() {
+/**
+ * Turn-divider rule. With a `label`, splits into two short rules
+ * with the label centered between them ("──── Turn 2 ────"); the
+ * label is the next turn's number, giving the conversation chapter-
+ * style waypoints. Without a label (legacy callers) the rule is
+ * unbroken, mirroring the v0.1 prototype.
+ *
+ * Spacing: `my-6` (48px). Earlier `my-9` (72px) felt too sparse
+ * during dogfood — DESIGN.md §4.3 documents the change rationale.
+ */
+function SoftHr({ label }: { label?: string } = {}) {
+  if (!label) {
+    return (
+      <hr
+        className="mx-[12%] my-6 border-0 border-t border-line opacity-60"
+        aria-hidden
+      />
+    );
+  }
   return (
-    <hr
-      className="mx-[12%] my-9 border-0 border-t border-line opacity-60"
-      aria-hidden
-    />
+    <div
+      className="mx-[12%] my-6 flex items-center gap-3 text-[11px] text-ink-muted"
+      role="separator"
+      aria-label={label}
+    >
+      <span className="h-px flex-1 bg-line opacity-60" aria-hidden />
+      <span className="shrink-0 font-mono uppercase tracking-[0.08em]">
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-line opacity-60" aria-hidden />
+    </div>
   );
 }

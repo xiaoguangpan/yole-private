@@ -76,6 +76,7 @@ function App() {
 
   const storeTurns = useAppStore((s) => s.turns);
   const storePending = useAppStore((s) => s.pendingApprovals);
+  const agentRunning = useAppStore((s) => s.agentRunning);
   const appendUserTurn = useAppStore((s) => s.appendUserTurn);
   const removePendingApproval = useAppStore((s) => s.removePendingApproval);
 
@@ -133,7 +134,12 @@ function App() {
   );
   const turns = storeTurns.length > 0 ? storeTurns : demoTurns;
   const pendingApprovals = storePending.length > 0 ? storePending : demoPending;
-  const isRunning = approvalDecisions["appr_demo1"] === "allow_once";
+  // Composer Stop-mode is driven by the real `agentRunning` store flag
+  // (set when user submits, cleared on turn_end / error / run_complete).
+  // Keep the demo heuristic OR'd in so the pre-bridge demo flow still
+  // exercises the Stop button visually.
+  const isRunning =
+    agentRunning || approvalDecisions["appr_demo1"] === "allow_once";
 
   // Sidebar full mode requires sessions; in the empty-state hero
   // pre-first-message there's no session to highlight.

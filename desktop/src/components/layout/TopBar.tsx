@@ -1,6 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import {
-  DotsThreeOutline,
+  Gear,
   Lightning,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
@@ -130,8 +130,12 @@ export function TopBar({
           >
             <MagnifyingGlass size={16} weight="thin" />
           </IconButton>
-          <IconButton title="More" ariaLabel="More options">
-            <DotsThreeOutline size={16} weight="thin" />
+          <IconButton
+            title="Settings · ⌘,"
+            onClick={onOpenSettings}
+            ariaLabel="Open settings"
+          >
+            <Gear size={16} weight="thin" />
           </IconButton>
         </div>
       </div>

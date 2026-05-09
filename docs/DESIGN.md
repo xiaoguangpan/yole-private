@@ -157,7 +157,7 @@ GA Workbench 的视觉与交互气质 = **Notion + Claude**。
   - title 居中是 macOS chrome 标准（Safari / Notion / Mail / Pages / Finder），跟 traffic light 之间不靠近避免视觉拥挤
   - 长 title truncate 居中
 - **Session title inline edit**（点击进入编辑态，Enter 提交，Esc 取消）
-- 右：YOLO indicator（条件渲染）+ ⌘K Command Palette 入口（Phosphor `MagnifyingGlass`）+ `...` 更多
+- 右：YOLO indicator（条件渲染）+ ⌘K Command Palette 入口（Phosphor `MagnifyingGlass`）+ Settings 入口（Phosphor `Gear` thin，tooltip "Settings · ⌘,"）。**不放 `...` 更多按钮**——V0.1 没有真正的二级菜单条目，dead 按钮反而占视觉
 - Sidebar toggle 不在这里（移到 Sidebar header logo 旁，避免跟 traffic light 视觉撞一起）
 - 整个 TopBar 加 `data-tauri-drag-region`，作为窗口拖动 handle（Tauri v2 需要 `core:window:allow-start-dragging` 权限，buttons 由 Tauri 自动豁免）
 - **不显示**：runtime（在 Sidebar 顶部）/ Stop（在 Composer Submit 位置）/ Context Window（V0.1 拿不到）/ 价格
@@ -336,13 +336,13 @@ PROJECTS 是 sidebar 的次要 section（保持在 timeline 之下），但 codi
 #### Turn 结构
 
 ```
-[💭 Thinking summary callout]      ← 序列最前，emoji 锚点
-[Tool callout 1]                    ← 行动序列
+[💭 Thinking summary callout]                   ← 序列最前，emoji 锚点
+[Tool callout 1]                                 ← 行动序列
 [Tool callout 2]
 [Tool callout 3]
-─────────────────                   ← 稍深 1px 全宽 hr（行动 → 结论）
-[Final answer，浮在文档里]          ← 不放 callout
-═════════════════                   ← 极淡 1px 60% 居中 hr（turn 间）
+─────────────────                                ← 稍深 1px 全宽 hr（行动 → 结论）
+[Final answer，浮在文档里]                       ← 不放 callout
+─────────  Turn 2  ─────────                     ← 极淡 1px 60% 居中 hr，中间嵌 turn 编号
 [下一 turn ...]
 ```
 
@@ -362,6 +362,33 @@ PROJECTS 是 sidebar 的次要 section（保持在 timeline 之下），但 codi
 - 每 turn 第一个 callout，💭 emoji 锚点（破例 emoji 合法）
 - 内容 = LLM 这一轮"打算做什么"的总结
 - Newsreader italic muted，13px
+
+#### Thinking Placeholder（in-flight 占位）
+
+用户提交消息后到 `turn_end` 到达之间存在显著延迟（LLM TTFT 可达几秒到十几秒）。如果不显示状态指示，用户会觉得 UI 卡住。
+
+- 用户提交瞬间 store 设 `agentRunning = true`（不等 `turn_start` IPC，避免一次往返延迟）
+- conversation 末尾立即渲染一个 ThinkingSummary 风格的占位：内容 "思考中…" Newsreader italic
+- 触发条件：`agentRunning && pendingApprovals.length === 0`（pending 状态时已经有 Approval Card 兜底）
+- `turn_end` / `error` / `run_complete` 到达时 `agentRunning = false`，占位消失，真 thinking summary + tools + final answer 一次性渲染替换
+- 视觉跟正式 ThinkingSummary 同款（💭 + 杏沙竖条 + 6% tint），保持视觉连续性
+
+Composer 状态同步：`agentRunning = true` 时 Submit 按钮切到 Stop 模式，LLM dropdown disable。
+
+#### Turn 编号
+
+每个 SoftHr（turn 间分隔）中间嵌入下一个 turn 的编号：`──── Turn 2 ────`。
+
+- 11px Inter muted，hr 居中位置
+- 第一个 turn 上方**不**显示 "Turn 1"——开屏即第一个 turn，无需标注；编号从 hr 开始
+- 编号取自 turns 数组 index + 1（agent / user 不区分编号空间，每次 user 提交开启一个新 turn）
+- 排版：hr 切两段，中间留 ~80px 空隙嵌文字，文字两侧各一段 hr
+
+#### Spacing
+
+- SoftHr 上下间距 `my-6`（48px）—— 给 turn 之间的呼吸感，但不浪费视觉空间
+- v0.1 早期版本是 `my-9`（72px），dogfood 时反馈"间距过大"，改为 48px 后视觉密度更紧凑
+- 如继续反馈"还是大"，再降到 `my-5`（40px）；不应小于 40px——hr 失去章节分隔感
 
 ### 4.4 Composer
 

@@ -77,6 +77,17 @@ interface State {
   // ---- Conversation (V0.1: single active session) ----
   turns: Turn[];
   pendingApprovals: PendingApproval[];
+  /**
+   * The agent is mid-run: user message dispatched, no `turn_end`
+   * received yet. Drives the inline "思考中…" placeholder
+   * (DESIGN.md §4.3 Thinking Placeholder) and the Composer's
+   * Stop-button mode so the user has feedback during LLM TTFT
+   * (which can be 3-15s on cold starts). Set true synchronously
+   * by `appendUserTurn` (we don't wait for `turn_start` to come
+   * back across IPC); cleared by `turn_end` / `error` /
+   * `run_complete`.
+   */
+  agentRunning: boolean;
 
   // ---- Approval ----
   approvalDecisions: Record<string, ApprovalDecision>;
@@ -141,6 +152,7 @@ interface Actions {
   addPendingApproval: (p: PendingApproval) => void;
   removePendingApproval: (approvalId: string) => void;
   clearConversation: () => void;
+  setAgentRunning: (running: boolean) => void;
 
   // Bridge runtime
   setBridgeStatus: (status: BridgeStatus) => void;
@@ -189,6 +201,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   turns: [],
   pendingApprovals: [],
+  agentRunning: false,
 
   toasts: [],
 
@@ -279,11 +292,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   appendUserTurn: (text) =>
     set((state) => ({
       turns: [...state.turns, { role: "user", content: text } as UserTurn],
+      // The agent will start running on the bridge shortly. Set this
+      // synchronously rather than waiting for `turn_start` over IPC —
+      // the round-trip would re-introduce the very latency we're
+      // masking with the thinking placeholder.
+      agentRunning: true,
     })),
 
   appendAgentTurn: (turn) =>
     set((state) => ({
       turns: [...state.turns, turn],
+      // turn_end is the canonical "agent finished this round" signal.
+      // ipc-handlers also clears agentRunning on `error` /
+      // `run_complete` for the failure paths where turn_end never
+      // arrives.
+      agentRunning: false,
     })),
 
   addPendingApproval: (p) =>
@@ -304,7 +327,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   clearConversation: () =>
-    set({ turns: [], pendingApprovals: [], approvalDecisions: {} }),
+    set({
+      turns: [],
+      pendingApprovals: [],
+      approvalDecisions: {},
+      agentRunning: false,
+    }),
+
+  setAgentRunning: (running) => set({ agentRunning: running }),
 
   // ---- Bridge runtime ----
   setBridgeStatus: (status) => set({ bridgeStatus: status }),
