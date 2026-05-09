@@ -97,6 +97,16 @@ interface State {
    * `null` when no turn is in flight.
    */
   currentTurnIndex: number | null;
+  /**
+   * Monotonic counter incremented every time the user submits a
+   * message (via `appendUserTurn`). MainView's scroll effect uses
+   * this as a trigger to snap the just-submitted user message to
+   * the viewport top — keying on `turns.length` would over-fire
+   * (every turn_end would scroll), keying on a derived value would
+   * miss back-to-back submits with the same content. A counter
+   * that only the submit path touches is the cleanest signal.
+   */
+  userSubmitTick: number;
 
   // ---- Approval ----
   approvalDecisions: Record<string, ApprovalDecision>;
@@ -213,6 +223,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   pendingApprovals: [],
   agentRunning: false,
   currentTurnIndex: null,
+  userSubmitTick: 0,
 
   toasts: [],
 
@@ -308,6 +319,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // the round-trip would re-introduce the very latency we're
       // masking with the thinking placeholder.
       agentRunning: true,
+      // Drive MainView's stick-to-top scroll. See `userSubmitTick`
+      // doc comment in State.
+      userSubmitTick: state.userSubmitTick + 1,
     })),
 
   appendAgentTurn: (turn) =>

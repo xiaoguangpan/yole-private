@@ -440,6 +440,34 @@ V0.1 **不做**：
 
 ReactNode children（非 markdown string）的 reply 不渲染 actions——demo fixture 没 markdown source 可复制。
 
+#### Scroll behaviour（stick to user message top）
+
+Conversation 主区是 `overflow-y-auto` 的列。用户提交新消息时**不**滚到底部（reply 还没生成，跳到一片空地）；**也不**被动什么都不做（user message 出现在视口外，看不到反馈）。**正确做法**：把刚 submit 的 user message 顶端贴到 viewport 顶部下方 32px 处。
+
+跟 Claude.ai / ChatGPT 收敛的同一模式。理由：
+
+- 用户提交完立刻能看到自己的提问
+- 长 reply 不会推走问题——问题永远在视口顶端附近
+- 短 reply 用户也不必往下找答案——它就在问题正下方
+- 阅读 reply 期间**不被打扰**（不跟随）
+
+实现细节：
+
+- store 加 `userSubmitTick` 计数器，`appendUserTurn` 时 +1
+- MainView `useEffect` 监听 `userSubmitTick` 变化（不监听 `turns.length`——避免 `turn_end` 也触发滚）
+- RAF 推迟到 `<MessageUser data-role="user-msg">` 真实 mount 后
+- 找最后一个 `[data-role="user-msg"]`，算 offset (`top - container.top - 32`)，`container.scrollBy({ top: delta, behavior: "smooth" })`
+- 不用 `scrollIntoView({block: "start"})`：它没法控 padding
+
+边界：
+
+| 场景 | 行为 |
+|---|---|
+| 第一次提交（EmptyState → MainView 切换） | 同样滚一次（保险，user message 已经在顶部时 delta 接近 0，相当于 noop） |
+| Turn_end 来 / 流式 token 流入 | 不触发（store 状态变了但 tick 没变） |
+| 用户主动向上翻历史 | 不打断（仅 submit 触发） |
+| 切换历史 session（multi-session 后） | 默认滚到底（看到最后 turn）；不属于此 spec 范畴 |
+
 #### Thinking Placeholder（in-flight 占位）
 
 用户提交消息后到 `turn_end` 到达之间存在显著延迟（LLM TTFT 可达几秒到十几秒）。如果不显示状态指示，用户会觉得 UI 卡住。

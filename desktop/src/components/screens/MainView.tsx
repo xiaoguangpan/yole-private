@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { ApprovalDock } from "@/components/conversation/ApprovalDock";
 import { Composer } from "@/components/conversation/Composer";
 import { Conversation, TurnMarker } from "@/components/conversation/Conversation";
@@ -29,6 +31,13 @@ export interface MainViewProps {
    * during quiet states.
    */
   currentTurnIndex?: number | null;
+  /**
+   * Counter that increments every time the user submits a message.
+   * MainView watches it to scroll the just-submitted user message
+   * to the viewport top (DESIGN.md §4.3 scroll behaviour). Stay
+   * stateless about the value itself — only changes matter.
+   */
+  userSubmitTick?: number;
 }
 
 /**
@@ -55,13 +64,51 @@ export function MainView({
   onStop,
   isRunning = false,
   currentTurnIndex,
+  userSubmitTick = 0,
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Stick-to-user-message-top scroll behaviour (DESIGN.md §4.3).
+  // Effect fires only when the user submits a new message — keying
+  // on `turns.length` would also fire on every turn_end (pushing
+  // the user away mid-read of the agent's reply). The store's
+  // `userSubmitTick` is a counter that only the submit path bumps.
+  //
+  // Why we don't use scrollIntoView({block: "start"}): it doesn't
+  // accept a top-padding argument. We compute the offset manually
+  // so the user message lands ~32px below the scroll container's
+  // top edge (gives the thinking placeholder + first reply lines
+  // visible breathing room without burying the prompt off-screen).
+  useEffect(() => {
+    if (userSubmitTick === 0) return; // initial render — nothing to scroll
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    // RAF defers to after the new <MessageUser data-role="user-msg">
+    // has actually mounted from the appendUserTurn state update.
+    const handle = requestAnimationFrame(() => {
+      const userMsgs = container.querySelectorAll<HTMLElement>(
+        '[data-role="user-msg"]',
+      );
+      const last = userMsgs[userMsgs.length - 1];
+      if (!last) return;
+      const containerRect = container.getBoundingClientRect();
+      const targetTop = last.getBoundingClientRect().top;
+      const TOP_PADDING = 32;
+      const delta = targetTop - containerRect.top - TOP_PADDING;
+      if (Math.abs(delta) < 1) return;
+      container.scrollBy({ top: delta, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [userSubmitTick]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app">
       {/* Scrollable conversation column */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <div
+        ref={scrollContainerRef}
+        className="min-h-0 flex-1 overflow-y-auto px-8 py-6"
+      >
         <div className="mx-auto max-w-[760px]">
           <Conversation
             turns={turns}

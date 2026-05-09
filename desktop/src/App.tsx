@@ -78,6 +78,7 @@ function App() {
   const storePending = useAppStore((s) => s.pendingApprovals);
   const agentRunning = useAppStore((s) => s.agentRunning);
   const currentTurnIndex = useAppStore((s) => s.currentTurnIndex);
+  const userSubmitTick = useAppStore((s) => s.userSubmitTick);
   const appendUserTurn = useAppStore((s) => s.appendUserTurn);
   const removePendingApproval = useAppStore((s) => s.removePendingApproval);
 
@@ -270,6 +271,7 @@ function App() {
               }}
               isRunning={isRunning}
               currentTurnIndex={currentTurnIndex}
+              userSubmitTick={userSubmitTick}
             />
           )
         }
