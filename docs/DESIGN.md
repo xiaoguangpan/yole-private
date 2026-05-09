@@ -468,6 +468,36 @@ Conversation 主区是 `overflow-y-auto` 的列。用户提交新消息时**不*
 | 用户主动向上翻历史 | 不打断（仅 submit 触发） |
 | 切换历史 session（multi-session 后） | 默认滚到底（看到最后 turn）；不属于此 spec 范畴 |
 
+#### Streaming generation（流式 partial 渲染）
+
+Bridge 订阅 GA 的 `display_queue`（`agentmain.put_task` 返回），把每个 partial chunk 通过 IPC `turn_progress` event 推给 desktop。Desktop 累积成 `inFlightContent`，跑 `cleanPartialContent` strip 掉 GA 内部 tag 后用 `MarkdownView` 实时渲染。
+
+| 时机 | 显示 |
+|---|---|
+| User 提交 → bridge spawn → LLM TTFT | `💭 思考中…` placeholder |
+| 第一批 token 到 | placeholder 消失，partial markdown 开始流出 |
+| 流式过程中 | partial 持续增长，Markdown re-render（行内 / 列表 / 代码块都跟着出现） |
+| `turn_end` 到 | partial 被 finalized AgentTurn **替换**（store `appendAgentTurn` clear inFlightContent） |
+| Tool call 触发 | partial 暂停，Approval Card 出现 |
+| 用户决策后 → bridge 继续 → 下一 turn | 新 turn 的 partial 重新开始流（store `turn_start` clear inFlightContent） |
+
+**关键 robustness**：partial 输入是 GA-raw（`<thinking>` / `<summary>` / `<tool_use>` / `<file_content>` / `[FILE:...]`），且**可能 mid-tag**（比如刚收到 `<thi` 没 close）。`cleanPartialContent` 的 4 步算法：
+
+1. Strip 完整的 `<tag>...</tag>` block
+2. 找 leftmost unclosed open tag → 截断
+3. 找 trailing partial open-tag start（"<thi" / "</sum"）→ 截断
+4. Strip `[FILE:...]` refs + 折叠空行
+
+效果：用户在任何 sampling instant 都看不到 GA 内部 scaffolding 闪过。
+
+#### Sticky-bottom + Scroll-to-bottom 浮动按钮
+
+- 流式过程中**默认跟随**：`atBottom` flag 通过 scroll listener 维护（24px tolerance），在底部时 `useLayoutEffect` 监听 `inFlightContent` 变化把 `scrollTop = scrollHeight`
+- **用户向上滚 → 不跟随**：`atBottom = false`，stream 继续但视图不动
+- **浮动按钮**：`atBottom = false` 时 conversation 列右下角（Composer 上方 140px）出现一个 36px 圆形 ghost 按钮，⬇ ArrowDown thin icon
+- 点按钮 → `scrollTo({ top: scrollHeight, behavior: "smooth" })` + `atBottom = true`（重新启用跟随）
+- ESC / 任何手动 wheel 不影响按钮可见性（仅 scroll position 决定）
+
 #### Thinking Placeholder（in-flight 占位）
 
 用户提交消息后到 `turn_end` 到达之间存在显著延迟（LLM TTFT 可达几秒到十几秒）。如果不显示状态指示，用户会觉得 UI 卡住。

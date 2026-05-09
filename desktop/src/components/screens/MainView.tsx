@@ -1,10 +1,14 @@
-import { useEffect, useRef } from "react";
+import { ArrowDown } from "@phosphor-icons/react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ApprovalDock } from "@/components/conversation/ApprovalDock";
 import { Composer } from "@/components/conversation/Composer";
 import { Conversation, TurnMarker } from "@/components/conversation/Conversation";
+import { MarkdownView } from "@/components/conversation/MarkdownView";
 import { ThinkingSummary } from "@/components/conversation/ThinkingSummary";
 import { ToolCallout } from "@/components/conversation/ToolCallout";
+import { cleanPartialContent } from "@/lib/ipc-handlers";
+import { cn } from "@/lib/utils";
 import type {
   ConversationToolEvent,
   PendingApproval,
@@ -38,6 +42,12 @@ export interface MainViewProps {
    * stateless about the value itself — only changes matter.
    */
   userSubmitTick?: number;
+  /**
+   * Streaming partial output from the bridge. Renders mid-turn
+   * after the completed turns and any pending Approval Card. Empty
+   * string when no streaming is active.
+   */
+  inFlightContent?: string;
 }
 
 /**
@@ -65,9 +75,61 @@ export function MainView({
   isRunning = false,
   currentTurnIndex,
   userSubmitTick = 0,
+  inFlightContent = "",
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Stripped partial — empty when nothing renderable yet (e.g. only
+  // `<thinking>...` partial has come through). We hide the
+  // ThinkingSummary placeholder once we have user-visible streaming
+  // content; otherwise the document briefly shows two "still
+  // working" affordances.
+  const visiblePartial = inFlightContent
+    ? cleanPartialContent(inFlightContent).trim()
+    : "";
+
+  // Sticky-bottom mode for streaming: when the user is "near the
+  // bottom" we follow newly-arrived tokens; if they've scrolled up
+  // to read older content we don't yank them down.
+  //
+  // `atBottom` is the currently-tracked position; updated on scroll
+  // events with a 24px tolerance so flicker around the boundary
+  // doesn't toggle the mode.
+  const [atBottom, setAtBottom] = useState(true);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight;
+      setAtBottom(distFromBottom < 24);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Stream-follow: while atBottom, pin scroll position to the bottom
+  // as inFlightContent grows. useLayoutEffect runs synchronously
+  // after the new content renders, before the browser paints — so
+  // the user never sees a glimpse of the bottom-having-moved-up
+  // before we snap it back.
+  useLayoutEffect(() => {
+    if (!atBottom) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [inFlightContent, atBottom]);
+
+  const onClickScrollToBottom = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    // The smooth-scroll arrives at bottom asynchronously; we
+    // optimistically flip atBottom now so subsequent stream chunks
+    // are followed without a frame's gap.
+    setAtBottom(true);
+  };
 
   // Stick-to-user-message-top scroll behaviour (DESIGN.md §4.3).
   // Effect fires only when the user submits a new message — keying
@@ -103,7 +165,7 @@ export function MainView({
   }, [userSubmitTick]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-app">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-app">
       {/* Scrollable conversation column */}
       <div
         ref={scrollContainerRef}
@@ -146,9 +208,10 @@ export function MainView({
               message; the bridge is dispatching but turn_end hasn't
               come back yet (LLM TTFT can be several seconds). Without
               this the conversation looks frozen. We hide it once an
-              Approval Card shows up — that already covers the "agent
-              waiting on you" state. */}
-          {isRunning && !stillWaiting && (
+              Approval Card shows up (already covers "agent waiting
+              on you") OR once streaming content has begun (the
+              partial render is itself the live signal). */}
+          {isRunning && !stillWaiting && !visiblePartial && (
             <div>
               {currentTurnIndex != null && (
                 <TurnMarker index={currentTurnIndex} />
@@ -156,8 +219,42 @@ export function MainView({
               <ThinkingSummary>思考中…</ThinkingSummary>
             </div>
           )}
+
+          {/* In-flight streaming partial (DESIGN.md §4.3 streaming
+              generation). Renders the LLM's tokens as they arrive
+              via turn_progress IPC events. Replaced by the canonical
+              AgentTurn the moment turn_end fires (store clears
+              inFlightContent in appendAgentTurn). */}
+          {isRunning && !stillWaiting && visiblePartial && (
+            <div>
+              {currentTurnIndex != null && (
+                <TurnMarker index={currentTurnIndex} />
+              )}
+              <MarkdownView source={visiblePartial} variant="agent" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Scroll-to-bottom floating button (DESIGN.md §4.3 streaming
+          generation). Visible only when the user has scrolled away
+          from the bottom. Anchored just above the Composer so it
+          doesn't fight with the dock for space when both are
+          present. */}
+      {!atBottom && (
+        <button
+          type="button"
+          onClick={onClickScrollToBottom}
+          aria-label="Scroll to latest"
+          className={cn(
+            "absolute bottom-[140px] right-8 z-10 inline-flex size-9 items-center justify-center rounded-full",
+            "border border-line bg-elevated text-ink-soft shadow-elevated",
+            "transition-colors hover:bg-hover hover:text-ink",
+          )}
+        >
+          <ArrowDown size={16} weight="thin" />
+        </button>
+      )}
 
       {/* Bottom stack: dock + composer + hint */}
       <div className="bg-app px-8 pb-4">

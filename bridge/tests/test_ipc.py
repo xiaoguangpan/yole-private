@@ -24,6 +24,7 @@ from bridge.ipc import (
     ToolCallPendingEvent,
     ToolCallStartEvent,
     TurnEndEvent,
+    TurnProgressEvent,
     TurnStartEvent,
     UserMessageCommand,
     decode_command,
@@ -97,6 +98,25 @@ def test_llm_changed_round_trip() -> None:
 
 def test_turn_start_round_trip() -> None:
     ev = TurnStartEvent(sessionId="s1", turnIndex=3)
+    decoded = decode_event(encode(ev))
+    assert decoded == ev
+
+
+def test_turn_progress_round_trip() -> None:
+    ev = TurnProgressEvent(
+        sessionId="s1",
+        delta="partial output chunk",
+        source="workbench",
+    )
+    decoded = decode_event(encode(ev))
+    assert decoded == ev
+    assert decoded.delta == "partial output chunk"
+
+
+def test_turn_progress_handles_empty_source() -> None:
+    """GA can push chunks with `source` defaulting to '' (system /
+    interstitial messages); the bridge forwards verbatim."""
+    ev = TurnProgressEvent(sessionId="s1", delta="…", source="")
     decoded = decode_event(encode(ev))
     assert decoded == ev
 

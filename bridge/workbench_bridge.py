@@ -50,6 +50,7 @@ from bridge.ipc import (
     ShutdownCommand,
     ToolCallPendingEvent,
     TurnEndEvent,
+    TurnProgressEvent,
     UserMessageCommand,
     decode_command,
     encode,
@@ -330,6 +331,12 @@ class Bridge:
         self.agent = agentmain.GeneraticAgent()
         self.agent.next_llm(self.llm_no)
         self.agent.verbose = False
+        # Push only the new substring on each display_queue tick rather
+        # than the full accumulated response. Smaller IPC payloads, and
+        # desktop accumulates deltas into its own inFlightContent
+        # (mirrors what fsapp.py does — agentmain default is False
+        # which would re-send the whole response every chunk).
+        self.agent.inc_out = True
 
     def _install_handler_subclass(self) -> None:
         from bridge.handlers import WorkbenchHandler
@@ -401,6 +408,62 @@ class Bridge:
 
     def _emit(self, ev: Any) -> None:
         self.event_queue.put(encode(ev))
+
+    def _start_progress_drain(self, display_queue: Any) -> None:
+        """Forward GA's display_queue partial chunks as turn_progress
+        IPC events so desktop can render the LLM output mid-turn.
+
+        GA's `agentmain.put_task` returns a `queue.Queue` whose items
+        are `{'next': delta, 'source': src}` for streaming chunks and
+        `{'done': full, 'source': src}` once the task completes. With
+        `agent.inc_out = True` (set in `_setup_ga`), `next` is the
+        delta since the last push rather than the full snapshot.
+
+        We don't republish `done` — the turn_end_callback hook fires
+        per GA turn and produces the canonical TurnEndEvent with full
+        tool calls / results / responseContent. `done` arrives at
+        whole-task completion (across multiple turns); duplicating it
+        as IPC would just give desktop a redundant signal.
+
+        Each user task gets its own daemon thread; the thread exits
+        on `done` or on shutdown.
+        """
+
+        def drain() -> None:
+            try:
+                while True:
+                    try:
+                        item = display_queue.get(timeout=0.5)
+                    except queue.Empty:
+                        if self.shutdown_event.is_set():
+                            return
+                        continue
+                    if not isinstance(item, dict):
+                        continue
+                    if "done" in item:
+                        return
+                    if "next" in item:
+                        delta = item["next"]
+                        if not isinstance(delta, str) or not delta:
+                            continue
+                        self._emit(
+                            TurnProgressEvent(
+                                sessionId=self.session_id,
+                                delta=delta,
+                                source=str(item.get("source", "")),
+                            )
+                        )
+            except Exception as e:
+                # Don't take down the bridge for a drain hiccup.
+                self._emit_error(
+                    f"progress drain failed: {e}",
+                    traceback.format_exc(),
+                    category="bridge",
+                    severity="warning",
+                    context="progress_drain",
+                )
+
+        threading.Thread(target=drain, daemon=True).start()
 
     def _emit_error(
         self,
@@ -556,7 +619,10 @@ class Bridge:
     def dispatch_command(self, cmd: Command) -> None:
         if isinstance(cmd, UserMessageCommand):
             self.run_in_progress.set()
-            self.agent.put_task(cmd.text, source="workbench", images=cmd.images)
+            display_queue = self.agent.put_task(
+                cmd.text, source="workbench", images=cmd.images
+            )
+            self._start_progress_drain(display_queue)
         elif isinstance(cmd, ApprovalResponseCommand):
             ok = self.state.resolve_pending(cmd.approvalId, cmd.decision)
             if not ok:
@@ -567,7 +633,8 @@ class Bridge:
                 )
         elif isinstance(cmd, AskUserResponseCommand):
             self.run_in_progress.set()
-            self.agent.put_task(cmd.text, source="workbench")
+            display_queue = self.agent.put_task(cmd.text, source="workbench")
+            self._start_progress_drain(display_queue)
         elif isinstance(cmd, AbortCommand):
             # GA's abort() sets stop_sig and breaks out of the run loop
             # without firing turn_end_callback, so we synthesize the

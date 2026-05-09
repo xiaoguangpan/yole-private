@@ -127,6 +127,23 @@ export interface TurnEndEvent {
   timestamp: string;
 }
 
+/**
+ * LLM streaming partial. The bridge subscribes to GA's display_queue
+ * and forwards each chunk; desktop accumulates `delta` into
+ * `inFlightContent` and re-renders the in-flight reply mid-turn.
+ *
+ * `delta` is GA-raw — still contains <thinking>/<summary>/
+ * <tool_use>/<file_content> tags. Desktop strips them at render
+ * time, with robust handling of unclosed tags at the partial's tail.
+ */
+export interface TurnProgressEvent {
+  kind: "turn_progress";
+  sessionId: string;
+  delta: string;
+  source: string;
+  timestamp: string;
+}
+
 export interface AskUserEvent {
   kind: "ask_user";
   sessionId: string;
@@ -195,6 +212,7 @@ export type IPCEvent =
   | ToolCallEndEvent
   | ToolCallProgressEvent
   | TurnEndEvent
+  | TurnProgressEvent
   | AskUserEvent
   | RunCompleteEvent
   | ErrorEvent

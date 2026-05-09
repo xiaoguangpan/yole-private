@@ -107,6 +107,21 @@ interface State {
    * that only the submit path touches is the cleanest signal.
    */
   userSubmitTick: number;
+  /**
+   * LLM streaming partial output, mid-turn (DESIGN.md §4.3 streaming
+   * generation). Bridge forwards GA's `display_queue` chunks as
+   * `turn_progress` IPC events; the handler appends `delta` here.
+   * MainView renders this — after passing through the partial-tag
+   * stripper — as the in-flight reply's body so the user sees
+   * tokens appear as they're generated.
+   *
+   * Cleared when:
+   *   - turn_end arrives (the canonical AgentTurn replaces the
+   *     in-flight render)
+   *   - run_complete / error
+   *   - user submits the next message (appendUserTurn)
+   */
+  inFlightContent: string;
 
   // ---- Approval ----
   approvalDecisions: Record<string, ApprovalDecision>;
@@ -173,6 +188,8 @@ interface Actions {
   clearConversation: () => void;
   setAgentRunning: (running: boolean) => void;
   setCurrentTurnIndex: (idx: number | null) => void;
+  appendInFlightDelta: (delta: string) => void;
+  clearInFlightContent: () => void;
 
   // Bridge runtime
   setBridgeStatus: (status: BridgeStatus) => void;
@@ -224,6 +241,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   agentRunning: false,
   currentTurnIndex: null,
   userSubmitTick: 0,
+  inFlightContent: "",
 
   toasts: [],
 
@@ -322,6 +340,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // Drive MainView's stick-to-top scroll. See `userSubmitTick`
       // doc comment in State.
       userSubmitTick: state.userSubmitTick + 1,
+      // Wipe any leftover streaming buffer from a previous turn.
+      inFlightContent: "",
     })),
 
   appendAgentTurn: (turn) =>
@@ -332,6 +352,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // `run_complete` for the failure paths where turn_end never
       // arrives.
       agentRunning: false,
+      // Finalised turn replaces the streaming buffer.
+      inFlightContent: "",
     })),
 
   addPendingApproval: (p) =>
@@ -358,10 +380,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       approvalDecisions: {},
       agentRunning: false,
       currentTurnIndex: null,
+      inFlightContent: "",
     }),
 
   setAgentRunning: (running) => set({ agentRunning: running }),
   setCurrentTurnIndex: (idx) => set({ currentTurnIndex: idx }),
+
+  appendInFlightDelta: (delta) =>
+    set((state) => ({ inFlightContent: state.inFlightContent + delta })),
+
+  clearInFlightContent: () => set({ inFlightContent: "" }),
 
   // ---- Bridge runtime ----
   setBridgeStatus: (status) => set({ bridgeStatus: status }),

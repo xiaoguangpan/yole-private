@@ -105,6 +105,31 @@ class TurnEndEvent:
 
 
 @dataclass
+class TurnProgressEvent:
+    """Streaming partial response from the LLM mid-turn (PRD §13.2,
+    DESIGN.md §4.3 streaming generation).
+
+    Bridge subscribes to GA's `display_queue` (the same queue
+    `agentmain.put_task` returns and fsapp.py drains) and forwards
+    each partial chunk over IPC. `delta` is the new substring since
+    the last progress event — desktop accumulates these into
+    `inFlightContent` and renders mid-turn so users see the LLM's
+    output appearing live rather than after the full turn settles.
+
+    `delta` is GA-raw — still contains <thinking>/<summary>/
+    <tool_use>/<file_content> tags. Desktop strips them at render
+    time (with robust handling of unclosed tags at the partial's
+    tail).
+    """
+
+    sessionId: str
+    delta: str
+    source: str  # GA's source field: "workbench" / "system" / etc
+    timestamp: str = field(default_factory=_now_iso)
+    kind: str = "turn_progress"
+
+
+@dataclass
 class AskUserEvent:
     sessionId: str
     question: str
@@ -166,6 +191,7 @@ Event = (
     | ToolCallEndEvent
     | ToolCallProgressEvent
     | TurnEndEvent
+    | TurnProgressEvent
     | AskUserEvent
     | RunCompleteEvent
     | ErrorEvent
@@ -265,6 +291,7 @@ EVENT_KINDS: dict[str, type] = {
     "tool_call_end": ToolCallEndEvent,
     "tool_call_progress": ToolCallProgressEvent,
     "turn_end": TurnEndEvent,
+    "turn_progress": TurnProgressEvent,
     "ask_user": AskUserEvent,
     "run_complete": RunCompleteEvent,
     "error": ErrorEvent,

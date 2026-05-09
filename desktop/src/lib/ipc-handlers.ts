@@ -92,6 +92,7 @@ export function dispatchIPCEvent(
       // `network` show the error toast instead.
       s.setAgentRunning(false);
       s.setCurrentTurnIndex(null);
+      s.clearInFlightContent();
       return;
     }
 
@@ -141,6 +142,7 @@ export function dispatchIPCEvent(
       // where turn_end_callback didn't fire on the GA side.
       s.setAgentRunning(false);
       s.setCurrentTurnIndex(null);
+      s.clearInFlightContent();
       return;
     }
 
@@ -151,6 +153,17 @@ export function dispatchIPCEvent(
       // multi-turn tasks. Cleared on run_complete / error.
       console.debug("[ipc] turn_start", event);
       s.setCurrentTurnIndex(event.turnIndex);
+      // New turn starts → drop whatever streaming buffer the previous
+      // turn left, so the in-flight render doesn't bleed across turns.
+      s.clearInFlightContent();
+      return;
+    }
+
+    case "turn_progress": {
+      // Streaming partial. Append delta; MainView re-renders the
+      // in-flight reply with cleanPartialContent stripping GA's
+      // internal tags.
+      s.appendInFlightDelta(event.delta);
       return;
     }
 
@@ -255,6 +268,77 @@ function cleanFinalAnswer(text: string): string {
   out = out.replace(FILE_REF_PATTERN, "");
   out = out.replace(/\n{3,}/g, "\n\n");
   return out.trim();
+}
+
+const GA_TAG_NAMES = ["thinking", "summary", "tool_use", "file_content"];
+
+/**
+ * Stripping for **partial** GA output (turn_progress streaming).
+ *
+ * Different from cleanFinalAnswer because the input may end mid-tag:
+ *   - "Some text <thi"        → could be the start of <thinking>
+ *   - "Some text <thinking>x" → inside an open tag, content not yet
+ *                                complete
+ *   - "Some text <thinking>x</thinking> rest" → complete, strip block
+ *
+ * Strategy:
+ *   1. Strip every well-formed <tag>...</tag> block.
+ *   2. Find the leftmost unclosed open tag (one of GA_TAG_NAMES).
+ *      Truncate the string at that position — content past it
+ *      belongs to the in-flight tag and shouldn't be rendered.
+ *   3. Find a trailing partial open-tag start (e.g. "<thi" with no
+ *      closing ">") and truncate it too — otherwise the user would
+ *      see a stray "<thi" rendered as text for one frame.
+ *   4. Strip [FILE:...] refs and normalise blank-line runs.
+ *
+ * Result: a string the user can read at any sampling instant
+ * without seeing GA's internal scaffolding flash through.
+ */
+export function cleanPartialContent(text: string): string {
+  if (!text) return "";
+  let out = text;
+
+  // 1. Complete blocks.
+  for (const p of GA_TAG_PATTERNS) out = out.replace(p, "");
+
+  // 2. Unclosed open tag — truncate at its position.
+  let earliestUnclosed = -1;
+  for (const name of GA_TAG_NAMES) {
+    // Look for an opener that has no matching closer further along.
+    // The complete-block regex above already removed matched pairs,
+    // so any remaining opener is by construction unclosed.
+    const openRe = new RegExp(`<${name}(?:\\s[^>]*)?>`);
+    const m = out.match(openRe);
+    if (m && m.index !== undefined) {
+      if (earliestUnclosed === -1 || m.index < earliestUnclosed) {
+        earliestUnclosed = m.index;
+      }
+    }
+  }
+  if (earliestUnclosed !== -1) out = out.slice(0, earliestUnclosed);
+
+  // 3. Trailing partial open-tag start ("<thi", "<sum", etc.).
+  // Find the last "<" — if what follows it is a prefix of any GA tag
+  // name AND there's no ">" yet, drop it.
+  const lastLt = out.lastIndexOf("<");
+  if (lastLt !== -1 && out.indexOf(">", lastLt) === -1) {
+    const tail = out.slice(lastLt + 1).toLowerCase();
+    const couldBeTag =
+      tail === "" ||
+      tail === "/" ||
+      GA_TAG_NAMES.some(
+        (n) =>
+          n.startsWith(tail) ||
+          // closing form like "</thi" → tail = "/thi"
+          (tail.startsWith("/") && n.startsWith(tail.slice(1))),
+      );
+    if (couldBeTag) out = out.slice(0, lastLt);
+  }
+
+  // 4. Cleanups.
+  out = out.replace(FILE_REF_PATTERN, "");
+  out = out.replace(/\n{3,}/g, "\n\n");
+  return out;
 }
 
 function extractThinking(text: string): string | undefined {
