@@ -28,13 +28,13 @@
       "identifier": "shell:allow-spawn",
       "allow": [
         {
-          "name": "python-bridge-py3",
+          "name": "python3",
           "cmd": "python3",
           "args": true,
           "sidecar": false
         },
         {
-          "name": "python-bridge-py",
+          "name": "python",
           "cmd": "python",
           "args": true,
           "sidecar": false
@@ -45,13 +45,13 @@
       "identifier": "shell:allow-stdin-write",
       "allow": [
         {
-          "name": "python-bridge-py3",
+          "name": "python3",
           "cmd": "python3",
           "args": true,
           "sidecar": false
         },
         {
-          "name": "python-bridge-py",
+          "name": "python",
           "cmd": "python",
           "args": true,
           "sidecar": false
@@ -62,13 +62,13 @@
       "identifier": "shell:allow-kill",
       "allow": [
         {
-          "name": "python-bridge-py3",
+          "name": "python3",
           "cmd": "python3",
           "args": true,
           "sidecar": false
         },
         {
-          "name": "python-bridge-py",
+          "name": "python",
           "cmd": "python",
           "args": true,
           "sidecar": false
