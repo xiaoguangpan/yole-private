@@ -366,6 +366,46 @@ Turn 2                                           ← 自带 mt-7 (28px) 的 chap
 - 内容 = LLM 这一轮"打算做什么"的总结
 - Newsreader italic muted，13px
 
+#### Markdown 渲染
+
+Final answer 跟 Thinking summary 都通过 `react-markdown` + `remark-gfm` + Shiki 渲染。LLM 输出的 markdown（标题 / 列表 / 表格 / 代码块 / 引用 / 链接 / 删除线）全部解析成对应 DOM，没解析的纯文本走默认段落。
+
+**typography 映射**（每个元素 pull 现有 token，不引入新字号）：
+
+| markdown | 渲染 |
+|---|---|
+| `p` | Newsreader 16.5px (`agent`) / Newsreader italic 14px muted (`thinking`) |
+| `h1` | Newsreader medium 22px |
+| `h2` | Newsreader medium 19px |
+| `h3` | Newsreader medium 17px（故意接近正文，避免视觉跳跃） |
+| `h4` | Newsreader medium 15.5px |
+| `ul` / `ol` | 标准缩进，`::marker` text-ink-muted |
+| `li` | 紧 paragraph 形态（list 内 `<p>` margin 0） |
+| 行内 `code` | mono 0.86em + bg-hover 浅底（pill） |
+| 块代码 ` ```python ` | 详见下方 Shiki 段 |
+| `blockquote` | 左 3px brand 竖线 + italic + ink-soft |
+| `a` | text-brand-strong + 1px 下划线 + 安全 _blank |
+| `table` (GFM) | border-collapse + th `bg-surface` + 单元格 padding 12px×8px |
+| `hr` | 1px line + my-5 |
+| `strong` | font-medium（不到 bolder，跟 Newsreader 协调） |
+| `em` | italic |
+| `~~del~~` (GFM) | line-through ink-muted |
+
+**视觉哲学**：每个 markdown 元素 reuse 现有 Newsreader / Inter / JetBrains-Mono token，不为 markdown 单独引入字号 ramp。整段对话读起来是一个 document，不是 stylesheet 拼贴。
+
+#### 代码块语法高亮（Shiki）
+
+- 引擎：[Shiki](https://shiki.style) v1+，TextMate grammar，跟 VS Code / Claude.ai web 同款
+- 主题：`github-light`，跟 Workbench light 主题对齐
+- 注册语言（hand-picked）：`bash` / `css` / `diff` / `html` / `javascript` / `json` / `markdown` / `python` / `rust` / `shell` / `sql` / `tsx` / `typescript` / `yaml` —— 14 种 coding agent 用户高频
+- 别名：`js → javascript` / `ts → typescript` / `py → python` / `rs → rust` / `sh → bash` / `yml → yaml`
+- 未注册的语言：fallback 到无色 mono code block（同样的 chrome，仅没 token color），不报错
+- async render：第一次 highlighter 加载时显示 plain mono fallback，加载完替换；同 highlighter 实例 cache，跨 code block 共享
+- 视觉容器：1px line border + bg-surface + 圆角 6px + 顶部一行 mono uppercase 11px 显示语言名
+- 横向 overflow scrollable（不 wrap）
+
+V0.1 不做：代码块行号 / Copy 按钮 / Edit 在行内（V0.2 候选）。
+
 #### Thinking Placeholder（in-flight 占位）
 
 用户提交消息后到 `turn_end` 到达之间存在显著延迟（LLM TTFT 可达几秒到十几秒）。如果不显示状态指示，用户会觉得 UI 卡住。
