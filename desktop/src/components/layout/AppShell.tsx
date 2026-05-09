@@ -88,28 +88,28 @@ function ThreeColumnLayout({
   inspector: ReactNode;
 }) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "ga-workbench-layout-3col",
+    id: "ga-workbench-layout-3col-v2",
     panelIds: ["sidebar", "main", "inspector"],
   });
   return (
     <Group
-      id="ga-workbench-layout-3col"
+      id="ga-workbench-layout-3col-v2"
       orientation="horizontal"
       defaultLayout={defaultLayout}
       onLayoutChanged={onLayoutChanged}
       className="flex min-h-0 flex-1"
     >
-      <Panel id="sidebar" defaultSize={18} minSize={14} maxSize={30}>
+      <Panel id="sidebar" defaultSize="18%" minSize="14%" maxSize="30%">
         <aside className="flex h-full flex-col border-r border-line bg-app">
           {sidebar}
         </aside>
       </Panel>
       <ResizeSeparator />
-      <Panel id="main" defaultSize={62} minSize={40}>
+      <Panel id="main" defaultSize="62%" minSize="40%">
         <main className="flex h-full min-w-0 flex-col bg-app">{main}</main>
       </Panel>
       <ResizeSeparator />
-      <Panel id="inspector" defaultSize={20} minSize={14} maxSize={30}>
+      <Panel id="inspector" defaultSize="20%" minSize="14%" maxSize="30%">
         <aside className="flex h-full flex-col border-l border-line bg-app">
           {inspector}
         </aside>
@@ -126,24 +126,24 @@ function TwoColumnLayout({
   main: ReactNode;
 }) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "ga-workbench-layout-2col",
+    id: "ga-workbench-layout-2col-v2",
     panelIds: ["sidebar", "main"],
   });
   return (
     <Group
-      id="ga-workbench-layout-2col"
+      id="ga-workbench-layout-2col-v2"
       orientation="horizontal"
       defaultLayout={defaultLayout}
       onLayoutChanged={onLayoutChanged}
       className="flex min-h-0 flex-1"
     >
-      <Panel id="sidebar" defaultSize={20} minSize={14} maxSize={30}>
+      <Panel id="sidebar" defaultSize="20%" minSize="14%" maxSize="30%">
         <aside className="flex h-full flex-col border-r border-line bg-app">
           {sidebar}
         </aside>
       </Panel>
       <ResizeSeparator />
-      <Panel id="main" defaultSize={80} minSize={40}>
+      <Panel id="main" defaultSize="80%" minSize="40%">
         <main className="flex h-full min-w-0 flex-col bg-app">{main}</main>
       </Panel>
     </Group>
