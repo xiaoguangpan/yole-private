@@ -8,9 +8,13 @@ interface SettingsAboutProps {
 /**
  * Settings → About tab. DESIGN.md §9 About tab.
  *
- * Static content: app icon (Newsreader title placeholder for V0.1),
- * versions, external links (GitHub / docs / report issue), MIT
- * license note, "Made by JCONE · Open source" footer.
+ * Static content: app title + tagline, version table, single GitHub
+ * link, MIT license note, attribution footer.
+ *
+ * V0.1 Links section is just the repo URL (was: GitHub / docs /
+ * report issue). The other two pointed at the same repo's README
+ * and Issues page — redundant click work for users who already
+ * know how to find them on GitHub.
  */
 export function SettingsAbout({
   workbenchVersion,
@@ -38,23 +42,23 @@ export function SettingsAbout({
         <dd className="m-0 text-ink">MIT</dd>
       </dl>
 
-      <div>
+      {/* Links section gets explicit `mt-10` instead of relying on
+          the parent's `space-y-7`. The dl above is visually dense
+          (12.5px rows + small gaps), and the Link section's
+          uppercase SubLabel is similar weight — the default 28px
+          gap reads as "still part of the same block". 40px breaks
+          that visual coupling cleanly. */}
+      <div className="mt-10">
         <SubLabel>Links</SubLabel>
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div className="mt-3">
           <ExternalLink href="https://github.com/wangjc683/genericagent-workbench">
-            GitHub
-          </ExternalLink>
-          <ExternalLink href="https://github.com/wangjc683/genericagent-workbench#readme">
-            Documentation
-          </ExternalLink>
-          <ExternalLink href="https://github.com/wangjc683/genericagent-workbench/issues/new">
-            Report issue
+            github.com/wangjc683/genericagent-workbench
           </ExternalLink>
         </div>
       </div>
 
       <div className="border-t border-line pt-4 text-[12px] text-ink-muted">
-        Made by JCONE · Open source
+        Made by wangjc683 · Open source
       </div>
     </div>
   );
