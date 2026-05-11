@@ -58,6 +58,7 @@ function App() {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const createSession = useAppStore((s) => s.createSession);
   const activateSession = useAppStore((s) => s.activateSession);
+  const archiveSession = useAppStore((s) => s.archiveSession);
   const llms = useAppStore((s) => s.llms);
   const llmDisplayName = useAppStore((s) => s.llmDisplayName);
   const runtimeInfo = useAppStore((s) => s.runtimeInfo);
@@ -184,7 +185,14 @@ function App() {
   // screen) so a user composing in "new chat" can still see and
   // switch back to a prior session. Empty selection is signalled
   // by activeSession being undefined, not by hiding the list.
-  const visibleSessions = sessions;
+  //
+  // Archived sessions are filtered out here so both Sidebar and
+  // CommandPalette pull from the same pre-filtered list. The rows
+  // still live in SQLite for a future Settings → Archive view.
+  const visibleSessions = useMemo(
+    () => sessions.filter((s) => s.status !== "archived"),
+    [sessions],
+  );
   const effectiveActiveId = screen === "main" ? activeSessionId : undefined;
   const activeSession = visibleSessions.find((s) => s.id === effectiveActiveId);
 
@@ -262,12 +270,23 @@ function App() {
               void activateSession(id);
               setScreen("main");
             }}
+            onArchiveSession={(id) => archiveSession(id)}
           />
         }
         main={
           screen === "empty" ? (
             <EmptyState
               llmDisplayName={llmDisplayName}
+              llms={llms}
+              onSelectLLM={(idx) => {
+                if (!activeSessionId) return;
+                if (bridgeStatus === "connected") {
+                  void sendIPCCommand(activeSessionId, {
+                    kind: "set_llm",
+                    llmIndex: idx,
+                  });
+                }
+              }}
               onOpenLLMSwitcher={() => setPaletteOpen(true)}
               onSubmit={(t) => {
                 // activeSessionId is guaranteed non-null here by the
@@ -316,6 +335,16 @@ function App() {
             <MainView
               turns={turns}
               llmDisplayName={llmDisplayName}
+              llms={llms}
+              onSelectLLM={(idx) => {
+                if (!activeSessionId) return;
+                if (bridgeStatus === "connected") {
+                  void sendIPCCommand(activeSessionId, {
+                    kind: "set_llm",
+                    llmIndex: idx,
+                  });
+                }
+              }}
               onOpenLLMSwitcher={() => setPaletteOpen(true)}
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}

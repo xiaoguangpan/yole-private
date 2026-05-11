@@ -439,6 +439,22 @@ interface Actions {
    */
   bumpSessionAfterTurn: (sessionId: string, summary?: string) => void;
   /**
+   * Archive a session: flip its status to "archived" and persist.
+   * Archived sessions are hidden from the Sidebar's bucketed list
+   * (V0.1 simplification — no separate Archive view yet; the row
+   * stays in SQLite so a future Settings → Archive page can surface
+   * it). If the archived session has a live bridge, we keep it
+   * alive — the user might be archiving the row visually but still
+   * have an in-flight turn they want to read. Re-activation later
+   * un-archives via `unarchiveSession`.
+   *
+   * If the archived session was active, we clear activeSessionId so
+   * the main view falls back to its empty / placeholder state.
+   */
+  archiveSession: (sessionId: string) => void;
+  /** Reverse archiveSession: status back to "idle" + persist. */
+  unarchiveSession: (sessionId: string) => void;
+  /**
    * Restore a session's `turns` from SQLite — Stage 3 Task 3 Session
    * Restore. Called by `activateSession` when the runtime is fresh
    * (no in-memory turns yet) and the session has prior turn history
@@ -829,6 +845,47 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // Already alive — mark as most-recently-used so the LRU
       // governor protects it on the next overflow.
       _lruTouch(id);
+    }
+  },
+
+  archiveSession: (sessionId) => {
+    const now = new Date().toISOString();
+    let updated: Session | null = null;
+    set((state) => {
+      const sessions = state.sessions.map((s) => {
+        if (s.id !== sessionId) return s;
+        updated = { ...s, status: "archived", updatedAt: now };
+        return updated;
+      });
+      // Clear active session if the one being archived was active —
+      // the main view falls back to the empty state seamlessly.
+      const activeSessionId =
+        state.activeSessionId === sessionId
+          ? undefined
+          : state.activeSessionId;
+      return { sessions, activeSessionId };
+    });
+    if (updated) {
+      void persistSession(updated).catch((e) => {
+        console.debug("[store] archiveSession persistSession failed.", e);
+      });
+    }
+  },
+
+  unarchiveSession: (sessionId) => {
+    const now = new Date().toISOString();
+    let updated: Session | null = null;
+    set((state) => ({
+      sessions: state.sessions.map((s) => {
+        if (s.id !== sessionId) return s;
+        updated = { ...s, status: "idle", updatedAt: now };
+        return updated;
+      }),
+    }));
+    if (updated) {
+      void persistSession(updated).catch((e) => {
+        console.debug("[store] unarchiveSession persistSession failed.", e);
+      });
     }
   },
 

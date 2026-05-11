@@ -6,7 +6,10 @@ import {
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
 
-import { Composer } from "@/components/conversation/Composer";
+import {
+  Composer,
+  type ComposerLLMOption,
+} from "@/components/conversation/Composer";
 import { cn } from "@/lib/utils";
 
 interface QuickPrompt {
@@ -30,11 +33,12 @@ export interface EmptyStateProps {
    * (label by default; can be overridden per chip via QuickPrompt.prompt). */
   onQuickPrompt?: (prompt: string) => void;
   prompts?: QuickPrompt[];
-  /**
-   * Click handler for the Composer's LLM pill. V0.1: opens the
-   * Command Palette to its "切换 LLM" view; dedicated dropdown is
-   * V0.2 work (DESIGN.md §4.4).
-   */
+  /** LLM list for the Composer's inline picker. Drives the popover
+   * under the model pill — see Composer's LLMPill. */
+  llms?: ComposerLLMOption[];
+  /** Called when the user picks an LLM from the inline dropdown. */
+  onSelectLLM?: (index: number) => void;
+  /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
 }
 
@@ -52,6 +56,8 @@ export function EmptyState({
   onSubmit,
   onQuickPrompt,
   prompts = DEFAULT_QUICK_PROMPTS,
+  llms,
+  onSelectLLM,
   onOpenLLMSwitcher,
 }: EmptyStateProps) {
   return (
@@ -66,6 +72,8 @@ export function EmptyState({
           placeholder="问点什么，或粘贴一段文字 / 文件路径…"
           onSubmit={onSubmit}
           autoFocus
+          llms={llms}
+          onSelectLLM={onSelectLLM}
           onOpenLLMSwitcher={onOpenLLMSwitcher}
         />
 

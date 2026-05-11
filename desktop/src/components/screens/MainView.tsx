@@ -2,7 +2,10 @@ import { ArrowDown } from "@phosphor-icons/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ApprovalDock } from "@/components/conversation/ApprovalDock";
-import { Composer } from "@/components/conversation/Composer";
+import {
+  Composer,
+  type ComposerLLMOption,
+} from "@/components/conversation/Composer";
 import { Conversation, TurnMarker } from "@/components/conversation/Conversation";
 import { MarkdownView } from "@/components/conversation/MarkdownView";
 import { ThinkingSummary } from "@/components/conversation/ThinkingSummary";
@@ -48,11 +51,11 @@ export interface MainViewProps {
    * string when no streaming is active.
    */
   inFlightContent?: string;
-  /**
-   * Click handler for the Composer's LLM pill. V0.1: opens the
-   * Command Palette to its "切换 LLM" view; a dedicated dropdown
-   * popover lands in V0.2 (DESIGN.md §4.4 — out of polish scope).
-   */
+  /** LLM list for the Composer's inline picker. */
+  llms?: ComposerLLMOption[];
+  /** Called when the user picks an LLM from the inline dropdown. */
+  onSelectLLM?: (index: number) => void;
+  /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
 }
 
@@ -82,6 +85,8 @@ export function MainView({
   currentTurnIndex,
   userSubmitTick = 0,
   inFlightContent = "",
+  llms,
+  onSelectLLM,
   onOpenLLMSwitcher,
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
@@ -278,6 +283,8 @@ export function MainView({
             stopMode={isRunning}
             onStop={onStop}
             disabled={false}
+            llms={llms}
+            onSelectLLM={onSelectLLM}
             onOpenLLMSwitcher={onOpenLLMSwitcher}
           />
 

@@ -1,4 +1,6 @@
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
+  Archive,
   Folder,
   FolderOpen,
   MagnifyingGlass,
@@ -28,6 +30,10 @@ export interface SidebarProps {
   onSelectSession?: (id: string) => void;
   onNewChat?: () => void;
   onSearch?: () => void;
+  /** Right-click → Archive. Hides the session from the bucketed list
+   * but keeps the row in SQLite. V0.1 has no Archived View yet — a
+   * future Settings → Archive page can surface them. */
+  onArchiveSession?: (id: string) => void;
   /**
    * Collapse the sidebar. Lives on the Sidebar itself (in the header
    * row, right of the logo) rather than in the TopBar — co-locating the
@@ -60,6 +66,7 @@ export function Sidebar({
   onSelectSession,
   onNewChat,
   onSearch,
+  onArchiveSession,
   onToggle,
 }: SidebarProps) {
   const isEmpty = sessions.length === 0;
@@ -85,6 +92,7 @@ export function Sidebar({
                   sessions={buckets[bucket]}
                   activeId={activeId}
                   onSelectSession={onSelectSession}
+                  onArchiveSession={onArchiveSession}
                 />
               ),
             )}
@@ -204,11 +212,13 @@ function SidebarBucket({
   sessions,
   activeId,
   onSelectSession,
+  onArchiveSession,
 }: {
   bucket: SessionBucket;
   sessions: Session[];
   activeId?: string;
   onSelectSession?: (id: string) => void;
+  onArchiveSession?: (id: string) => void;
 }) {
   return (
     <>
@@ -219,6 +229,9 @@ function SidebarBucket({
           session={s}
           active={s.id === activeId}
           onClick={() => onSelectSession?.(s.id)}
+          onArchive={
+            onArchiveSession ? () => onArchiveSession(s.id) : undefined
+          }
         />
       ))}
     </>
@@ -237,12 +250,16 @@ function SidebarSessionRow({
   session,
   active,
   onClick,
+  onArchive,
 }: {
   session: Session;
   active?: boolean;
   onClick?: () => void;
+  /** Provided when the host wires archiving; the right-click menu
+   * is suppressed otherwise (no actions = no menu to show). */
+  onArchive?: () => void;
 }) {
-  return (
+  const row = (
     <div
       onClick={onClick}
       className={cn(
@@ -280,6 +297,32 @@ function SidebarSessionRow({
         )}
       </div>
     </div>
+  );
+
+  if (!onArchive) return row;
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>{row}</ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content
+          className={cn(
+            "z-50 min-w-[160px] rounded-md border border-line bg-elevated p-1 shadow-elevated",
+          )}
+        >
+          <ContextMenu.Item
+            onSelect={onArchive}
+            className={cn(
+              "flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-[12.5px] text-ink-soft outline-none transition-colors",
+              "data-[highlighted]:bg-hover data-[highlighted]:text-ink",
+            )}
+          >
+            <Archive size={13} weight="thin" />
+            Archive
+          </ContextMenu.Item>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 }
 
