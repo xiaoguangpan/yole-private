@@ -298,6 +298,23 @@ const GA_TAG_PATTERNS: RegExp[] = [
 const FILE_REF_PATTERN = /\[FILE:[^\]]+\]/g;
 
 /**
+ * GA's `agent_loop.py` prints `LLM Running (Turn N) ...` (sometimes
+ * wrapped in `**...**`) to the display queue at the start of every
+ * turn. It's a frontend-side marker — every official GA frontend
+ * (dcapp / tgapp / qtapp / stapp / wechatapp) strips it before
+ * showing the user. We do the same: this string should never reach
+ * the conversation document; our own per-turn placeholder
+ * ("第 N 轮 · 思考中…") covers the same UX intent in the product's
+ * voice.
+ *
+ * Pattern matches the line on its own row, with optional surrounding
+ * `**` markdown bold markers, leading/trailing whitespace, and any
+ * turn number.
+ */
+const LLM_RUNNING_MARKER =
+  /^\s*\*{0,2}LLM Running \(Turn \d+\) \.\.\.\*{0,2}\s*$/gm;
+
+/**
  * Mirror of bridge's `_clean_response_for_display`. Strips GA's
  * structured tags so the user sees the prose-ish final answer
  * Newsreader can render directly. Bridge emits the raw responseContent
@@ -308,6 +325,7 @@ function cleanFinalAnswer(text: string): string {
   if (!text) return "";
   let out = text;
   for (const p of GA_TAG_PATTERNS) out = out.replace(p, "");
+  out = out.replace(LLM_RUNNING_MARKER, "");
   out = out.replace(FILE_REF_PATTERN, "");
   out = out.replace(/\n{3,}/g, "\n\n");
   return out.trim();
@@ -343,6 +361,15 @@ export function cleanPartialContent(text: string): string {
 
   // 1. Complete blocks.
   for (const p of GA_TAG_PATTERNS) out = out.replace(p, "");
+
+  // 1b. Strip GA's per-turn `LLM Running (Turn N) ...` marker. This
+  //     is a frontend-side string GA writes to its display queue;
+  //     our own thinking placeholder covers the same UX in product
+  //     voice. Done before the unclosed-tag truncation so the
+  //     marker doesn't accidentally survive when the partial ends
+  //     mid-line. The /gm flag handles multiple occurrences in
+  //     accumulated streaming buffers (multi-turn runs).
+  out = out.replace(LLM_RUNNING_MARKER, "");
 
   // 2. Unclosed open tag — truncate at its position.
   let earliestUnclosed = -1;
