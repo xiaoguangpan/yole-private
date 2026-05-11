@@ -10,6 +10,7 @@ import {
   getPref,
   loadSessions,
   persistSession,
+  persistToolEventApprovalDecision,
   setPref,
 } from "@/lib/db";
 import { dispatchIPCEvent } from "@/lib/ipc-handlers";
@@ -262,13 +263,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setActiveSession: (id) => set({ activeSessionId: id }),
 
   // ---- Approval actions ----
-  recordApprovalDecision: (approvalId, decision) =>
+  recordApprovalDecision: (approvalId, decision) => {
     set((state) => ({
       approvalDecisions: {
         ...state.approvalDecisions,
         [approvalId]: decision,
       },
-    })),
+    }));
+    // Best-effort SQLite double-write for the approval audit trail.
+    // The matching `pending` row was written when tool_call_pending
+    // arrived (see ipc-handlers.persistToolEventPendingFromIPC); this
+    // update fills in approval_decision + terminal status. Silently
+    // swallows when SQLite isn't available (Vite-only dev).
+    void persistToolEventApprovalDecision(
+      approvalId,
+      decision,
+      new Date().toISOString(),
+    ).catch((e) => {
+      console.debug(
+        "[store] persistToolEventApprovalDecision failed.",
+        e,
+      );
+    });
+  },
 
   setApprovalRequiredTools: (tools) =>
     set((state) => ({

@@ -125,6 +125,9 @@ export function dispatchIPCEvent(
         args: event.args,
       };
       s.addPendingApproval(pending);
+      // Best-effort SQLite double-write for audit trail. Silently
+      // swallow when SQLite isn't available (Vite dev / first launch).
+      void persistToolEventPendingFromIPC(event);
       return;
     }
 
@@ -355,6 +358,44 @@ function extractThinking(text: string): string | undefined {
  * (Vite-only dev) doesn't fail hard at IPC dispatch time; if the DB
  * isn't available we just log and move on.
  */
+/**
+ * Best-effort SQLite write for the audit trail. See db.ts
+ * `persistToolEventPending` for the v0.1 scoping rationale (audit only,
+ * no completion rows).
+ */
+async function persistToolEventPendingFromIPC(event: {
+  sessionId: string;
+  approvalId: string;
+  turnIndex: number;
+  toolName: string;
+  args: Record<string, unknown>;
+  argsPreview: string;
+  riskLevel: string;
+  timestamp: string;
+}): Promise<void> {
+  try {
+    const { persistToolEventPending } = await import("@/lib/db");
+    // Bridge sends riskLevel as a free string per the wire format; map
+    // unexpected values to 'medium' to keep the column constraint happy.
+    const risk: "low" | "medium" | "high" =
+      event.riskLevel === "low" || event.riskLevel === "high"
+        ? event.riskLevel
+        : "medium";
+    await persistToolEventPending({
+      approvalId: event.approvalId,
+      sessionId: event.sessionId,
+      turnIndex: event.turnIndex,
+      toolName: event.toolName,
+      args: event.args,
+      argsPreview: event.argsPreview,
+      riskLevel: risk,
+      startedAt: event.timestamp,
+    });
+  } catch (e) {
+    console.debug("[ipc] persistToolEventPending: SQLite unavailable.", e);
+  }
+}
+
 async function persistTurnEndToMessages(event: {
   sessionId: string;
   turnIndex: number;

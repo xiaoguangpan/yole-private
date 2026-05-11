@@ -1,7 +1,8 @@
 import Database from "@tauri-apps/plugin-sql";
 
 import type { Project, Session, SessionStatus } from "@/types/session";
-import type { ProjectRow, SessionRow } from "@/types/db";
+import type { ProjectRow, SessionRow, ToolEventRow } from "@/types/db";
+import type { ApprovalDecision } from "@/types/ipc";
 
 /**
  * SQLite client wrapper. Migrations run automatically on first
@@ -182,6 +183,138 @@ function projectFromRow(r: ProjectRow): Project {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+// ---------------- tool_events ----------------
+//
+// V0.1 scope: persist **approval-related rows only** — one row per
+// tool_call_pending event, updated when the user records a decision.
+// This delivers the schema's stated core use case ("Approval state
+// lives here so we can audit later who approved what" — 001_init.sql
+// L82) without requiring an IPC protocol change.
+//
+// What we explicitly DON'T persist here:
+//   - tool_call_start / tool_call_end / tool_call_progress events
+//   - Auto-allowed tools (no preceding `pending`)
+//   - Completion data for approved tools (success/failed/elapsed_ms)
+//
+// Rationale: conversation rendering already rebuilds tool state from
+// turn_end's toolCalls/toolResults (persisted in `messages` table via
+// persistTurnEndToMessages). Full tool-timeline persistence —
+// including auto-allowed tools and execution outcomes — is V0.2 work,
+// likely paired with the Memory Inspector that surfaces it.
+//
+// Status semantics for the rows we DO write:
+//   - 'waiting_approval' — initial state on pending arrival
+//   - 'denied'           — user denied; row is terminal
+//   - 'running'          — user approved (allow_once / always_allow_*);
+//                          row stays at 'running' since we don't track
+//                          completion. Join messages.tool_results by
+//                          (session_id, turn_index, tool_name) for the
+//                          actual outcome.
+
+export interface PersistToolEventPendingParams {
+  approvalId: string;
+  sessionId: string;
+  turnIndex: number;
+  toolName: string;
+  args: Record<string, unknown>;
+  argsPreview: string;
+  riskLevel: "low" | "medium" | "high";
+  startedAt: string;
+}
+
+/**
+ * INSERT a tool_events row on tool_call_pending. Uses approvalId as
+ * the primary key — every pending event from the bridge carries a
+ * unique approvalId, so re-emitted pending events upsert harmlessly.
+ */
+export async function persistToolEventPending(
+  p: PersistToolEventPendingParams,
+): Promise<void> {
+  const db = await getDB();
+  let argsJson: string | null;
+  try {
+    argsJson = JSON.stringify(p.args);
+  } catch {
+    argsJson = null;
+  }
+  await db.execute(
+    `INSERT INTO tool_events (
+       id, session_id, turn_index, tool_name, status,
+       args_json, args_preview, result_preview,
+       risk_level, approval_id, approval_decision,
+       elapsed_ms, started_at, ended_at
+     ) VALUES (
+       $1, $2, $3, $4, 'waiting_approval',
+       $5, $6, NULL,
+       $7, $1, NULL,
+       NULL, $8, NULL
+     )
+     ON CONFLICT(id) DO UPDATE SET
+       session_id   = excluded.session_id,
+       turn_index   = excluded.turn_index,
+       tool_name    = excluded.tool_name,
+       args_json    = excluded.args_json,
+       args_preview = excluded.args_preview,
+       risk_level   = excluded.risk_level,
+       started_at   = excluded.started_at`,
+    [
+      p.approvalId,
+      p.sessionId,
+      p.turnIndex,
+      p.toolName,
+      argsJson,
+      p.argsPreview,
+      p.riskLevel,
+      p.startedAt,
+    ],
+  );
+}
+
+/**
+ * UPDATE the existing tool_events row when the user records an
+ * approval decision. No-op (zero rows affected) if the matching
+ * `pending` row was never persisted — caller is best-effort anyway.
+ *
+ * Sets `ended_at` only for terminal decisions (deny). Approved rows
+ * stay open (`ended_at` NULL, status 'running') since we don't track
+ * the subsequent tool execution in this table.
+ */
+export async function persistToolEventApprovalDecision(
+  approvalId: string,
+  decision: ApprovalDecision,
+  decidedAt: string,
+): Promise<void> {
+  const db = await getDB();
+  const denied = decision === "deny";
+  await db.execute(
+    `UPDATE tool_events
+       SET status            = $1,
+           approval_decision = $2,
+           ended_at          = $3
+     WHERE id = $4`,
+    [
+      denied ? "denied" : "running",
+      decision,
+      denied ? decidedAt : null,
+      approvalId,
+    ],
+  );
+}
+
+/**
+ * Load all tool_events rows for a session, ordered by start time.
+ * Used by Session restore + Memory Inspector (Stage 3 follow-ups).
+ */
+export async function loadToolEventsBySession(
+  sessionId: string,
+): Promise<ToolEventRow[]> {
+  const db = await getDB();
+  return db.select<ToolEventRow[]>(
+    "SELECT * FROM tool_events WHERE session_id = $1 ORDER BY started_at ASC",
+    [sessionId],
+  );
 }
 
 // ---------------- prefs ----------------
