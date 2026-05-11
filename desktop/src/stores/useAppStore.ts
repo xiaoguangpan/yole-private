@@ -14,6 +14,7 @@ import {
   setPref,
 } from "@/lib/db";
 import { dispatchIPCEvent } from "@/lib/ipc-handlers";
+import { deriveSessionStatus } from "@/lib/sessions";
 import {
   DEMO_APPROVAL_CONFIG,
   DEMO_APPROVAL_RECORDS,
@@ -268,15 +269,26 @@ interface Actions {
 export type AppStore = State & Actions;
 
 /**
- * Helper: apply an updater to a single session's runtime, and
- * refresh the top-level projection when that session is the active
- * one. Returns a partial state to be passed to Zustand's `set`.
+ * Helper: apply an updater to a single session's runtime, refresh
+ * the top-level projection when that session is active, and sync
+ * the sidebar-visible fields (status, pendingApprovalCount) onto
+ * the corresponding row in `sessions`. Returns a partial state to
+ * pass to Zustand's `set`.
+ *
+ * **Why sync `sessions` inline instead of deriving in the UI**: a
+ * useShallow / useMemo selector in App.tsx hit React 19's
+ * `useSyncExternalStore` getSnapshot stability check (the inline
+ * arrow selector + new array result every call triggered a
+ * "getSnapshot should be cached" warning + Maximum update depth
+ * loop). The fix is to make `state.sessions` itself the source of
+ * truth: only generate a new `sessions` array when sidebar-visible
+ * fields actually change, so a plain `useAppStore(s => s.sessions)`
+ * with default strict-equality stays stable across frequent
+ * non-sidebar updates like turn_progress streaming.
  *
  * Lazily initializes the runtime entry if missing — the IPC layer
  * may emit events (turn_start, turn_progress, tool_call_pending)
- * for a session that the store hasn't seen yet (e.g., a bridge
- * spawn started but the runtime wasn't pre-seeded). We accept
- * those updates rather than dropping them.
+ * for a session that the store hasn't seen yet.
  */
 function applyRuntimeUpdate(
   state: State,
@@ -290,6 +302,27 @@ function applyRuntimeUpdate(
   };
   if (sessionId === state.activeSessionId) {
     Object.assign(out, projectionFrom(newRt));
+  }
+  // Sync sidebar-visible fields onto the session row, but only if
+  // they actually changed — otherwise `sessions` reference stays
+  // identical and subscribers don't re-render.
+  const sessionIndex = state.sessions.findIndex((s) => s.id === sessionId);
+  if (sessionIndex !== -1) {
+    const session = state.sessions[sessionIndex];
+    const newStatus = deriveSessionStatus(session, newRt);
+    const newCount = newRt.pendingApprovals.length;
+    if (
+      session.status !== newStatus ||
+      session.pendingApprovalCount !== newCount
+    ) {
+      const sessions = state.sessions.slice();
+      sessions[sessionIndex] = {
+        ...session,
+        status: newStatus,
+        pendingApprovalCount: newCount,
+      };
+      out.sessions = sessions;
+    }
   }
   return out;
 }
