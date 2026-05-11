@@ -48,6 +48,12 @@ export interface MainViewProps {
    * string when no streaming is active.
    */
   inFlightContent?: string;
+  /**
+   * Click handler for the Composer's LLM pill. V0.1: opens the
+   * Command Palette to its "切换 LLM" view; a dedicated dropdown
+   * popover lands in V0.2 (DESIGN.md §4.4 — out of polish scope).
+   */
+  onOpenLLMSwitcher?: () => void;
 }
 
 /**
@@ -76,6 +82,7 @@ export function MainView({
   currentTurnIndex,
   userSubmitTick = 0,
   inFlightContent = "",
+  onOpenLLMSwitcher,
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -271,6 +278,7 @@ export function MainView({
             stopMode={isRunning}
             onStop={onStop}
             disabled={false}
+            onOpenLLMSwitcher={onOpenLLMSwitcher}
           />
 
           <div className="mt-1.5 flex items-center justify-between text-[11px] text-ink-muted">

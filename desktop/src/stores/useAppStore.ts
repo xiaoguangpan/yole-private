@@ -90,7 +90,50 @@ export interface SessionRuntime {
   bridgeStatus: BridgeStatus;
   bridgeError: string | null;
   bridgePid: number | null;
+  /**
+   * LLM list + currently-selected LLM **for this session's bridge**.
+   * N-active multi-session means each bridge has its own currently-
+   * selected LLM (the user can `set_llm` per-session). The top-level
+   * `llms` / `llmDisplayName` are the projection of the active
+   * session's pair, so switching sessions reflects the right LLM in
+   * Composer / Command Palette / Inspector.
+   *
+   * Seeded with the demo list so the empty-state Composer can render
+   * a believable LLM name pre-bridge; gets overwritten the moment the
+   * bridge sends `ready`.
+   */
+  llms: LLMOption[];
+  llmDisplayName: string;
 }
+
+/**
+ * Title length cap for the derived title path (`appendUserTurn` first
+ * call). Chinese chars eat one cell each; ~30 fills the Sidebar
+ * row's truncate window without wrapping. Beyond this we append "…"
+ * to signal truncation.
+ */
+const TITLE_DERIVE_MAX = 30;
+
+/** Same idea, for the Sidebar second-line "Turn N · {summary}". */
+const SUMMARY_TRUNCATE_MAX = 60;
+
+function deriveTitleFromText(text: string): string {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  if (oneLine.length <= TITLE_DERIVE_MAX) return oneLine;
+  return oneLine.slice(0, TITLE_DERIVE_MAX) + "…";
+}
+
+function truncateSummary(text: string): string {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  if (oneLine.length <= SUMMARY_TRUNCATE_MAX) return oneLine;
+  return oneLine.slice(0, SUMMARY_TRUNCATE_MAX) + "…";
+}
+
+/** "新对话" is the seed title set by `createSession`. We only auto-
+ * derive a title when the row is still wearing the default placeholder
+ * — once the user (or restoration) renames the session we leave it
+ * alone. */
+const DEFAULT_NEW_SESSION_TITLE = "新对话";
 
 function emptyRuntime(): SessionRuntime {
   return {
@@ -104,6 +147,8 @@ function emptyRuntime(): SessionRuntime {
     bridgeStatus: "idle",
     bridgeError: null,
     bridgePid: null,
+    llms: DEMO_LLMS,
+    llmDisplayName: DEMO_LLM_DISPLAY_NAME,
   };
 }
 
@@ -117,7 +162,15 @@ interface State {
   // ---- Sessions ----
   sessions: Session[];
   activeSessionId: string | undefined;
+  /**
+   * Projection of `_runtimes[activeSessionId].llms` — see SessionRuntime
+   * for the rationale (LLM list is per-bridge in N-active).
+   */
   llms: LLMOption[];
+  /**
+   * Projection of `_runtimes[activeSessionId].llmDisplayName`. Mirrors
+   * Composer / Inspector display.
+   */
   llmDisplayName: string;
   runtimeInfo: RuntimeInfo;
 
@@ -150,6 +203,9 @@ interface State {
   // single-session layer. Writers must keep them synced via
   // `applyRuntimeUpdate`. Components that only care about the
   // active session can keep reading these as before.
+  //
+  // `llms` / `llmDisplayName` are declared above (in the Sessions
+  // group) — same field, just grouped with related session state.
   turns: Turn[];
   pendingApprovals: PendingApproval[];
   agentRunning: boolean;
@@ -210,8 +266,13 @@ interface Actions {
    * Status is set to "idle" — turn_end is the canonical "agent
    * finished this round" signal; subsequent runs flip status back
    * to "running" via setBridgeStatus + agentRunning.
+   *
+   * `summary` (optional) is GA's per-turn summary from turn_end. When
+   * present, written into `session.summary` as `Turn N · {summary}`
+   * for the Sidebar two-line preview. Truncated to keep the line
+   * single-row.
    */
-  bumpSessionAfterTurn: (sessionId: string) => void;
+  bumpSessionAfterTurn: (sessionId: string, summary?: string) => void;
 
   // Approval (global)
   setApprovalRequiredTools: (tools: string[]) => void;
@@ -229,8 +290,14 @@ interface Actions {
   pushToast: (e: AppError) => void;
   dismissToast: (id: string) => void;
 
-  // LLMs (replaceLLMs is called by ipc-handlers on ready / llm_changed)
-  replaceLLMs: (llms: LLMOption[]) => void;
+  /**
+   * Replace this session's LLM list (and currently-selected
+   * displayName, derived from `llms.find(l => l.isCurrent)`). Called
+   * by ipc-handlers on `ready` (initial list) and `llm_changed`
+   * (after a successful `set_llm`). Per-session because each bridge
+   * has its own currently-selected LLM in N-active.
+   */
+  replaceLLMs: (sessionId: string, llms: LLMOption[]) => void;
 
   // Conversation (per-session — sessionId required)
   appendUserTurn: (sessionId: string, text: string) => void;
@@ -343,6 +410,8 @@ function projectionFrom(rt: SessionRuntime): {
   bridgeStatus: BridgeStatus;
   bridgeError: string | null;
   bridgePid: number | null;
+  llms: LLMOption[];
+  llmDisplayName: string;
 } {
   return {
     turns: rt.turns,
@@ -355,6 +424,8 @@ function projectionFrom(rt: SessionRuntime): {
     bridgeStatus: rt.bridgeStatus,
     bridgeError: rt.bridgeError,
     bridgePid: rt.bridgePid,
+    llms: rt.llms,
+    llmDisplayName: rt.llmDisplayName,
   };
 }
 
@@ -386,8 +457,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   sessions: DEMO_SESSIONS,
   activeSessionId: undefined,
-  llms: DEMO_LLMS,
-  llmDisplayName: DEMO_LLM_DISPLAY_NAME,
+  // llms / llmDisplayName are populated by the trailing
+  // `...projectionFrom(emptyRuntime())` spread below — emptyRuntime
+  // seeds DEMO_LLMS / DEMO_LLM_DISPLAY_NAME so Composer renders a
+  // plausible LLM pre-bridge.
   runtimeInfo: DEMO_RUNTIME_INFO,
 
   approvalConfig: DEMO_APPROVAL_CONFIG,
@@ -441,7 +514,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString();
     const newSession: Session = {
       id,
-      title: "新对话",
+      title: DEFAULT_NEW_SESSION_TITLE,
       status: "idle",
       pendingApprovalCount: 0,
       errorCount: 0,
@@ -484,15 +557,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return id;
   },
 
-  bumpSessionAfterTurn: (sessionId) => {
+  bumpSessionAfterTurn: (sessionId, summary) => {
     const now = new Date().toISOString();
     let updated: Session | null = null;
     set((state) => ({
       sessions: state.sessions.map((s) => {
         if (s.id !== sessionId) return s;
+        const turnCount = (s.turnCount ?? 0) + 1;
+        // Compose sidebar two-liner: "Turn N · {one-line summary}".
+        // We strip newlines + clamp length so it fits the row's
+        // truncate ellipsis without wrapping. When the bridge didn't
+        // emit a summary we keep the previous one rather than wipe
+        // it — staleness beats blanking the row on every turn.
+        const nextSummary =
+          summary && summary.trim()
+            ? `Turn ${turnCount} · ${truncateSummary(summary)}`
+            : s.summary;
         updated = {
           ...s,
-          turnCount: (s.turnCount ?? 0) + 1,
+          turnCount,
+          summary: nextSummary,
           lastActivityAt: now,
           updatedAt: now,
           status: "idle",
@@ -588,12 +672,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   // ---- LLMs ----
-  replaceLLMs: (llms) => set({ llms }),
+  replaceLLMs: (sessionId, llms) =>
+    set((state) => {
+      // displayName follows isCurrent. If for some reason no entry
+      // is flagged current, keep the previous displayName to avoid
+      // a flash of empty string in the Composer.
+      const current = llms.find((l) => l.isCurrent);
+      return applyRuntimeUpdate(state, sessionId, (rt) => ({
+        ...rt,
+        llms,
+        llmDisplayName: current?.displayName ?? rt.llmDisplayName,
+      }));
+    }),
 
   // ---- Conversation (per-session) ----
-  appendUserTurn: (sessionId, text) =>
-    set((state) =>
-      applyRuntimeUpdate(state, sessionId, (rt) => ({
+  appendUserTurn: (sessionId, text) => {
+    let titleDerived: { sessionId: string; title: string } | null = null;
+    set((state) => {
+      const update = applyRuntimeUpdate(state, sessionId, (rt) => ({
         ...rt,
         turns: [...rt.turns, { role: "user", content: text } as UserTurn],
         // The agent will start running on the bridge shortly. Set
@@ -606,8 +702,42 @@ export const useAppStore = create<AppStore>((set, get) => ({
         userSubmitTick: rt.userSubmitTick + 1,
         // Wipe leftover streaming buffer from a previous turn.
         inFlightContent: "",
-      })),
-    ),
+      }));
+      // Derive a Sidebar title from the first user message — but only
+      // once, and only when the row is still wearing the seed
+      // "新对话" placeholder. Renaming a user-edited title would be
+      // worse than no rename.
+      //
+      // `applyRuntimeUpdate` may have already produced a new `sessions`
+      // (sidebar status / approval-count sync), so we layer this on
+      // top of whichever array is freshest.
+      const baseSessions = update.sessions ?? state.sessions;
+      const idx = baseSessions.findIndex((s) => s.id === sessionId);
+      if (idx !== -1) {
+        const session = baseSessions[idx];
+        if (session.title === DEFAULT_NEW_SESSION_TITLE && text.trim()) {
+          const newTitle = deriveTitleFromText(text);
+          const sessions = baseSessions.slice();
+          sessions[idx] = { ...session, title: newTitle };
+          update.sessions = sessions;
+          titleDerived = { sessionId, title: newTitle };
+        }
+      }
+      return update;
+    });
+    if (titleDerived) {
+      // Best-effort persist so the derived title survives an app
+      // restart. SQLite unavailable in pre-Tauri dev is non-fatal.
+      const snap = get().sessions.find(
+        (s) => s.id === titleDerived!.sessionId,
+      );
+      if (snap) {
+        void persistSession(snap).catch((e) => {
+          console.debug("[store] appendUserTurn persistSession failed.", e);
+        });
+      }
+    }
+  },
 
   appendAgentTurn: (sessionId, turn) =>
     set((state) =>

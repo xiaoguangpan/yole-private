@@ -50,7 +50,12 @@ export function dispatchIPCEvent(
         llm: event.llmName,
         availableLLMs: event.availableLLMs.length,
       });
+      // Per-session LLM list — N-active multi-session means each
+      // bridge has its own currently-selected LLM. The active session's
+      // pair projects up to top-level `llms` / `llmDisplayName` for
+      // Composer / Command Palette / Inspector reads.
       s.replaceLLMs(
+        event.sessionId,
         event.availableLLMs.map((l) => ({
           index: l.index,
           displayName: l.displayName,
@@ -76,9 +81,17 @@ export function dispatchIPCEvent(
       console.info("[ipc] llm_changed", {
         index: event.index,
         displayName: event.displayName,
+        sessionId: event.sessionId,
       });
+      // Re-read this session's current LLM list from the store rather
+      // than the top-level projection — the `llm_changed` event might
+      // be for a non-active session (background bridge that the user
+      // had set_llm'd before switching sessions), in which case
+      // `s.llms` projects the wrong session.
+      const rtLLMs = s._runtimes[event.sessionId]?.llms ?? s.llms;
       s.replaceLLMs(
-        s.llms.map((l) => ({
+        event.sessionId,
+        rtLLMs.map((l) => ({
           ...l,
           isCurrent: l.index === event.index,
         })),
@@ -112,10 +125,12 @@ export function dispatchIPCEvent(
       // self-contained — anyone tracing event flow without reading
       // the store action sees the state transition explicitly.
       s.setAgentRunning(event.sessionId, false);
-      // Update the session row (turn_count + last_activity_at) so
-      // the Sidebar bucketing + "Turn N" badge stay current across
-      // app restarts. SQLite write is best-effort.
-      s.bumpSessionAfterTurn(event.sessionId);
+      // Update the session row (turn_count + last_activity_at +
+      // summary) so the Sidebar bucketing + "Turn N · {summary}" badge
+      // stay current across app restarts. SQLite write is best-effort.
+      // `event.summary` is GA's per-turn one-liner from
+      // `agent._turn_end_hooks`; bridge passes it through verbatim.
+      s.bumpSessionAfterTurn(event.sessionId, event.summary);
       // Best-effort SQLite double-write. Silently swallow when the
       // backend isn't available (Vite dev / first launch / migration).
       void persistTurnEndToMessages(event);

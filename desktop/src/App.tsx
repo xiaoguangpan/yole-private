@@ -257,6 +257,7 @@ function App() {
           screen === "empty" ? (
             <EmptyState
               llmDisplayName={llmDisplayName}
+              onOpenLLMSwitcher={() => setPaletteOpen(true)}
               onSubmit={(t) => {
                 // activeSessionId is guaranteed non-null here by the
                 // auto-create-on-empty useEffect above. Defensive
@@ -304,6 +305,7 @@ function App() {
             <MainView
               turns={turns}
               llmDisplayName={llmDisplayName}
+              onOpenLLMSwitcher={() => setPaletteOpen(true)}
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}
               onSubmit={(t) => {
@@ -379,9 +381,29 @@ function App() {
           void activateSession(id);
           setScreen("main");
         }}
-        onSwitchLLM={(idx) =>
-          console.info("[palette] switch llm to index:", idx)
-        }
+        onSwitchLLM={(idx) => {
+          // Route to the active session's bridge. The palette is a
+          // global affordance but `set_llm` is per-bridge; the user
+          // intuitively expects "the LLM I see in the Composer" to
+          // be the one switched, which matches activeSessionId.
+          if (!activeSessionId) {
+            console.info("[palette] switch llm: no active session, idx=", idx);
+            return;
+          }
+          if (bridgeStatus === "connected") {
+            void sendIPCCommand(activeSessionId, {
+              kind: "set_llm",
+              llmIndex: idx,
+            });
+          } else {
+            console.info(
+              "[palette] switch llm: bridge not ready, idx=",
+              idx,
+              "status=",
+              bridgeStatus,
+            );
+          }
+        }}
         onReRunHealthCheck={() => console.info("[palette] re-run health check")}
         onOpenSettings={() => setSettingsOpen(true)}
         onToggleInspector={toggleInspector}

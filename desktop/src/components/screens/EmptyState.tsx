@@ -30,6 +30,12 @@ export interface EmptyStateProps {
    * (label by default; can be overridden per chip via QuickPrompt.prompt). */
   onQuickPrompt?: (prompt: string) => void;
   prompts?: QuickPrompt[];
+  /**
+   * Click handler for the Composer's LLM pill. V0.1: opens the
+   * Command Palette to its "切换 LLM" view; dedicated dropdown is
+   * V0.2 work (DESIGN.md §4.4).
+   */
+  onOpenLLMSwitcher?: () => void;
 }
 
 /**
@@ -46,6 +52,7 @@ export function EmptyState({
   onSubmit,
   onQuickPrompt,
   prompts = DEFAULT_QUICK_PROMPTS,
+  onOpenLLMSwitcher,
 }: EmptyStateProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-app px-16 py-12">
@@ -59,6 +66,7 @@ export function EmptyState({
           placeholder="问点什么，或粘贴一段文字 / 文件路径…"
           onSubmit={onSubmit}
           autoFocus
+          onOpenLLMSwitcher={onOpenLLMSwitcher}
         />
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
