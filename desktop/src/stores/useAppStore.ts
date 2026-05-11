@@ -696,7 +696,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   toggleInspector: () => set({ inspectorVisible: !get().inspectorVisible }),
 
   // ---- Sessions actions ----
-  setActiveSession: (id) =>
+  setActiveSession: (id) => {
+    // Clearing unread on activation is the inbox metaphor — opening
+    // a session counts as reading it. Persist the cleared row so
+    // the read state survives restart. Done outside the set callback
+    // because it's a side-effect (SQLite write) we want to fire only
+    // when the targeted row actually has unread=true, not on every
+    // setActiveSession call.
+    let toPersist: Session | null = null;
     set((state) => {
       if (!id) {
         return {
@@ -711,12 +718,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const _runtimes = existing
         ? state._runtimes
         : { ...state._runtimes, [id]: rt };
+      // Clear has_unread on the activated session.
+      const sessionIndex = state.sessions.findIndex((s) => s.id === id);
+      let sessions = state.sessions;
+      if (sessionIndex !== -1) {
+        const s = state.sessions[sessionIndex];
+        if (s.hasUnread) {
+          const cleared = { ...s, hasUnread: false };
+          sessions = state.sessions.slice();
+          sessions[sessionIndex] = cleared;
+          toPersist = cleared;
+        }
+      }
       return {
         activeSessionId: id,
         _runtimes,
+        sessions,
         ...projectionFrom(rt),
       };
-    }),
+    });
+    if (toPersist) {
+      void persistSession(toPersist).catch((e) => {
+        console.debug("[store] setActiveSession persistSession failed.", e);
+      });
+    }
+  },
 
   createSession: () => {
     const id = `s-${Date.now().toString(36)}-${Math.random()
@@ -771,6 +797,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   bumpSessionAfterTurn: (sessionId, summary) => {
     const now = new Date().toISOString();
+    // Inbox-style unread: a finished turn in a non-active session
+    // is new content the user hasn't seen. The active session
+    // stays read — the user is on it and presumably reading.
+    // Sidebar reflects this with a brand dot + bold title via
+    // SidebarSessionRow.
+    const becameUnread = sessionId !== get().activeSessionId;
     let updated: Session | null = null;
     set((state) => ({
       sessions: state.sessions.map((s) => {
@@ -796,6 +828,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           lastActivityAt: now,
           updatedAt: now,
           status: "idle",
+          hasUnread: becameUnread ? true : s.hasUnread,
         };
         return updated;
       }),

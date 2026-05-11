@@ -64,11 +64,13 @@ export async function persistSession(s: Session): Promise<void> {
     `INSERT INTO sessions (
        id, project_id, title, status, summary, turn_count, current_tool,
        pending_approval_count, error_count, pid, cwd, pinned,
-       llm_index, llm_display_name, last_activity_at, created_at, updated_at
+       llm_index, llm_display_name, has_unread,
+       last_activity_at, created_at, updated_at
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7,
        $8, $9, $10, $11, $12,
-       $13, $14, $15, $16, $17
+       $13, $14, $15,
+       $16, $17, $18
      )
      ON CONFLICT(id) DO UPDATE SET
        project_id             = excluded.project_id,
@@ -84,6 +86,7 @@ export async function persistSession(s: Session): Promise<void> {
        pinned                 = excluded.pinned,
        llm_index              = excluded.llm_index,
        llm_display_name       = excluded.llm_display_name,
+       has_unread             = excluded.has_unread,
        last_activity_at       = excluded.last_activity_at,
        updated_at             = excluded.updated_at`,
     [
@@ -101,6 +104,7 @@ export async function persistSession(s: Session): Promise<void> {
       s.pinned ? 1 : 0,
       null, // llm_index — wired in #10
       null, // llm_display_name — wired in #10
+      s.hasUnread ? 1 : 0,
       s.lastActivityAt,
       s.createdAt,
       s.updatedAt,
@@ -218,6 +222,7 @@ function sessionFromRow(r: SessionRow): Session {
     pid: r.pid ?? undefined,
     cwd: r.cwd ?? undefined,
     pinned: r.pinned === 1,
+    hasUnread: r.has_unread === 1,
     lastActivityAt: r.last_activity_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

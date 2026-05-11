@@ -259,6 +259,14 @@ function SidebarSessionRow({
    * is suppressed otherwise (no actions = no menu to show). */
   onArchive?: () => void;
 }) {
+  // Three-state sidebar display (Stage 3 round 7):
+  //   1. running                 — spinner via StatusIcon
+  //   2. idle  + hasUnread=true  — static icon + brand dot + bold
+  //   3. idle  + hasUnread=false — static icon, no dot
+  // Active row is always treated as read (the user is looking at
+  // it); even if turn_end fires there, bumpSessionAfterTurn skips
+  // the unread mark for sessionId === activeSessionId.
+  const showUnread = !!session.hasUnread && !active;
   const row = (
     <div
       onClick={onClick}
@@ -271,8 +279,22 @@ function SidebarSessionRow({
         <StatusIcon status={session.status} size={14} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-ink">
-          {session.title}
+        <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              "min-w-0 flex-1 truncate text-[13px] text-ink",
+              showUnread ? "font-semibold" : "font-medium",
+            )}
+          >
+            {session.title}
+          </div>
+          {showUnread && (
+            <span
+              aria-label="未读"
+              title="有新回复"
+              className="size-2 shrink-0 rounded-full bg-brand"
+            />
+          )}
         </div>
         {session.summary && (
           <div className="mt-0.5 truncate text-[11px] leading-[1.4] text-ink-muted">

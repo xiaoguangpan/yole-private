@@ -41,6 +41,16 @@ export interface Session {
 
   pendingApprovalCount: number;
   errorCount: number;
+  /**
+   * "There is new content the user hasn't seen yet." Set when a
+   * turn_end (or `error`) IPC event arrives for a session that is
+   * NOT the active session; cleared when the user activates that
+   * session via the sidebar. Persisted to SQLite (column
+   * `has_unread`) so the inbox-style signal survives app restart.
+   * Orthogonal to the runtime status — see DESIGN.md sidebar three-
+   * way display (running spinner / idle + dot / idle).
+   */
+  hasUnread?: boolean;
 
   /** ISO 8601 timestamps. lastActivityAt drives sidebar bucket. */
   lastActivityAt: string;
