@@ -26,6 +26,22 @@ import type { Session } from "@/types/session";
 
 // ---------------- Static fixtures ----------------
 
+/**
+ * Hard-coded path + python + bridge cwd used by the multi-session
+ * spawn flow. sessionId is supplied per-spawn from the session row
+ * the user is activating (so each session's bridge has its own
+ * process keyed by its own id).
+ *
+ * V0.2 (Settings path picker — Stage 3 #4) will replace these with
+ * a prefs lookup so users can point Workbench at their own GA
+ * install without editing source.
+ */
+export const DEMO_GA_CONFIG = {
+  python: "python3",
+  gaPath: "/Users/inkstone/Documents/GenericAgent",
+  bridgeCwd: "/Users/inkstone/Documents/genericagent-webui",
+};
+
 export const DEMO_LLM_DISPLAY_NAME = "Claude Sonnet 4.5";
 
 export const DEMO_LLMS = [

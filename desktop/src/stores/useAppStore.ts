@@ -17,12 +17,13 @@ import { dispatchIPCEvent } from "@/lib/ipc-handlers";
 import {
   DEMO_APPROVAL_CONFIG,
   DEMO_APPROVAL_RECORDS,
+  DEMO_GA_CONFIG,
   DEMO_LLM_DISPLAY_NAME,
   DEMO_LLMS,
   DEMO_RUNTIME_INFO,
   DEMO_SESSIONS,
 } from "@/stores/demo";
-import type { AppError } from "@/types/app-error";
+import { type AppError, makeAppError } from "@/types/app-error";
 import type {
   AgentTurn,
   PendingApproval,
@@ -182,6 +183,23 @@ interface Actions {
 
   // Sessions
   setActiveSession: (id: string | undefined) => void;
+  /**
+   * Create a new session row (persisted best-effort), make it the
+   * active session, and seed an empty runtime. Returns the new id
+   * so the caller can chain `activateSession(id)` to spawn its
+   * bridge. Pushes a soft-limit warning toast once `sessions.length`
+   * exceeds 10 — the architecture supports more, but the UX scales
+   * poorly past that and the LLM-API budget grows linearly.
+   */
+  createSession: () => string;
+  /**
+   * Make `id` the active session and ensure its bridge is alive.
+   * Idempotent — if a connected bridge already exists for `id`,
+   * this is just a session switch. Re-spawns on `idle` / `closed` /
+   * `error` so a crashed session recovers when the user re-clicks
+   * its sidebar row.
+   */
+  activateSession: (id: string) => Promise<void>;
 
   // Approval (global)
   setApprovalRequiredTools: (tools: string[]) => void;
@@ -371,6 +389,77 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ...projectionFrom(rt),
       };
     }),
+
+  createSession: () => {
+    const id = `s-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    const now = new Date().toISOString();
+    const newSession: Session = {
+      id,
+      title: "新对话",
+      status: "idle",
+      pendingApprovalCount: 0,
+      errorCount: 0,
+      lastActivityAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((state) => {
+      const rt = emptyRuntime();
+      return {
+        sessions: [newSession, ...state.sessions],
+        activeSessionId: id,
+        _runtimes: { ...state._runtimes, [id]: rt },
+        ...projectionFrom(rt),
+      };
+    });
+    // Best-effort persist. SQLite may not be available (Vite dev /
+    // first launch before tauri-plugin-sql finishes init); the in-
+    // memory session list still drives UI for this app instance.
+    void persistSession(newSession).catch((e) => {
+      console.debug("[store] createSession persistSession failed.", e);
+    });
+    // Soft limit warning. The store doesn't block — power users can
+    // dismiss the toast and keep going. The number is a "you might
+    // want to archive some" line, not a hard limit.
+    const totalNow = get().sessions.length;
+    if (totalNow > 10) {
+      get().pushToast(
+        makeAppError({
+          category: "business",
+          severity: "warning",
+          message: `已开 ${totalNow} 个 session — 建议先 archive 几个旧的，否则后台 bridge 进程会越来越占资源。`,
+          hint: null,
+          retryable: false,
+          context: "createSession",
+          traceback: null,
+        }),
+      );
+    }
+    return id;
+  },
+
+  activateSession: async (id) => {
+    // setActiveSession lazy-inits the runtime and refreshes the
+    // top-level projection from _runtimes[id].
+    get().setActiveSession(id);
+    // Auto-spawn the bridge when this session has no live one.
+    // Re-spawn on `closed` / `error` lets a kill or crash recover
+    // by simply re-clicking the session.
+    const rt = get()._runtimes[id];
+    const needsSpawn =
+      !rt ||
+      rt.bridgeStatus === "idle" ||
+      rt.bridgeStatus === "closed" ||
+      rt.bridgeStatus === "error";
+    if (needsSpawn) {
+      await get().spawnBridge({
+        ...DEMO_GA_CONFIG,
+        sessionId: id,
+      });
+    }
+  },
 
   // ---- Approval (global) ----
   setApprovalRequiredTools: (tools) =>

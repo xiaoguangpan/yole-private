@@ -49,7 +49,8 @@ function App() {
 
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const createSession = useAppStore((s) => s.createSession);
+  const activateSession = useAppStore((s) => s.activateSession);
   const llms = useAppStore((s) => s.llms);
   const llmDisplayName = useAppStore((s) => s.llmDisplayName);
   const runtimeInfo = useAppStore((s) => s.runtimeInfo);
@@ -70,7 +71,6 @@ function App() {
   const dismissToast = useAppStore((s) => s.dismissToast);
 
   const bridgeStatus = useAppStore((s) => s.bridgeStatus);
-  const spawnBridge = useAppStore((s) => s.spawnBridge);
   const shutdownAllBridges = useAppStore((s) => s.shutdownAllBridges);
   const sendIPCCommand = useAppStore((s) => s.sendIPCCommand);
 
@@ -92,6 +92,24 @@ function App() {
   useEffect(() => {
     hydrateFromDB();
   }, [hydrateFromDB]);
+
+  // Auto-create + activate a session whenever the user lands on the
+  // empty screen without one. Two paths in:
+  //   1. App start (initial screen = "empty"): users without any
+  //      existing session get a fresh one + a bridge that starts
+  //      spawning in the background, so by the time they type a
+  //      message bridgeStatus is closer to "connected".
+  //   2. After "新 chat" click (which calls createSession itself —
+  //      this useEffect is then a no-op because activeSessionId is
+  //      already set).
+  // Skipped on the onboarding screen so the path picker can complete
+  // first without a stale session getting created behind it.
+  useEffect(() => {
+    if (screen === "empty" && !activeSessionId) {
+      const id = createSession();
+      void activateSession(id);
+    }
+  }, [screen, activeSessionId, createSession, activateSession]);
 
   // Global keyboard shortcuts: ⌘K palette, ⌘, settings, ⌘E inspector,
   // ⌘N new chat. Esc handled by Radix Dialog (Settings) and cmdk
@@ -173,7 +191,14 @@ function App() {
             setScreen={setScreen}
             onTriggerToast={() => pushToast(makeDemoToast())}
             bridgeStatus={bridgeStatus}
-            onSpawnBridge={() => spawnBridge(DEMO_BRIDGE_ARGS)}
+            onSpawnBridge={() => {
+              // Dev "spawn" walks the same path as production
+              // "新 chat": create a session row + activate (which
+              // spawns its bridge). Keeps the dev tool from
+              // diverging into a separate flow.
+              const id = createSession();
+              void activateSession(id);
+            }}
             onShutdownBridge={() => {
               // Dev-only kill switch. Multi-session is N-active, so
               // "kill" maps to "shutdown every alive bridge".
@@ -202,9 +227,20 @@ function App() {
           <Sidebar
             sessions={visibleSessions}
             activeId={effectiveActiveId}
-            onNewChat={() => setScreen("empty")}
+            onNewChat={() => {
+              // Create a fresh session row + activate (spawns the
+              // bridge) before switching the screen, so by the time
+              // the user finishes typing their first message the
+              // GA process is closer to ready.
+              const id = createSession();
+              void activateSession(id);
+              setScreen("empty");
+            }}
             onSelectSession={(id) => {
-              setActiveSession(id);
+              // Activate (re-spawns the bridge if this session has
+              // been idle / closed / errored) and switch to main.
+              // Other sessions' bridges keep running in background.
+              void activateSession(id);
               setScreen("main");
             }}
           />
@@ -214,40 +250,45 @@ function App() {
             <EmptyState
               llmDisplayName={llmDisplayName}
               onSubmit={(t) => {
-                // Only push into store turns when the bridge is alive
-                // — otherwise we'd flip the source-of-truth precedence
-                // away from the demo flow and the user would see their
-                // own message but no agent reply.
-                //
-                // sessionId is hard-coded to "s-today-1" here because
-                // we're activating the same session in setActiveSession
-                // below (Zustand state updates are async, so we can't
-                // rely on activeSessionId being updated by this line).
+                // activeSessionId is guaranteed non-null here by the
+                // auto-create-on-empty useEffect above. Defensive
+                // check anyway, in case of an edge race during very
+                // first paint.
+                if (!activeSessionId) {
+                  console.warn(
+                    "[empty] submit fired before session auto-create resolved",
+                  );
+                  return;
+                }
                 if (bridgeStatus === "connected") {
-                  appendUserTurn("s-today-1", t);
-                  sendIPCCommand("s-today-1", {
+                  appendUserTurn(activeSessionId, t);
+                  sendIPCCommand(activeSessionId, {
                     kind: "user_message",
                     text: t,
                     images: [],
                   });
                 } else {
-                  console.info("[empty] submit (demo flow):", t);
+                  console.info("[empty] submit (bridge not ready):", t);
                 }
-                setActiveSession("s-today-1");
                 setScreen("main");
               }}
               onQuickPrompt={(p) => {
+                if (!activeSessionId) {
+                  console.warn(
+                    "[empty] quick-prompt fired before session auto-create resolved",
+                  );
+                  return;
+                }
                 if (bridgeStatus === "connected") {
-                  appendUserTurn("s-today-1", p);
-                  sendIPCCommand("s-today-1", {
+                  appendUserTurn(activeSessionId, p);
+                  sendIPCCommand(activeSessionId, {
                     kind: "user_message",
                     text: p,
                     images: [],
                   });
                 } else {
-                  console.info("[empty] quick-prompt (demo flow):", p);
+                  console.info("[empty] quick-prompt (bridge not ready):", p);
                 }
-                setActiveSession("s-today-1");
                 setScreen("main");
               }}
             />
@@ -258,27 +299,26 @@ function App() {
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}
               onSubmit={(t) => {
-                // effectiveActiveId always resolves to a sessionId on
-                // the main screen (see fallback at L161). Components
-                // below MainView never see the empty-string projection.
-                const targetId = effectiveActiveId ?? "s-today-1";
+                // Main screen always has an active session — Sidebar
+                // / EmptyState set it before transitioning here.
+                if (!activeSessionId) return;
                 if (bridgeStatus === "connected") {
-                  appendUserTurn(targetId, t);
-                  sendIPCCommand(targetId, {
+                  appendUserTurn(activeSessionId, t);
+                  sendIPCCommand(activeSessionId, {
                     kind: "user_message",
                     text: t,
                     images: [],
                   });
                 } else {
-                  console.info("[main] submit (demo flow):", t);
+                  console.info("[main] submit (bridge not ready):", t);
                 }
               }}
               onApprove={(approvalId, decision) => {
-                const targetId = effectiveActiveId ?? "s-today-1";
-                recordApprovalDecision(targetId, approvalId, decision);
-                removePendingApproval(targetId, approvalId);
+                if (!activeSessionId) return;
+                recordApprovalDecision(activeSessionId, approvalId, decision);
+                removePendingApproval(activeSessionId, approvalId);
                 if (bridgeStatus === "connected") {
-                  sendIPCCommand(targetId, {
+                  sendIPCCommand(activeSessionId, {
                     kind: "approval_response",
                     approvalId,
                     decision,
@@ -290,9 +330,9 @@ function App() {
               }
               onStop={() => {
                 console.info("[main] stop");
-                const targetId = effectiveActiveId ?? "s-today-1";
+                if (!activeSessionId) return;
                 if (bridgeStatus === "connected") {
-                  sendIPCCommand(targetId, { kind: "abort" });
+                  sendIPCCommand(activeSessionId, { kind: "abort" });
                 }
               }}
               isRunning={isRunning}
@@ -328,7 +368,7 @@ function App() {
         llms={llms}
         onNewChat={() => setScreen("empty")}
         onOpenSession={(id) => {
-          setActiveSession(id);
+          void activateSession(id);
           setScreen("main");
         }}
         onSwitchLLM={(idx) =>
@@ -393,23 +433,6 @@ function App() {
 export default App;
 
 // ---------------- dev-only screen toggle ----------------
-
-// Hardcoded for #10a so the DEV "spawn bridge" button has something
-// to call without an Onboarding round-trip. Real values come from
-// the prefs table once #10b wires Onboarding step 1's path picker
-// + Settings → Runtime back to SQLite. If your machine has GA at a
-// different path, change DEMO_BRIDGE_ARGS.gaPath / bridgeCwd here.
-// sessionId aligns with DEMO_SESSIONS[0].id ("s-today-1" — see
-// stores/demo.ts) so the dev "spawn" button creates a bridge for
-// the same session the demo flow activates on empty→main. In the
-// N-active multi-session model, sendIPCCommand routes by sessionId,
-// so a mismatched id here would send messages into the void.
-const DEMO_BRIDGE_ARGS = {
-  python: "python3",
-  gaPath: "/Users/inkstone/Documents/GenericAgent",
-  bridgeCwd: "/Users/inkstone/Documents/genericagent-webui",
-  sessionId: "s-today-1",
-};
 
 const SCREEN_TOGGLE_LABEL: Record<Screen, string> = {
   onboarding: "intro",
