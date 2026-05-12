@@ -773,9 +773,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
     let toPersist: Session | null = null;
     set((state) => {
       if (!id) {
+        // Clearing the active session (e.g. user clicked "New Chat"
+        // → lazy path). Conversation projection resets to empty, but
+        // KEEP `llms` / `llmDisplayName` — LLM config is shared
+        // across the whole GA install (mykey.py is one file), so any
+        // previously-spawned bridge has already populated the real
+        // list. Falling back to emptyRuntime's DEMO_LLMS here would
+        // make the empty-screen Composer dropdown show fake model
+        // names ("GLM 5.1" etc.) until the user lands on a session.
         return {
           activeSessionId: undefined,
           ...projectionFrom(emptyRuntime()),
+          llms: state.llms,
+          llmDisplayName: state.llmDisplayName,
         };
       }
       // Lazy-init the runtime so subsequent setters can operate on
