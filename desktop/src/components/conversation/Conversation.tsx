@@ -69,7 +69,12 @@ function AgentTurnView({
   approvalDecisions?: Record<string, ApprovalDecision>;
   onApprove?: (approvalId: string, decision: ApprovalDecision) => void;
 }) {
-  const showFinalAnswer = turn.finalAnswer !== null;
+  // Hide MessageAgent + Copy/Save actions for intermediate turns
+  // that have no user-facing answer. ipc-handlers normalizes empty
+  // cleanedFinalAnswer → null; this trim() check is defense-in-depth
+  // for any other path that might leak a whitespace-only string.
+  const showFinalAnswer =
+    turn.finalAnswer !== null && turn.finalAnswer.trim() !== "";
 
   return (
     <div>

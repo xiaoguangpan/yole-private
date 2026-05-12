@@ -265,11 +265,18 @@ function turnFromTurnEnd(event: {
   // text when the LLM didn't produce a meaningful one. Trim + treat
   // empty as undefined so the UI doesn't render a hollow line.
   const trimmedSummary = event.summary?.trim();
+  // Intermediate turns (tool-only, no user-facing answer) produce a
+  // responseContent that's entirely <thinking>...</thinking> +
+  // <tool_use>...</tool_use> tags; after cleanFinalAnswer strips
+  // everything what's left is "". Normalize to null so Conversation's
+  // `showFinalAnswer = finalAnswer !== null` check correctly hides
+  // the MessageAgent + its Copy/Save actions for these turns.
+  const cleanedAnswer = cleanFinalAnswer(event.responseContent);
   return {
     role: "agent",
     thinking: extractThinking(event.responseContent),
     tools,
-    finalAnswer: cleanFinalAnswer(event.responseContent),
+    finalAnswer: cleanedAnswer.trim() ? cleanedAnswer : null,
     turnIndex: event.turnIndex,
     summary: trimmedSummary ? trimmedSummary : undefined,
   };

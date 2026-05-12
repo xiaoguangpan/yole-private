@@ -316,11 +316,18 @@ function rowsToTurns(rows: MessageRow[]): Turn[] {
       const displayStep = currentMessageBase
         ? row.turn_index - currentMessageBase + 1
         : row.turn_index; // defensive: no preceding user row found
+      // Normalize empty-string final_answer back to null (same as
+      // ipc-handlers turnFromTurnEnd does for live events). Old rows
+      // written before commit 1d0c404's fix may have stored "" for
+      // tool-only intermediate turns; surfacing them as null here
+      // keeps the Copy/Save actions from appearing under those turns.
+      const finalAnswerRaw = row.final_answer ?? "";
+      const finalAnswer = finalAnswerRaw.trim() ? finalAnswerRaw : null;
       const turn: AgentTurn = {
         role: "agent",
         thinking: row.thinking ?? undefined,
         tools,
-        finalAnswer: row.final_answer ?? null,
+        finalAnswer,
         turnIndex: displayStep,
         // GA turn summary (added in migration v3). Pre-v3 rows
         // have NULL — TurnMarker collapses to just "第 N 步"

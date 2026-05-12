@@ -26,48 +26,40 @@ interface ToolCalloutProps {
 }
 
 /**
- * Tool visual tier — picks one of three rendering paths based on
- * GA's tool taxonomy and current status:
+ * Tool visual tier — three rendering paths, selected by status:
  *
  *   "hidden"  — `no_tool`. GA's null-op tool; its semantic ("agent
  *               chose not to dispatch") is already covered by the
  *               TurnMarker's GA summary. Rendering a callout for
  *               it would only crowd the conversation.
  *
- *   "inline"  — read-only / agent-internal tools in a settled
- *               success state. file_read / web_scan / recall /
- *               start_long_term_update. Their args are usually
- *               1-line (path / query / memory key) and their
- *               results have already been folded into the agent's
- *               final answer; users rarely revisit them. A compact
- *               pill keeps the conversation continuous.
+ *   "inline"  — ANY tool in a settled success state. Compact
+ *               single-row pill (icon + name + primary arg
+ *               preview) with click-to-expand for full args /
+ *               result. Visual consistency across tools beats
+ *               case-by-case prominence: users skimming a finished
+ *               conversation see a clean narrative; users who want
+ *               to audit a specific operation (e.g. file_patch
+ *               diff, code_run output) click to expand.
  *
- *   "block"   — everything else: external-world tools in any state
- *               (file_patch / file_write / code_run) where users
- *               will want to see the diff / output for audit and
- *               trust; plus any tool in waiting_approval / failed /
- *               running / denied — those statuses need visual
- *               prominence regardless of which tool produced them.
+ *   "block"   — attention-demanding states: waiting_approval /
+ *               failed / running / denied. These ALL need visual
+ *               prominence regardless of which tool produced them
+ *               (the user must see them; in-flight needs spinner
+ *               space; errors need warning weight).
  *
- * The split mirrors GA's design philosophy: agents are continuous
- * reasoning processes, but users only need to see *consequential
- * decision points* (the tools that change the outside world or
- * demand user input). Read-only tools are scaffolding the agent
- * uses, not nodes the user audits.
+ * Earlier design (commit 1b283c1) split block/inline by tool name
+ * — file_patch / file_write / code_run stayed as block in settled
+ * state for "audit value". That left settled turns rendering as a
+ * jarring mix of pill + block depending on which tools fired,
+ * violating visual consistency. Dropped: settled state is always
+ * pill, full content lives one click away.
  */
-const INLINE_TOOL_NAMES = new Set([
-  "file_read",
-  "web_scan",
-  "recall",
-  "start_long_term_update",
-]);
-
 function pickToolTier(tool: ConversationToolEvent): "hidden" | "inline" | "block" {
   if (tool.name === "no_tool") return "hidden";
   const isSettledSuccess =
     tool.status === "success-current" || tool.status === "success-historical";
-  if (isSettledSuccess && INLINE_TOOL_NAMES.has(tool.name)) return "inline";
-  return "block";
+  return isSettledSuccess ? "inline" : "block";
 }
 
 /**
@@ -407,9 +399,14 @@ function InlineToolPill({ tool }: { tool: ConversationToolEvent }) {
 
 /**
  * Pick the most useful single-line arg preview for a given tool.
- * Each inline-tier tool has a "primary" arg the user would want
- * to see at a glance — path for file_read, query for web_scan, etc.
+ * Each tool has a "primary" arg the user wants to see at a glance —
+ * path for file ops, script for code_run, query for searches.
+ *
+ * Truncates long values (e.g. code_run scripts) since the pill is
+ * single-line; the full content lives in the expanded ArgsBlock.
  */
+const PREVIEW_MAX_LEN = 80;
+
 function previewArgs(
   toolName: string,
   args: Record<string, unknown> | undefined,
@@ -419,17 +416,32 @@ function previewArgs(
     const v = args[k];
     return typeof v === "string" && v.length > 0 ? v : null;
   };
+  const truncate = (s: string | null): string | null =>
+    s && s.length > PREVIEW_MAX_LEN ? s.slice(0, PREVIEW_MAX_LEN) + "…" : s;
   // Tool-specific primary arg picks.
+  let raw: string | null;
   switch (toolName) {
     case "file_read":
-      return get("path");
+    case "file_write":
+    case "file_patch":
+      raw = get("path");
+      break;
     case "web_scan":
-      return get("query") ?? get("url");
+      raw = get("query") ?? get("url");
+      break;
     case "recall":
-      return get("query") ?? get("key");
+      raw = get("query") ?? get("key");
+      break;
     case "start_long_term_update":
-      return get("key") ?? get("topic");
+      raw = get("key") ?? get("topic");
+      break;
+    case "code_run":
+      // GA's code_run args carry `type` + `script` — script is the
+      // useful preview; type (bash / python) is implicit in context.
+      raw = get("script") ?? get("command");
+      break;
     default:
-      return get("path") ?? get("query") ?? get("command");
+      raw = get("path") ?? get("query") ?? get("command");
   }
+  return truncate(raw);
 }
