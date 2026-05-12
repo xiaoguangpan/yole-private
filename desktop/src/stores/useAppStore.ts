@@ -277,8 +277,23 @@ const DEFAULT_NEW_SESSION_TITLE = "新对话";
  */
 function rowsToTurns(rows: MessageRow[]): Turn[] {
   const turns: Turn[] = [];
+  // Per-message step recovery: AgentTurn.turnIndex is the GA-side
+  // per-message step (1 for the first turn of each user message,
+  // 2 for the second, etc) — that's what the user expects to see
+  // in the "第 N 步" UI. SQLite however stores the **absolute**
+  // session-wide turn_index to avoid primary-key collisions
+  // between different user messages' assistant rows (see
+  // turnIndexOffset rationale on SessionRuntime).
+  //
+  // To map back from absolute to per-message at restore, we walk
+  // rows in (turn_index, sequence) order and track the latest
+  // user row's turn_index as the base of the current user_message
+  // "block". Each assistant row's display step is then
+  // `absolute - base + 1`.
+  let currentMessageBase = 0;
   for (const row of rows) {
     if (row.role === "user") {
+      currentMessageBase = row.turn_index;
       turns.push({ role: "user", content: row.content } as UserTurn);
     } else if (row.role === "assistant") {
       const toolCalls = safeParseJsonArray(row.tool_calls);
@@ -298,12 +313,15 @@ function rowsToTurns(rows: MessageRow[]): Turn[] {
           resultPreview,
         };
       });
+      const displayStep = currentMessageBase
+        ? row.turn_index - currentMessageBase + 1
+        : row.turn_index; // defensive: no preceding user row found
       const turn: AgentTurn = {
         role: "agent",
         thinking: row.thinking ?? undefined,
         tools,
         finalAnswer: row.final_answer ?? null,
-        turnIndex: row.turn_index,
+        turnIndex: displayStep,
         // GA turn summary (added in migration v3). Pre-v3 rows
         // have NULL — TurnMarker collapses to just "第 N 步"
         // when summary is undefined, which is the right behavior
@@ -491,8 +509,18 @@ interface Actions {
    * present, written into `session.summary` as `第 N 步 · {summary}`
    * for the Sidebar two-line preview. Truncated to keep the line
    * single-row.
+   *
+   * `stepNumber` is the per-message step the user sees ("第 N 步").
+   * Comes straight from `event.turnIndex` (GA-native, resets per
+   * user message). Distinct from the session's absolute turnCount
+   * (which keeps growing forever, used internally as the
+   * turnIndexOffset source).
    */
-  bumpSessionAfterTurn: (sessionId: string, summary?: string) => void;
+  bumpSessionAfterTurn: (
+    sessionId: string,
+    summary?: string,
+    stepNumber?: number,
+  ) => void;
   /**
    * Archive a session: flip its status to "archived" and persist.
    * Archived sessions are hidden from the Sidebar's bucketed list
@@ -868,7 +896,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return id;
   },
 
-  bumpSessionAfterTurn: (sessionId, summary) => {
+  bumpSessionAfterTurn: (sessionId, summary, stepNumber) => {
     const now = new Date().toISOString();
     // Inbox-style unread: a finished turn in a non-active session
     // is new content the user hasn't seen. The active session
@@ -881,18 +909,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
       sessions: state.sessions.map((s) => {
         if (s.id !== sessionId) return s;
         const turnCount = (s.turnCount ?? 0) + 1;
-        // Compose sidebar two-liner: "Turn N · {one-line summary}".
-        // We strip newlines + clamp length so it fits the row's
-        // truncate ellipsis without wrapping. When the bridge didn't
-        // emit a summary we keep the previous one rather than wipe
-        // it — staleness beats blanking the row on every turn.
-        // Sidebar二行预览：用「第 N 步」跟 TurnMarker 一致，避免
-        // 跟用户对话「轮次」混淆。N 是 GA 内核 turn_index（单条
-        // user message 可能触发多个 step），不是 session 中第几条
-        // user 发言。
+        // Compose sidebar two-liner: "第 N 步 · {summary}".
+        // `stepNumber` is the per-message step the user expects
+        // ("第 N 步" resets to 1 on every new user message — GA-
+        // native semantic via event.turnIndex). Falls back to
+        // turnCount in case some old code path didn't pass it.
+        // Truncate the summary so the line fits the row's
+        // truncate ellipsis without wrapping. When the bridge
+        // didn't emit a summary we keep the previous one rather
+        // than wipe it — staleness beats blanking the row on
+        // every turn.
+        const displayStep = stepNumber ?? turnCount;
         const nextSummary =
           summary && summary.trim()
-            ? `第 ${turnCount} 步 · ${truncateSummary(summary)}`
+            ? `第 ${displayStep} 步 · ${truncateSummary(summary)}`
             : s.summary;
         updated = {
           ...s,

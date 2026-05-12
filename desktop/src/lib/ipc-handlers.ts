@@ -132,14 +132,15 @@ export function dispatchIPCEvent(
 
     case "turn_end": {
       // GA's agent_runner_loop resets turn=1 on every put_task
-      // (per-message), so event.turnIndex is local to the current
-      // user_message run. Add the runtime's offset (set in
-      // appendUserTurn = turnCount before this run) to get an
-      // absolute session-wide turn index. See SessionRuntime
-      // doc comment for the full bug + fix rationale.
+      // (per-message), so event.turnIndex is the per-message
+      // step (the value users want to see in "第 N 步"). For
+      // SQLite, we add the runtime's offset to get an absolute
+      // session-wide turn index — the primary key
+      // `msg_${sessionId}_${turnIndex}_assistant` would collide
+      // across user messages otherwise. See SessionRuntime
+      // `turnIndexOffset` doc comment for full background.
       const offset = s._runtimes[event.sessionId]?.turnIndexOffset ?? 0;
       const absoluteTurnIndex = event.turnIndex + offset;
-      const normalized = { ...event, turnIndex: absoluteTurnIndex };
       console.info("[ipc] turn_end", {
         gaTurnIndex: event.turnIndex,
         absoluteTurnIndex,
@@ -147,7 +148,11 @@ export function dispatchIPCEvent(
         toolCallCount: event.toolCalls?.length ?? 0,
         hasFinalAnswer: !!event.responseContent,
       });
-      const turn = turnFromTurnEnd(normalized);
+      // UI: AgentTurn.turnIndex = per-message step (raw GA value).
+      // TurnMarker renders "第 N 步" against this — resetting to 1
+      // on every new user message is GA's native semantic and what
+      // the user expects.
+      const turn = turnFromTurnEnd(event);
       s.appendAgentTurn(event.sessionId, turn);
       // Defensive: appendAgentTurn already sets agentRunning=false in
       // its reducer, but call it again here so the IPC layer is
@@ -155,16 +160,15 @@ export function dispatchIPCEvent(
       // the store action sees the state transition explicitly.
       s.setAgentRunning(event.sessionId, false);
       // Update the session row (turn_count + last_activity_at +
-      // summary) so the Sidebar bucketing + "第 N 步 · {summary}" badge
-      // stay current across app restarts. SQLite write is best-effort.
-      // `event.summary` is GA's per-turn one-liner from
-      // `agent._turn_end_hooks`; bridge passes it through verbatim.
-      s.bumpSessionAfterTurn(event.sessionId, event.summary);
-      // Best-effort SQLite double-write. Persisted under the
-      // ABSOLUTE turn index — using the raw GA index would let
-      // back-to-back user messages collide on the same
-      // `msg_${sessionId}_1_assistant` row and silently overwrite.
-      void persistTurnEndToMessages(normalized);
+      // summary). Sidebar `第 N 步 · {summary}` previews also use
+      // the per-message step (matches what the user sees in the
+      // main view). turn_count itself keeps incrementing in
+      // absolute terms — that's the offset's source of truth.
+      s.bumpSessionAfterTurn(event.sessionId, event.summary, event.turnIndex);
+      // SQLite: persist under the ABSOLUTE turn index. rowsToTurns
+      // reconstructs the per-message step at restore by tracking
+      // the latest user row's turn_index as a per-message base.
+      void persistTurnEndToMessages({ ...event, turnIndex: absoluteTurnIndex });
       return;
     }
 
@@ -210,14 +214,12 @@ export function dispatchIPCEvent(
     case "turn_start": {
       // Reflects which GA-side iteration the agent is currently on.
       // The thinking placeholder reads this to render
-      // "第 N 步 · 思考中…" so users can see progress on long
-      // multi-turn tasks. N is the absolute (session-wide) step
-      // number, matching what appears in completed TurnMarkers and
-      // the Sidebar "第 N 步 · {summary}" preview — so we add the
-      // runtime's offset to GA's per-message-local index.
-      const offset = s._runtimes[event.sessionId]?.turnIndexOffset ?? 0;
-      console.debug("[ipc] turn_start", { ...event, offset });
-      s.setCurrentTurnIndex(event.sessionId, event.turnIndex + offset);
+      // "第 N 步 · 思考中…". N is the per-message step (GA-native,
+      // resets to 1 on each new user message) — matches what
+      // completed TurnMarkers show, what the Sidebar preview
+      // shows. No offset applied; raw GA value is the display.
+      console.debug("[ipc] turn_start", event);
+      s.setCurrentTurnIndex(event.sessionId, event.turnIndex);
       // New turn starts → drop whatever streaming buffer the previous
       // turn left, so the in-flight render doesn't bleed across turns.
       s.clearInFlightContent(event.sessionId);

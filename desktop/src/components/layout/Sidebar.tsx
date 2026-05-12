@@ -283,14 +283,18 @@ function SidebarSessionRow({
   // just by the icon's rotation.
   const showUnread = !!session.hasUnread && !active;
   const isRunning = session.status === "running";
-  // While a turn is mid-flight, turnCount hasn't been bumped yet —
-  // bumpSessionAfterTurn fires on turn_end. So the step currently
-  // being run is `turnCount + 1`, matching the TurnMarker / thinking
-  // placeholder count in the main view.
-  const runningStepIndex = (session.turnCount ?? 0) + 1;
-  const sublineText = isRunning
-    ? `正在工作 · 第 ${runningStepIndex} 步`
-    : session.summary;
+  // Sidebar running subline omits a step number. The previous
+  // form ("正在工作 · 第 N 步") used `turnCount + 1` which is the
+  // session-absolute count — wrong unit, since users expect "第 N
+  // 步" to reset per user message (matches the TurnMarker /
+  // thinking-placeholder semantic). Surfacing the correct
+  // per-message step here would require pulling
+  // `_runtimes[id].currentTurnIndex` into the sidebar row, which
+  // adds coupling for not much gain at this granularity (the
+  // user can open the session to see the live step). So this
+  // subline just says "正在工作…" — visible activity signal
+  // without committing to a number.
+  const sublineText = isRunning ? "正在工作…" : session.summary;
   const row = (
     <div
       onClick={onClick}
