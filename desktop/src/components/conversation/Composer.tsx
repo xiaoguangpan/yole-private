@@ -307,6 +307,21 @@ function LLMPill({
               </button>
             </Popover.Close>
           ))}
+          {/* Footer hint: addresses the "为什么这里没有 X 模型" question
+              right where it surfaces. mykey.py is GA's LLM config file;
+              edits only take effect on a fresh GA process, which
+              for Workbench means restarting the app. Putting the
+              hint here (rather than in Settings) ensures the user
+              sees it exactly when they need it — opening the
+              picker — without having to remember it from
+              onboarding or hunt in Settings. */}
+          <div className="mt-1 border-t border-line px-2.5 pb-1 pt-1.5 text-[11px] leading-[1.45] text-ink-muted">
+            没看到你的模型？修改{" "}
+            <code className="rounded-sm bg-app px-1 py-px font-mono text-[10.5px] text-ink-soft">
+              mykey.py
+            </code>{" "}
+            后重启 Workbench
+          </div>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
