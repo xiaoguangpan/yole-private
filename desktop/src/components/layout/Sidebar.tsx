@@ -268,14 +268,29 @@ function SidebarSessionRow({
    * is suppressed otherwise (no actions = no menu to show). */
   onArchive?: () => void;
 }) {
-  // Three-state sidebar display (Stage 3 round 7):
-  //   1. running                 — spinner via StatusIcon
-  //   2. idle  + hasUnread=true  — static icon + brand dot + bold
+  // Three-state sidebar display (Stage 3 round 7+10):
+  //   1. running                 — bold brand spinner + italic "正在工作 · 第 N 步" subline
+  //   2. idle  + hasUnread=true  — static icon + brand dot + bold title
   //   3. idle  + hasUnread=false — static icon, no dot
   // Active row is always treated as read (the user is looking at
   // it); even if turn_end fires there, bumpSessionAfterTurn skips
   // the unread mark for sessionId === activeSessionId.
+  //
+  // Running gets a second signal beyond the spinning icon: the
+  // subline switches from the persisted turn-summary to a live
+  // italic "正在工作 · 第 N 步". Color + typography + language all
+  // shift so the running state is identifiable at a glance, not
+  // just by the icon's rotation.
   const showUnread = !!session.hasUnread && !active;
+  const isRunning = session.status === "running";
+  // While a turn is mid-flight, turnCount hasn't been bumped yet —
+  // bumpSessionAfterTurn fires on turn_end. So the step currently
+  // being run is `turnCount + 1`, matching the TurnMarker / thinking
+  // placeholder count in the main view.
+  const runningStepIndex = (session.turnCount ?? 0) + 1;
+  const sublineText = isRunning
+    ? `正在工作 · 第 ${runningStepIndex} 步`
+    : session.summary;
   const row = (
     <div
       onClick={onClick}
@@ -305,9 +320,16 @@ function SidebarSessionRow({
             />
           )}
         </div>
-        {session.summary && (
-          <div className="mt-0.5 truncate text-[11px] leading-[1.4] text-ink-muted">
-            {session.summary}
+        {sublineText && (
+          <div
+            className={cn(
+              "mt-0.5 truncate text-[11px] leading-[1.4]",
+              isRunning
+                ? "font-serif italic text-ink-soft"
+                : "text-ink-muted",
+            )}
+          >
+            {sublineText}
           </div>
         )}
         {(session.pendingApprovalCount > 0 || session.errorCount > 0) && (

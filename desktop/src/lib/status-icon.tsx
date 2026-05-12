@@ -12,15 +12,18 @@ import { cn } from "@/lib/utils";
 import type { SessionStatus } from "@/types/session";
 
 /**
- * Maps SessionStatus to the Phosphor thin icon + color it should render
- * with on session rows. Per DESIGN.md §4.2 Sidebar Spec + prototype's
- * chrome.jsx.
+ * Maps SessionStatus to the Phosphor icon + color + weight it should
+ * render with on session rows. Per DESIGN.md §4.2 Sidebar Spec +
+ * prototype's chrome.jsx.
  *
- * - running: spinning brand-strong CircleNotch
- * - completed: brand-strong CheckCircle
- * - waiting_approval: amber PauseCircle
- * - error: deep red XCircle
- * - idle / connecting / archived: muted
+ * - running: spinning brand-strong CircleNotch, BOLD weight so the
+ *   "agent is working" state pops on sidebar scan. Thin weight at
+ *   14px was visually too quiet to distinguish from idle even with
+ *   the spin animation.
+ * - completed: brand-strong CheckCircle (thin — passive success)
+ * - waiting_approval: amber PauseCircle (thin)
+ * - error: deep red XCircle (thin)
+ * - idle / connecting / archived: muted (thin)
  * - cancelled: muted Prohibit (different from error — user-initiated)
  */
 const STATUS_MAP: Record<
@@ -28,12 +31,18 @@ const STATUS_MAP: Record<
   {
     Icon: typeof Circle;
     className: string;
+    weight?: "thin" | "regular" | "bold";
     spin?: boolean;
   }
 > = {
   idle: { Icon: Circle, className: "text-ink-muted" },
   connecting: { Icon: CircleNotch, className: "text-ink-muted", spin: true },
-  running: { Icon: CircleNotch, className: "text-brand-strong", spin: true },
+  running: {
+    Icon: CircleNotch,
+    className: "text-brand-strong",
+    weight: "bold",
+    spin: true,
+  },
   waiting_approval: { Icon: PauseCircle, className: "text-warning" },
   error: { Icon: XCircle, className: "text-error" },
   cancelled: { Icon: Prohibit, className: "text-ink-muted" },
@@ -52,7 +61,7 @@ export function StatusIcon({
   const { Icon } = cfg;
   return (
     <span className={cn("inline-flex shrink-0", cfg.spin && "spin")}>
-      <Icon size={size} weight="thin" className={cfg.className} />
+      <Icon size={size} weight={cfg.weight ?? "thin"} className={cfg.className} />
     </span>
   );
 }
