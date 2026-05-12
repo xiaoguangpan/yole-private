@@ -283,18 +283,33 @@ function SidebarSessionRow({
   // just by the icon's rotation.
   const showUnread = !!session.hasUnread && !active;
   const isRunning = session.status === "running";
-  // Sidebar running subline omits a step number. The previous
-  // form ("正在工作 · 第 N 步") used `turnCount + 1` which is the
-  // session-absolute count — wrong unit, since users expect "第 N
-  // 步" to reset per user message (matches the TurnMarker /
-  // thinking-placeholder semantic). Surfacing the correct
-  // per-message step here would require pulling
-  // `_runtimes[id].currentTurnIndex` into the sidebar row, which
-  // adds coupling for not much gain at this granularity (the
-  // user can open the session to see the live step). So this
-  // subline just says "正在工作…" — visible activity signal
-  // without committing to a number.
-  const sublineText = isRunning ? "正在工作…" : session.summary;
+  // Subline composition:
+  //
+  //   running → "正在工作…"
+  //     (No step number — surfacing per-message step here would
+  //     require coupling the sidebar row to runtime state.
+  //     "Activity is happening" is the right granularity for
+  //     this overview; the live step lives in the main view.)
+  //
+  //   settled → "已完成 · {summary}"
+  //     "Stops at 第 N 步" reads as "still mid-flight"; the
+  //     past-tense "已完成 ·" prefix shifts the register to
+  //     "this conversation is done, here's the recap". The {summary}
+  //     itself is GA's third-person past-tense one-liner so it
+  //     reads naturally after the prefix.
+  //
+  // Legacy data: pre-this-change rows wrote
+  // "第 N 步 · {summary}" into session.summary directly. Strip
+  // that prefix at render so old rows display in the new format
+  // without a DB migration.
+  const cleanSummary = session.summary
+    ? stripLegacyStepPrefix(session.summary)
+    : null;
+  const sublineText = isRunning
+    ? "正在工作…"
+    : cleanSummary
+      ? `已完成 · ${cleanSummary}`
+      : null;
   const row = (
     <div
       onClick={onClick}
@@ -459,4 +474,16 @@ function SidebarFooter({
       {count > 0 && <span className="ml-auto text-ink-soft">{count}</span>}
     </button>
   );
+}
+
+/**
+ * Strip the legacy "第 N 步 · " prefix that earlier versions of
+ * bumpSessionAfterTurn wrote into session.summary. The current
+ * write path stores raw summary text and lets the renderer decide
+ * which prefix to add (e.g. "已完成 · " when settled). This
+ * keeps old rows displaying in the new format without a DB
+ * migration — they'll re-save in the new format on next turn_end.
+ */
+function stripLegacyStepPrefix(s: string): string {
+  return s.replace(/^第\s*\d+\s*步\s*·\s*/, "");
 }

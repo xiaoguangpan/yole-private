@@ -903,7 +903,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return id;
   },
 
-  bumpSessionAfterTurn: (sessionId, summary, stepNumber) => {
+  bumpSessionAfterTurn: (sessionId, summary, _stepNumber) => {
     const now = new Date().toISOString();
     // Inbox-style unread: a finished turn in a non-active session
     // is new content the user hasn't seen. The active session
@@ -916,21 +916,23 @@ export const useAppStore = create<AppStore>((set, get) => ({
       sessions: state.sessions.map((s) => {
         if (s.id !== sessionId) return s;
         const turnCount = (s.turnCount ?? 0) + 1;
-        // Compose sidebar two-liner: "第 N 步 · {summary}".
-        // `stepNumber` is the per-message step the user expects
-        // ("第 N 步" resets to 1 on every new user message — GA-
-        // native semantic via event.turnIndex). Falls back to
-        // turnCount in case some old code path didn't pass it.
-        // Truncate the summary so the line fits the row's
-        // truncate ellipsis without wrapping. When the bridge
-        // didn't emit a summary we keep the previous one rather
-        // than wipe it — staleness beats blanking the row on
-        // every turn.
-        const displayStep = stepNumber ?? turnCount;
+        // Store raw summary text — no "第 N 步 · " or "已完成 · "
+        // prefix at the storage layer. Sidebar rendering decides
+        // what prefix to add based on the session's current state
+        // ("正在工作…" while running, "已完成 · {summary}" once
+        // settled). This keeps presentation flexible without DB
+        // migrations, and the same summary string can serve both
+        // running and finished views.
+        //
+        // _stepNumber kept in the signature for API stability —
+        // earlier prefix format used it. No longer consumed; the
+        // step-N display lives in the main view's TurnMarker.
+        //
+        // When the bridge didn't emit a summary we keep the
+        // previous one rather than wipe it — staleness beats
+        // blanking the row on every turn.
         const nextSummary =
-          summary && summary.trim()
-            ? `第 ${displayStep} 步 · ${truncateSummary(summary)}`
-            : s.summary;
+          summary && summary.trim() ? truncateSummary(summary) : s.summary;
         updated = {
           ...s,
           turnCount,
