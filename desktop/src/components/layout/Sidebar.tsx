@@ -752,7 +752,7 @@ function SidebarSessionRow({
                 )}
               >
                 <Folder size={13} weight="thin" />
-                归入项目
+                加入项目
                 <CaretRight
                   size={10}
                   weight="thin"
@@ -986,7 +986,7 @@ function SidebarProjectsSection({
           className="mx-1.5 mb-1 flex w-[calc(100%-12px)] cursor-pointer items-start rounded-sm px-3 py-2 text-left transition-colors hover:bg-hover"
         >
           <span className="font-serif text-[11.5px] italic text-ink-muted group-hover:text-ink-soft">
-            把相关对话归入项目
+            把相关对话加入项目
           </span>
         </button>
       ) : (
@@ -1228,7 +1228,7 @@ function SidebarProjectEmptyCta({
         在 {projectName} 里新建对话
       </button>
       <p className="text-[11px] text-ink-muted">
-        或右键已有对话「归入项目」
+        或右键已有对话「加入项目」
       </p>
     </div>
   );

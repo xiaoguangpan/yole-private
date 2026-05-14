@@ -284,7 +284,7 @@ PROJECTS 是 sidebar 的次要 section（保持在 timeline 之下），但 codi
 
 **E. 移动 Session 到 Project**
 
-- V0.1 仅支持右键菜单：session row right-click → `Move to project ▸` submenu → 列出全部 project + `(no project)` 选项
+- V0.1 仅支持右键菜单：session row right-click → `加入项目 ▸` submenu → 列出全部 project + `(no project)` 选项
 - 已属某 project 的 session 在 submenu 中该 project 名前打勾
 - **不做拖拽**（V0.2 候选，sidebar drag/drop 工程坑较深）
 - 移动后：UI 立即重渲染（timeline 内 session tag 更新 + 原/新 project 内 session list 更新）；DB 异步双写
