@@ -47,16 +47,21 @@ export interface TopBarProps {
    *     active session's LLM history. Low-frequency power-user fix
    *     for "agent forgot its tools" after long runs.
    *   - Desktop Pet: launches GA's `desktop_pet_v2.pyw` subprocess
-   *     and attaches a turn_end hook to the active session. Sticky
-   *     to the session active at click time.
+   *     and attaches a turn_end hook to a session. Clicking from a
+   *     non-holder session implicitly migrates the pet here (the
+   *     parent's onTogglePet handles the detach/attach sequence).
    *
-   * `petAttachedSessionId` non-null = pet is currently running
-   * (attached to that session). Used to flip the menu item label
-   * to indicate the running state.
+   * `currentSessionHasPet` = pet is attached to the session whose
+   * title this menu represents. Drives the 2-state label:
+   *   true  → "关闭桌面宠物"
+   *   false → "桌面宠物"
+   * Whether a pet exists ON ANOTHER session is conveyed by the
+   * Sidebar's Cat badge; the menu intentionally doesn't surface
+   * that distinction.
    */
   onReinjectTools?: () => void;
   onTogglePet?: () => void;
-  petAttachedSessionId?: string | null;
+  currentSessionHasPet?: boolean;
   /**
    * Rename the active session. When provided, the title menu shows a
    * "重命名" entry that flips the title block into an inline input —
@@ -118,7 +123,7 @@ export function TopBar({
   onToggleConversationWidth,
   onReinjectTools,
   onTogglePet,
-  petAttachedSessionId,
+  currentSessionHasPet = false,
   onRenameSession,
   trafficLightPadding = 70,
 }: TopBarProps) {
@@ -164,7 +169,7 @@ export function TopBar({
             title={sessionTitle}
             onReinjectTools={onReinjectTools}
             onTogglePet={onTogglePet}
-            petAttachedSessionId={petAttachedSessionId}
+            currentSessionHasPet={currentSessionHasPet}
             onRename={onRenameSession}
           />
         ) : (
@@ -296,12 +301,14 @@ function YoloIndicator({
  *
  *   - 🔄 重新注入工具 (Reinject Tools): one-shot — re-injects GA's
  *     tool definitions into the active session's LLM history.
- *   - 🐱 Desktop Pet: toggle — spawns GA's pet subprocess and binds
- *     turn-end progress to it. The label flips to "已附着" suffix
- *     when running.
+ *   - 🐱 桌面宠物 (Desktop Pet): 2-state toggle. Label is
+ *     "关闭桌面宠物" when this session holds the pet and "桌面宠物"
+ *     otherwise; clicking "桌面宠物" from a non-holder session
+ *     implicitly migrates the pet here. "Where is the pet right
+ *     now" lives in the Sidebar Cat badge, not in this label.
  *
- * Future V0.2 entries (`/branch`, `/rewind`, inline rename) slot in
- * here too — see discussion thread 2026-05-13.
+ * Future V0.2 entries (`/branch`, `/rewind`) slot in here too — see
+ * discussion thread 2026-05-13.
  *
  * Why title-as-trigger instead of a sibling `⋯` button: a bare title +
  * trailing dots reads as CSS text-overflow ellipsis. The whole-block
@@ -312,16 +319,16 @@ function SessionTitleMenu({
   title,
   onReinjectTools,
   onTogglePet,
-  petAttachedSessionId,
+  currentSessionHasPet,
   onRename,
 }: {
   title: string;
   onReinjectTools?: () => void;
   onTogglePet?: () => void;
-  petAttachedSessionId?: string | null;
+  currentSessionHasPet?: boolean;
   onRename?: (newTitle: string) => void;
 }) {
-  const petRunning = !!petAttachedSessionId;
+  const petHere = !!currentSessionHasPet;
   const [editing, setEditing] = useState(false);
 
   // Tracks whether the menu close was triggered by "重命名" so we can
@@ -425,16 +432,11 @@ function SessionTitleMenu({
             <Cat
               size={14}
               weight="thin"
-              className={petRunning ? "text-brand" : "text-ink-soft"}
+              className={petHere ? "text-brand" : "text-ink-soft"}
             />
-            <span className={petRunning ? "text-ink" : "text-ink"}>
-              桌面宠物
+            <span className="text-ink">
+              {petHere ? "关闭桌面宠物" : "桌面宠物"}
             </span>
-            {petRunning && (
-              <span className="ml-auto text-[11px] text-ink-muted">
-                · 已附着
-              </span>
-            )}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

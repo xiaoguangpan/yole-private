@@ -103,6 +103,7 @@ function App() {
   const conversationWidth = useAppStore((s) => s.conversationWidth);
   const setConversationWidth = useAppStore((s) => s.setConversationWidth);
   const petAttachedSessionId = useAppStore((s) => s.petAttachedSessionId);
+  const setPendingPetMigration = useAppStore((s) => s.setPendingPetMigration);
 
   const toasts = useAppStore((s) => s.toasts);
   const pushToast = useAppStore((s) => s.pushToast);
@@ -347,28 +348,39 @@ function App() {
               });
             }}
             onTogglePet={() => {
-              // Pet toggle:
-              //   - If a pet is already attached (anywhere): detach it.
-              //     Send detach to THAT session's bridge, not the
-              //     active one, so the hook gets cleared on the right
-              //     agent instance.
-              //   - Else: attach to the currently active session.
-              // Sticky-B per discussion: switching active sessions
-              // doesn't re-attach.
+              // Three cases (see devlog 2026-05-14 pet UX overhaul):
+              //   1. Active session HOLDS the pet → detach (close).
+              //   2. Pet on another session → implicit migrate:
+              //      detach old + stash target; the pet_detached IPC
+              //      handler fires the follow-up attach once the
+              //      port is released.
+              //   3. No pet anywhere → attach to active.
+              // The sidebar Cat badge tells the user where the pet
+              // currently lives, so the menu's "桌面宠物" always
+              // reads as "I want it here" without surprise.
+              if (!activeSessionId) return;
+              if (petAttachedSessionId === activeSessionId) {
+                void sendIPCCommand(activeSessionId, {
+                  kind: "detach_pet",
+                });
+                return;
+              }
+              if (bridgeStatus !== "connected") return;
               if (petAttachedSessionId) {
+                setPendingPetMigration(activeSessionId);
                 void sendIPCCommand(petAttachedSessionId, {
                   kind: "detach_pet",
                 });
                 return;
               }
-              if (!activeSessionId) return;
-              if (bridgeStatus !== "connected") return;
               void sendIPCCommand(activeSessionId, {
                 kind: "attach_pet",
                 port: 41983,
               });
             }}
-            petAttachedSessionId={petAttachedSessionId}
+            currentSessionHasPet={
+              !!activeSessionId && petAttachedSessionId === activeSessionId
+            }
             onRenameSession={(newTitle) => {
               if (!activeSessionId) return;
               renameSession(activeSessionId, newTitle);
@@ -422,6 +434,7 @@ function App() {
             onEditProject={(id) => setEditingProjectId(id)}
             onDeleteProject={(id) => setDeletingProjectId(id)}
             onOpenProjectsBrowser={() => setProjectsBrowserOpen(true)}
+            petAttachedSessionId={petAttachedSessionId}
           />
         }
         main={

@@ -295,12 +295,15 @@ export function dispatchIPCEvent(
         port: event.port,
       });
       s.setPetAttachedSession(event.sessionId);
+      // Clear any stale migration target so a future detach can't
+      // re-trigger an attach on a session the user no longer wants.
+      s.setPendingPetMigration(null);
       s.pushToast(
         makeAppError({
           category: "business",
           severity: "info",
-          title: "Desktop Pet 已启动",
-          message: "宠物会实时显示本 session 的进展。",
+          title: "桌面宠物已启动",
+          message: "宠物会实时显示本对话的进展。",
           hint: null,
           retryable: false,
           context: "attach_pet",
@@ -320,11 +323,25 @@ export function dispatchIPCEvent(
       if (s.petAttachedSessionId === event.sessionId) {
         s.setPetAttachedSession(null);
       }
+      // Implicit-migration relay: the user clicked "桌面宠物" in a
+      // non-holder session; we detached the holder, and now (port
+      // released, hook removed) we fire the follow-up attach. Skip
+      // the "已关闭" toast in this case — the about-to-arrive
+      // pet_attached toast tells the right story for migrations.
+      const pendingTarget = s.pendingPetMigrationTo;
+      if (pendingTarget) {
+        s.setPendingPetMigration(null);
+        void s.sendIPCCommand(pendingTarget, {
+          kind: "attach_pet",
+          port: 41983,
+        });
+        return;
+      }
       s.pushToast(
         makeAppError({
           category: "business",
           severity: "info",
-          title: "Desktop Pet 已关闭",
+          title: "桌面宠物已关闭",
           message: "",
           hint: null,
           retryable: false,

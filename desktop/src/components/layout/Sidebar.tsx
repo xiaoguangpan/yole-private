@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   CaretRight,
+  Cat,
   Clock,
   Folder,
   FolderOpen,
@@ -118,6 +119,11 @@ export interface SidebarProps {
    * passive info indicator and stays non-interactive. See
    * SidebarHeader doc for the asymmetric-affordance rationale. */
   onOpenRuntimeSettings?: () => void;
+  /** Session that currently holds the Desktop Pet, or `null` when no
+   * pet is running. Renders a small Cat badge on the matching session
+   * row so users see "where the pet lives" at a glance — non-
+   * interactive status, not a click target. */
+  petAttachedSessionId?: string | null;
 }
 
 /**
@@ -157,6 +163,7 @@ export function Sidebar({
   onOpenArchived,
   archivedCount = 0,
   onOpenRuntimeSettings,
+  petAttachedSessionId,
 }: SidebarProps) {
   // When a project filter is active, the bucketed list shows only
   // sessions that belong to that project. Active session in main
@@ -245,6 +252,7 @@ export function Sidebar({
                 sessions={buckets[bucket]}
                 activeId={activeId}
                 projects={projects}
+                petAttachedSessionId={petAttachedSessionId}
                 onSelectSession={onSelectSession}
                 onArchiveSession={onArchiveSession}
                 onTogglePinSession={onTogglePinSession}
@@ -415,6 +423,7 @@ function SidebarBucket({
   sessions,
   activeId,
   projects,
+  petAttachedSessionId,
   onSelectSession,
   onArchiveSession,
   onTogglePinSession,
@@ -428,6 +437,7 @@ function SidebarBucket({
   sessions: Session[];
   activeId?: string;
   projects: Project[];
+  petAttachedSessionId?: string | null;
   onSelectSession?: (id: string) => void;
   onArchiveSession?: (id: string) => void;
   onTogglePinSession?: (id: string) => void;
@@ -454,6 +464,7 @@ function SidebarBucket({
           key={s.id}
           session={s}
           active={s.id === activeId}
+          petAttached={s.id === petAttachedSessionId}
           projects={projects}
           onClick={() => onSelectSession?.(s.id)}
           onArchive={
@@ -490,6 +501,7 @@ function SidebarSectionLabel({ children }: { children: React.ReactNode }) {
 function SidebarSessionRow({
   session,
   active,
+  petAttached = false,
   projects,
   onClick,
   onArchive,
@@ -502,6 +514,10 @@ function SidebarSessionRow({
 }: {
   session: Session;
   active?: boolean;
+  /** True when Desktop Pet is bound to this session. Renders a small
+   * Cat icon next to the title — status only, not clickable (the
+   * row itself is the click target for switching sessions). */
+  petAttached?: boolean;
   /** Full project list — used to populate the "Move to project"
    * submenu. Sorted by lastActivityAt desc, pinned-first for the
    * menu render (matches Sidebar Projects section order). */
@@ -624,6 +640,15 @@ function SidebarSessionRow({
             >
               {session.title}
             </div>
+          )}
+          {petAttached && (
+            <span
+              aria-label="桌面宠物附着中"
+              title="桌面宠物附着中 · 进入此对话可关闭"
+              className="inline-flex shrink-0 text-ink-soft"
+            >
+              <Cat size={12} weight="thin" />
+            </span>
           )}
           {hasPendingAsk ? (
             <span
@@ -1188,7 +1213,7 @@ function SidebarProjectEmptyCta({
   return (
     <div className="mx-1.5 mt-3 flex flex-col gap-2 rounded-sm border border-dashed border-line px-3 py-3">
       <p className="font-serif text-[12px] italic text-ink-muted">
-        {projectName} 还没有 session。
+        {projectName} 还没有对话。
       </p>
       <button
         type="button"
@@ -1203,7 +1228,7 @@ function SidebarProjectEmptyCta({
         在 {projectName} 里新建对话
       </button>
       <p className="text-[11px] text-ink-muted">
-        也可以右键已有 session → Move to project 把现有的归进来
+        或右键已有对话「归入项目」
       </p>
     </div>
   );

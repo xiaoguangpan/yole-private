@@ -471,19 +471,30 @@ interface State {
    * Desktop Pet attached session id. Pet is a global feature (only
    * one instance can run at a time since it binds a fixed local
    * port), so we store one session id at the top level rather than
-   * on a per-session runtime. `null` when no pet is attached. When
-   * non-null, the TopBar menu's "Desktop Pet" entry shows a "已附着"
-   * suffix and a click sends `detach_pet` to that session's bridge.
+   * on a per-session runtime. `null` when no pet is attached.
    *
-   * Sticky-B behavior: pet attaches to the session that was active
-   * when the user clicked the menu item. Switching active session
-   * later does NOT re-attach; user must explicitly detach + re-attach.
-   * See discussion thread 2026-05-13.
+   * Surfaced in two places:
+   *   - Sidebar session row: a small Cat badge appears next to the
+   *     title of whichever session currently holds the pet, so the
+   *     user can see "where the pet is" from any view.
+   *   - SessionTitleMenu: when the active session === this id, the
+   *     menu item label flips to "关闭桌面宠物"; otherwise it stays
+   *     "桌面宠物" and a click implicitly migrates the pet to the
+   *     active session (see pendingPetMigrationTo for the relay).
    *
    * Not persisted: pet's subprocess dies on app exit anyway, so
    * "remember it across restart" would lie about state.
    */
   petAttachedSessionId: string | null;
+  /**
+   * Implicit-migration target: when the user clicks "桌面宠物" in a
+   * session that doesn't currently hold the pet, we send detach_pet
+   * to the holder and stash the target here. The pet_detached IPC
+   * handler relays an attach_pet to this target once the old pet's
+   * port is released. Cleared in both pet_attached and pet_detached
+   * handlers so a stale value can't trigger spurious attaches.
+   */
+  pendingPetMigrationTo: string | null;
   /**
    * Conversation reading column width. Notion-style two-mode toggle
    * (DESIGN.md tbd):
@@ -840,6 +851,12 @@ interface Actions {
    * bridge's response flip this flag.
    */
   setPetAttachedSession: (sessionId: string | null) => void;
+  /**
+   * Stage the target session for an implicit pet migration. Set by
+   * the title-menu click in a non-holder session; consumed by the
+   * pet_detached IPC handler to fire the follow-up attach_pet.
+   */
+  setPendingPetMigration: (sessionId: string | null) => void;
 
   // Bridge runtime (per-session — sessionId required)
   setBridgeStatus: (sessionId: string, status: BridgeStatus) => void;
@@ -1145,6 +1162,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   yoloMode: false,
   conversationWidth: "compact",
   petAttachedSessionId: null,
+  pendingPetMigrationTo: null,
 
   toasts: [],
 
@@ -2255,6 +2273,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setPetAttachedSession: (sessionId) =>
     set({ petAttachedSessionId: sessionId }),
+
+  setPendingPetMigration: (sessionId) =>
+    set({ pendingPetMigrationTo: sessionId }),
 
   // ---- Bridge runtime ----
   setBridgeStatus: (sessionId, status) =>
