@@ -53,6 +53,7 @@ from bridge.ipc import (
     SetLLMCommand,
     SetYoloModeCommand,
     ShutdownCommand,
+    SystemMessageEvent,
     ToolCallPendingEvent,
     ToolsReinjectedEvent,
     TurnEndEvent,
@@ -358,6 +359,20 @@ class Bridge:
     def _setup_ga(self) -> None:
         if self.ga_path not in sys.path:
             sys.path.insert(0, self.ga_path)
+        # GA's `frontends/` directory holds modules that GA's own
+        # frontends import flat (e.g. `import btw_cmd`) rather than
+        # `frontends.btw_cmd`. There's no __init__.py there. We add
+        # the directory to sys.path so the bridge can pull these
+        # frontend helpers (currently: btw_cmd; future: possibly
+        # continue_cmd).
+        #
+        # Coupling point (CLAUDE.md constitution §"关于读取"):
+        # `<ga_path>/frontends/` layout is GA-owned; re-audit at
+        # each baseline upgrade. An absent btw_cmd is handled
+        # below in the try/except — the bridge stays functional.
+        frontends_dir = os.path.join(self.ga_path, "frontends")
+        if frontends_dir not in sys.path:
+            sys.path.insert(0, frontends_dir)
         if self.cwd:
             os.chdir(self.cwd)
         else:
@@ -385,6 +400,36 @@ class Bridge:
         # (mirrors what fsapp.py does — agentmain default is False
         # which would re-send the whole response every chunk).
         self.agent.inc_out = True
+
+        # `/btw` side-question support. GA's btw_cmd module ships two
+        # entry points: `install()` patches the agent's task-queue
+        # dispatch (which queues /btw behind the currently-running
+        # task — defeats the "non-blocking side question" UX), and
+        # `handle_frontend_command()` is a synchronous entry that
+        # calls `backend.raw_ask` directly. We use the latter and
+        # bypass the agent.run() queue entirely (see
+        # _handle_user_message_command) so /btw is genuinely
+        # interruption-free.
+        #
+        # Stash the handle so the user_message path can call it
+        # without re-importing on every command. None when the
+        # module isn't bundled with the user's GA install (older
+        # baselines / partial checkouts) — /btw degrades gracefully
+        # to a plain prompt rather than 500-ing.
+        self._btw_handler: Any = None
+        try:
+            import btw_cmd  # type: ignore[import-not-found]
+
+            self._btw_handler = btw_cmd.handle_frontend_command
+        except ImportError:
+            self._emit_error(
+                "GA's btw_cmd module not found — /btw side-question "
+                "will be treated as a regular prompt.",
+                None,
+                category="bridge",
+                severity="warning",
+                context="setup_ga",
+            )
 
     def _install_handler_subclass(self) -> None:
         from bridge.handlers import WorkbenchHandler
@@ -534,6 +579,30 @@ class Bridge:
                     if not isinstance(item, dict):
                         continue
                     if "done" in item:
+                        # `source='system'` is GA's signal that this
+                        # `done` came from a slash-command handler
+                        # (currently /btw, /session.x=v) that
+                        # bypasses agent_runner_loop. No turn_end
+                        # callback fires for these — emit a
+                        # SystemMessageEvent so desktop can render
+                        # the content. The default `'workbench'`
+                        # source's `done` is intentionally ignored
+                        # (turn_end carries the canonical payload).
+                        if str(item.get("source", "")) == "system":
+                            content = item.get("done", "")
+                            if isinstance(content, str) and content:
+                                variant = (
+                                    "side_question"
+                                    if content.lstrip().startswith("> 🟡 /btw")
+                                    else "system"
+                                )
+                                self._emit(
+                                    SystemMessageEvent(
+                                        sessionId=self.session_id,
+                                        content=content,
+                                        variant=variant,
+                                    )
+                                )
                         return
                     if "next" in item:
                         delta = item["next"]
@@ -722,6 +791,21 @@ class Bridge:
 
     def dispatch_command(self, cmd: Command) -> None:
         if isinstance(cmd, UserMessageCommand):
+            # `/btw <question>` is a side question — non-blocking,
+            # interruption-free. Route through btw_cmd's sync entry
+            # in a worker thread so the main agent's task queue is
+            # left untouched. `/btw` with the agent mid-run still
+            # returns an answer in seconds rather than waiting for
+            # the main task to finish. See _setup_ga for the
+            # handler import.
+            text = cmd.text.lstrip()
+            if self._btw_handler is not None and (
+                text == "/btw"
+                or text.startswith("/btw ")
+                or text.startswith("/btw\t")
+            ):
+                self._handle_btw_command(cmd.text)
+                return
             # New put_task = new agent_runner_loop, turn counter restarts
             # at 1. Reset dedupe so the first turn_start(1) of the new
             # run isn't suppressed when the previous run also ended at
@@ -943,6 +1027,48 @@ class Bridge:
                 blocksAdded=len(tool_hist),
             )
         )
+
+    # ---------------- Side question (/btw) ----------------
+
+    def _handle_btw_command(self, raw_text: str) -> None:
+        """Run GA's btw_cmd.handle_frontend_command in a worker
+        thread and emit the result as a SystemMessageEvent.
+        Non-blocking: the bridge's command loop returns immediately
+        so other commands (and the main agent.run thread) keep
+        flowing.
+        """
+        handler = self._btw_handler
+        if handler is None:
+            return  # guarded at caller, but defensive
+
+        def worker() -> None:
+            try:
+                # btw_cmd internally strips the /btw prefix + does
+                # the deepcopy-history + raw_ask dance. Returns the
+                # formatted markdown reply (header line + body +
+                # elapsed seconds).
+                body = handler(self.agent, raw_text)
+            except Exception as e:  # noqa: BLE001
+                self._emit_error(
+                    f"/btw failed: {e}",
+                    traceback.format_exc(),
+                    category="runtime",
+                    context="btw",
+                )
+                return
+            if not isinstance(body, str) or not body.strip():
+                return
+            self._emit(
+                SystemMessageEvent(
+                    sessionId=self.session_id,
+                    content=body,
+                    variant="side_question",
+                )
+            )
+
+        threading.Thread(
+            target=worker, daemon=True, name=f"btw-{self.session_id}"
+        ).start()
 
     # ---------------- Desktop Pet ----------------
 

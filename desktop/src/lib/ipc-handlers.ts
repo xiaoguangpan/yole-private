@@ -352,6 +352,20 @@ export function dispatchIPCEvent(
       return;
     }
 
+    case "system_message": {
+      console.info("[ipc] system_message", {
+        sessionId: event.sessionId,
+        variant: event.variant,
+        length: event.content.length,
+      });
+      s.appendSystemTurn(event.sessionId, {
+        role: "system",
+        content: event.content,
+        variant: event.variant,
+      });
+      return;
+    }
+
     case "history_loaded":
     case "tool_call_start":
     case "tool_call_progress": {

@@ -229,6 +229,31 @@ class PetDetachedEvent:
     kind: str = "pet_detached"
 
 
+@dataclass
+class SystemMessageEvent:
+    """A standalone, non-agent-loop message emitted into the
+    conversation. Used by GA's slash-command paths (`/btw`,
+    `/session.x=v`, etc.) where the response bypasses
+    agent_runner_loop and goes straight to `display_queue` with
+    `source='system'`. The bridge translates that signal into this
+    event so desktop can render the content inline.
+
+    `content` is markdown source; desktop renders through the same
+    pipeline as agent final answers.
+
+    `kind` discriminates rendering (yellow side-question callout vs
+    a more neutral confirmation pill, etc.) — initial values:
+      - "side_question" : `/btw` reply
+      - "system"        : generic catch-all (default)
+    """
+
+    sessionId: str
+    content: str
+    variant: str = "system"
+    timestamp: str = field(default_factory=_now_iso)
+    kind: str = "system_message"
+
+
 Event = (
     ReadyEvent
     | TurnStartEvent
@@ -246,6 +271,7 @@ Event = (
     | ToolsReinjectedEvent
     | PetAttachedEvent
     | PetDetachedEvent
+    | SystemMessageEvent
 )
 
 
@@ -387,6 +413,7 @@ EVENT_KINDS: dict[str, type] = {
     "tools_reinjected": ToolsReinjectedEvent,
     "pet_attached": PetAttachedEvent,
     "pet_detached": PetDetachedEvent,
+    "system_message": SystemMessageEvent,
 }
 
 COMMAND_KINDS: dict[str, type] = {

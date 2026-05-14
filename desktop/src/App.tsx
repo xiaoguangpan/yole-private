@@ -133,6 +133,9 @@ function App() {
   const inFlightContent = useAppStore((s) => s.inFlightContent);
   const pendingAskUser = useAppStore((s) => s.pendingAskUser);
   const appendUserTurn = useAppStore((s) => s.appendUserTurn);
+  const appendSideQuestionUserTurn = useAppStore(
+    (s) => s.appendSideQuestionUserTurn,
+  );
   const removePendingApproval = useAppStore((s) => s.removePendingApproval);
 
   const hydrateFromDB = useAppStore((s) => s.hydrateFromDB);
@@ -505,6 +508,22 @@ function App() {
                 // / EmptyState set it before transitioning here.
                 if (!activeSessionId) return;
                 if (bridgeStatus === "connected") {
+                  // `/btw` is a side question (interruption-free,
+                  // not a main-agent turn). Route to the transient
+                  // user-turn path so it doesn't disturb the main
+                  // agent's running state — bridge intercepts the
+                  // user_message command and runs the btw worker
+                  // independently of the task queue.
+                  const trimmed = t.trimStart();
+                  if (trimmed === "/btw" || trimmed.startsWith("/btw ")) {
+                    appendSideQuestionUserTurn(activeSessionId, t);
+                    sendIPCCommand(activeSessionId, {
+                      kind: "user_message",
+                      text: t,
+                      images: [],
+                    });
+                    return;
+                  }
                   // Snapshot pendingAskUser **before** appendUserTurn
                   // clears it — we need to know which IPC command to
                   // send. ask_user_response and user_message both

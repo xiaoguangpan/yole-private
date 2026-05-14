@@ -38,6 +38,7 @@ import type {
   ConversationToolEvent,
   PendingApproval,
   PendingAskUser,
+  SystemTurn,
   Turn,
   UserTurn,
 } from "@/types/conversation";
@@ -823,7 +824,30 @@ interface Actions {
 
   // Conversation (per-session — sessionId required)
   appendUserTurn: (sessionId: string, text: string) => void;
+  /**
+   * Append a transient user message for `/btw` side questions.
+   * Distinct from `appendUserTurn`:
+   *   - Doesn't touch agentRunning / inFlightContent /
+   *     currentTurnIndex / pendingAskUser — /btw runs in its own
+   *     bridge worker; main agent state is untouched
+   *   - Doesn't derive sidebar title (/btw isn't a "topic")
+   *   - Doesn't persist to SQLite (ephemeral by design)
+   * Still bumps `userSubmitTick` so the scroll-to-bottom-anchor
+   * effect fires — user wants to see their question appear.
+   */
+  appendSideQuestionUserTurn: (sessionId: string, text: string) => void;
   appendAgentTurn: (sessionId: string, turn: AgentTurn) => void;
+  /**
+   * Append a non-agent-loop system message (currently from /btw
+   * side-question replies; future: /session.x=v confirmations).
+   * Distinct from `appendAgentTurn`:
+   *   - Doesn't carry tool calls or turn index
+   *   - Doesn't affect agentRunning / currentTurnIndex
+   *   - Renders with a callout chrome rather than the bare prose
+   *     of an agent final answer
+   * Transient — no SQLite write for V0.1. See implementation.
+   */
+  appendSystemTurn: (sessionId: string, turn: SystemTurn) => void;
   addPendingApproval: (sessionId: string, p: PendingApproval) => void;
   removePendingApproval: (sessionId: string, approvalId: string) => void;
   recordApprovalDecision: (
@@ -2171,6 +2195,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
         inFlightContent: "",
       })),
     ),
+
+  appendSystemTurn: (sessionId, turn) =>
+    // Transient append — no DB persistence for V0.1. The /btw side
+    // question + reply are ephemeral by design ("不打断主任务" 已经
+    // 暗示了"不进入主线"). On session reopen the /btw exchange is
+    // gone from view — consistent with the "side, not main" mental
+    // model. If users complain in dogfood we promote to persisted
+    // (messages.role='system' rows + rowsToTurns handling).
+    //
+    // Also intentionally NOT touching agentRunning / currentTurnIndex
+    // — /btw runs in its own worker, doesn't drive the main agent's
+    // running state.
+    set((state) =>
+      applyRuntimeUpdate(state, sessionId, (rt) => ({
+        ...rt,
+        turns: [...rt.turns, turn],
+      })),
+    ),
+
+  appendSideQuestionUserTurn: (sessionId, text) => {
+    set((state) => {
+      const update = applyRuntimeUpdate(state, sessionId, (rt) => ({
+        ...rt,
+        turns: [...rt.turns, { role: "user", content: text } as UserTurn],
+        // Deliberately NOT touching agentRunning / inFlightContent /
+        // currentTurnIndex / pendingAskUser — /btw is a side worker
+        // path that doesn't interfere with the main agent loop.
+      }));
+      update.userSubmitTick = state.userSubmitTick + 1;
+      return update;
+    });
+  },
 
   addPendingApproval: (sessionId, p) =>
     set((state) =>

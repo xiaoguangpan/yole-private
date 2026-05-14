@@ -60,6 +60,24 @@ export interface UserTurn {
   content: string;
 }
 
+/**
+ * Standalone, non-agent-loop conversation message. Comes from the
+ * bridge's SystemMessageEvent (GA slash-command paths that bypass
+ * agent_runner_loop — currently /btw side-question, /session.x=v
+ * config confirmations).
+ *
+ * Rendered as a callout block distinct from agent turns:
+ *   - "side_question": yellow AskUserBubble-family chrome
+ *   - "system": neutral muted register
+ */
+export interface SystemTurn {
+  role: "system";
+  /** Markdown source — rendered via the same MarkdownView pipeline
+   * as agent final answers. */
+  content: string;
+  variant: "side_question" | "system";
+}
+
 export interface AgentTurn {
   role: "agent";
   /** Optional 💭 thinking summary that opens the turn. */
@@ -92,7 +110,7 @@ export interface AgentTurn {
   summary?: string;
 }
 
-export type Turn = UserTurn | AgentTurn;
+export type Turn = UserTurn | AgentTurn | SystemTurn;
 
 export interface PendingApproval {
   approvalId: string;

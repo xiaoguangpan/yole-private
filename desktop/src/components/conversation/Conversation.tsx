@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from "react";
 import { TypingDots } from "@/components/conversation/LiveIndicators";
 import { MessageAgent } from "@/components/conversation/MessageAgent";
 import { MessageUser } from "@/components/conversation/MessageUser";
+import { SystemMessageBubble } from "@/components/conversation/SystemMessageBubble";
 import { ThinkingSummary } from "@/components/conversation/ThinkingSummary";
 import { ToolCallout } from "@/components/conversation/ToolCallout";
 import type { AgentTurn, Turn } from "@/types/conversation";
@@ -47,6 +48,8 @@ export function Conversation({
         <Fragment key={i}>
           {t.role === "user" ? (
             <MessageUser content={t.content} />
+          ) : t.role === "system" ? (
+            <SystemMessageBubble content={t.content} variant={t.variant} />
           ) : (
             <AgentTurnView
               turn={t}

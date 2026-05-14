@@ -395,6 +395,26 @@ desktop 收到后把 store 顶层 `petAttachedSessionId` 标为该 session id；
 
 bridge 已终止 pet 子进程 + 解除 `_turn_end_hooks` 中对应 entry。
 
+### 4.16 `system_message`
+
+非 `agent_runner_loop` 路径产生的对话消息——GA 的 slash command 处理器（当前：`/btw <question>` 走 `btw_cmd.py` monkey-patch；未来：`/session.x=v`、`/resume` 等）会直接把回复 push 到 `display_queue` 并标记 `source='system'`。bridge drain 检测到 `source='system'` 的 `done` 时翻译为本事件。
+
+```json
+{
+  "kind": "system_message",
+  "sessionId": "sess_abc123",
+  "content": "> 🟡 /btw 当前进度如何？\n\n基于已有对话，agent 正在读取 ga.py 第二批...\n\n*(2.3s)*",
+  "variant": "side_question",
+  "timestamp": "..."
+}
+```
+
+`content` 是 markdown source；desktop 走同一套 markdown 渲染（与 agent final answer 一致），但外层套一个 callout chrome 跟 agent turn 视觉区分。
+
+`variant` 枚举：
+- `"side_question"`：`/btw` 答案，黄色 callout（跟 AskUserBubble 同色家族）
+- `"system"`（默认）：catch-all，简单 muted 行
+
 ## 5. Commands (workbench → bridge)
 
 每个命令必有 `kind` 字段。

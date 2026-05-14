@@ -244,6 +244,29 @@ export interface PetDetachedEvent {
   timestamp: string;
 }
 
+/**
+ * Standalone, non-agent-loop conversation message. Emitted by the
+ * bridge when GA's slash-command paths (`/btw`, `/session.x=v`) push
+ * a `done` payload to display_queue with `source='system'` — those
+ * paths bypass agent_runner_loop, so no turn_end carries the reply.
+ *
+ * `content` is markdown source — desktop renders through the same
+ * pipeline as agent final answers but wraps in a callout chrome
+ * matching `variant`.
+ *
+ * `variant`:
+ *   - "side_question": `/btw` reply — yellow callout (AskUserBubble
+ *     color family)
+ *   - "system": catch-all confirmations — neutral muted register
+ */
+export interface SystemMessageEvent {
+  kind: "system_message";
+  sessionId: string;
+  content: string;
+  variant: "side_question" | "system";
+  timestamp: string;
+}
+
 export type IPCEvent =
   | ReadyEvent
   | TurnStartEvent
@@ -260,7 +283,8 @@ export type IPCEvent =
   | LLMChangedEvent
   | ToolsReinjectedEvent
   | PetAttachedEvent
-  | PetDetachedEvent;
+  | PetDetachedEvent
+  | SystemMessageEvent;
 
 // ---------------- Commands (desktop → bridge) ----------------
 
