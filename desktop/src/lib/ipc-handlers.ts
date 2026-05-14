@@ -496,6 +496,59 @@ const TOOL_DISPATCH_MARKER_LINE =
 const TOOL_DISPATCH_MARKER_PARTIAL = /🛠️?\s+\w+\(/;
 
 /**
+ * Verbose-mode tool dispatch marker — emitted by `agent_loop.py:72`
+ * when GA runs with `verbose=True` (which Galley's bridge sets so
+ * the LLM streams per-token). Format:
+ *
+ *   🛠️ Tool: `tool_name`  📥 args:
+ *   ````text
+ *   {pretty JSON args}
+ *   ````
+ *
+ * Different shape from the compact form (above) — multi-line, with
+ * a 4-backtick fenced args block. Same role though: this is GA's
+ * terminal-frontend chrome, not content the user should read in
+ * Galley's document register. ToolCallout renders the structured
+ * version on turn_end.
+ */
+const TOOL_DISPATCH_VERBOSE_BLOCK =
+  /🛠️?\s+Tool:\s+`[^`\n]+`\s+📥\s+args:\n````text\n[\s\S]*?\n````\n?/g;
+
+/**
+ * Partial-truncation pattern for the verbose marker — chunk
+ * boundary fell anywhere inside the block before the closing
+ * 4-backtick fence. Truncating at the leading 🛠 keeps the partial
+ * render clean while the rest of the block arrives.
+ */
+const TOOL_DISPATCH_VERBOSE_PARTIAL = /🛠️?\s+Tool:\s+`/;
+
+/**
+ * 5-backtick fenced block — wraps the streamed stdout/stderr of a
+ * tool's dispatch generator while GA is in verbose mode
+ * (`agent_loop.py:79-81`):
+ *
+ *   `````
+ *   <tool's yielded output, potentially many lines / chunks>
+ *   `````
+ *
+ * Stripped wholesale (including content). The structured outcome
+ * lands at turn_end via `toolResults[]`; ToolCallout's resultPreview
+ * surfaces it there. Showing raw tool stdout as Newsreader prose
+ * during streaming is uglier than a brief "stream pauses" feel
+ * during tool execution.
+ */
+const FIVE_BACKTICK_BLOCK = /`{5}\n[\s\S]*?\n`{5}\n?/g;
+
+/**
+ * Trailing 5-backtick fence open without a matching close — chunk
+ * boundary fell after the fence opener but before any line of
+ * content has arrived (or before the closer arrives). Truncate at
+ * the fence start to avoid rendering "`````" plus partial stdout
+ * as prose.
+ */
+const FIVE_BACKTICK_PARTIAL = /`{5}\n?$/;
+
+/**
  * Mirror of bridge's `_clean_response_for_display`. Strips GA's
  * structured tags so the user sees the prose-ish final answer
  * Newsreader can render directly. Bridge emits the raw responseContent
@@ -552,19 +605,41 @@ export function cleanPartialContent(text: string): string {
   //     accumulated streaming buffers (multi-turn runs).
   out = out.replace(LLM_RUNNING_MARKER, "");
 
-  // 1c. Strip GA's `🛠️ tool_name(args)` dispatch markers. See the
-  //     comment on TOOL_DISPATCH_MARKER_LINE — the structured tool
-  //     call arrives via turn_end's toolCalls[], so we don't want
-  //     the display-only marker line flashing as prose during the
-  //     streaming window.
+  // 1c. Strip GA's compact `🛠️ tool_name(args)` dispatch markers.
+  //     Emitted by `agent_loop.py:73` in verbose=False mode. Galley
+  //     now runs verbose=True so these don't appear in practice, but
+  //     the stripper stays as backstop in case the user runs against
+  //     an older GA baseline where the bridge still falls back.
   out = out.replace(TOOL_DISPATCH_MARKER_LINE, "");
 
-  // 1d. Mid-stream partial dispatch marker — chunk arrived with
-  //     just the prefix, no closing paren yet. Truncate the buffer
-  //     at that position so we don't render half the marker for a
-  //     frame.
+  // 1d. Mid-stream partial of the compact dispatch marker (chunk
+  //     arrived with just the prefix, no closing paren yet).
   const partialMarkerIdx = out.search(TOOL_DISPATCH_MARKER_PARTIAL);
   if (partialMarkerIdx !== -1) out = out.slice(0, partialMarkerIdx);
+
+  // 1e. Verbose-mode `🛠️ Tool: ... 📥 args: ...` multi-line marker
+  //     block. Same role as the compact marker but with a 4-backtick
+  //     fenced args section underneath. Complete blocks first, then
+  //     partial truncation if the chunk boundary fell inside.
+  out = out.replace(TOOL_DISPATCH_VERBOSE_BLOCK, "");
+  const partialVerboseIdx = out.search(TOOL_DISPATCH_VERBOSE_PARTIAL);
+  if (partialVerboseIdx !== -1) out = out.slice(0, partialVerboseIdx);
+
+  // 1f. 5-backtick fenced tool-output blocks (verbose mode wraps the
+  //     tool's dispatch stream in these). Strip wholesale — the
+  //     structured result lands at turn_end via toolResults[] and
+  //     ToolCallout renders the preview from there.
+  out = out.replace(FIVE_BACKTICK_BLOCK, "");
+  // Trailing un-closed 5-fence — truncate so the user doesn't see
+  // raw stdout-as-prose pile up between the opener and the chunk
+  // carrying the closer.
+  const fenceOpenIdx = out.search(/`{5}\n/);
+  if (fenceOpenIdx !== -1) {
+    out = out.slice(0, fenceOpenIdx);
+  } else if (FIVE_BACKTICK_PARTIAL.test(out)) {
+    // Chunk ended exactly on a fence open, no newline yet.
+    out = out.replace(FIVE_BACKTICK_PARTIAL, "");
+  }
 
   // 2. Unclosed open tag — truncate at its position.
   let earliestUnclosed = -1;

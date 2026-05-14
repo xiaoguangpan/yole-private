@@ -369,7 +369,16 @@ class Bridge:
         self.agentmain = agentmain
         self.agent = agentmain.GeneraticAgent()
         self.agent.next_llm(self.llm_no)
-        self.agent.verbose = False
+        # verbose=True enables GA's per-token LLM streaming
+        # (`yield from response_gen` in agent_loop.py). With it off,
+        # agent_loop drains the LLM generator silently and yields the
+        # full response only at turn end — the conversation reads as
+        # "long wait → big drop of text", losing the live-typing UX.
+        # The cost is a handful of decorative yields (verbose tool
+        # marker block + 5-backtick fences around tool output) that
+        # leak into display_queue; desktop's cleanPartialContent
+        # strips them before rendering.
+        self.agent.verbose = True
         # Push only the new substring on each display_queue tick rather
         # than the full accumulated response. Smaller IPC payloads, and
         # desktop accumulates deltas into its own inFlightContent
