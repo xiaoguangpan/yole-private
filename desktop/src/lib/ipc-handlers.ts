@@ -469,6 +469,33 @@ const LLM_RUNNING_MARKER =
   /^\s*\*{0,2}LLM Running \(Turn \d+\) \.\.\.\*{0,2}\s*$/gm;
 
 /**
+ * GA's `agent_loop.py:73` yields a display-only line of the form
+ * `🛠️ tool_name(compact_args)` to the display queue every time a
+ * tool dispatches. It's meant for GA's terminal frontends (dcapp /
+ * tgapp / qtapp) — the structured tool call arrives separately via
+ * turn_end's `toolCalls[]`, which the conversation renders as a
+ * proper ToolCallout pill.
+ *
+ * Without stripping, the streaming partial flashes the raw marker as
+ * Newsreader serif prose, then snaps to the compact pill when
+ * turn_end fires — a noticeable "floppy" transition users notice
+ * right away.
+ *
+ * The variation selector after the hammer (`️`) is optional —
+ * some renderers and terminal pipes drop it.
+ */
+const TOOL_DISPATCH_MARKER_LINE =
+  /^🛠️?\s+\w+\(.*\)[ \t]*$/gm;
+
+/**
+ * Mid-stream partial of the dispatch marker — chunk boundary fell
+ * after the prefix but before the closing paren. Same role as the
+ * unclosed-tag truncation: avoid showing "🛠 web_exec" for one
+ * frame while we wait for the rest of the chunk.
+ */
+const TOOL_DISPATCH_MARKER_PARTIAL = /🛠️?\s+\w+\(/;
+
+/**
  * Mirror of bridge's `_clean_response_for_display`. Strips GA's
  * structured tags so the user sees the prose-ish final answer
  * Newsreader can render directly. Bridge emits the raw responseContent
@@ -524,6 +551,20 @@ export function cleanPartialContent(text: string): string {
   //     mid-line. The /gm flag handles multiple occurrences in
   //     accumulated streaming buffers (multi-turn runs).
   out = out.replace(LLM_RUNNING_MARKER, "");
+
+  // 1c. Strip GA's `🛠️ tool_name(args)` dispatch markers. See the
+  //     comment on TOOL_DISPATCH_MARKER_LINE — the structured tool
+  //     call arrives via turn_end's toolCalls[], so we don't want
+  //     the display-only marker line flashing as prose during the
+  //     streaming window.
+  out = out.replace(TOOL_DISPATCH_MARKER_LINE, "");
+
+  // 1d. Mid-stream partial dispatch marker — chunk arrived with
+  //     just the prefix, no closing paren yet. Truncate the buffer
+  //     at that position so we don't render half the marker for a
+  //     frame.
+  const partialMarkerIdx = out.search(TOOL_DISPATCH_MARKER_PARTIAL);
+  if (partialMarkerIdx !== -1) out = out.slice(0, partialMarkerIdx);
 
   // 2. Unclosed open tag — truncate at its position.
   let earliestUnclosed = -1;
