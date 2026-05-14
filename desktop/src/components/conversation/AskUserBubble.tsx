@@ -47,7 +47,7 @@ export function AskUserBubble({
   return (
     <div
       data-role="ask-user-bubble"
-      className="my-5 rounded-md border-l-2 border-warning bg-warning/[0.04] py-3 pl-4 pr-3"
+      className="my-5 rounded-r-[6px] border-l-[3px] border-warning bg-warning/[0.04] px-4 py-2.5"
     >
       <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-warning">
         <PauseCircle size={12} weight="bold" />

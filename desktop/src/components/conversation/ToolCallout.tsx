@@ -350,12 +350,17 @@ function ResultBlock({ content }: { content: string }) {
  * narrative rather than a sequence of callout blocks; users who
  * want the full args / result can click to expand.
  *
- *   ✓ file_read · docs/PRD.md (L180-230)             ▾
+ *   file_read · docs/PRD.md (L180-230)               ▾
  *
  * Visual register sits between the TurnMarker (L2) and the ambient
  * body text — supplementary metadata, not a focal point. Compare to
  * BlockToolCallout which deliberately interrupts the reading flow
  * for high-stakes operations (file_patch / waiting_approval / etc.).
+ *
+ * No leading success icon: the inline tier is *only* reached by
+ * already-succeeded tools (see pickToolTier), so a check mark would
+ * be redundant noise. Failure / running / awaiting-approval renders
+ * via BlockToolCallout, where the status bit carries real signal.
  */
 function InlineToolPill({ tool }: { tool: ConversationToolEvent }) {
   const [open, setOpen] = useState(false);
@@ -371,11 +376,6 @@ function InlineToolPill({ tool }: { tool: ConversationToolEvent }) {
           "text-ink-soft hover:bg-hover hover:text-ink",
         )}
       >
-        <CheckCircle
-          size={12}
-          weight="thin"
-          className="shrink-0 text-ink-muted group-hover:text-brand-strong"
-        />
         <span className="font-mono">{tool.name}</span>
         {preview && (
           <span className="truncate text-ink-muted">
