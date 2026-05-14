@@ -563,6 +563,22 @@ const FIVE_BACKTICK_BLOCK = /`{5}\n[\s\S]*?\n`{5}\n?/g;
 const FIVE_BACKTICK_PARTIAL = /`{5}\n?$/;
 
 /**
+ * GA tool-dispatch yields all start with `[Action] ...` — first
+ * line of every `do_*` tool method (ga.py:18, :360, :378, :408,
+ * etc.) ahead of any subprocess output. These live INSIDE the
+ * 5-backtick fence that wraps tool output in verbose mode, so the
+ * fence truncation below `should` catch them — but if chunk timing
+ * ever delivers the [Action] line without the fence-open in the
+ * same partial-render window, the line would leak as prose. This
+ * line-level strip is the defensive belt-and-suspenders for that.
+ *
+ * Subprocess stdout that follows the [Action] line is also inside
+ * the fence and likewise caught there; we don't have a pattern for
+ * arbitrary stdout, so the fence is the only defense for it.
+ */
+const TOOL_ACTION_LINE = /^\[Action\] [^\n]*$/gm;
+
+/**
  * "当前阶段：..." preamble that GA's [sys_prompt.txt:4] obliges the
  * LLM to write before every tool call ("调用工具前先推演：当前阶段、
  * 上步结果是否符合预期、下步策略"). The structured `<summary>` form
@@ -595,6 +611,7 @@ function cleanFinalAnswer(text: string): string {
   let out = text;
   for (const p of GA_TAG_PATTERNS) out = out.replace(p, "");
   out = out.replace(LLM_RUNNING_MARKER, "");
+  out = out.replace(TOOL_ACTION_LINE, "");
   out = out.replace(PHASE_PREAMBLE, "");
   out = out.replace(FILE_REF_PATTERN, "");
   out = out.replace(/\n{3,}/g, "\n\n");
@@ -677,7 +694,16 @@ export function cleanPartialContent(text: string): string {
     out = out.replace(FIVE_BACKTICK_PARTIAL, "");
   }
 
-  // 1g. Strip "当前阶段：..." preamble paragraphs that GA's
+  // 1g. Defensive line-level strip for GA tool-output lines that
+  //     start with [Action]. See TOOL_ACTION_LINE — these live
+  //     inside the 5-backtick fence and should already be hidden
+  //     by the fence truncation above, but chunk-timing edge cases
+  //     can leave the fence context out of the partial-render
+  //     window. The line strip is cheap and harmless when the fence
+  //     already caught them.
+  out = out.replace(TOOL_ACTION_LINE, "");
+
+  // 1h. Strip "当前阶段：..." preamble paragraphs that GA's
   //     sys_prompt obliges the LLM to write before every tool call.
   //     The same content arrives in structured form via <summary>
   //     → TurnMarker副标题; the prose preamble is a duplicate the
