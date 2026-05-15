@@ -15,6 +15,8 @@
 - 产品定义（PRD v0.2）：[docs/PRD.md](./docs/PRD.md)
 - 设计系统（DESIGN.md，draft）：[docs/DESIGN.md](./docs/DESIGN.md)
 - IPC 契约：[docs/ipc-protocol.md](./docs/ipc-protocol.md)
+- 发版 SOP（v0.2+）：[docs/release-workflow.md](./docs/release-workflow.md)
+- Win 手动 build 指南：[docs/windows-build-checklist.md](./docs/windows-build-checklist.md)
 - 决策叙事 / 历史：[docs/devlog/](./docs/devlog/)
 
 ## 项目宪法（Non-invasive）
@@ -179,12 +181,18 @@ galley/
 │   ├── ipc.py               # IPC 事件 / 命令 dataclass
 │   └── tests/               # pytest，必须脱离桌面端独立可跑
 ├── desktop/                 # Tauri + React + shadcn（阶段 2 才建）
+├── .github/
+│   └── workflows/
+│       ├── release.yml      # tag-triggered 三平台 build + GitHub Release
+│       └── check.yml        # PR 时三平台 typecheck/lint/cargo check
 └── docs/
-    ├── PRD.md               # 产品定义（v0.2）
-    ├── DESIGN.md            # 设计系统（v0.2 draft，工作中）
-    ├── ipc-protocol.md      # IPC 契约（bridge ↔ desktop）
-    └── devlog/              # 决策叙事 / 历史
-        ├── README.md        # 时间线索引
+    ├── PRD.md                       # 产品定义（v0.2）
+    ├── DESIGN.md                    # 设计系统（v0.2 draft，工作中）
+    ├── ipc-protocol.md              # IPC 契约（bridge ↔ desktop）
+    ├── release-workflow.md          # 发版 SOP + CI 故障排查
+    ├── windows-build-checklist.md   # Win 手动 build / smoke test 清单
+    └── devlog/                      # 决策叙事 / 历史
+        ├── README.md                # 时间线索引
         └── YYYY-MM-DD-topic.md
 ```
 

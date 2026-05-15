@@ -1,8 +1,8 @@
 # Windows build checklist
 
-> Status: **draft**. Tracks what's needed to produce a Galley `.exe` installer on Windows and the smoke tests to run before v0.2 release.
+> Status: **draft**. Tracks what's needed to produce a Galley `.exe` installer on Windows manually and the smoke tests to run on Win release artifacts.
 >
-> Galley v0.1 ships Mac-only (`.app` + `.dmg`). v0.2 plan: dual Mac + Windows via GitHub Actions CI. This document is the offline / local build path — useful for one-evening Win machine validation before CI is set up.
+> Galley v0.1 ships Mac-only (`.app` + `.dmg`). v0.2+ release path is **CI-driven** — see [release-workflow.md](./release-workflow.md). This document is the **fallback / offline build path**: use it when CI is unavailable, when smoke-testing a CI-produced `.exe`, or when validating a local change on a Win machine before pushing.
 
 ## 1 · Prerequisites
 

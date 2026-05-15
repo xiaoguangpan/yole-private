@@ -1,0 +1,75 @@
+name: Check
+
+# Pre-merge sanity check. Runs on every PR targeting main + every push
+# to main. Verifies the build is healthy across all three release
+# platforms WITHOUT producing release artifacts — much faster than the
+# release workflow (no bundling, no uploads).
+#
+# Gates: pnpm typecheck, pnpm lint, cargo check (per target). Each
+# platform runs in parallel (~5-8 min each); fail-fast: false so all
+# three report independently and we get a complete picture.
+#
+# When this fails on Win or Intel Mac but not Apple Silicon, you've
+# likely introduced an OS-conditional bug (the most common reason to
+# care about a multi-platform check on a Mac-led codebase).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-14
+            target: aarch64-apple-darwin
+          - platform: macos-13
+            target: x86_64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./desktop/src-tauri -> target
+
+      - name: Install frontend deps
+        working-directory: ./desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: ./desktop
+        run: pnpm typecheck
+
+      - name: Lint
+        working-directory: ./desktop
+        run: pnpm lint
+
+      - name: Cargo check
+        working-directory: ./desktop/src-tauri
+        run: cargo check --target ${{ matrix.target }}
