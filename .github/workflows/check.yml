@@ -1,17 +1,22 @@
 name: Check
 
 # Pre-merge sanity check. Runs on every PR targeting main + every push
-# to main. Verifies the build is healthy across all three release
-# platforms WITHOUT producing release artifacts — much faster than the
-# release workflow (no bundling, no uploads).
+# to main. Verifies the build is healthy across the release matrix
+# WITHOUT producing release artifacts — much faster than the release
+# workflow (no bundling, no uploads).
 #
 # Gates: pnpm typecheck, pnpm lint, cargo check (per target). Each
-# platform runs in parallel (~5-8 min each); fail-fast: false so all
-# three report independently and we get a complete picture.
+# platform runs in parallel (~5-8 min each); fail-fast: false so both
+# report independently and we get a complete picture.
 #
-# When this fails on Win or Intel Mac but not Apple Silicon, you've
-# likely introduced an OS-conditional bug (the most common reason to
-# care about a multi-platform check on a Mac-led codebase).
+# When this fails on Win but not Mac, you've likely introduced an
+# OS-conditional bug — the most common reason a Mac-led codebase
+# needs a multi-platform check.
+#
+# Matrix must mirror release.yml's: macos-26 (Apple Silicon) +
+# windows-latest. macOS Intel (x86_64-apple-darwin) is no longer
+# CI-built — JC produces an Intel bundle on his own Intel Mac when
+# needed (see docs/release-workflow.md §"Intel runner deprecation").
 
 on:
   pull_request:
@@ -25,10 +30,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-14
+          - platform: macos-26
             target: aarch64-apple-darwin
-          - platform: macos-13
-            target: x86_64-apple-darwin
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
 
@@ -36,16 +39,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           # Pin major version explicitly — see release.yml for why.
           version: 10
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
