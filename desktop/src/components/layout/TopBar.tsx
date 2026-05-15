@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
+import { isMac } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 export interface TopBarProps {
@@ -70,9 +71,16 @@ export interface TopBarProps {
    */
   onRenameSession?: (newTitle: string) => void;
   /**
-   * Padding on the left to clear the macOS traffic light (which is
-   * positioned at {16, 16} via tauri.conf.json titleBarStyle "Overlay").
-   * Three buttons × 12px + gaps + safety = ~70px.
+   * Left chrome padding.
+   *
+   *   - macOS: 70px to clear the traffic light cluster (positioned at
+   *     {16, 16} via tauri.conf.json titleBarStyle "Overlay";
+   *     three buttons × 12px + gaps + safety).
+   *   - Windows: 12px breathing room — no native chrome on the left
+   *     under our custom-chrome plan (Y), so the title floats nearly
+   *     flush with the window edge.
+   *
+   * Default resolves from `isMac`; consumers rarely override.
    */
   trafficLightPadding?: number;
 }
@@ -125,12 +133,18 @@ export function TopBar({
   onTogglePet,
   currentSessionHasPet = false,
   onRenameSession,
-  trafficLightPadding = 70,
+  trafficLightPadding = isMac ? 70 : 12,
 }: TopBarProps) {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-11 shrink-0 items-stretch border-b border-line bg-app pr-3 text-[13px]"
+      className={cn(
+        "flex h-11 shrink-0 items-stretch border-b border-line bg-app text-[13px]",
+        // Windows reserves no right padding here — WindowControls
+        // (Step 3) will own the right edge and hug the corner per
+        // Win 11 convention. Mac keeps its 12px breathing room.
+        isMac && "pr-3",
+      )}
     >
       {/* Left: traffic-light reserve. Pure spacer, draggable. */}
       <div
