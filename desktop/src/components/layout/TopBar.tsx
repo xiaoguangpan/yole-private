@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { isMac, isWindowActionTarget } from "@/lib/platform";
+import { formatShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
 import { WindowControls } from "./WindowControls";
@@ -233,7 +234,7 @@ export function TopBar({
             onToggle={onToggleConversationWidth}
           />
           <IconButton
-            title="Settings · ⌘,"
+            title={`Settings · ${formatShortcut("Mod+,")}`}
             onClick={onOpenSettings}
             ariaLabel="Open settings"
           >

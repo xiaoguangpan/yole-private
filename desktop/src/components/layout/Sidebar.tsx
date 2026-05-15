@@ -19,12 +19,13 @@ import {
 } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
-import { StatusIcon } from "@/lib/status-icon";
 import {
   BUCKET_LABEL,
   groupSessions,
   SIDEBAR_BUCKET_ORDER,
 } from "@/lib/sessions";
+import { formatShortcut } from "@/lib/shortcuts";
+import { StatusIcon } from "@/lib/status-icon";
 import { cn } from "@/lib/utils";
 import type { Project, Session, SessionBucket } from "@/types/session";
 
@@ -379,13 +380,13 @@ function SidebarQuickActions({
       <QuickAction
         icon={<Plus size={14} weight="thin" />}
         label={newChatLabel}
-        hint="⌘N"
+        hint={formatShortcut("Mod+N")}
         onClick={onNewChat}
       />
       <QuickAction
         icon={<MagnifyingGlass size={14} weight="thin" />}
         label="搜索"
-        hint="⌘K"
+        hint={formatShortcut("Mod+K")}
         onClick={onSearch}
       />
     </div>

@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { searchMessages, type MessageSearchHit } from "@/lib/db";
+import { formatShortcut } from "@/lib/shortcuts";
 import { StatusIcon } from "@/lib/status-icon";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/types/session";
@@ -241,7 +242,7 @@ function RootPage({
 
       {/* Always-first: New chat. Plain Item, no group header. */}
       <Command.Item value="new-chat new chat 新对话 新建对话" onSelect={onNewChat}>
-        <PaletteRow Icon={Plus} label="新对话" shortcut="⌘N" />
+        <PaletteRow Icon={Plus} label="新对话" shortcut={formatShortcut("Mod+N")} />
       </Command.Item>
       <Command.Item
         value="new-project new project 新建项目"
@@ -307,7 +308,7 @@ function RootPage({
         <PaletteRow Icon={ArrowsClockwise} label="重新运行健康检查" />
       </Command.Item>
       <Command.Item value="open settings 设置" onSelect={onOpenSettings}>
-        <PaletteRow Icon={Gear} label="打开设置" shortcut="⌘," />
+        <PaletteRow Icon={Gear} label="打开设置" shortcut={formatShortcut("Mod+,")} />
       </Command.Item>
       <Command.Item
         value="attach ga folder 切换 GA 路径"

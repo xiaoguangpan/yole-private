@@ -7,7 +7,15 @@
  *
  * V0.1 read-only: rebinding lands in V0.2 Settings → Shortcuts as
  * row-level edit affordances. For now the list is static.
+ *
+ * OS-conditional display: rows with a platform modifier (Mod/Alt)
+ * resolve through formatShortcut so Mac sees ⌘K-style glyphs and
+ * Win sees Ctrl+K word names. Rows without a modifier (Enter, Esc,
+ * arrows, Tab) render the same on both OSes.
  */
+
+import { isMac } from "@/lib/platform";
+import { formatShortcut } from "@/lib/shortcuts";
 
 interface ShortcutRow {
   /** Canonical key combo, rendered as kbd-style chips. */
@@ -27,10 +35,10 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "Navigation",
     rows: [
-      { combo: "⌘K", action: "打开命令面板（Command Palette）" },
-      { combo: "⌘N", action: "新建对话" },
-      { combo: "⌘\\", action: "折叠 / 展开 Sidebar", note: "V0.1 已规划，wiring 待补" },
-      { combo: "⌘,", action: "打开 Settings" },
+      { combo: formatShortcut("Mod+K"), action: "打开命令面板（Command Palette）" },
+      { combo: formatShortcut("Mod+N"), action: "新建对话" },
+      { combo: formatShortcut("Mod+\\"), action: "折叠 / 展开 Sidebar", note: "V0.1 已规划，wiring 待补" },
+      { combo: formatShortcut("Mod+,"), action: "打开 Settings" },
     ],
   },
   {
@@ -44,9 +52,15 @@ const GROUPS: ShortcutGroup[] = [
     title: "Conversation",
     rows: [
       {
-        combo: "⌥↑ / ⌥↓",
+        combo: `${formatShortcut("Alt+↑")} / ${formatShortcut("Alt+↓")}`,
         action: "跳到上 / 下一条提问",
-        note: "焦点在 Composer 时不生效（macOS 文本编辑原生快捷键保留）",
+        // Mac users had the original "macOS 文本编辑原生快捷键保留"
+        // phrasing — preserved verbatim so Mac UX is byte-identical
+        // through the A4 migration. Win gets a parallel sentence that
+        // doesn't reference macOS.
+        note: isMac
+          ? "焦点在 Composer 时不生效（macOS 文本编辑原生快捷键保留）"
+          : "焦点在 Composer 时不生效（保留原生文本编辑快捷键）",
       },
     ],
   },
