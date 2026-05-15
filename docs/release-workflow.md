@@ -18,17 +18,21 @@ git commit + git tag v0.2.0 + git push origin main v0.2.0
 GitHub Actions release.yml 自动触发
        │
        ├─ macos-14 (Apple Silicon) → Galley_0.2.0_aarch64.dmg
-       ├─ macos-13 (Intel)         → Galley_0.2.0_x64.dmg
        └─ windows-latest           → Galley_0.2.0_x64-setup.exe
        ↓
-ubuntu-latest 收集三份产物 + gh release create --draft
+ubuntu-latest 收集产物 + gh release create --draft
        ↓
-手动 review: GitHub Release 页面看 draft、edit 加亮 notes、本地下载三份 smoke test
+（可选）JC 在 Intel Mac 上本地 `pnpm tauri build` 出 Galley_0.2.0_x64.dmg
+        → 手动 `gh release upload v0.2.0 …` 挂到同一 draft
+       ↓
+手动 review: GitHub Release 页面看 draft、edit 加亮 notes、本地下载 smoke test
        ↓
 点 publish → 用户可见 + 可下载
 ```
 
-构建时间预估：每个 platform job 8-15 min（缓存命中后），三个并行。全流程 push tag 到 draft release ready 大约 **15-20 min**。
+构建时间预估：每个 platform job 8-15 min（缓存命中后），两个并行。全流程 push tag 到 draft release ready 大约 **15-20 min**。
+
+**Mac Intel 不在 CI matrix 内**（v0.1.0-alpha.2 起）：JC 当前开发机是 Intel Mac，需要时本地 `pnpm tauri build --target x86_64-apple-darwin` 出包；GitHub macos-13 runner 本身也在 2026-27 被 deprecated 的路径上，CI 提前撤出符合方向。详 §"Intel runner deprecation"。
 
 ## 版本号策略
 
@@ -114,10 +118,10 @@ CI 完成时：GitHub 顶部红圈通知 + 邮件提醒（默认订阅）。
 
 进 https://github.com/wangjc683/galley/releases 看到一个 draft `Galley v0.2.0`：
 
-- **产物列表**：确认有 3 个文件
+- **产物列表**：确认 CI 出 2 个文件
   - `Galley_0.2.0_aarch64.dmg`
-  - `Galley_0.2.0_x64.dmg`
   - `Galley_0.2.0_x64-setup.exe`
+  - （如果需要 Intel Mac binary，JC 本地 build 完后 `gh release upload v0.2.0 Galley_0.2.0_x64.dmg`）
 - **Auto-generated notes**：GitHub 根据 tag 间的 commit 自动列出来。点 **Edit** 按下面模板加工：
 
 ```markdown
@@ -150,12 +154,12 @@ GA baseline: `<commit-hash>` (e.g. 6bb3104)
 
 ### Step 4. Smoke test 三份产物
 
-把 3 个文件下载到本地，按下表跑核心流程：
+把 CI 出的 2 个文件（+ 可选的本地 build Intel 包）下载到本地，按下表跑核心流程：
 
 | 平台 | 装法 | smoke 路径 |
 |---|---|---|
 | Mac arm64 | 右键 → 打开 `.dmg` → 拖进 Applications | 跑新对话 / 切 LLM / 触发一次审批 |
-| Mac x64 (Intel) | 同上，在 Intel Mac 上装 | 同上 |
+| Mac x64 (Intel) | 本地 build（不在 CI matrix）；JC 自用机器，按需 smoke | 同上 |
 | Win x64 | 双击 `-setup.exe` 装 | 按 [windows-build-checklist.md §4](./windows-build-checklist.md#4--smoke-test-checklist) 25 项 |
 
 任何 smoke 项失败：**不要 publish**，先 `git tag -d v0.2.0 && git push origin :v0.2.0` 删 tag、修 bug、bump 到 `v0.2.1`（或推 `v0.2.0-rc.2` 重新预发）。
@@ -358,24 +362,25 @@ GitHub Actions 偶发某些 runner 排队。等 5-10 min 通常自然解决。
 
 ## Intel runner deprecation 应对
 
-`macos-13` runner GitHub 已经标 deprecated（具体下线日期 GitHub 没公告，估计 2026 年底-2027 年）。下线那天到来之前的应对路径：
+`macos-13` runner GitHub 已经标 deprecated（具体下线日期 GitHub 没公告，估计 2026 年底-2027 年）。**v0.1.0-alpha.2 起 Galley 已经从 CI matrix 撤掉 macos-13**——比 GitHub 强制下线提前走，按需采用下面方案 B/C 兜底。
 
 **方案 A**: drop Intel Mac 支持
-- `release.yml` 删 macos-13 matrix 行
-- Release notes 加 Intel Mac 用户说明：从 v0.x.0 起不再发 Intel `.dmg`
-- 影响：Intel Mac 用户失去新版本，留在最后一个 x64 dmg
+- `release.yml` 删 macos-13 matrix 行 ✅（已落实）
+- Release notes 加 Intel Mac 用户说明：CI 不再出 Intel `.dmg`
+- 影响：Intel Mac 用户失去 CI 出包；想要装就走方案 B 本地 build
 
-**方案 B**: 本地建 Intel Mac dmg
+**方案 B**: 本地建 Intel Mac dmg（**当前主力路径**）
 - JC 在自己的 Intel Mac 上手动跑 `pnpm tauri build --target x86_64-apple-darwin`
-- 把产物 manual upload 到 Release
-- 影响：发版多一步本地 build；可作为过渡方案
+- 把产物 `gh release upload v<X.Y.Z> Galley_<X.Y.Z>_x64.dmg` 挂到 same Release
+- 影响：发版多一步本地 build；JC 当前开发机就是 Intel Mac，零额外成本
 
 **方案 C**: 用 Apple Silicon 跨编译 x86_64
 - macos-14 runner 上 `rustup target add x86_64-apple-darwin` + `tauri build --target x86_64-apple-darwin`
 - Tauri 2 支持 Mac → Mac 跨架构（同一个 OS，不同 CPU 架构）
 - 影响：build 时间加倍（一台机出两份），但 release.yml matrix 简化为单 platform 双 target
+- 状态：备选，JC 换 M 系列开发机或 Intel 用户量起来后再考虑
 
-JC 的偏好（2026-05-15）：先用 macos-13 直到下线，下线后走方案 B（自有 Intel Mac 兜底）。方案 C 作为长期备选。
+JC 的偏好（2026-05-15 alpha.2 起）：方案 B（自有 Intel Mac 兜底）。方案 C 长期备选。
 
 ## Announcement templates
 

@@ -1,13 +1,19 @@
 name: Release
 
 # Tag-triggered release. Push a tag matching `v*` (e.g. `v0.2.0`) on main
-# to fire this workflow. It produces three artifacts in parallel:
+# to fire this workflow. It produces two artifacts in parallel:
 #
 #   - Galley_<version>_aarch64.dmg    (Apple Silicon Mac, macos-14 runner)
-#   - Galley_<version>_x64.dmg        (Intel Mac,         macos-13 runner)
 #   - Galley_<version>_x64-setup.exe  (Windows,           windows-latest runner)
 #
-# After all three build, a final job collects them and creates a DRAFT
+# Mac Intel (x86_64-apple-darwin) was dropped from the matrix in
+# v0.1.0-alpha.2 — JC's dev machine is an Intel Mac so an Intel bundle
+# can be produced locally on demand, and the GitHub-hosted macos-13
+# runner is on track for removal anyway (TBD, 2026-27; see
+# docs/release-workflow.md §"Intel runner deprecation"). Re-add the
+# matrix row if/when a sizable user base needs official Intel binaries.
+#
+# After both build, a final job collects them and creates a DRAFT
 # GitHub Release. JC reviews the auto-generated notes, smoke-tests each
 # artifact, then publishes.
 #
@@ -18,11 +24,6 @@ name: Release
 # and `cargo check` before bundling. A failure on any platform aborts
 # its job (fail-fast: false keeps the other platforms going so we get
 # a complete failure picture).
-#
-# When macos-13 (Intel) gets removed from GitHub Actions (TBD, 2026-27),
-# either drop the macos-13 matrix row (Intel users build locally from
-# JC's x64 Mac) or rewrite to cross-compile aarch64 → x86_64 from
-# macos-14. See docs/release-workflow.md §"Intel runner deprecation".
 
 on:
   push:
@@ -30,7 +31,7 @@ on:
       - "v*"
   # Manual dispatch (Actions UI → "Release" workflow → "Run workflow") lets
   # JC validate the workflow end-to-end without polluting git tags or
-  # the Releases page. On manual dispatch we build all three platforms
+  # the Releases page. On manual dispatch we build both platforms
   # but skip the `release` job that creates the GitHub Release draft —
   # because there's no tag to associate the release with anyway.
   workflow_dispatch:
@@ -44,11 +45,6 @@ jobs:
           - platform: macos-14
             target: aarch64-apple-darwin
             arch: aarch64
-            bundle_dir: dmg
-            bundle_glob: "*.dmg"
-          - platform: macos-13
-            target: x86_64-apple-darwin
-            arch: x64
             bundle_dir: dmg
             bundle_glob: "*.dmg"
           - platform: windows-latest
