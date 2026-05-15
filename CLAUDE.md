@@ -10,6 +10,12 @@
 - **Large hero display (≥ 30px)**: `Galley` (Newsreader medium, sentence case). Currently used: Onboarding StepWelcome h1 (36px). Uppercase at this scale reads as marketing banner; sentence case stays gentle and product-appropriate.
 - Use **GenericAgent** / **GA** when referring to the upstream engine, never to mean Galley.
 
+**Platform terminology** (用于一致区分 OS 和设备):
+- **macOS** = the OS. Use for platform name / system requirements / app target. Examples: "Requires macOS 14", "macOS app", release titles like "Galley vX.Y · macOS (RC)"
+- **Mac** = the device / hardware family / user. Use for hardware references. Examples: "Apple Silicon Mac", "Intel Mac", "your Mac", "M1+ 用户"
+- Convention follows Apple's own usage. Major SaaS (Slack / Notion / Figma) align here on download pages.
+- Today's lesson: [2026-05-15 v0.1 ship devlog §D4](docs/devlog/2026-05-15-v0.1-ship-and-ci-fallback.md#d4-macos-vs-mac-用词约定)
+
 本地 agent team 编排器，人和 agent 都是一等公民。Galley GUI 给坐在桌前的 human operator，Galley CLI 给 Supervisor Agent 远程操作整个 session team。
 
 v0.5 之前（v0.1 / v0.2）仍以"GA 的本地桌面工作台 + 多 session 并行"为主要使用形态；v0.5 起 dual-native 架构（Rust 端 Galley Core + 双前端）正式 ship。
