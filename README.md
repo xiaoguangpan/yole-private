@@ -1,13 +1,13 @@
 # Galley
 
-> **A local agent team orchestrator, native for both human and agent.**
+> **基于 GenericAgent 的本地 Agent Team 编排器 Desktop，人和 Agent 都是一等公民。**
 
 > *Galley started as a workbench for [GenericAgent](https://github.com/lsdefine/GenericAgent). The first two letters of our name are a quiet bow to where we came from.*
 
-[中文 README](./README.zh.md)
+[English README](./README_en.md)
 
 <p align="center">
-  <img src="docs/screenshots/screenshot_05.png" alt="Galley main conversation view" width="800" />
+  <img src="docs/screenshots/screenshot_05.png" alt="Galley 主对话界面" width="800" />
 </p>
 
 <p align="center">
@@ -17,44 +17,46 @@
   <a href="https://github.com/wangjc683/galley/stargazers"><img src="https://img.shields.io/github/stars/wangjc683/galley?style=social" alt="Stars" /></a>
 </p>
 
-## What is Galley
+## Galley 是什么
 
-Galley is a desktop app for running multiple AI agent sessions in parallel — and, soon, for letting one **Supervisor Agent** drive the whole team remotely.
+Galley 是一个桌面应用，让你并行跑多个 AI agent session——v0.5 之后，还能让一个 **Supervisor Agent** 远程指挥整个 agent team。
 
-**Today (v0.1 / v0.2)** Galley is a desktop workbench for [GenericAgent](https://github.com/lsdefine/GenericAgent): you run several agent sessions side-by-side, watch their tool calls in a structured timeline, approve high-risk actions when you want to (or let them rip with YOLO mode), and pick up old sessions where you left off.
+**今天（v0.1）**：Galley 是 [GenericAgent](https://github.com/lsdefine/GenericAgent) 的本地桌面工作台。多个 agent session 并排跑，工具调用走结构化时间线展示，高风险动作可以等审批（也可以开 YOLO mode 一路放行），历史会话随时回来续聊。
 
-**Coming in v0.5** Galley becomes **dual-native**: a Rust `Galley Core` exposes both the existing GUI and a new `Galley CLI`. The CLI lets an external **Supervisor Agent** — running on the same machine as a separate GenericAgent process plugged into IM frontends like WeChat or Lark — orchestrate the entire session team. You text the Supervisor from your phone, it calls `galley` commands locally; back at the desk, every session is right there in the GUI.
+**v0.5 之后**：Galley 变成 **dual-native** ——Rust 写的 `Galley Core` 同时支撑现有 GUI 和新的 `Galley CLI`。CLI 让外部 **Supervisor Agent** 来编排整个 session team：同一台机器上另一个 GenericAgent 进程（接入飞书 / 微信等 IM frontend），收到你在手机上的指令后调用本地 `galley` 命令；回到电脑前，所有 session 在 GUI 里一目了然。
 
-Galley is **local-first**. Your data never leaves your machine. Remote access is the Supervisor's responsibility (via IM, SSH, whatever it wants), not Galley's. Delete Galley anytime — GenericAgent keeps working untouched.
+Galley 是 **local-first** 的。你的数据不离开你的机器。**远程访问**由 Supervisor 在外部传输层（IM / SSH / 其他）负责，不是 Galley 的责任。
 
-## Features
+Galley 不会修改用户已有的 GenericAgent，随时可以删 Galley，GenericAgent 独立运行不受影响。
 
-### Today
+## 功能
 
-- 🪟 **Multi-session parallel** — each session runs as an independent GenericAgent subprocess
-- 🔧 **Structured tool timeline** — see every tool call, args, result, and timing inline with the conversation
-- 🛡️ **Approval system + YOLO mode** — pause for high-risk actions (file_patch, code_run, ...), or trust your agent and skip
-- 💾 **Session persistence + restore** — close Galley, come back days later, pick up where you left off
-- 📁 **Projects + full-text search** — organize sessions by project; SQLite FTS5 search across all conversations
-- 🤖 **Per-session LLM switching** — switch models mid-conversation without losing context
+### 今日（v0.1）
 
-### Coming in v0.5
+- 🪟 **多 session 并行** —— 每个 session 独立 GenericAgent 子进程
+- 🔧 **结构化工具时间线** —— 工具调用、参数、结果、时延都在对话流内联展示
+- 🛡️ **审批系统 + YOLO 模式** —— 高风险动作（file_patch / code_run...）可拦审批，或者干脆全程信任 agent
+- 💾 **会话持久化 + 恢复** —— 关掉 Galley，几天后回来继续聊
+- 📁 **项目分组 + 全文搜索** —— 按项目组织 session；SQLite FTS5 trigram 跨对话搜索
+- 🤖 **per-session LLM 切换** —— 对话中途换模型，不丢上下文
 
-- 🚧 **Galley CLI** — `galley sessions list / send / new / watch / ...` for Supervisor Agent control
-- 🚧 **Background mode** — close the window, keep running in the menubar
-- 🚧 **Agent-API public contract** — versioned JSON schema for stable agent integration
-- 🚧 **Galley Supervisor SOP** for GenericAgent + **galley-supervisor** Skill for Claude
+### 即将（v0.5）
 
-See the [PRD](./docs/PRD.md) and [refactor playbook](./docs/refactor/) for the full v0.5 plan.
+- 🚧 **Galley CLI** —— `galley sessions list / send / new / watch / ...` 给 Supervisor Agent 用
+- 🚧 **Background mode** —— 关窗不退出，留在 menubar
+- 🚧 **Agent-API 公开契约** —— 版本化 JSON schema，让 agent 集成长期稳定
+- 🚧 **Galley Supervisor SOP**（给 GenericAgent）+ **galley-supervisor skill**（给 Claude）
 
-## Screenshots
+完整 v0.5 计划见 [PRD](./docs/PRD.md) 和 [refactor playbook](./docs/refactor/)。
+
+## 截图
 
 | | |
 |---|---|
 | ![](docs/screenshots/screenshot_01.png) | ![](docs/screenshots/screenshot_02.png) |
 | ![](docs/screenshots/screenshot_03.png) | ![](docs/screenshots/screenshot_04.png) |
 
-## Architecture
+## 架构
 
 ```
               ┌─────────────────┐  ┌─────────────────────────┐
@@ -68,84 +70,84 @@ See the [PRD](./docs/PRD.md) and [refactor playbook](./docs/refactor/) for the f
                        ┌────────────────────────┐
                        │  Galley Core 🚧 v0.5   │
                        │  (Rust)                │
-                       │  • Session lifecycle   │
-                       │  • SQLite (writes)     │
-                       │  • Runner management   │
-                       │  • Event broadcast     │
+                       │  • Session 生命周期    │
+                       │  • SQLite 写            │
+                       │  • Runner 管理         │
+                       │  • Event 广播          │
                        └────────┬───────────────┘
                                 ↓
                        ┌────────────────────────┐
                        │  Runner (Python)       │
-                       │  wraps one GenericAgent│
-                       │  subprocess per session│
+                       │  每 session 一个        │
+                       │  GenericAgent 子进程    │
                        └────────────────────────┘
 ```
 
-**v0.1 / v0.2 ship today**: only the GUI box is real; logic currently lives in the TypeScript layer. **v0.5 introduces Galley Core in Rust**, which then exposes the CLI box. See the [refactor playbook](./docs/refactor/) for execution detail.
+**v0.1 今天 ship 的是**：只有 GUI 那一格真实存在，业务逻辑目前在 TypeScript 层。**v0.5 引入 Rust 写的 Galley Core**，进而暴露 CLI。具体执行计划见 [refactor playbook](./docs/refactor/)。
 
-**Tech stack:**
+**技术栈：**
 
-- **Frontend** — Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4
-- **Backend** — Rust (Galley Core, v0.5 in progress) + Python (runner, wraps GenericAgent)
-- **Local DB** — SQLite (FTS5 trigram for search)
-- **IPC** — JSON Lines over stdio today; Unix socket / named pipe for CLI in v0.5
-- **Platform** — macOS + Windows (Linux candidate post-v0.5)
+- **前端** —— Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4
+- **后端** —— Rust (Galley Core，v0.5 实现中) + Python (runner，包装 GenericAgent)
+- **本地数据库** —— SQLite (FTS5 trigram 搜索)
+- **IPC** —— 当前 stdio JSON Lines；v0.5 起 CLI 走 Unix socket / named pipe
+- **平台** —— macOS + Windows（Linux 候选 · v0.5 之后）
 
-## Installation
+## 安装
 
-### Prerequisites
+### 前置条件
 
-Galley wraps [GenericAgent](https://github.com/lsdefine/GenericAgent). Install GA first by following [their setup instructions](https://github.com/lsdefine/GenericAgent). At minimum you need:
+Galley 需要 [GenericAgent](https://github.com/lsdefine/GenericAgent) 先装好。按 [GA 的安装说明](https://datawhalechina.github.io/hello-generic-agent/part1/chapter1/) 走。最少需要：
 
-- GenericAgent cloned to `~/Documents/GenericAgent/` (or any path; Galley lets you pick on first launch)
-- Python 3.10+ with GA's dependencies installed
-- A configured `mykey.py` with at least one LLM provider (Galley dogfoods with Claude and GLM 4)
+- GenericAgent 仓库 clone 到 `~/Documents/GenericAgent/`（或任意路径，Galley 首次启动让你选）
+- Python 3.10+ 装好 GA 的依赖
+- `mykey.py` 配置好至少一个 LLM provider（Galley dogfood 主要用 Claude Opus 4.6，GPT 5.5 和 GLM 5.1）
 
-Galley will run a health check on first launch and tell you exactly what's missing.
+Galley 首次启动会跑健康检查，缺什么会明确告诉你。
 
 ### macOS
 
-1. Download `Galley-v0.x.x-aarch64.dmg` (Apple Silicon) or `Galley-v0.x.x-x86_64.dmg` (Intel) from [Releases](https://github.com/wangjc683/galley/releases)
-2. Open the .dmg and drag **Galley.app** to your **Applications** folder
-3. Galley isn't code-signed (yet — we're a small dev project). To open it the first time, run this in Terminal:
+1. 从 [Releases](https://github.com/wangjc683/galley/releases) 下载 `Galley-v0.x.x-aarch64.dmg`（Apple Silicon）或 `Galley-v0.x.x-x86_64.dmg`（Intel）
+2. 打开 .dmg，把 **Galley.app** 拖到 **应用程序** 文件夹
+3. Galley 暂时没有 Apple code signing 证书。首次打开请在 Terminal 跑：
    ```bash
    xattr -d com.apple.quarantine /Applications/Galley.app
    ```
-   Then double-click Galley.app to launch. *(Alternative: right-click the app → Open → Open again. The `xattr` command is more reliable on recent macOS versions.)*
+   然后双击 Galley.app 启动。*（替代方案：右键应用 → 打开 → 再点打开。最近 macOS 版本上 `xattr` 命令更稳。）*
 
 ### Windows
 
-1. Download `Galley-v0.x.x-x64-setup.exe` from [Releases](https://github.com/wangjc683/galley/releases)
-2. Run the installer. Windows SmartScreen will warn that the publisher is unknown (Galley isn't EV-signed):
-   - Click **"More info"** → **"Run anyway"**
-3. Launch Galley from the Start menu
+1. 从 [Releases](https://github.com/wangjc683/galley/releases) 下载 `Galley-v0.x.x-x64-setup.exe`
+2. 跑安装程序。Windows SmartScreen 会提示发布者未知（Galley 没买 EV 签名证书）：
+   - 点 **"更多信息"** → **"仍要运行"**
+3. 从开始菜单启动 Galley
 
-## Contributing / Building from source
+## 贡献 / 从源码构建
 
 ```bash
 git clone https://github.com/wangjc683/galley
 cd galley
 
-# Python bridge (tests)
+# Python bridge（测试）
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m pytest          # unit tests
 GA_PATH=/path/to/GenericAgent BRIDGE_PYTHON=/path/to/python .venv/bin/python -m pytest -m e2e
 
-# Desktop app (dev / build)
+# 桌面应用（开发 / 构建）
 cd desktop
 pnpm install
-pnpm tauri dev                       # macOS desktop dev mode
-pnpm tauri build                     # produces .app / .dmg / .exe
+pnpm tauri dev                       # macOS 桌面开发模式
+pnpm tauri build                     # 出 .app / .dmg / .exe
 ```
 
-See [docs/release-workflow.md](./docs/release-workflow.md) for the CI release flow and [docs/windows-build-checklist.md](./docs/windows-build-checklist.md) for manual Windows builds.
+CI release 流程见 [docs/release-workflow.md](./docs/release-workflow.md)；手动 Windows build 见 [docs/windows-build-checklist.md](./docs/windows-build-checklist.md)。
 
-## Acknowledgments
+## 致谢
 
-[**lsdefine/GenericAgent**](https://github.com/lsdefine/GenericAgent) — the agent framework Galley is built on — is a self-evolving LLM agent organized around a single principle: **contextual information density maximization**. Rather than chasing raw context length, it keeps the active context small and decision-relevant through four interlocking mechanisms — a minimal atomic tool set, a hierarchical on-demand memory that surfaces only a small high-level view by default, a self-evolution layer that distills past trajectories into reusable SOPs and executable code, and a context truncation/compression layer that maintains density during long executions. The reasoning, tool dispatch, memory consolidation, and SOP system all come from GA. Galley adds a desktop workbench and (in v0.5) a CLI for agent-driven orchestration, while staying strictly non-invasive — delete Galley and GA keeps working untouched.
+[**lsdefine/GenericAgent**](https://github.com/lsdefine/GenericAgent) —— Galley 建立在其之上的 agent framework —— 是一个自演化的 LLM agent，围绕单一原则设计：**上下文信息密度最大化（contextual information density maximization）**。它不追求 raw context 长度，而是通过四个互锁机制——最小原子工具集、默认只暴露浅层 high-level 视图的分层按需记忆、把过往轨迹蒸馏成可复用 SOP 和可执行代码的自演化层、以及在长执行中维持密度的 context 截断/压缩层——让 active context 保持小巧且决策相关。推理、工具调度、记忆固化、SOP 系统全部来自 GA。Galley 提供桌面工作台和（v0.5 起）让外部 agent 编排的 CLI，但严格 non-invasive：删掉 Galley，GA 独立运行不受影响。
 
-Paper: [GenericAgent: A Token-Efficient Self-Evolving LLM Agent via Contextual Information Density Maximization (arXiv:2604.17091)](https://arxiv.org/abs/2604.17091)
+论文：[GenericAgent: A Token-Efficient Self-Evolving LLM Agent via Contextual Information Density Maximization (arXiv:2604.17091)](https://arxiv.org/abs/2604.17091)
 
 ## License
 
