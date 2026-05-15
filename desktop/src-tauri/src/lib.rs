@@ -54,6 +54,28 @@ pub fn run() {
                 .add_migrations(DB_URL, migrations)
                 .build(),
         )
+        .setup(|_app| {
+            // Windows-only custom chrome: drop native decorations and
+            // restore the drop shadow via window-shadows-v2 so the borderless
+            // window doesn't look like a flat rectangle. Mac keeps its
+            // titleBarStyle: "Overlay" from tauri.conf.json — this block
+            // is cfg-gated out at compile time on macOS, so the Mac binary
+            // contains zero Windows-specific code.
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::Manager;
+                use window_shadows_v2::set_shadow;
+                let window = _app
+                    .get_webview_window("main")
+                    .expect("main webview window must exist at setup time");
+                window
+                    .set_decorations(false)
+                    .expect("failed to disable native decorations on Windows");
+                set_shadow(&window, true)
+                    .expect("failed to enable drop shadow on Windows");
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
