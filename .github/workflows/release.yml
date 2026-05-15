@@ -28,6 +28,12 @@ on:
   push:
     tags:
       - "v*"
+  # Manual dispatch (Actions UI → "Release" workflow → "Run workflow") lets
+  # JC validate the workflow end-to-end without polluting git tags or
+  # the Releases page. On manual dispatch we build all three platforms
+  # but skip the `release` job that creates the GitHub Release draft —
+  # because there's no tag to associate the release with anyway.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -114,6 +120,9 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
+    # Only create a GitHub Release when fired from a real tag push.
+    # workflow_dispatch (manual dry-run) builds artifacts but stops here.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

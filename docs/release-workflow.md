@@ -185,6 +185,24 @@ GitHub 自动：
 4. Merge back to main + tag + push
 5. 走正常发版流程，但 RC 可跳过（影响小、改动小）
 
+## Dry-run · 不打 tag 验证 CI 健康
+
+如果想验证「release.yml 本身能正确跑完三平台 build」而不想真发版（不留 tag、不创建 draft Release），用 GitHub Actions 的 **manual dispatch**：
+
+1. 打开 https://github.com/wangjc683/galley/actions/workflows/release.yml
+2. 右上角点 **Run workflow** → 选 `Branch: main` → 点绿色 **Run workflow** 按钮
+3. CI 会触发完整 build matrix（三平台并行 build）
+4. **release job 自动跳过**（`if: startsWith(github.ref, 'refs/tags/v')` 守门）—— 不创建 Release、不上传到任何 Release
+5. 三个 build job 都绿 = CI 工作流健康
+6. Artifacts 在 run 详情页右侧可下载（保留 90 天），想本地装一下 smoke test 也行
+
+适用场景：
+- CI 配置改动后想验证还能跑（比如调整 matrix / 升级 actions 版本）
+- 怀疑某个平台 break 了但不想等下次真发版才发现
+- 给 PR contributor 看「你的改动确实能在三个 OS build」
+
+不会产生：tag 污染 git 历史、draft Release 占 Releases 页。
+
 ## 预发版（RC）流程
 
 跟正式发版几乎一样，区别：
