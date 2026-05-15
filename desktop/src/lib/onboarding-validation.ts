@@ -228,10 +228,18 @@ interface HealthProbe {
 }
 
 async function fsExists(path: string): Promise<boolean> {
-  // Lazy import so a Vite-only dev build doesn't fail to load just
-  // because the Tauri plugin shim is missing.
-  const { exists } = await import("@tauri-apps/plugin-fs");
-  return exists(path);
+  // Routes through our custom `path_exists` Tauri command (Rust side,
+  // src-tauri/src/lib.rs) instead of `@tauri-apps/plugin-fs`'s
+  // `exists()`. The plugin-fs version is gated by `fs:scope` in
+  // capabilities/default.json which defaults to a user-profile glob
+  // allow-list — fine for Tauri's sandboxed-web threat model, but
+  // wrong for Galley: a v0.1-alpha Windows user with GA at
+  // `D:\projects_2026\GenericAgent` saw every health-check row fail
+  // because `D:\` wasn't in the allow-list. See the command's doc
+  // comment for the full rationale. Lazy import keeps a Vite-only
+  // dev build loadable when the Tauri shim isn't present.
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("path_exists", { path });
 }
 
 /**

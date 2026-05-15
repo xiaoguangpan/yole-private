@@ -9,6 +9,35 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// runs Up migrations in version order on first connect.
 const DB_URL: &str = "sqlite:workbench.db";
 
+/// Plain `Path::exists` check that bypasses `tauri-plugin-fs`'s
+/// `fs:scope` glob allow-list.
+///
+/// **Why a custom command exists.** v0.1.0-alpha.1 Windows users
+/// reported the Onboarding health check failing on the very first row
+/// ("GA 路径存在") for any GA install outside the user-profile tree —
+/// e.g. `D:\projects_2026\GenericAgent`, external SSDs, `/opt/...`.
+/// `tauri-plugin-fs`'s scope was set to `$HOME/**`, `$DOCUMENT/**`,
+/// `$DESKTOP/**`, `$DOWNLOAD/**` (defaults inherited from Tauri's
+/// sandboxed-web-content threat model); paths outside those globs
+/// throw a permission error that our `fsExists` catches and reports
+/// as "path does not exist", which is technically wrong and
+/// operationally a dead-end (no app-visible way to widen the scope).
+///
+/// Galley is a trusted desktop tool: the dist is statically bundled,
+/// loads no remote content, and the only paths it ever inspects come
+/// from a user-driven OS picker or input box. The web-sandbox threat
+/// model doesn't apply. Rather than widening `fs:scope` to `**` (and
+/// inheriting glob-on-Windows quirks plus a wide write surface for
+/// any future plugin-fs usage), this command exposes one narrow read
+/// — boolean existence — directly from Rust, where `std::path::Path`
+/// handles cross-platform separators correctly and no scope check
+/// runs. JS callers route through `invoke("path_exists", ...)`
+/// instead of `@tauri-apps/plugin-fs`'s `exists()`.
+#[tauri::command]
+fn path_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -54,6 +83,7 @@ pub fn run() {
                 .add_migrations(DB_URL, migrations)
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![path_exists])
         .setup(|_app| {
             // Windows-only custom chrome: drop native decorations and
             // restore the drop shadow via window-shadows-v2 so the borderless
