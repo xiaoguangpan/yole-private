@@ -1,11 +1,11 @@
 # B1 · Rust core 骨架 + CLI 只读
 
 ```
-Cursor:   T1.15  (一次性大 commit · 准备就绪)
-Status:   🚧 启动中 (M1 90% — T1.1–T1.14 done, commit pending)
+Cursor:   T3.1  (M3 启动 — 选 rusqlite vs sqlx，写 running notes)
+Status:   🚧 启动中 (M2 done · cargo check clean · API surface frozen)
 Started:  2026-05-18
-Last touch: 2026-05-18 M1 rename + all 4 gates pass + dogfood OK
-Predecessor: Prototype (bridge-owner) 全部 checklist pass
+Last touch: 2026-05-18 M2 done — GalleyApi trait + all data types + stub impl
+Predecessor: M1 commit 4ee23e3 (rename) + M1 pushed
 Successor:   B2 (bridge ownership 迁 Rust)
 Duration:    3 周 (D1-D15)
 ```
@@ -114,8 +114,8 @@ Duration:    3 周 (D1-D15)
 
 ### Sub-tasks
 
-- [ ] **T2.1** 把 `core/` 改造成 Cargo workspace root：`core/Cargo.toml` 顶层 `[workspace]`，成员包括当前的 lib（重命名为 `galley-core`）+ 新建 cli（`galley-cli`，路径 `../cli`）。或者保持 core/ 是单 crate + cli/ 是另一个独立 crate（不 workspace），看哪个 Cargo dev 流更顺。**决定写到 running notes 里**
-- [ ] **T2.2** `core/src/` 加新模块结构：
+- [x] **T2.1** 把 `core/` 改造成 Cargo workspace root：`core/Cargo.toml` 顶层 `[workspace]`，成员包括当前的 lib（重命名为 `galley-core`）+ 新建 cli（`galley-cli`，路径 `../cli`）。或者保持 core/ 是单 crate + cli/ 是另一个独立 crate（不 workspace），看哪个 Cargo dev 流更顺。**决定写到 running notes 里**
+- [x] **T2.2** `core/src/` 加新模块结构：
   ```
   core/src/
   ├── lib.rs           (现有，加 mod 引用)
@@ -128,7 +128,7 @@ Duration:    3 周 (D1-D15)
   ├── db.rs            ← M3 填实现
   └── error.rs         ← GalleyError + Result<T> alias
   ```
-- [ ] **T2.3** 定义 `Origin` 类型：
+- [x] **T2.3** 定义 `Origin` 类型：
   ```rust
   pub enum OriginVia { Manual, Cli }
   pub struct Origin {
@@ -137,11 +137,11 @@ Duration:    3 周 (D1-D15)
       pub reason: Option<String>,
   }
   ```
-- [ ] **T2.4** 定义 `SessionBrief` 数据 type（对应当前 TS `Session`），所有字段 + `serde::{Serialize, Deserialize}` + `schemars::JsonSchema` derive
-- [ ] **T2.5** 同上 `ProjectBrief`, `MessageBrief`
-- [ ] **T2.6** 定义 `SessionFilter` 入参类型（`project_id` / `status` / `archived`）
-- [ ] **T2.7** 定义 `GalleyError` enum + `pub type Result<T> = std::result::Result<T, GalleyError>;`
-- [ ] **T2.8** 定义 `GalleyApi` trait：
+- [x] **T2.4** 定义 `SessionBrief` 数据 type（对应当前 TS `Session`），所有字段 + `serde::{Serialize, Deserialize}` + `schemars::JsonSchema` derive
+- [x] **T2.5** 同上 `ProjectBrief`, `MessageBrief`
+- [x] **T2.6** 定义 `SessionFilter` 入参类型（`project_id` / `status` / `archived`）
+- [x] **T2.7** 定义 `GalleyError` enum + `pub type Result<T> = std::result::Result<T, GalleyError>;`
+- [x] **T2.8** 定义 `GalleyApi` trait：
   ```rust
   #[async_trait]
   pub trait GalleyApi: Send + Sync {
@@ -158,10 +158,10 @@ Duration:    3 周 (D1-D15)
       // async fn create_session(...) → B2
   }
   ```
-- [ ] **T2.9** Stub 所有 trait method 用 `todo!("M3")` 让代码能 compile
-- [ ] **T2.10** 加 dependency：`async-trait`, `serde`, `schemars`, `tokio`（如果还没）
-- [ ] **T2.11** `cargo check` 干净
-- [ ] **T2.12** 写一份 `core/src/api.rs` 顶部 doc-comment，说明这是 single source of truth（呼应 [invariants.md I5](./invariants.md)）
+- [x] **T2.9** Stub 所有 trait method 用 `todo!("M3")` 让代码能 compile
+- [x] **T2.10** 加 dependency：`async-trait`, `serde`, `schemars`, `tokio`（如果还没）
+- [x] **T2.11** `cargo check` 干净
+- [x] **T2.12** 写一份 `core/src/api.rs` 顶部 doc-comment，说明这是 single source of truth（呼应 [invariants.md I5](./invariants.md)）
 
 ### M2 完成标志
 
@@ -350,16 +350,29 @@ B1 全部 acceptance 跑过，devlog ship，B2 playbook 写好可以启动。
 - **N4 (T1.11)**: `gui/src/stores/demo.ts` 里有 demo fixture content 引用 `desktop/src/db/migrations/...`，是历史虚构内容（不是真实代码路径），保留不动 —— "克制" 原则，rename 阶段不动 demo strings。
 - **N5 (T1.1-T1.3)**: 三个 `git mv` 打包到一个 M1 commit 而非按 invariants.md §I4 拆三个独立 commit。JC 2026-05-18 显式选择按 playbook T1.15 走 1-commit 路径；invariants.md §I4 跟 B1 playbook T1.15 文档内部矛盾，留 **open task: 调和 §I4 vs T1.15**（删一个或互相援引/限定 scope）。
 
+#### 2026-05-18 · M2 GalleyApi trait + scaffolding
+
+- **N6 (T2.1 · O1 resolved)**: Cargo **workspace** chosen (not independent crates). Workspace root at `core/Cargo.toml` with `members = [".", "../cli"]`. cli/Cargo.toml carries `[package].workspace = "../core"` so `cd cli && cargo build` discovers the same workspace. Shared `target/` lives at `core/target/` — keeps CI cache key (`./core -> target`) and tauri build output paths byte-identical to M1. Repo-root workspace was the more idiomatic alternative but would have moved `target/` to `<repo>/target/` and forced workflow/.gitignore/script churn unrelated to API-surface work. Per playbook G5 ("倾向 workspace").
+- **N7 (T2.1)**: Crate rename `desktop` → `galley-core`, lib `desktop_lib` → `galley_core_lib`, default-run `desktop` → `galley-core`, `core/src/main.rs` bin updated. Tauri build paths unchanged (`target/<profile>/galley-core` replaces `desktop`; productName="Galley" still drives the .app/.dmg name). `cli/Cargo.lock` standalone lock removed in favor of the workspace lock at `core/Cargo.lock`.
+- **N8 (T2.10 · scope cut)**: **Only `async-trait = "0.1"` added as new dep.** Playbook T2.10 originally listed `schemars` and (depending on read) `thiserror`. Deferred both: `schemars` is needed for agent-api.md schema generation which is M5/B4 (deferring saves ~30s of compile + transitive deps now); `thiserror` is convenient but not necessary — `GalleyError`'s `Display` + `std::error::Error` impls are 12 lines of hand-rolled code, cheaper than the trait derive's compile cost. If either ends up needed earlier, easy enough to add. **Decision**: 倾向最小 deps；M5 添加 schemars 时统一在所有 api types 上加 `JsonSchema` derive。
+- **N9 (T2.2-T2.8 · scope expand)**: Playbook listed 4 types in `api/` (session/message/project/origin); actual implementation added **3 more** (`status.rs`, `health.rs`, `search.rs`) because trait signatures need `StatusSummary` / `HealthReport+HealthCheck+HealthStatus` / `SearchHit+SearchScope`. These weren't called out in T2.5 but are obviously required to compile the trait. Module split kept narrow per type-family.
+- **N10 (T2.4-T2.5 · JSON convention)**: All struct field-names serialize as **camelCase** (`#[serde(rename_all = "camelCase")]`); all enum variants serialize as **snake_case** (`#[serde(rename_all = "snake_case")]`). Matches existing TS contract in `gui/src/types/session.ts` so Tauri `invoke()` round-trips work without an intermediate adapter. CLI agent-api.md will document the same convention (snake_case enum string values are agent-friendly; camelCase keys aren't ideal for shell-piping but uniformity > optimization at this stage).
+- **N11 (T2.9 stub impl)**: Stub lives in `core/src/db.rs` as `SqliteGalley` (zero-state struct) with `todo!("M3")` per method. `cargo check` passes because `todo!()` is a runtime panic, not a compile error. M3 will replace the struct with a real connection-pool holder and fill in SQL.
+- **N12 (Cargo cache invalidation)**: After workspace re-org, *no* `cargo clean` needed — cargo correctly detects the workspace move via Cargo.toml mtime. (M1 _did_ need clean because of tauri-build's generated permission file referencing the old `desktop/src-tauri/...` path.) Useful lesson: tauri-build's codegen anchors paths absolutely in `target/.../build/.../out/permissions/...`, so any **repo-relative** layout change demands clean. Pure crate-internal changes (workspace setup, rename) don't.
+- **N13 (Open decisions cleanup)**: O1 (workspace) resolved → see N6. O2 (rusqlite vs sqlx) deferred to T3.1 (next session). O3 (error stdout vs stderr) deferred to T4.12. O4 (health scope) deferred to T3.9.
+
 ---
 
 ## Open decisions
 
-- [O1] Cargo workspace vs 独立 crate (T2.1)：倾向 workspace，但要验证 Tauri build 兼容
+- [O1] ~~Cargo workspace vs 独立 crate (T2.1)：倾向 workspace，但要验证 Tauri build 兼容~~ **RESOLVED 2026-05-18 → workspace root at `core/`, members include self + `../cli`** (see running note N6)
 - [O2] Rust SQLite 驱动：`rusqlite` 推荐，但要确认 libsqlite3-sys 版本跟 tauri-plugin-sql 不冲突 (T3.1)
 - [O3] Error output 走 stdout 还是 stderr (T4.12)：影响 agent SOP 读法
 - [O4] B1 阶段 `health` 命令复杂度边界 (T3.9 / G8)：是否包 Python dry-run
 - [O5] GUI 迁移模板选哪个函数 (T6.1)：loadProjects vs loadSessions vs getPref
 - [O6] cli/ 是否需要 platform-specific build (Windows .exe icon resource embedding 等)：B1 暂不做，B4 polish
+- [O7] **NEW** `schemars::JsonSchema` derive 是否要现在加 (T2.10)：M2 deferred to M5/B4 when agent-api.md schema gen actually needs it (N8). If we hit a "need schemars now" moment earlier, revisit.
+- [O8] **NEW** invariants.md §I4 (3-commit rename) vs B1 playbook T1.15 (1-commit rename) 文档内部矛盾未调和 — JC 2026-05-18 选了 T1.15 路径，但文档冲突仍在 (running note N5).
 
 ## Migration pattern · 给 B2/B3 用的迁移模板
 

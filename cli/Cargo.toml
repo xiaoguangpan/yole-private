@@ -3,6 +3,11 @@ name = "galley-cli"
 version = "0.1.0-dev"
 edition = "2021"
 description = "Galley CLI — agent-first interface to Galley Core (placeholder; impl lands in B1 M4)"
+# Workspace root lives at ../core (not in an ancestor of this crate),
+# so cargo needs an explicit hint to find it. Without this, invoking
+# `cargo build` from cli/ would treat the crate as standalone and use a
+# separate cli/target/, defeating the workspace's shared-target benefit.
+workspace = "../core"
 
 [[bin]]
 name = "galley"

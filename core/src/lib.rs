@@ -1,3 +1,7 @@
+pub mod api;
+pub mod db;
+pub mod error;
+
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
