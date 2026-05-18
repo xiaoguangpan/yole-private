@@ -1,11 +1,11 @@
 # B1 · Rust core 骨架 + CLI 只读
 
 ```
-Cursor:   T5.1  (M5 启动 — docs/agent-api.md 初稿)
-Status:   🚧 启动中 (M4 done · galley CLI binary works · 12 core + 6 cli tests pass · ESCAPE fix on M3)
+Cursor:   T6.1  (M6 启动 — pick loadProjects vs loadSessions as migration template)
+Status:   🚧 启动中 (M5 done · docs/agent-api.md draft published)
 Started:  2026-05-18
-Last touch: 2026-05-18 M4 done — clap subcommands, 6 reads, GALLEY_DB_PATH override
-Predecessor: M3 commit 9f6b369 (sqlx reads)
+Last touch: 2026-05-18 M5 done — agent-api.md covers 6 commands + stability promise + error envelope
+Predecessor: M4 commit e3f11a1 (CLI binary)
 Successor:   B2 (bridge ownership 迁 Rust)
 Duration:    3 周 (D1-D15)
 ```
@@ -255,16 +255,16 @@ Galley 对 agent 生态的公开契约文档。B1 阶段先写 read 命令部分
 
 ### Sub-tasks
 
-- [ ] **T5.1** 创建 `docs/agent-api.md`，按 PRD §11 + B1 ship 的 6 个命令骨架填
-- [ ] **T5.2** 每个命令一节，含：
+- [x] **T5.1** 创建 `docs/agent-api.md`，按 PRD §11 + B1 ship 的 6 个命令骨架填
+- [x] **T5.2** 每个命令一节，含：
   - Command grammar (`galley sessions list [flags]`)
   - Flags + 默认值
   - Response schema (JSON object with `schema_version` + payload)
   - Possible exit codes
   - 错误码示例
-- [ ] **T5.3** 顶部加 stability promise 段：schema_version 1 内 additive-only，breaking → bump
-- [ ] **T5.4** 顶部加 exit code 总表
-- [ ] **T5.5** PRD 里有引用，验证 link 不死
+- [x] **T5.3** 顶部加 stability promise 段：schema_version 1 内 additive-only，breaking → bump
+- [x] **T5.4** 顶部加 exit code 总表
+- [x] **T5.5** PRD 里有引用，验证 link 不死
 
 ### M5 完成标志
 
