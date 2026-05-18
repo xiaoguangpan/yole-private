@@ -12,6 +12,7 @@ import { StreamingCursor } from "@/components/conversation/LiveIndicators";
 import { MarkdownView } from "@/components/conversation/MarkdownView";
 import { ToolCallout } from "@/components/conversation/ToolCallout";
 import { TurnTicker } from "@/components/conversation/TurnTicker";
+import { UserQuestionRail } from "@/components/conversation/UserQuestionRail";
 import { IconTooltip } from "@/components/ui/tooltip";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { cleanPartialContent, extractPreamble } from "@/lib/ipc-handlers";
@@ -408,10 +409,18 @@ export function MainView({
       {/* Scrollable conversation column. Width follows the TopBar
           toggle: 760px (typography sweet spot) by default, 1200px
           in wide mode. Bottom stack matches — see MainViewProps doc
-          for the lockstep rationale. */}
+          for the lockstep rationale.
+
+          Wrapped in `relative min-h-0 flex-1` so the UserQuestionRail
+          (sibling below) can sit at the right edge of the visible
+          conversation area without scrolling with content. The inner
+          scrollContainerRef takes the flex extent via `absolute
+          inset-0` — same scroll behavior as before; the wrapper just
+          gives the rail a fixed-height parent to position against. */}
+      <div className="relative min-h-0 flex-1">
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto px-8 py-6"
+        className="absolute inset-0 overflow-y-auto px-8 py-6"
       >
         <div
           className={cn(
@@ -532,6 +541,15 @@ export function MainView({
             />
           )}
         </div>
+      </div>
+
+        {/* Right-edge question index — one dot per user-msg, click to
+            jump. Sibling of the scroll container (not inside it) so
+            it doesn't scroll with content. Hidden under 3 user-msgs. */}
+        <UserQuestionRail
+          turns={turns}
+          scrollContainerRef={scrollContainerRef}
+        />
       </div>
 
       {/* Scroll-to-bottom floating button (DESIGN.md §4.3 streaming
