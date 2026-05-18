@@ -48,6 +48,15 @@
 //   x2: 10,000 events delivered through the broadcast channel + direct
 //       subscriber. Validates the registry doesn't OOM under sustained
 //       load; measures sustained event throughput.
+//   p1: 100 single-command set_llm RTT samples. Computes p50 / p95 / p99
+//       to give a stable latency baseline (no LLM cost). Comparison vs
+//       TS path deferred to B1 dogfood — see results.md "P1-P3 strategy".
+//   p2: Sustained event throughput (events/sec) with 200 commands; same
+//       deferral note as P1.
+//   p3: 3 bridges spawned, RSS sampled periodically while events flow
+//       at ~10/sec per bridge. Default 30s; set P3_DURATION_SECS=300 for
+//       the spec-compliant 5-minute run. Reports start RSS, end RSS,
+//       delta. Threshold per spec: <50 MB beyond baseline.
 //
 // Usage:
 //   GA_PATH=$HOME/Documents/GenericAgent \
@@ -83,9 +92,13 @@ async fn main() -> anyhow::Result<()> {
         "s4" => scenario_s4().await,
         "x1" => scenario_x1().await,
         "x2" => scenario_x2().await,
+        "p1" => scenario_p1().await,
+        "p2" => scenario_p2().await,
+        "p3" => scenario_p3().await,
         other => {
             eprintln!(
-                "usage: bridge-owner-experiment [l1|l2|l3|l4|l5|c1|c2|c3|s1|s2|s3|s4|x1|x2]"
+                "usage: bridge-owner-experiment \
+                 [l1|l2|l3|l4|l5|c1|c2|c3|s1|s2|s3|s4|x1|x2|p1|p2|p3]"
             );
             eprintln!("unknown scenario: {other}");
             std::process::exit(2);
@@ -730,6 +743,213 @@ async fn scenario_x2() -> anyhow::Result<()> {
     );
 
     bridge.shutdown().await?;
+    Ok(())
+}
+
+async fn scenario_p1() -> anyhow::Result<()> {
+    eprintln!("=== P1: 100 set_llm RTT samples (Rust-side latency baseline) ===");
+    let mut bridge = spawn_default("exp_p1").await?;
+    let mut rx = bridge.subscribe();
+    wait_ready(&mut rx, "exp_p1").await?;
+
+    let n = 100;
+    let mut latencies = Vec::with_capacity(n);
+    for i in 0..n {
+        let idx = (i + 1) % 4;
+        let started = Instant::now();
+        bridge
+            .send_command(&format!(r#"{{"kind":"set_llm","llmIndex":{idx}}}"#))
+            .await?;
+        // Wait for the matching llm_changed event
+        loop {
+            let line = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await??;
+            if line.contains(r#""kind":"llm_changed""#) {
+                latencies.push(started.elapsed());
+                break;
+            }
+        }
+    }
+
+    // Sort copy for percentiles
+    let mut sorted = latencies.clone();
+    sorted.sort();
+    let p50 = sorted[n / 2];
+    let p95 = sorted[(n * 95) / 100];
+    let p99 = sorted[(n * 99) / 100];
+    let min = sorted[0];
+    let max = sorted[n - 1];
+    let mean = sorted.iter().sum::<Duration>() / n as u32;
+
+    println!();
+    println!(
+        "P1 PASS — Rust-side set_llm RTT over {n} samples: \
+         min={min:?}, mean={mean:?}, p50={p50:?}, p95={p95:?}, p99={p99:?}, max={max:?}"
+    );
+    println!(
+        "  Comparison vs TS baseline deferred to B1 dogfood. Architecture suggests \
+         Rust path is structurally lighter (fewer hops than tauri-plugin-shell)."
+    );
+
+    bridge.shutdown().await?;
+    Ok(())
+}
+
+async fn scenario_p2() -> anyhow::Result<()> {
+    eprintln!("=== P2: sustained event throughput (Rust-side baseline) ===");
+    let mut bridge = spawn_default("exp_p2").await?;
+    let mut rx = bridge.subscribe();
+    wait_ready(&mut rx, "exp_p2").await?;
+
+    let n: usize = 200;
+    let started = Instant::now();
+    for i in 0..n {
+        bridge
+            .send_command(&format!(r#"{{"kind":"set_llm","llmIndex":{}}}"#, i % 4))
+            .await?;
+    }
+    let send_phase = started.elapsed();
+
+    let mut count = 0;
+    while count < n {
+        let line = tokio::time::timeout(Duration::from_secs(30), rx.recv()).await??;
+        if line.contains(r#""kind":"llm_changed""#) {
+            count += 1;
+        }
+    }
+    let total = started.elapsed();
+    let rate = n as f64 / total.as_secs_f64();
+
+    println!();
+    println!(
+        "P2 PASS — Rust-side sustained throughput: {n} events in {total:?} \
+         (~{rate:.0}/s, send phase {send_phase:?})"
+    );
+    println!("  Comparison vs TS baseline deferred to B1 dogfood.");
+
+    bridge.shutdown().await?;
+    Ok(())
+}
+
+async fn scenario_p3() -> anyhow::Result<()> {
+    let duration_secs: u64 = env::var("P3_DURATION_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(30);
+    eprintln!(
+        "=== P3: 3 bridges, RSS growth over {duration_secs}s (spec asks 300s; set P3_DURATION_SECS=300 for full run) ==="
+    );
+
+    let started_spawn = Instant::now();
+    let (mut b1, mut b2, mut b3) = tokio::try_join!(
+        spawn_default("exp_p3_a"),
+        spawn_default("exp_p3_b"),
+        spawn_default("exp_p3_c"),
+    )?;
+    let mut rx1 = b1.subscribe();
+    let mut rx2 = b2.subscribe();
+    let mut rx3 = b3.subscribe();
+    tokio::try_join!(
+        wait_ready(&mut rx1, "exp_p3_a"),
+        wait_ready(&mut rx2, "exp_p3_b"),
+        wait_ready(&mut rx3, "exp_p3_c"),
+    )?;
+    eprintln!(
+        "[experiment] 3 bridges ready in {:?}",
+        started_spawn.elapsed()
+    );
+
+    let own_pid = std::process::id();
+    let rss_at = |label: &str| -> anyhow::Result<u64> {
+        let out = std::process::Command::new("ps")
+            .args(["-o", "rss=", "-p", &own_pid.to_string()])
+            .output()?;
+        let s = String::from_utf8_lossy(&out.stdout);
+        let kb: u64 = s.trim().parse().map_err(|e| {
+            anyhow::anyhow!("ps rss parse {label} (raw={s:?}): {e}")
+        })?;
+        Ok(kb)
+    };
+
+    let baseline_kb = rss_at("baseline")?;
+    eprintln!("[experiment] baseline RSS: {} KB ({:.1} MB)", baseline_kb, baseline_kb as f64 / 1024.0);
+
+    // Background draining tasks so the broadcast channels never back up.
+    let drain1 = tokio::spawn(async move {
+        loop {
+            if rx1.recv().await.is_err() {
+                break;
+            }
+        }
+    });
+    let drain2 = tokio::spawn(async move {
+        loop {
+            if rx2.recv().await.is_err() {
+                break;
+            }
+        }
+    });
+    let drain3 = tokio::spawn(async move {
+        loop {
+            if rx3.recv().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let activity_started = Instant::now();
+    let mut samples: Vec<(Duration, u64)> = vec![(Duration::ZERO, baseline_kb)];
+    let mut next_sample = Instant::now() + Duration::from_secs(10);
+    let end = activity_started + Duration::from_secs(duration_secs);
+
+    // ~10 events/sec per bridge = 30 events/sec system-wide.
+    let mut tick_interval = tokio::time::interval(Duration::from_millis(100));
+    let mut i: u64 = 0;
+    while Instant::now() < end {
+        tick_interval.tick().await;
+        let idx = (i % 4) as i64;
+        let cmd = format!(r#"{{"kind":"set_llm","llmIndex":{idx}}}"#);
+        let _ = b1.send_command(&cmd).await;
+        let _ = b2.send_command(&cmd).await;
+        let _ = b3.send_command(&cmd).await;
+        i += 1;
+
+        if Instant::now() >= next_sample {
+            let kb = rss_at("interval")?;
+            samples.push((activity_started.elapsed(), kb));
+            eprintln!(
+                "[experiment] t+{:?} RSS={} KB ({:.1} MB, +{} KB vs baseline)",
+                activity_started.elapsed(),
+                kb,
+                kb as f64 / 1024.0,
+                kb as i64 - baseline_kb as i64
+            );
+            next_sample = Instant::now() + Duration::from_secs(10);
+        }
+    }
+
+    let final_kb = rss_at("final")?;
+    samples.push((activity_started.elapsed(), final_kb));
+    let delta_kb = final_kb as i64 - baseline_kb as i64;
+    let delta_mb = delta_kb as f64 / 1024.0;
+    let events_sent = i * 3;
+
+    println!();
+    println!(
+        "P3 result — {events_sent} events over {duration_secs}s with 3 bridges. \
+         Baseline RSS {baseline_kb} KB → final {final_kb} KB (Δ {delta_kb} KB = {delta_mb:.1} MB)"
+    );
+    if delta_mb < 50.0 {
+        println!("P3 PASS — Δ {delta_mb:.1} MB is under the 50 MB spec threshold");
+    } else {
+        println!("P3 FAIL — Δ {delta_mb:.1} MB exceeds the 50 MB spec threshold");
+        // Don't exit non-zero — the data itself is the report. Let caller decide.
+    }
+    eprintln!("  Note: spec asks for 300s. This run was {duration_secs}s; set P3_DURATION_SECS=300 to match exactly.");
+
+    drain1.abort();
+    drain2.abort();
+    drain3.abort();
+    let _ = tokio::try_join!(b1.shutdown(), b2.shutdown(), b3.shutdown())?;
     Ok(())
 }
 

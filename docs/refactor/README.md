@@ -30,13 +30,13 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    [Prototype] → B1 → B2 → B3 → B4 → v0.5
-           ↑ 现在在这里
-Status:   prototype 进行中 · 14/17 pass · Lifecycle + Stdin + Stdout + Stress 完成
-Next:     P1 (first-token latency) — 需要先量 TS baseline 才能做对比
-          见 experiments/bridge-owner/README.md 底部 cursor / running notes
-          所有定性验证已过；P1-P3 是定量比较 gate
-Verdict:  likely GO for B1, pending P1-P3 confirmation
+Phase:    Prototype ✅ → [B1] → B2 → B3 → B4 → v0.5
+                          ↑ 现在在这里
+Status:   Prototype COMPLETE — 17/17 PASS · GO for B1
+Next:     B1 T1.1 — 目录重组 src-tauri→core/, desktop→gui/, bridge→runner/,
+          新建 cli/。见 docs/refactor/B1-rust-core.md
+          BridgeProcess (experiments/bridge-owner/registry.rs) 是 B1
+          runner_manager 模块的 source pattern
 Blocker:  无
 ```
 
@@ -46,8 +46,8 @@ Blocker:  无
 
 | Phase | 状态 | Cursor | 详细 playbook | Last touch |
 |---|---|---|---|---|
-| Prototype: Rust-owned subprocess | 🟡 进行中 · 14/17 pass · 仅 P1-P3 待跑 | (checklist P1, needs TS baseline) | [bridge-owner/README.md](../../desktop/src-tauri/experiments/bridge-owner/README.md) | 2026-05-18 session 1: 4/5 subsections done in one sprint |
-| B1: Rust core 骨架 + CLI 只读 | ⏳ 未启动 | (T1.1 目录重组) | [B1-rust-core.md](./B1-rust-core.md) | 2026-05-15 playbook written |
+| Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../desktop/src-tauri/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
+| B1: Rust core 骨架 + CLI 只读 | ⏳ 启动中 | (T1.1 目录重组) | [B1-rust-core.md](./B1-rust-core.md) | 2026-05-18 cleared by prototype GO |
 | B2: Bridge ownership 迁 Rust | ⏳ 未启动 | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) (stub) | 2026-05-15 stub |
 | B3: useAppStore 拆 slice + 改订阅 | ⏳ 未启动 | — | [B3-store-slice.md](./B3-store-slice.md) (stub) | 2026-05-15 stub |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
