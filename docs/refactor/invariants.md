@@ -153,6 +153,23 @@ v0.1 / v0.2 用户的 SQLite schema、prefs 格式、文件位置 ship 之后是
 
 **为什么**：跨 session continuity 靠的就是这个 log。删除等于丢失上下文。新 session 读到看似过时的内容会主动追问 / 验证，这是 feature 不是 bug。
 
+## I11. Cargo `panic = "unwind"` 必须保留
+
+**`desktop/src-tauri/Cargo.toml` 的 dev + release profile 不允许设 `panic = "abort"`**。Cargo 默认是 `panic = "unwind"`——保持默认即可，但任何 PR 显式加 `[profile.*] panic = "abort"` 拒绝。
+
+**为什么**：
+
+Galley 主进程持有 N 个 Python bridge `tokio::process::Child` 句柄，每个以 `kill_on_drop(true)` 创建。主线程任何 panic 触发 Drop 链 → `kill_on_drop` 同步 SIGKILL bridge child → 进程退出时没 orphan。这套**完全依赖 Rust 默认的 unwind 行为**：
+
+- `panic = "unwind"`（默认）：unwind 走 Drop 链，所有局部变量的析构跑完 → bridge children 干净回收
+- `panic = "abort"`：进程立刻调 `abort()`，Drop **不跑** → bridge children orphan（reparented to init），用户 ps 里能看到死掉 Galley 之后还活着的 bridges
+
+prototype L5 通过的前提就是 unwind 路径。如果有人为减小 binary size（abort 路径不需要 unwind tables，能省 ~5% binary size）加 `panic = "abort"`，L5 即时 fail，所有 alive bridges 在 panic 后 orphan。
+
+**例外**：测试 binary（如 `[[bin]] required-features = ["experiments"]` 的实验代码）可以单独覆盖；但生产 desktop 主入口 + B1+ 的 core/ crate 必须保持 unwind。
+
+**历史**：2026-05-18 bridge-owner prototype session 1 L5 验证后引入。详 [prototype-go-for-b1 devlog](../devlog/2026-05-18-prototype-go-for-b1.md) §D5。
+
 ---
 
 ## 如何引用本文件
