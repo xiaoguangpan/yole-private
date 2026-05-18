@@ -37,6 +37,8 @@
     {
       "identifier": "shell:allow-spawn",
       "allow": [
+        { "name": "python-bundled", "cmd": "$RESOURCE/python/bin/python3", "args": true, "sidecar": false },
+        { "name": "python-bundled-win", "cmd": "$RESOURCE/python/python.exe", "args": true, "sidecar": false },
         { "name": "python-ga-venv", "cmd": "$HOME/Documents/GenericAgent/.venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-ga-venv-alt", "cmd": "$HOME/Documents/GenericAgent/venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-brew-arm", "cmd": "/opt/homebrew/bin/python3", "args": true, "sidecar": false },
@@ -52,6 +54,8 @@
     {
       "identifier": "shell:allow-stdin-write",
       "allow": [
+        { "name": "python-bundled", "cmd": "$RESOURCE/python/bin/python3", "args": true, "sidecar": false },
+        { "name": "python-bundled-win", "cmd": "$RESOURCE/python/python.exe", "args": true, "sidecar": false },
         { "name": "python-ga-venv", "cmd": "$HOME/Documents/GenericAgent/.venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-ga-venv-alt", "cmd": "$HOME/Documents/GenericAgent/venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-brew-arm", "cmd": "/opt/homebrew/bin/python3", "args": true, "sidecar": false },
@@ -67,6 +71,8 @@
     {
       "identifier": "shell:allow-kill",
       "allow": [
+        { "name": "python-bundled", "cmd": "$RESOURCE/python/bin/python3", "args": true, "sidecar": false },
+        { "name": "python-bundled-win", "cmd": "$RESOURCE/python/python.exe", "args": true, "sidecar": false },
         { "name": "python-ga-venv", "cmd": "$HOME/Documents/GenericAgent/.venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-ga-venv-alt", "cmd": "$HOME/Documents/GenericAgent/venv/bin/python", "args": true, "sidecar": false },
         { "name": "python-brew-arm", "cmd": "/opt/homebrew/bin/python3", "args": true, "sidecar": false },

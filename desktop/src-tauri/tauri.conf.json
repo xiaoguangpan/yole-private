@@ -42,7 +42,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../bridge": "bridge"
+      "../../bridge": "bridge",
+      "python-bundle/python": "python"
     },
     "windows": {
       "webviewInstallMode": {
