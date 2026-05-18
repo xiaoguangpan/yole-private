@@ -50,6 +50,12 @@ export function _resetDBForTest(): void {
 
 // ---------------- sessions ----------------
 
+/**
+ * @deprecated B1 M3 — Rust port available at `galley_core_lib::db::SqliteGalley::list_sessions`,
+ * exposed via Tauri command `list_sessions`. Migrate call sites to
+ * `invoke("list_sessions", {...})` then delete this once no callers remain.
+ * Kept alive in parallel per refactor/invariants.md §I1.
+ */
 export async function loadSessions(): Promise<Session[]> {
   const db = await getDB();
   const rows = await db.select<SessionRow[]>(
@@ -462,6 +468,11 @@ export interface MessageSearchHit {
  * deduped at the message level — one message produces one hit even
  * if its body matches multiple times.
  */
+/**
+ * @deprecated B1 M3 — Rust port available at `galley_core_lib::db::SqliteGalley::search_messages`.
+ * Migrate call sites to `invoke("search_messages", {...})` then delete this
+ * once no callers remain. Kept alive in parallel per refactor/invariants.md §I1.
+ */
 export async function searchMessages(
   query: string,
   limit = 20,
@@ -575,6 +586,11 @@ function highlightLike(snippet: string, q: string): string {
  * via `restoreSessionTurns`) or `ConversationMessage[]` (for GA
  * `load_history` IPC). The two consumers need slightly different
  * shapes — keep the conversion out of this primitive.
+ */
+/**
+ * @deprecated B1 M3 — Rust port available at `galley_core_lib::db::SqliteGalley::session_messages`.
+ * Migrate call sites to `invoke("session_messages", {...})` then delete this
+ * once no callers remain. Kept alive in parallel per refactor/invariants.md §I1.
  */
 export async function loadMessagesBySession(
   sessionId: string,

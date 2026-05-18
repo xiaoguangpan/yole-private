@@ -1,11 +1,11 @@
 # B1 · Rust core 骨架 + CLI 只读
 
 ```
-Cursor:   T3.1  (M3 启动 — 选 rusqlite vs sqlx，写 running notes)
-Status:   🚧 启动中 (M2 done · cargo check clean · API surface frozen)
+Cursor:   T4.1  (M4 启动 — cli/ crate deps + clap subcommand 骨架)
+Status:   🚧 启动中 (M3 done · 12/12 tests · Tauri command `list_sessions` registered)
 Started:  2026-05-18
-Last touch: 2026-05-18 M2 done — GalleyApi trait + all data types + stub impl
-Predecessor: M1 commit 4ee23e3 (rename) + M1 pushed
+Last touch: 2026-05-18 M3 done — sqlx reads, 6 trait methods implemented
+Predecessor: M2 commit d79558a (trait + types)
 Successor:   B2 (bridge ownership 迁 Rust)
 Duration:    3 周 (D1-D15)
 ```
@@ -175,19 +175,19 @@ Duration:    3 周 (D1-D15)
 
 ### Sub-tasks
 
-- [ ] **T3.1** 选 SQLite 驱动：`rusqlite` (sync) vs `sqlx` (async)。**决定 + 写理由到 running notes**。建议 `rusqlite`：成熟、简单、跟 tauri-plugin-sql 一致；async 通过 `tokio::task::spawn_blocking` 包装即可
-- [ ] **T3.2** 加 `core/src/db.rs`：DB connection pool + 打开 helper
-- [ ] **T3.3** DB 路径解析：用 Tauri 的 `app_data_dir()` API 拿到 `~/Library/Application Support/app.galley/`，拼 `workbench.db`。注意 CLI 进程没有 Tauri context——为 CLI 重新实现 platform-aware 路径（同样的 logic）。把这个 helper 提到 shared 位置（`core/src/db.rs` 暴露 `pub fn db_path() -> PathBuf`，CLI 直接调）
-- [ ] **T3.4** 实现 `list_sessions`：对照 `gui/src/lib/db.ts:53 loadSessions()` 把 SQL 迁过来。返回 `Vec<SessionBrief>`
-- [ ] **T3.5** 实现 `session_brief`：包含 last_step_at + preamble_latest 等"digested" 字段。**SQL 可能要 JOIN messages 表拿最后一步信息**
-- [ ] **T3.6** 实现 `session_messages`：对照 `loadMessagesBySession`，支持 `tail` limit
-- [ ] **T3.7** 实现 `search_messages`：对照 `searchMessages`（FTS5 trigram，migration 004 已建好索引）
-- [ ] **T3.8** 实现 `status`：聚合 `count(*) where status='running'` / waiting_input / errored / total
-- [ ] **T3.9** 实现 `health`：对应 v0.1 的 5 项 health check（GA path / Python / agentmain importable / mykey.py / LLM session init）。**这一项 trickier**——其中 GA / Python / LLM 检查需要跑命令，不只是 SQLite。Rust 端需要 `tokio::process` 起 Python 子进程做一次 dry-run。**M3 内只实现 SQLite 能查的 2 项**（GA path 存在 + mykey.py 可读），剩下 3 项标 `todo!("M3+ or B4 daemon")` 留 stub。**或者**：health 命令在 B1 阶段只做 SQLite 能查的部分，复杂的留 B4。**决定写 running notes**
-- [ ] **T3.10** 写 Rust unit tests 覆盖每个 read：`core/tests/db_test.rs`，用 fixture DB（pre-seeded SQLite 文件，checked into `core/tests/fixtures/`）
-- [ ] **T3.11** 跑 `cd core && cargo test` 全过
-- [ ] **T3.12** 给 `gui/src/lib/db.ts` 里被迁的每个函数加 `@deprecated 见 core/src/db.rs::<name>` JSDoc 注释，但**不删**——[invariants.md I1](./invariants.md)
-- [ ] **T3.13** Tauri command 包装一个 read（建议 `list_sessions`）：在 `core/src/lib.rs` 加 `#[tauri::command] async fn list_sessions_cmd(...) -> Result<Vec<SessionBrief>, String> { ... }`，通过 `tauri::generate_handler!` 注册
+- [x] **T3.1** 选 SQLite 驱动：`rusqlite` (sync) vs `sqlx` (async)。**决定 + 写理由到 running notes**。建议 `rusqlite`：成熟、简单、跟 tauri-plugin-sql 一致；async 通过 `tokio::task::spawn_blocking` 包装即可
+- [x] **T3.2** 加 `core/src/db.rs`：DB connection pool + 打开 helper
+- [x] **T3.3** DB 路径解析：用 Tauri 的 `app_data_dir()` API 拿到 `~/Library/Application Support/app.galley/`，拼 `workbench.db`。注意 CLI 进程没有 Tauri context——为 CLI 重新实现 platform-aware 路径（同样的 logic）。把这个 helper 提到 shared 位置（`core/src/db.rs` 暴露 `pub fn db_path() -> PathBuf`，CLI 直接调）
+- [x] **T3.4** 实现 `list_sessions`：对照 `gui/src/lib/db.ts:53 loadSessions()` 把 SQL 迁过来。返回 `Vec<SessionBrief>`
+- [x] **T3.5** 实现 `session_brief`：包含 last_step_at + preamble_latest 等"digested" 字段。**SQL 可能要 JOIN messages 表拿最后一步信息**
+- [x] **T3.6** 实现 `session_messages`：对照 `loadMessagesBySession`，支持 `tail` limit
+- [x] **T3.7** 实现 `search_messages`：对照 `searchMessages`（FTS5 trigram，migration 004 已建好索引）
+- [x] **T3.8** 实现 `status`：聚合 `count(*) where status='running'` / waiting_input / errored / total
+- [x] **T3.9** 实现 `health`：对应 v0.1 的 5 项 health check（GA path / Python / agentmain importable / mykey.py / LLM session init）。**这一项 trickier**——其中 GA / Python / LLM 检查需要跑命令，不只是 SQLite。Rust 端需要 `tokio::process` 起 Python 子进程做一次 dry-run。**M3 内只实现 SQLite 能查的 2 项**（GA path 存在 + mykey.py 可读），剩下 3 项标 `todo!("M3+ or B4 daemon")` 留 stub。**或者**：health 命令在 B1 阶段只做 SQLite 能查的部分，复杂的留 B4。**决定写 running notes**
+- [x] **T3.10** 写 Rust unit tests 覆盖每个 read：`core/tests/db_test.rs`，用 fixture DB（pre-seeded SQLite 文件，checked into `core/tests/fixtures/`）
+- [x] **T3.11** 跑 `cd core && cargo test` 全过
+- [x] **T3.12** 给 `gui/src/lib/db.ts` 里被迁的每个函数加 `@deprecated 见 core/src/db.rs::<name>` JSDoc 注释，但**不删**——[invariants.md I1](./invariants.md)
+- [x] **T3.13** Tauri command 包装一个 read（建议 `list_sessions`）：在 `core/src/lib.rs` 加 `#[tauri::command] async fn list_sessions_cmd(...) -> Result<Vec<SessionBrief>, String> { ... }`，通过 `tauri::generate_handler!` 注册
 
 ### M3 完成标志
 
@@ -361,12 +361,23 @@ B1 全部 acceptance 跑过，devlog ship，B2 playbook 写好可以启动。
 - **N12 (Cargo cache invalidation)**: After workspace re-org, *no* `cargo clean` needed — cargo correctly detects the workspace move via Cargo.toml mtime. (M1 _did_ need clean because of tauri-build's generated permission file referencing the old `desktop/src-tauri/...` path.) Useful lesson: tauri-build's codegen anchors paths absolutely in `target/.../build/.../out/permissions/...`, so any **repo-relative** layout change demands clean. Pure crate-internal changes (workspace setup, rename) don't.
 - **N13 (Open decisions cleanup)**: O1 (workspace) resolved → see N6. O2 (rusqlite vs sqlx) deferred to T3.1 (next session). O3 (error stdout vs stderr) deferred to T4.12. O4 (health scope) deferred to T3.9.
 
+#### 2026-05-18 · M3 sqlx reads + tests + first Tauri command
+
+- **N14 (T3.1 · O2 resolved)**: **sqlx** chosen, not rusqlite. Playbook G6's hint "tauri-plugin-sql 默认共用 sqlite3 binding (rusqlite)" was wrong — Cargo.lock shows `tauri-plugin-sql 2.4.0` actually pulls in `sqlx 0.8.6` + `sqlx-sqlite 0.8.6` + `libsqlite3-sys 0.30.1`. Adding sqlx 0.8 as a direct dep shares that exact graph (zero new transitives compared to baseline) and async-native pairs naturally with `async_trait`. Rusqlite would have required `spawn_blocking` wrappers in every method (sync API) plus its own libsqlite3-sys version (compile cost + binding-mismatch hazard the gotcha worried about).
+- **N15 (T3.3 db_path)**: Used `directories::ProjectDirs::from("", "", "app.galley")` to compute the data dir. Empty qualifier+org segments + the full Tauri identifier in the third slot → produces `<base>/app.galley/` on all three platforms, matching `tauri-plugin-sql`'s layout. Pinned **directories v5** (v6 is newer but pulls in newer MSRV transitives; v5 works fine and the API surface we use is stable across versions). Open to bumping if anything later needs v6.
+- **N16 (T3.9 · O4 resolved)**: Health impl splits into **SQLite-checkable** (3 ids: `db_readable`, `ga_path`, `mykey_py`) **vs DeferredB4** (2 ids: `agentmain_import`, `llm_session_init`). The two deferred probes need to spawn a Python subprocess against the user's GA install — appropriate for B4's daemon mode but heavy/awkward to do from inline trait methods in B1. Each deferred check surfaces as `HealthStatus::DeferredB4` with a `detail` string explaining why. Net effect: `galley health` from CLI in B1 returns 5 entries with 3 actionable + 2 marker rows — agents can pattern-match on `status == "ok" | "warn" | "fail"` for the ones we cover, ignore `deferred_b4`. Better than `todo!()` panic.
+- **N17 (T3.10 tests)**: Programmatic seed > checked-in fixture file. Each `#[tokio::test]` opens a fresh `sqlite::memory:` pool, applies all five migration files via `include_str!` + `sqlx::raw_sql`, then seeds rows via small helpers. Pros: schema evolves with migrations automatically, no binary artifact in git, tests fully isolated. Cons: more Rust setup code than loading a .db file. 12 tests / 0.15s — fast.
+- **N18 (T3.11 tokio dev-dep)**: `#[tokio::test]` macro needs `tokio = { features = ["macros", "rt-multi-thread"] }`. Tokio is brought in transitively (sqlx + tauri) but those transitives don't enable the `macros` feature. Listed under `[dev-dependencies]` so production build doesn't pull it. **Note**: the experiment-only optional tokio entry (`[dependencies]` with `optional = true`, feature `experiments`) is still there for the bridge-owner prototype binary; both coexist fine. M3 explicit dep is for tests only.
+- **N19 (T3.12 deprecation scope)**: Marked 3 TS functions with `@deprecated` JSDoc: `loadSessions` / `loadMessagesBySession` / `searchMessages`. Skipped `loadProjects` (no Rust port in B1 M3 — projects covered by `ProjectBrief` type but no trait method yet; B2 will add one), `loadToolEventsBySession` (read but outside B1 scope), `getPref` (covered by future B4 daemon).
+- **N20 (T3.13 Tauri wrapper · migration template)**: Only `list_sessions` exposed via `#[tauri::command]` for M3. Pattern: `async fn list_sessions(filter: SessionFilter) -> std::result::Result<Vec<SessionBrief>, String>` — error is JSON-stringified `GalleyError` so the GUI side can `JSON.parse()` and pattern-match on `error` discriminant. Each Tauri command currently opens its own `SqliteGalley::open()` — wasteful but simple. **M6** will introduce app-state-managed shared pool to remove per-call open overhead (and serves as the B2/B3 template). Wrote no `loadSessionsViaCore()` TS helper yet — playbook M6 covers that. M3 stops at the Rust + Tauri-handler-registration layer; GUI consumption is M6.
+- **N21 (status() truthfulness)**: `status()` impl noted in doc-comment that B1's persistence-truth view (only durable statuses are stored — `archived` / `completed` / `cancelled`) means `running` / `waiting_input` / `errored` counts will usually be 0 unless caught mid-write. Real runtime counts require runner-state introspection (B2+). This is fine: the agent-facing API surfaces persistent truth in B1, runtime truth in B2+ — both honest, just different snapshots.
+
 ---
 
 ## Open decisions
 
 - [O1] ~~Cargo workspace vs 独立 crate (T2.1)：倾向 workspace，但要验证 Tauri build 兼容~~ **RESOLVED 2026-05-18 → workspace root at `core/`, members include self + `../cli`** (see running note N6)
-- [O2] Rust SQLite 驱动：`rusqlite` 推荐，但要确认 libsqlite3-sys 版本跟 tauri-plugin-sql 不冲突 (T3.1)
+- [O2] ~~Rust SQLite 驱动：`rusqlite` 推荐，但要确认 libsqlite3-sys 版本跟 tauri-plugin-sql 不冲突 (T3.1)~~ **RESOLVED 2026-05-18 → `sqlx 0.8.6` + `sqlite` feature** (matches the version already pulled in transitively by `tauri-plugin-sql 2.4.0`; sharing `libsqlite3-sys 0.30.1` rules out the linking-conflict hazard the gotcha worried about). Playbook G6 claimed tauri-plugin-sql uses rusqlite internally — that's wrong, Cargo.lock confirms sqlx. Async-native sqlx also pairs naturally with the `async_trait`-defined `GalleyApi`; rusqlite would have needed `tokio::task::spawn_blocking` wrappers in every method.
 - [O3] Error output 走 stdout 还是 stderr (T4.12)：影响 agent SOP 读法
 - [O4] B1 阶段 `health` 命令复杂度边界 (T3.9 / G8)：是否包 Python dry-run
 - [O5] GUI 迁移模板选哪个函数 (T6.1)：loadProjects vs loadSessions vs getPref

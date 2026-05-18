@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use super::session::SessionId;
 
-/// Opaque message identifier (SQLite rowid surfaced as i64).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Opaque message identifier. The `messages.id` column is `TEXT` —
+/// runner / GUI assign string ids like `msg_…`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct MessageId(pub i64);
+pub struct MessageId(pub String);
 
 /// Role of a message in the conversation history. Mirrors GA's roles
 /// plus Galley's "system" pseudo-role for /btw side questions.

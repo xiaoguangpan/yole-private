@@ -2,6 +2,8 @@ pub mod api;
 pub mod db;
 pub mod error;
 
+use api::{GalleyApi, SessionBrief, SessionFilter};
+use db::SqliteGalley;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
@@ -40,6 +42,26 @@ const DB_URL: &str = "sqlite:workbench.db";
 #[tauri::command]
 fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
+}
+
+/// B1 M3 read — first GalleyApi method exposed through the Tauri
+/// invoke transport. Validates the end-to-end path
+/// (GUI → Tauri invoke → Rust core → SQLite). Used as the migration
+/// template for B2/B3 (gui/src/lib/db.ts `loadSessions` → `loadSessionsViaCore`).
+///
+/// Returns `(SessionBrief[])` on success and a JSON-stringified
+/// [`crate::error::GalleyError`] on failure. The error shape matches
+/// the CLI agent-api.md schema (B1 M5) so all transports surface the
+/// same `error: <category>` discriminant.
+#[tauri::command]
+async fn list_sessions(filter: SessionFilter) -> std::result::Result<Vec<SessionBrief>, String> {
+    let galley = SqliteGalley::open()
+        .await
+        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+    galley
+        .list_sessions(filter)
+        .await
+        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -87,7 +109,7 @@ pub fn run() {
                 .add_migrations(DB_URL, migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![path_exists])
+        .invoke_handler(tauri::generate_handler![path_exists, list_sessions])
         .setup(|_app| {
             // Windows-only custom chrome: drop native decorations and
             // restore the drop shadow via window-shadows-v2 so the borderless
