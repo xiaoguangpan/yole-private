@@ -110,19 +110,19 @@ jobs:
         working-directory: ./desktop
         run: pnpm lint
 
-      - name: Cargo check
-        working-directory: ./desktop/src-tauri
-        run: cargo check --target ${{ matrix.target }}
-
       # v0.1.1+ Galley ships a bundled CPython 3.11 + GA core deps at
       # $RESOURCE/python/. `scripts/bundle-python.sh` downloads the
       # python-build-standalone tarball, strips non-essential stdlib,
       # and pip-installs GA's four deps. Output lands in
       # desktop/src-tauri/python-bundle/python/, which tauri.conf.json's
       # bundle.resources mapping copies into the .app / NSIS payload.
-      # The bundle path is .gitignored so this step is mandatory before
-      # `tauri build` — otherwise the resource resolver finds an empty
-      # directory and fails.
+      #
+      # MUST run before Cargo check / Build: Tauri's build.rs validates
+      # bundle.resources path existence at cargo build time. Empty /
+      # missing dir → resource resolver hard-fails with `resource path
+      # 'python-bundle/python' doesn't exist`. Placing this step before
+      # the cargo check is therefore load-bearing, not just for the
+      # later `tauri build` artifact.
       - name: Setup Python (for bundle pip install)
         uses: actions/setup-python@v5
         with:
@@ -144,6 +144,10 @@ jobs:
             *) echo "Unmapped target: ${{ matrix.target }}" >&2; exit 1 ;;
           esac
           ./scripts/bundle-python.sh "$ARCH"
+
+      - name: Cargo check
+        working-directory: ./desktop/src-tauri
+        run: cargo check --target ${{ matrix.target }}
 
       - name: Build Tauri bundle
         working-directory: ./desktop
