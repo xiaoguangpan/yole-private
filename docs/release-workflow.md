@@ -17,13 +17,13 @@ git commit + git tag v0.2.0 + git push origin main v0.2.0
        ↓
 GitHub Actions release.yml 自动触发
        │
-       ├─ macos-14 (Apple Silicon) → Galley_0.2.0_aarch64.dmg
-       └─ windows-latest           → Galley_0.2.0_x64-setup.exe
+       ├─ macos-15 (Apple Silicon) → Galley_0.2.0_macOS_aarch64.dmg
+       └─ windows-latest           → Galley_0.2.0_Windows_x64-setup.exe
        ↓
 ubuntu-latest 收集产物 + gh release create --draft
        ↓
-（可选）JC 在 Intel Mac 上本地 `pnpm tauri build` 出 Galley_0.2.0_x64.dmg
-        → 手动 `gh release upload v0.2.0 …` 挂到同一 draft
+（可选）JC 在 Intel Mac 上本地 `pnpm tauri build` + 跑 `scripts/rename-artifact.sh x86_64-apple-darwin`
+        → 出 Galley_0.2.0_macOS_x64.dmg → `gh release upload v0.2.0 …` 挂到同一 draft
        ↓
 手动 review: GitHub Release 页面看 draft、edit 加亮 notes、本地下载 smoke test
        ↓
@@ -119,9 +119,9 @@ CI 完成时：GitHub 顶部红圈通知 + 邮件提醒（默认订阅）。
 进 https://github.com/wangjc683/galley/releases 看到一个 draft `Galley v0.2.0`：
 
 - **产物列表**：确认 CI 出 2 个文件
-  - `Galley_0.2.0_aarch64.dmg`
-  - `Galley_0.2.0_x64-setup.exe`
-  - （如果需要 Intel Mac binary，JC 本地 build 完后 `gh release upload v0.2.0 Galley_0.2.0_x64.dmg`）
+  - `Galley_0.2.0_macOS_aarch64.dmg`
+  - `Galley_0.2.0_Windows_x64-setup.exe`
+  - （如果需要 Intel Mac binary：JC 本地 `pnpm tauri build --target x86_64-apple-darwin` + `scripts/rename-artifact.sh x86_64-apple-darwin` 出 `Galley_0.2.0_macOS_x64.dmg`，再 `gh release upload v0.2.0` 挂上去）
 - **Auto-generated notes**：GitHub 根据 tag 间的 commit 自动列出来。点 **Edit** 按下面模板加工：
 
 ```markdown
@@ -293,12 +293,13 @@ gh run list --workflow=release.yml --limit 3   # 找 run ID
 gh run cancel <run-id>
 
 # 2a. 已 success 的 CI artifact 下载到本地
-gh run download <run-id> -n galley-macos-14-aarch64   # 出 Galley_X.Y.Z_aarch64.dmg
-gh run download <run-id> -n galley-windows-latest-x64 # 出 Galley_X.Y.Z_x64-setup.exe
+gh run download <run-id> -n galley-macos-15-aarch64   # 出 Galley_X.Y.Z_macOS_aarch64.dmg
+gh run download <run-id> -n galley-windows-latest-x64 # 出 Galley_X.Y.Z_Windows_x64-setup.exe
 
-# 2b. 本地 build 兜 self-arch（Mac x64 / aarch64）
-cd desktop && pnpm tauri build
-# 产物：src-tauri/target/release/bundle/dmg/Galley_X.Y.Z_<arch>.dmg
+# 2b. 本地 build 兜 self-arch（Mac x64 / aarch64）— 别忘了重命名
+cd desktop && pnpm tauri build --target x86_64-apple-darwin
+../scripts/rename-artifact.sh x86_64-apple-darwin
+# 产物：src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/Galley_X.Y.Z_macOS_x64.dmg
 
 # 3. 起草 release notes 到 /tmp/galley-<tag>-notes.md
 # 模板见 "Announcement templates" 一节
@@ -308,8 +309,8 @@ gh release create vX.Y.Z-rc.N \
   --draft --prerelease \
   --title "Galley vX.Y.Z-rc.N · macOS (Release Candidate)" \
   --notes-file /tmp/galley-rc-notes.md \
-  Galley_X.Y.Z_aarch64.dmg \
-  Galley_X.Y.Z_x64.dmg
+  Galley_X.Y.Z_macOS_aarch64.dmg \
+  Galley_X.Y.Z_macOS_x64.dmg
 
 # 5. 上 GitHub UI 看 draft（Markdown 渲染 / files / metadata）
 
@@ -371,8 +372,9 @@ GitHub Actions 偶发某些 runner 排队。等 5-10 min 通常自然解决。
 
 **方案 B**: 本地建 Intel Mac dmg（**当前主力路径**）
 - JC 在自己的 Intel Mac 上手动跑 `pnpm tauri build --target x86_64-apple-darwin`
-- 把产物 `gh release upload v<X.Y.Z> Galley_<X.Y.Z>_x64.dmg` 挂到 same Release
-- 影响：发版多一步本地 build；JC 当前开发机就是 Intel Mac，零额外成本
+- 跑 `scripts/rename-artifact.sh x86_64-apple-darwin` 给文件名插入 `macOS` slug
+- 把产物 `gh release upload v<X.Y.Z> Galley_<X.Y.Z>_macOS_x64.dmg` 挂到 same Release
+- 影响：发版多一步本地 build + rename；JC 当前开发机就是 Intel Mac，零额外成本
 
 **方案 C**: 用 Apple Silicon 跨编译 x86_64
 - macos-14 runner 上 `rustup target add x86_64-apple-darwin` + `tauri build --target x86_64-apple-darwin`
