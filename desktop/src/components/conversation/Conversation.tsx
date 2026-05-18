@@ -22,6 +22,12 @@ export interface ConversationProps {
    * threaded down to ToolCallout → ApprovalForm so the "Always
    * allow in {projectName}" button reflects context. */
   projectName?: string;
+  /**
+   * Resend handler — invoked when the user clicks the ↻ button on a
+   * past user-msg. Receives the message text. Host should prefill the
+   * Composer (not delete history). Omitting hides the affordance.
+   */
+  onResendUserMessage?: (content: string) => void;
 }
 
 /**
@@ -43,13 +49,14 @@ export function Conversation({
   approvalDecisions,
   onApprove,
   projectName,
+  onResendUserMessage,
 }: ConversationProps) {
   return (
     <div>
       {turns.map((t, i) => (
         <Fragment key={i}>
           {t.role === "user" ? (
-            <MessageUser content={t.content} />
+            <MessageUser content={t.content} onResend={onResendUserMessage} />
           ) : t.role === "system" ? (
             <SystemMessageBubble content={t.content} variant={t.variant} />
           ) : (

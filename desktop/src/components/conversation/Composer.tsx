@@ -7,7 +7,13 @@ import {
   Plus,
   Stop,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,6 +21,24 @@ export interface ComposerLLMOption {
   index: number;
   displayName: string;
   isCurrent: boolean;
+}
+
+/**
+ * Imperative handle exposed via `ref` on Composer. Lets callers
+ * imperatively seed the textarea with new content — used by the
+ * MessageUser ↻ resend button to prefill the Composer with a past
+ * user-msg's text without a controlled-mode rewrite of the whole
+ * paste-fold registry. `focus()` is a thin pass-through.
+ */
+export interface ComposerHandle {
+  /**
+   * Replace the Composer's text with `text`. Clears the paste-fold
+   * registry first (the new text isn't a user paste so there are no
+   * placeholders to track) and focuses the textarea with the caret at
+   * the end so the user can immediately edit / submit.
+   */
+  prefillText(text: string): void;
+  focus(): void;
 }
 
 /**
@@ -97,20 +121,24 @@ export interface ComposerProps {
  * stopMode replaces submit with a deep-amber Stop button at the same
  * position.
  */
-export function Composer({
-  llmDisplayName,
-  value,
-  onChange,
-  onSubmit,
-  stopMode = false,
-  onStop,
-  disabled = false,
-  placeholder = "问点什么…",
-  autoFocus = false,
-  llms,
-  onSelectLLM,
-  onOpenLLMSwitcher,
-}: ComposerProps) {
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(
+  function Composer(
+    {
+      llmDisplayName,
+      value,
+      onChange,
+      onSubmit,
+      stopMode = false,
+      onStop,
+      disabled = false,
+      placeholder = "问点什么…",
+      autoFocus = false,
+      llms,
+      onSelectLLM,
+      onOpenLLMSwitcher,
+    },
+    ref,
+  ) {
   // Hybrid controlled / uncontrolled. When `value` prop is provided
   // we render it directly; otherwise we maintain an internal copy.
   // Avoid syncing prop -> internal in an effect (React 19 / Compiler
@@ -141,6 +169,43 @@ export function Composer({
       textareaRef.current.focus();
     }
   }, [autoFocus]);
+
+  // Imperative API for callers that need to seed the textarea
+  // without rewiring as a controlled component. Today's only user is
+  // MainView's resend handler (MessageUser ↻ → prefill Composer);
+  // adding it via ref keeps the existing paste-fold internal-state
+  // refs intact for the common typing path.
+  useImperativeHandle(
+    ref,
+    () => ({
+      prefillText(next: string) {
+        if (isControlled) {
+          onChange?.(next);
+        } else {
+          setInternal(next);
+        }
+        // Resend prefill is not a user paste — drop any folded
+        // placeholders so the next paste counter starts at #1 and
+        // the registry doesn't carry stale entries.
+        pastesRef.current.clear();
+        pasteCounterRef.current = 0;
+        // Focus + caret at end on the next frame, after React has
+        // committed the new textarea value. setSelectionRange before
+        // the commit lands at the old text length.
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          ta.focus();
+          const end = ta.value.length;
+          ta.setSelectionRange(end, end);
+        });
+      },
+      focus() {
+        textareaRef.current?.focus();
+      },
+    }),
+    [isControlled, onChange],
+  );
 
   // Auto-grow: reset height to `auto` (so scrollHeight reflects
   // content, not previous height) then snap to scrollHeight. Capped
@@ -314,7 +379,8 @@ export function Composer({
       </div>
     </div>
   );
-}
+  },
+);
 
 /**
  * LLM pill — clickable label showing the current model, opens a

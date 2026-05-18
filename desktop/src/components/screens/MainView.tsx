@@ -5,6 +5,7 @@ import { ApprovalDock } from "@/components/conversation/ApprovalDock";
 import { AskUserBubble } from "@/components/conversation/AskUserBubble";
 import {
   Composer,
+  type ComposerHandle,
   type ComposerLLMOption,
 } from "@/components/conversation/Composer";
 import { Conversation, TurnMarker } from "@/components/conversation/Conversation";
@@ -138,6 +139,11 @@ export function MainView({
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Imperative handle to the Composer — used by the MessageUser ↻
+  // resend button. The handler routes through composerRef.prefillText
+  // rather than hoisting Composer to controlled mode, which would
+  // require lifting its paste-fold registry state too.
+  const composerRef = useRef<ComposerHandle>(null);
   // Stripped partial — empty when nothing renderable yet (e.g. only
   // `<thinking>...` partial has come through). We hide the
   // ThinkingSummary placeholder once we have user-visible streaming
@@ -433,6 +439,9 @@ export function MainView({
             approvalDecisions={approvalDecisions}
             onApprove={onApprove}
             projectName={projectName}
+            onResendUserMessage={(content) =>
+              composerRef.current?.prefillText(content)
+            }
           />
           {/* In-flight pending approvals — rendered after the
               completed turns. The agent has emitted tool_call_pending
@@ -588,6 +597,7 @@ export function MainView({
           />
 
           <Composer
+            ref={composerRef}
             llmDisplayName={llmDisplayName}
             placeholder={
               pendingAskUser
