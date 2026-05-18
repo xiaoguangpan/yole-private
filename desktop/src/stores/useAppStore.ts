@@ -2605,6 +2605,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // initial state if SQLite isn't available (Vite-only dev / first
   // launch before tauri-plugin-sql finishes init).
   hydrateFromDB: async () => {
+    // Replace the demo fixture's hardcoded workbenchVersion ("0.1.0",
+    // a lie since alpha.1) with the real value baked into tauri.conf.json
+    // at build time. Tauri's getVersion() returns the same string the
+    // bundler stamped into the .app, so Settings → About always matches
+    // the installed release. Failing fetch keeps the demo value — not
+    // worth blocking hydration on this.
+    try {
+      const { getVersion } = await import("@tauri-apps/api/app");
+      const realVersion = await getVersion();
+      set((state) => ({
+        runtimeInfo: { ...state.runtimeInfo, workbenchVersion: realVersion },
+      }));
+    } catch (e) {
+      console.debug("[store] hydrateFromDB: app.getVersion failed.", e);
+    }
     try {
       // Sweep accumulated empty "新对话" rows from prior launches —
       // each auto-created session that the user never typed into
