@@ -40,10 +40,12 @@ Status:   B3 M4 COMPLETE — sessionsStore extracted; useAppStore.ts
           pattern. M5 启动门: M4b dogfood 1 day + M5 sub-plan.
 Next:     B3 M5 T5.1 — messagesStore extraction (per-session conversation
           turns, pending approvals, ask_user, in-flight streaming).
-          最复杂 slice — 启动前必读 [M5 sub-plan](TBD) + G11 子文件拆分预案
-          (sessions.ts 已超 600 行，M5 同步分 messages/ subfolder).
+          最复杂 slice — 启动前必读 [M5 sub-plan](./B3-M5-sub-plan.md)
+          (single commit 决策 + R1-R8 risk register + V1-V7 verification
+          + 7 cluster dogfood scenarios + G11 子文件拆分预案).
 Blocker:  M4b dogfood 1 day (B3-I1) — JC 验证 bulk / project / LLM /
-          unread / rename / pin / activate 行为不退化。
+          unread / rename / pin / activate 行为不退化。M5 sub-plan
+          paperwork 不阻 dogfood，可并行。
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
@@ -55,7 +57,7 @@ Blocker:  M4b dogfood 1 day (B3-I1) — JC 验证 bulk / project / LLM /
 | Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../core/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
-| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1 ✅ + M2 ✅ + M3 ✅ + M4 ✅ | T5.1 (M5 messagesStore) | [B3-store-slice.md](./B3-store-slice.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) | 2026-05-19 third session: M4 完成全部 — sub-plan + M4a Rust trait + addendum + M4b frontend sessionsStore extraction. useAppStore -931 LOC; lib/db.ts -276 LOC. M5 messagesStore 待 fresh session. |
+| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1 ✅ + M2 ✅ + M3 ✅ + M4 ✅ + M5 sub-plan ✅ | T5.1 (M5 messagesStore implementation) | [B3-store-slice.md](./B3-store-slice.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) · [M5 sub-plan](./B3-M5-sub-plan.md) | 2026-05-19 fourth session: M5 sub-plan ship — single commit M5 决策 + R1-R8 risk register + 4 cross-store stub handoff plan + 23 call-site swap roadmap. Implementation 待 fresh session. |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
 | **v0.5 milestone** | ⏳ | — | — | — |
 
