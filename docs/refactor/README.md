@@ -30,19 +30,20 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → [B3] → B4 → v0.5
-                                          ↑ 现在在这里
-Status:   B2 COMPLETE — M1-M7 code + docs shipped (tag b2-complete)
-          Acceptance A1/A2/A3/A5/A7/A10/A12 auto-verified (83 tests pass);
-          A4/A6/A8/A9/A11 + perf gate moved to B3 M2 启动门 (per 2026-05-19
-          prereq relaxation — event-driven, not 1-week calendar gate)
-          Final code state: full read+write pipeline through Rust;
-          GUI byte-identical UX; CLI socket transport live; origin tracking on DB
-Next:     B3 M1 T1.1 — slice boundary static analysis + Rust emit event catalogue
-          (B3 playbook upgraded + prereq amended same session, cursor at T1.1)
-Blocker:  M1 gate: ✅ dogfood-scenarios.md 35 项已落地 (2026-05-19).
-          M2 gate (改 frontend 代码前): scenarios JC 真跑过签字 + perf baseline
-          测好. 详 B3-store-slice.md Prerequisites + devlog 2026-05-19-b3-prereq-relaxation.md
+Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → [B3 M1 ✅] → B4 → v0.5
+                                              ↑ 现在在这里
+Status:   B3 M1 COMPLETE — paperwork only, 0 代码改动. 3 artifact 落地:
+          (1) b3-slice-mapping.md — 89 items 分到 5 slice + 9 dead-after-B3 symbol
+          (2) b3-slice-adr.md — 11 AD 含边界判断 / module-level 删除 / DAG
+          (3) b3-rust-emit-catalogue.md — 5 新 event payload spec
+          + M1 完成 devlog. Single session 总耗 ~5h (prereq 2h + M1 3h).
+Next:     B3 M2 T2.1 — uiStore 抽离 (D34-D35) — 5 slice 最简单，建模式
+          (M2 启动前需 M2 启动门: dogfood scenarios JC 真跑过 + perf baseline)
+Blocker:  M2 启动门两条:
+          - dogfood scenarios JC 真跑过一遍 GA task 签字「未发现 B2 regression」
+          - B2 perf baseline (first-token RTT / streaming throughput) 测好
+            落到 docs/refactor/perf-baseline.md
+          M1 是 paperwork, 不卡 M2 启动门 (本 session 已完成 paperwork)
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
@@ -54,7 +55,7 @@ Blocker:  M1 gate: ✅ dogfood-scenarios.md 35 项已落地 (2026-05-19).
 | Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../core/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
-| B3: useAppStore 拆 slice + 改订阅 | ⏳ 待启动（playbook ready） | T1.1 | [B3-store-slice.md](./B3-store-slice.md) | 2026-05-19 升格到完整 playbook (M1-M7, ~60 sub-tasks, 7 phase invariants, 12 gotchas) |
+| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1 ✅ 设计完成 (0 代码改动) | T2.1 (M2 启动门待) | [B3-store-slice.md](./B3-store-slice.md) · [M1 devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · 3 artifact: [mapping](./b3-slice-mapping.md) / [ADR](./b3-slice-adr.md) / [emit catalogue](./b3-rust-emit-catalogue.md) | 2026-05-19 single session: prereq relaxation + scenarios + M1 全 10 sub-task done (~5h total) |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
 | **v0.5 milestone** | ⏳ | — | — | — |
 

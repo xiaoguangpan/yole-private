@@ -1,10 +1,10 @@
 # B3 · useAppStore 拆 slice + 改订阅 Rust event
 
 ```
-Cursor:   T1.1  (B3 未启动 · M1 第一个 sub-task — 静态分析 + slice 映射表)
-Status:   ⏳ 未启动 · 详细 playbook 已升格 (was 117-line stub, 2026-05-19) · prereq relaxation 双层 gate (2026-05-19)
-Started:  -
-Last touch: 2026-05-19 — prereq 从「1 周日历仪式」改成事件驱动双层 gate (M1 / M2)，详 N1
+Cursor:   T2.1  (M2 uiStore 抽离 — 进入实施阶段)
+Status:   🟡 M1 ✅ COMPLETE · 3 artifact (mapping + ADR + Rust emit catalogue) + M1 devlog · 0 代码改动 · M2 实施前不需等额外 gate
+Started:  2026-05-19
+Last touch: 2026-05-19 — M1 全 10 sub-task done, ~3.5h total (1.5× under 4-6h G1 budget). 详 N2 / N3
 Predecessor: B2 完成 (M1-M7 + tag b2-complete) + dogfood 1 周稳定期
 Successor:   B4 (CLI feature-complete + background mode + adapter artifact)
 Duration:    3-4 周估计（D31-D50+，按 PRD 节奏），但 stub 已警告"3-4 周可能拖到 5-6 周"
@@ -77,26 +77,16 @@ Duration:    3-4 周估计（D31-D50+，按 PRD 节奏），但 stub 已警告"3
 
 ### Sub-tasks
 
-- [ ] **T1.1** 静态分析 `useAppStore.ts`：用脚本 `grep -n "^  [a-z][A-Za-z]*[:?]"` 列出全部 fields + actions，按 domain 归类。输出到 `docs/refactor/b3-slice-mapping.md`（一次性 artifact，B3 后归档）
-- [ ] **T1.2** Slice 边界 ADR：
-  - **uiStore**：screen / paletteOpen / settingsOpen / toggle\* / activeProjectFilter / conversationWidth / toasts / yoloIntroSeen / pendingPetMigrationTo
-  - **sessionsStore**：sessions list / activeSessionId / projects / activeProjectFilter (移 ui 还是这？决策) / 所有 session/project CRUD action（authoritative，通过 invoke → emit event 路径）
-  - **messagesStore**：per-session `_runtimes` 的 conversation 字段（turns / pendingApprovals / pendingAskUser / inFlightContent / currentTurnIndex / approvalDecisions / userSubmitTick）+ 所有 conversation 写入 action
-  - **runtimeStore**：per-session runtime 字段（llms / llmDisplayName / bridgeStatus / bridgeError / bridgePid / agentRunning / pet attachment）+ runner / LLM 切换 action
-  - **prefsStore**（5 个 slice 而非 4）：gaConfig / approvalConfig / yoloMode / yoloIntroSeen / conversationWidth + persistence；理由：prefs 是独立 lifecycle（onboarding 时写一次，其它时刻几乎不动），跟 ui state 混在一起会让 prefs save 频繁触发 ui rerender
-- [ ] **T1.3** 决定 `activeProjectFilter` 归属：filter 是纯 UI 状态（仅影响 sidebar 渲染）但跟 sessions 数据深耦合（filter 决定哪些 session 显示）。**暂定 sessionsStore**：filter 是 sessions 视图的一部分，跟 sessions list 同 slice 减少 cross-store subscribe
-- [ ] **T1.4** 决定 `_bridgeClients` / `_lruOrder` / `_stderrTails` 模块级 Map 去向：B2 M2 已经让它们行为变成"代理 Rust state"。**B3 内删除全部三个** —— Rust 端 RunnerManager 是 ground truth，TS 端缓存 `bridgePid` 在 runtimeStore 即可。任何调用方原来用 `getBridgeClient(sid)` 的，改 invoke `runner_stderr_tail` 或直接读 runtimeStore
-- [ ] **T1.5** 选 store 库 (O1)：**沿用 Zustand**。理由：(a) JC 熟悉 + dogfood 稳定 (b) 小 bundle (c) Redux Toolkit 跟 slice 模式集成更好但要重学 (d) Jotai atom-based 跟当前 selector pattern 距离大。**Strict mode 兼容**通过 store-side enrichment 解决（B3-I2），不靠换库
-- [ ] **T1.6** 选 event batching window (O2)：**16ms (单帧)** for streaming `turn_progress` events。理由：低于 16ms 多个 event 在同一帧渲染只会消耗 React，user 看不到差别；高于 16ms (50ms 等) streaming 字符延迟肉眼可见。Rust 端在 [`runner_commands.rs`](../../core/src/runner_commands.rs) `spawn_emit_task` 加 batch 逻辑 — 收 16ms 内的多个 `turn_progress` 合并成一个 event，TS 端把 delta 拼起来
-- [ ] **T1.7** Selector 设计 (O3)：每个组件订阅 path 长度 ≤ 2 layers (`useSessionsStore(s => s.activeSession)` not `useStore(s => s.sessions.list[0].turns[3].x)`)。**store-side enrichment** 把 derived value 物化成 cached field
-- [ ] **T1.8** Slice 间依赖 graph：画 DAG（5 个 slice 之间允许的 reference 方向）。预想：uiStore 顶部，sessionsStore + runtimeStore + messagesStore + prefsStore 平级。**禁止 cyclic**
-- [ ] **T1.9** Rust 端 emit event 清单：B2 M2 已经 emit `runner-event` / `runner-malformed` / `runner-closed`。B3 需要补 emit：
-  - `sessions-updated`：session list / status / pinned / has_unread / lastActivityAt 任何变更
-  - `messages-appended`：单 session 新 message (turn / approval / inFlight)
-  - `projects-updated`：project list 变更
-  - `prefs-updated`：prefs 变更 (rare)
-  - 每个 event 携带变更类型 + 最小 delta（避免 emit 整个 list）
-- [ ] **T1.10** M1 commit：仅 `docs/refactor/b3-slice-mapping.md` + ADR 文件，**0 代码改动**。message：`Docs: B3 M1 — slice boundary design + Rust emit event catalogue`
+- [x] **T1.1** 静态分析 `useAppStore.ts`：grep 起索引（193 lines）+ manual review 收敛到 32 字段 + 57 action = 89 distinct items。输出到 [`docs/refactor/b3-slice-mapping.md`](./b3-slice-mapping.md)（2026-05-19 落地）。**新发现**：9 个 dead-after-B3 module-level symbol（3 Map + 1 数组 + 5 helper/flag）；12 个 active-session projection mirror M3 起逐字段 retire；4 个 cross-slice helper（applyRuntimeUpdate / projectionFrom / emptyRuntime）拆分中消失。`getBridgeClient` export **0 个外部调用方** = 干净删除路径。详 N2
+- [x] **T1.2** Slice 边界 ADR — 5 slice 划分（ui / sessions / messages / runtime / prefs）verbatim 字段-级 contract 落地 [`b3-slice-mapping.md`](./b3-slice-mapping.md) § A-E；判断 / rationale 落地 [`b3-slice-adr.md`](./b3-slice-adr.md) AD-01
+- [x] **T1.3** `activeProjectFilter` 归属 → **sessionsStore**（[AD-02](./b3-slice-adr.md#ad-02--activeprojectfilter-归-sessionsstore不是-uistore)）；同时显式钉 `yoloIntroSeen` → prefsStore (AD-03)、`conversationWidth` → prefsStore (AD-04)、`agentRunning` → messagesStore (AD-05)、`userSubmitTick` → messagesStore (AD-06)
+- [x] **T1.4** 模块级 Map / helper 全删（9 个 symbol，含 `_bridgeClients` / `_lruOrder` / `_stderrTails` / `getBridgeClient` 零外部 callers）— [AD-07](./b3-slice-adr.md#ad-07--module-level-state-全删t14-verbatim) verbatim + [mapping doc § F](./b3-slice-mapping.md#f-跨-slice--内部-only-state) 明细
+- [x] **T1.5** 沿用 Zustand — [AD-10 § T1.5](./b3-slice-adr.md#ad-10--已-resolved-字段回顾-t15-t17)
+- [x] **T1.6** 16ms batch window for streaming delta — [AD-10 § T1.6](./b3-slice-adr.md#ad-10--已-resolved-字段回顾-t15-t17) + [emit catalogue § in_flight_delta batching](./b3-rust-emit-catalogue.md#2--messages-appended)
+- [x] **T1.7** Selector ≤ 2 layers + store-side enrichment — [AD-10 § T1.7](./b3-slice-adr.md#ad-10--已-resolved-字段回顾-t15-t17)
+- [x] **T1.8** Slice dependency DAG（5 slice）— [AD-09](./b3-slice-adr.md#ad-09--slice-dependency-dagt18)。无 cycle；唯一 hot edge: prefs → runtime（gaConfig change reset warmup）走 Rust event 中介；其它 read-only cross-slice 允许
+- [x] **T1.9** Rust emit event catalogue — 5 新 event（sessions-updated / messages-appended / projects-updated / prefs-updated / runtime-updated）+ 3 沿用 + 跨 channel ordering / batching / initial-state contract 全 spec 在 [`b3-rust-emit-catalogue.md`](./b3-rust-emit-catalogue.md)
+- [x] **T1.10** M1 commit 准备就绪：3 个 artifact + [M1 完成 devlog](../devlog/2026-05-19-b3-m1-design-complete.md) + playbook cursor 更新到 T2.1 + dashboard 更新
 
 ---
 
@@ -252,6 +242,8 @@ Duration:    3-4 周估计（D31-D50+，按 PRD 节奏），但 stub 已警告"3
 ### Session 跑下来追加的 notes（按日期）
 
 - **N1 (2026-05-19, pre-T1.1)** — Prereq relaxation: 把 "B2 完成后 dogfood 1 周稳定期" 单层 gate 拆成「M1 启动门」（轻，scenarios 列表先写）+「M2 启动门」（重，scenarios JC 真跑过签字 + perf baseline 测好）。理由 + rejected alternatives 详 [devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)。**触发**：B2 ship 当天 JC 想推 B3，发现单层 gate 跟 B2 完成 devlog 自己的话（"the dogfood period is an empirical confidence-building step, not a gating contract"）+ CLAUDE.md「事件驱动，非日历驱动」原则双重冲突，且 T1.1（pure paperwork）跟 M2（动 frontend 代码）风险差 100×，同 gate 拦不合理
+- **N2 (2026-05-19, T1.1 done)** — 静态分析跑下来 grep 索引比预期省力：193 line 经 manual review 到 89 distinct items（32 字段 + 57 action），4-6h G1 预算实际花 1.5h（含读 SessionRuntime jsdoc + 跑 callers grep + 写 mapping doc）。**预算太保守**——遗产是 SessionRuntime 已经把所有 per-session 字段集中到一个 interface，grep 跟 interface 互相印证非常省。**新发现**：(a) `getBridgeClient` 0 个外部 callers — T1.4 删 module-level 3 Map 完全干净；(b) **active-session projection 是 B3 最大的 mechanical work** —— 12 个 top-level mirror 字段对应 96 个 useAppStore call site，M3-M5 每个 slice 实施时都要 sweep 一遍组件订阅；(c) `agentRunning` 边界模糊 — 是 messages（conversation 状态）还是 runtime（bridge 状态）？mapping doc 暂分 messages，O7 标注 M3/M5 dogfood 时复核；(d) sessionsStore / messagesStore 估计 550 / 600 行，**接近** B3-I5 600 行硬上限，M5 实施时 G11 子文件拆分预案要执行。**Open**: T1.2 ADR 实施 verbatim 跟 mapping doc 字段表对齐；T1.3 `activeProjectFilter` / yoloIntroSeen / conversationWidth 归属判断需要 explicit 写下来（mapping doc 已给暂行决定但 ADR 是契约）
+- **N3 (2026-05-19, M1 COMPLETE)** — T1.2 → T1.10 串推：[`b3-slice-adr.md`](./b3-slice-adr.md) 落 11 个 AD（边界 / dead-state / DAG / RESOLVED 复述）+ [`b3-rust-emit-catalogue.md`](./b3-rust-emit-catalogue.md) 落 5 个新 emit event spec（sessions-updated / messages-appended / projects-updated / prefs-updated / runtime-updated）+ [M1 完成 devlog](../devlog/2026-05-19-b3-m1-design-complete.md) 6 段格式总结。**新发现**：(a) Rust 端 emit 5 个 domain event 而非 raw runner-event 给 GUI —— GUI 不重复解释 IpcEvent，IPC 解释逻辑在 Rust spawn_emit_task 中央化（[ADR AD-09](./b3-slice-adr.md#ad-09--slice-dependency-dagt18) 钉死）。(b) [`runtime-updated` 新 event](./b3-rust-emit-catalogue.md#5--runtime-updated) 是关键设计 call —— 不放在 M3 T3.3 的 stub list 里曾经只写「spawn_emit_task 内 emit」没钉 schema，本次 catalogue 把 payload shape 完整 spec。(c) M1 + prereq relaxation 同 session 跑完 = 单 session 5h 总时长（含 prereq 2h + M1 3h），G1 budget 4-6h 是 M1 alone，超估约 1.5×。**Open**: M2 启动门要求「scenarios JC 真跑过 + perf baseline 测好」——本 session 不动 frontend 代码，M2 启动前 JC 单独跑 dogfood + 测 baseline 即可，本 session 结束
 
 ---
 
