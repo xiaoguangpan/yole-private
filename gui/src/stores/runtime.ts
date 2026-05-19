@@ -12,13 +12,14 @@ import {
   DEMO_LLMS,
   DEMO_RUNTIME_INFO,
 } from "@/stores/demo";
+import { useMessagesStore } from "@/stores/messages";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
-// useAppStore is imported for getState-time access (cross-store
-// transitional reads). The import is a circular dependency at the
-// module-graph level, but neither store reads the other's value at
-// initialisation time — only inside action bodies, after both
-// modules have finished evaluating. Vite handles this correctly.
+// useAppStore is still imported for one last cross-store read in M5:
+// `gaConfig` (line ~696). M6 prefsStore will move gaConfig out and
+// remove this import entirely. messagesStore extraction in M5
+// already retired the `_runtimes` cross-store writes that used to
+// live here (onClose stub + _enforceLRUCap agentRunning probe).
 import { useAppStore } from "@/stores/useAppStore";
 import { makeAppError } from "@/types/app-error";
 import type { RuntimeInfo } from "@/types/inspector";
@@ -237,13 +238,13 @@ function _lruRemove(sessionId: string): void {
 
 async function _enforceLRUCap(): Promise<void> {
   while (_lruOrder.length > LRU_CAP) {
-    // TRANSITIONAL (M5 messagesStore): `agentRunning` still lives in
-    // useAppStore._runtimes[id].agentRunning. After M5, switch to
-    // `useMessagesStore.getState().byId[id]?.agentRunning`.
-    const appState = useAppStore.getState();
+    // `agentRunning` lives in messagesStore (B3 M5). Active-running
+    // bridges are protected from eviction so we don't kill a streaming
+    // agent the user just walked away from.
+    const messagesState = useMessagesStore.getState();
     const activeId = useSessionsStore.getState().activeSessionId;
     const victim = _lruOrder.find(
-      (id) => id !== activeId && !appState._runtimes[id]?.agentRunning,
+      (id) => id !== activeId && !messagesState.byId[id]?.agentRunning,
     );
     if (!victim) {
       console.info(
@@ -533,26 +534,13 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
               }),
             },
           }));
-          // TRANSITIONAL (M5 messagesStore): conversation-side cleanup
-          // still lives in useAppStore._runtimes[sid]. After M5, this
-          // becomes useMessagesStore.getState().clearStreamingOnClose(sid)
-          // or moves to a Rust-event-driven path. Until then, reach
-          // across stores.
-          useAppStore.setState((state) => {
-            const rt = state._runtimes[sessionId];
-            if (!rt) return {};
-            return {
-              _runtimes: {
-                ...state._runtimes,
-                [sessionId]: {
-                  ...rt,
-                  agentRunning: false,
-                  currentTurnIndex: null,
-                  inFlightContent: "",
-                },
-              },
-            };
-          });
+          // Conversation-side cleanup: agentRunning / currentTurnIndex
+          // / inFlightContent live in messagesStore (B3 M5). The
+          // streaming reset leaves turns / pendingApprovals /
+          // approvalDecisions intact so the user can still read the
+          // conversation while the bridge is down. messagesStore's
+          // `fireSessionMirror` updates the sidebar status row too.
+          useMessagesStore.getState().clearStreamingOnBridgeClose(sessionId);
         },
         onError: (msg) => {
           console.error(`[bridge ${sessionId}] error`, msg);

@@ -26,6 +26,12 @@ import {
   buildDemoTurns,
   makeDemoToast,
 } from "@/stores/demo";
+import {
+  EMPTY_APPROVALS,
+  EMPTY_DECISIONS,
+  EMPTY_TURNS,
+  useMessagesStore,
+} from "@/stores/messages";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore, type Screen } from "@/stores/ui";
@@ -56,20 +62,19 @@ function App() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
 
-  // Sidebar live-status comes from `sessions` directly: the store's
-  // `applyRuntimeUpdate` syncs sidebar-visible fields (status,
-  // pendingApprovalCount) onto each session row whenever its
-  // runtime changes, but only generates a new `sessions` array when
-  // those fields actually change. So a plain selector with default
-  // strict-equality stays stable through frequent non-sidebar
-  // updates like turn_progress streaming.
+  // Sidebar live-status comes from `sessions` directly: messagesStore's
+  // `fireSessionMirror` writes sidebar-visible fields (status,
+  // pendingApprovalCount, hasPendingAskUser) onto each session row
+  // whenever the conversation changes, but only generates a new
+  // `sessions` array when those fields actually change. So a plain
+  // selector with default strict-equality stays stable through
+  // frequent non-sidebar updates like turn_progress streaming.
   const sessions = useSessionsStore((s) => s.sessions);
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const createSession = useSessionsStore((s) => s.createSession);
-  // activateSession is the orchestrator and still lives in useAppStore
-  // (composes setActive + restoreTurns + spawnBridge). Other CRUD
-  // actions are slice-native now.
-  const activateSession = useAppStore((s) => s.activateSession);
+  // activateSession is the orchestrator — moved to sessionsStore in
+  // B3 M5 so it sits next to active id ownership.
+  const activateSession = useSessionsStore((s) => s.activateSession);
   const setActiveSession = useSessionsStore((s) => s.setActiveSession);
   const archiveSession = useSessionsStore((s) => s.archiveSession);
   const unarchiveSession = useSessionsStore((s) => s.unarchiveSession);
@@ -98,7 +103,9 @@ function App() {
     (s) => s.deleteSessionPermanently,
   );
   const emptyArchive = useSessionsStore((s) => s.emptyArchive);
-  const appendUserTurnExternal = useAppStore((s) => s.appendUserTurnExternal);
+  const appendUserTurnExternal = useMessagesStore(
+    (s) => s.appendUserTurnExternal,
+  );
   // LLM / runtimeInfo / pet state now live in runtimeStore (M3a).
   // Subscribe to the active session's per-runtime entry so the
   // Composer pill + dropdown + Inspector tab re-render on changes.
@@ -118,8 +125,18 @@ function App() {
   );
   const runtimeInfo = useRuntimeStore((s) => s.runtimeInfo);
 
-  const approvalDecisions = useAppStore((s) => s.approvalDecisions);
-  const recordApprovalDecision = useAppStore((s) => s.recordApprovalDecision);
+  // Per-session conversation reads — activeSessionId comes from
+  // sessionsStore (declared above), used by every selector below to
+  // index into messagesStore.byId. EMPTY_* singletons keep React 19
+  // strict-mode getSnapshot stable across renders.
+  const approvalDecisions = useMessagesStore((s) =>
+    activeSessionId
+      ? (s.byId[activeSessionId]?.approvalDecisions ?? EMPTY_DECISIONS)
+      : EMPTY_DECISIONS,
+  );
+  const recordApprovalDecision = useMessagesStore(
+    (s) => s.recordApprovalDecision,
+  );
   const approvalConfig = useAppStore((s) => s.approvalConfig);
   const setApprovalRequiredTools = useAppStore(
     (s) => s.setApprovalRequiredTools,
@@ -158,18 +175,34 @@ function App() {
       ? "ready"
       : "unconfigured";
 
-  const storeTurns = useAppStore((s) => s.turns);
-  const storePending = useAppStore((s) => s.pendingApprovals);
-  const agentRunning = useAppStore((s) => s.agentRunning);
-  const currentTurnIndex = useAppStore((s) => s.currentTurnIndex);
-  const userSubmitTick = useAppStore((s) => s.userSubmitTick);
-  const inFlightContent = useAppStore((s) => s.inFlightContent);
-  const pendingAskUser = useAppStore((s) => s.pendingAskUser);
-  const appendUserTurn = useAppStore((s) => s.appendUserTurn);
-  const appendSideQuestionUserTurn = useAppStore(
+  const storeTurns = useMessagesStore((s) =>
+    activeSessionId ? (s.byId[activeSessionId]?.turns ?? EMPTY_TURNS) : EMPTY_TURNS,
+  );
+  const storePending = useMessagesStore((s) =>
+    activeSessionId
+      ? (s.byId[activeSessionId]?.pendingApprovals ?? EMPTY_APPROVALS)
+      : EMPTY_APPROVALS,
+  );
+  const agentRunning = useMessagesStore((s) =>
+    activeSessionId ? (s.byId[activeSessionId]?.agentRunning ?? false) : false,
+  );
+  const currentTurnIndex = useMessagesStore((s) =>
+    activeSessionId ? (s.byId[activeSessionId]?.currentTurnIndex ?? null) : null,
+  );
+  const userSubmitTick = useMessagesStore((s) => s.userSubmitTick);
+  const inFlightContent = useMessagesStore((s) =>
+    activeSessionId ? (s.byId[activeSessionId]?.inFlightContent ?? "") : "",
+  );
+  const pendingAskUser = useMessagesStore((s) =>
+    activeSessionId ? (s.byId[activeSessionId]?.pendingAskUser ?? null) : null,
+  );
+  const appendUserTurn = useMessagesStore((s) => s.appendUserTurn);
+  const appendSideQuestionUserTurn = useMessagesStore(
     (s) => s.appendSideQuestionUserTurn,
   );
-  const removePendingApproval = useAppStore((s) => s.removePendingApproval);
+  const removePendingApproval = useMessagesStore(
+    (s) => s.removePendingApproval,
+  );
 
   const hydrateFromDB = useAppStore((s) => s.hydrateFromDB);
 
@@ -1053,7 +1086,7 @@ function DevScreenToggle({
   setScreen: (s: Screen) => void;
   onTriggerToast?: () => void;
   onSeedMockSessions?: () => void;
-  bridgeStatus?: import("@/stores/useAppStore").BridgeStatus;
+  bridgeStatus?: import("@/stores/runtime").BridgeStatus;
   onSpawnBridge?: () => void;
   onShutdownBridge?: () => void;
 }) {

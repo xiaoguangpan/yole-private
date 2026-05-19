@@ -1,0 +1,123 @@
+// SQLite messages → UI Turn[] reconstruction.
+//
+// Extracted from messages.ts per [B3-M5-sub-plan §3 T5.1 G11] when
+// the parent store hit the B3-I5 600-line budget. Pure functions —
+// no store dependency.
+
+import type {
+  AgentTurn,
+  ConversationToolEvent,
+  Turn,
+  UserTurn,
+} from "@/types/conversation";
+import type { MessageRow } from "@/types/db";
+
+/**
+ * Convert SQLite `messages` rows back into UI `Turn[]`. Walks rows in
+ * (turn_index, sequence) order — user rows (sequence=0) become
+ * UserTurn; assistant rows (sequence=1) become AgentTurn with
+ * tool_calls / tool_results JSON re-hydrated into
+ * ConversationToolEvent[].
+ *
+ * `system` and `tool` rows are skipped — V0.1 collapses tools into the
+ * assistant row's JSON columns; future Memory Inspector work can
+ * surface them.
+ *
+ * Tools restored from history are always marked `success-historical`:
+ * by the time a turn is persisted, every dispatched tool has
+ * completed (turn_end is the canonical "finished" signal). The
+ * conversation view fades them appropriately.
+ */
+export function rowsToTurns(rows: MessageRow[]): Turn[] {
+  const turns: Turn[] = [];
+  // Per-message step recovery: AgentTurn.turnIndex is the GA-side
+  // per-message step (1 for the first turn of each user message,
+  // 2 for the second, etc) — that's what the user expects to see
+  // in the "第 N 步" UI. SQLite however stores the **absolute**
+  // session-wide turn_index to avoid primary-key collisions
+  // between different user messages' assistant rows (see
+  // turnIndexOffset rationale in messages.ts appendUserTurn).
+  //
+  // To map back from absolute to per-message at restore, we walk
+  // rows in (turn_index, sequence) order and track the latest
+  // user row's turn_index as the base of the current user_message
+  // "block". Each assistant row's display step is then
+  // `absolute - base + 1`.
+  let currentMessageBase = 0;
+  for (const row of rows) {
+    if (row.role === "user") {
+      currentMessageBase = row.turn_index;
+      turns.push({ role: "user", content: row.content } as UserTurn);
+    } else if (row.role === "assistant") {
+      const toolCalls = safeParseJsonArray(row.tool_calls);
+      const toolResults = safeParseJsonArray(row.tool_results);
+      const tools: ConversationToolEvent[] = toolCalls.map((tc, i) => {
+        const result = toolResults[i];
+        const resultPreview = previewFromContent(result?.content);
+        const id =
+          (typeof result?.toolUseId === "string" && result.toolUseId) ||
+          (typeof tc.toolUseId === "string" && tc.toolUseId) ||
+          `t-${row.turn_index}-${i}`;
+        return {
+          id,
+          name: typeof tc.toolName === "string" ? tc.toolName : "(unknown)",
+          status: "success-historical",
+          args: (tc.args as Record<string, unknown>) ?? {},
+          resultPreview,
+        };
+      });
+      const displayStep = currentMessageBase
+        ? row.turn_index - currentMessageBase + 1
+        : row.turn_index; // defensive: no preceding user row found
+      // Normalize empty-string final_answer back to null (same as
+      // ipc-handlers turnFromTurnEnd does for live events). Old rows
+      // written before commit 1d0c404's fix may have stored "" for
+      // tool-only intermediate turns; surfacing them as null here
+      // keeps the Copy/Save actions from appearing under those turns.
+      const finalAnswerRaw = row.final_answer ?? "";
+      const finalAnswer = finalAnswerRaw.trim() ? finalAnswerRaw : null;
+      const turn: AgentTurn = {
+        role: "agent",
+        thinking: row.thinking ?? undefined,
+        // LLM "当前阶段：..." preamble (added in migration v5). Pre-
+        // v5 rows have NULL — TurnMarker DetailPanel chevron stays
+        // hidden when preamble is undefined and there's no
+        // thinking either.
+        preamble: row.preamble ?? undefined,
+        tools,
+        finalAnswer,
+        turnIndex: displayStep,
+        // GA turn summary (added in migration v3). Pre-v3 rows
+        // have NULL — TurnMarker collapses to just "第 N 步"
+        // when summary is undefined, which is the right behavior
+        // for those rows since the data never existed on disk.
+        summary: row.summary ?? undefined,
+      };
+      turns.push(turn);
+    }
+    // system / tool rows: skipped at v0.1.
+  }
+  return turns;
+}
+
+/** Defensive JSON.parse — returns `[]` on malformed / null / non-array. */
+function safeParseJsonArray(raw: string | null): Record<string, unknown>[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Mirror of ipc-handlers' resultPreview logic — keep ≤500 char preview. */
+function previewFromContent(content: unknown): string | undefined {
+  if (content === undefined || content === null) return undefined;
+  if (typeof content === "string") return content.slice(0, 500);
+  try {
+    return JSON.stringify(content).slice(0, 500);
+  } catch {
+    return String(content).slice(0, 500);
+  }
+}

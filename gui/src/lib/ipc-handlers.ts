@@ -12,6 +12,7 @@ import type {
   ToolResult as IPCToolResult,
 } from "@/types/ipc";
 
+import { useMessagesStore } from "@/stores/messages";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
@@ -45,7 +46,12 @@ export function dispatchIPCEvent(
   event: IPCEvent,
   store: typeof useAppStore,
 ): void {
+  // `s` only carries prefs-level state still owned by useAppStore
+  // (yoloMode). All per-session conversation state moved to
+  // messagesStore in B3 M5 — accessed via useMessagesStore.getState()
+  // directly so the receiving slice is obvious at the call site.
   const s = store.getState();
+  const messages = useMessagesStore.getState();
 
   switch (event.kind) {
     case "ready": {
@@ -142,9 +148,9 @@ export function dispatchIPCEvent(
       // running flag so the thinking placeholder + Stop-mode Composer
       // don't get stuck on. Categories like `quota_exceeded` /
       // `network` show the error toast instead.
-      s.setAgentRunning(event.sessionId, false);
-      s.setCurrentTurnIndex(event.sessionId, null);
-      s.clearInFlightContent(event.sessionId);
+      messages.setAgentRunning(event.sessionId, false);
+      messages.setCurrentTurnIndex(event.sessionId, null);
+      messages.clearInFlightContent(event.sessionId);
       return;
     }
 
@@ -155,9 +161,10 @@ export function dispatchIPCEvent(
       // SQLite, we add the runtime's offset to get an absolute
       // session-wide turn index — the primary key
       // `msg_${sessionId}_${turnIndex}_assistant` would collide
-      // across user messages otherwise. See SessionRuntime
-      // `turnIndexOffset` doc comment for full background.
-      const offset = s._runtimes[event.sessionId]?.turnIndexOffset ?? 0;
+      // across user messages otherwise. See messages.ts
+      // appendUserTurn for the `turnIndexOffset` rationale.
+      const offset =
+        messages.byId[event.sessionId]?.turnIndexOffset ?? 0;
       const absoluteTurnIndex = event.turnIndex + offset;
       console.info("[ipc] turn_end", {
         gaTurnIndex: event.turnIndex,
@@ -171,7 +178,7 @@ export function dispatchIPCEvent(
       // on every new user message is GA's native semantic and what
       // the user expects.
       const turn = turnFromTurnEnd(event);
-      s.appendAgentTurn(event.sessionId, turn);
+      messages.appendAgentTurn(event.sessionId, turn);
       // No setAgentRunning(false) here — turn_end is per-step inside
       // GA's agent_runner_loop, not the run terminus. agentRunning
       // stays true until `run_complete` / `error` / bridge close so
@@ -195,7 +202,8 @@ export function dispatchIPCEvent(
     }
 
     case "tool_call_pending": {
-      const offset = s._runtimes[event.sessionId]?.turnIndexOffset ?? 0;
+      const offset =
+        messages.byId[event.sessionId]?.turnIndexOffset ?? 0;
       const target = pickTarget(event.args);
       const pending: PendingApproval = {
         approvalId: event.approvalId,
@@ -204,7 +212,7 @@ export function dispatchIPCEvent(
         riskLevel: event.riskLevel,
         args: event.args,
       };
-      s.addPendingApproval(event.sessionId, pending);
+      messages.addPendingApproval(event.sessionId, pending);
       // Best-effort SQLite double-write for audit trail. tool_events
       // joins to messages by (session_id, turn_index) — must use
       // absolute turn index so the join works after restore.
@@ -227,9 +235,9 @@ export function dispatchIPCEvent(
       // Last-resort clear: turn_end already cleared agentRunning for
       // the normal happy path; this catches ABORTED / DENIED exits
       // where turn_end_callback didn't fire on the GA side.
-      s.setAgentRunning(event.sessionId, false);
-      s.setCurrentTurnIndex(event.sessionId, null);
-      s.clearInFlightContent(event.sessionId);
+      messages.setAgentRunning(event.sessionId, false);
+      messages.setCurrentTurnIndex(event.sessionId, null);
+      messages.clearInFlightContent(event.sessionId);
       return;
     }
 
@@ -241,10 +249,10 @@ export function dispatchIPCEvent(
       // completed TurnMarkers show, what the Sidebar preview
       // shows. No offset applied; raw GA value is the display.
       console.debug("[ipc] turn_start", event);
-      s.setCurrentTurnIndex(event.sessionId, event.turnIndex);
+      messages.setCurrentTurnIndex(event.sessionId, event.turnIndex);
       // New turn starts → drop whatever streaming buffer the previous
       // turn left, so the in-flight render doesn't bleed across turns.
-      s.clearInFlightContent(event.sessionId);
+      messages.clearInFlightContent(event.sessionId);
       return;
     }
 
@@ -252,7 +260,7 @@ export function dispatchIPCEvent(
       // Streaming partial. Append delta; MainView re-renders the
       // in-flight reply with cleanPartialContent stripping GA's
       // internal tags.
-      s.appendInFlightDelta(event.sessionId, event.delta);
+      messages.appendInFlightDelta(event.sessionId, event.delta);
       return;
     }
 
@@ -268,7 +276,7 @@ export function dispatchIPCEvent(
         sessionId: event.sessionId,
         candidateCount: event.candidates.length,
       });
-      s.setPendingAskUser(event.sessionId, {
+      messages.setPendingAskUser(event.sessionId, {
         question: event.question,
         candidates: event.candidates,
       });
@@ -366,7 +374,7 @@ export function dispatchIPCEvent(
         variant: event.variant,
         length: event.content.length,
       });
-      s.appendSystemTurn(event.sessionId, {
+      messages.appendSystemTurn(event.sessionId, {
         role: "system",
         content: event.content,
         variant: event.variant,

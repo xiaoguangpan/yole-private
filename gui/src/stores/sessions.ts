@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
+// Cross-store statics: runtime.ts and messages.ts both import this
+// module statically too, forming a cycle. The pattern is safe in
+// Vite / ES modules as long as accesses happen at action-body time
+// rather than module evaluation time — exactly the case here
+// (everything is `useFooStore.getState()` inside an async action).
+import { useMessagesStore } from "@/stores/messages";
+import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore } from "@/stores/ui";
 import { makeAppError } from "@/types/app-error";
 import type { Project, Session, SessionStatus } from "@/types/session";
@@ -17,22 +24,22 @@ import type { Project, Session, SessionStatus } from "@/types/session";
  * rendering) introduced visible lag during dogfood for archive/delete.
  *
  * This file does NOT own:
- *   - `_runtimes[sid]` (conversation turns / pending approvals / etc.)
- *     — stays in useAppStore until M5 messagesStore lands.
- *   - bridge lifecycle (status / pid / errors) — runtimeStore (M3b).
+ *   - Per-session conversation state (turns / pending approvals /
+ *     ask_user / in-flight streaming) — messagesStore (B3 M5).
+ *   - Bridge lifecycle (status / pid / errors) — runtimeStore (M3b).
  *   - LLM list + per-session selected LLM — runtimeStore (M3a/b);
  *     the *persisted* row column is set via `setSessionLlm` here
  *     which routes through the Rust `set_session_llm` trait method.
  *
- * Cross-store reach: M4b couples to useAppStore for two transitional
- * paths (both marked TRANSITIONAL (M5) inline):
- *   - `applyDerivedFromRuntime` — applyRuntimeUpdate in useAppStore
- *     calls this to mirror status/pendingApprovalCount/hasPendingAskUser
- *     onto the session row. After M5 messagesStore + Rust event
- *     driving these fields, this entry-point goes away.
- *   - `_runtimes[sid]` cleanup on session delete/bulk-delete is done
- *     here by reaching into useAppStore.setState. M5 messagesStore
- *     subscribes to a `session-deleted` signal and cleans itself.
+ * Cross-store reach after M5:
+ *   - `applyDerivedFromRuntime` is called by messagesStore's
+ *     `fireSessionMirror` to keep `status` / `pendingApprovalCount` /
+ *     `hasPendingAskUser` on the session row in sync with the live
+ *     conversation state.
+ *   - `clearSessionMessages` (local helper) drops a session's
+ *     conversation entry from messagesStore on delete + bulk delete.
+ *   - `activateSession` orchestrates messagesStore.ensureMessages +
+ *     restoreSessionTurns + runtimeStore.spawnBridge.
  */
 
 // ---------------- types ----------------
@@ -169,24 +176,14 @@ function patchSessionInList(
 }
 
 /**
- * Cross-store cleanup: drop a session's `_runtimes[sid]` entry from
- * useAppStore. Used by delete + bulk delete. TRANSITIONAL (M5
- * messagesStore): once `_runtimes` moves out of useAppStore, the
- * sessionsStore will emit a `session-deleted` signal and messagesStore
- * subscribes — no cross-store setState needed.
+ * Cross-store cleanup: drop a session's per-session conversation
+ * state from messagesStore. Used by delete + bulk delete. The runtime
+ * slot in `useRuntimeStore.byId[sid]` keeps the bridgeStatus around
+ * for forensics (closed / error) — it gets garbage-collected the
+ * next time the session id is reused.
  */
-async function clearSessionRuntime(sid: string): Promise<void> {
-  // Dynamic import to avoid a hard circular dependency at module
-  // evaluation. useAppStore imports sessionsStore (during M4b
-  // transition); without the dynamic boundary, evaluation order
-  // depends on whoever Vite encounters first.
-  const { useAppStore } = await import("@/stores/useAppStore");
-  useAppStore.setState((state) => {
-    if (!state._runtimes[sid]) return {};
-    const _runtimes = { ...state._runtimes };
-    delete _runtimes[sid];
-    return { _runtimes };
-  });
+function clearSessionMessages(sid: string): void {
+  useMessagesStore.getState().clearSessionMessages(sid);
 }
 
 // ---------------- mock fixture (dev only) ----------------
@@ -327,6 +324,20 @@ interface SessionsState {
 interface SessionsActions {
   // ---- session list mutations ----
   setActiveSession: (id: string | undefined) => void;
+  /**
+   * Orchestrator: refresh the active session pointer, lazy-init the
+   * runtime + messages slots, restore SQLite turns on first touch,
+   * and auto-spawn the bridge when the session has no live one.
+   *
+   * Spans three slices (sessions / runtime / messages) — kept here
+   * because sessionsStore owns the active id and is the natural
+   * entry point for "switch to this session" UX events.
+   *
+   * Reads `useAppStore.gaConfig` via dynamic import (gaConfig moves
+   * to prefsStore in M6 — the dynamic import will resolve cleanly
+   * after that move too).
+   */
+  activateSession: (id: string) => Promise<void>;
   /** Synchronous create — returns the new id for chaining. Rust write
    * happens fire-and-forget; in-memory state updates immediately. */
   createSession: (projectId?: string) => string;
@@ -369,10 +380,10 @@ interface SessionsActions {
 
   // ---- runtime-driven mirroring (cross-store entry point) ----
   /**
-   * Used by useAppStore.applyRuntimeUpdate to sync sidebar-visible
-   * fields derived from runtime state. TRANSITIONAL (M5): after the
-   * messagesStore lands and runtime → session sync moves to Rust
-   * event emit, this entry point goes away.
+   * Sync sidebar-visible fields (status / pendingApprovalCount /
+   * hasPendingAskUser) onto the session row from the live
+   * conversation state. Called from messagesStore.fireSessionMirror
+   * after every conversation-side write.
    *
    * No-op when the patch matches the current row.
    */
@@ -437,6 +448,103 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         console.debug("[sessions] clear_session_unread failed.", e);
       });
     }
+  },
+
+  activateSession: async (id) => {
+    // Step 1: refresh the active session pointer (clears unread on
+    // the row via Rust + sets activeSessionId).
+    get().setActiveSession(id);
+    const session = get().sessions.find((s) => s.id === id);
+    // Step 2: lazy-init the runtime entry — LLM seed comes from the
+    // session row's persisted choice + cross-session cache.
+    const runtimeStore = useRuntimeStore.getState();
+    runtimeStore.ensureRuntime(id, {
+      persistedIndex: session?.selectedLlmIndex,
+      persistedDisplayName: session?.selectedLlmDisplayName,
+      cachedLLMs: runtimeStore.cachedLLMs,
+      cachedDisplayName: runtimeStore.cachedLLMDisplayName,
+    });
+    // Step 3: lazy-init the messages entry for this session.
+    const messagesStore = useMessagesStore.getState();
+    messagesStore.ensureMessages(id);
+    // Step 4: restore conversation turns from SQLite on first touch
+    // in this app instance. `byId[id].turns.length === 0` is a safe
+    // proxy for "fresh runtime" — once IPC starts streaming, even an
+    // empty SQLite history won't keep turns at zero.
+    const msgs = useMessagesStore.getState().byId[id];
+    const looksFresh = !msgs || msgs.turns.length === 0;
+    const hasHistory = (session?.turnCount ?? 0) > 0;
+    if (looksFresh && hasHistory) {
+      try {
+        await messagesStore.restoreSessionTurns(id);
+      } catch (e) {
+        console.warn(
+          "[sessions] activateSession restoreSessionTurns failed.",
+          e,
+        );
+      }
+    }
+    // Step 5: auto-spawn the bridge when this session has no live
+    // one. Re-spawn on `closed` / `error` lets a kill or crash
+    // recover by simply re-clicking the session. `closed` is also
+    // how the LRU governor signals "suspended" — re-activation
+    // regenerates the bridge and the IPC `ready` handler replays
+    // SQLite history.
+    const bridgeStatus =
+      useRuntimeStore.getState().byId[id]?.bridgeStatus ?? "idle";
+    const needsSpawn =
+      bridgeStatus === "idle" ||
+      bridgeStatus === "closed" ||
+      bridgeStatus === "error";
+    if (needsSpawn) {
+      // Project = pure grouping. We deliberately do NOT inject the
+      // project's rootPath as the bridge cwd here — doing so would
+      // chdir away from the GA install dir and silently break GA's
+      // relative `./memory/...` reads (memory_management_sop, any
+      // user SOP, etc.). See devlog 2026-05-14 rootPath rollback.
+      //
+      // EmptyState's inline LLM picker stashes `pendingLLMIndex`
+      // because there was no live bridge to set_llm against. Apply
+      // it here as `--llm-no` only when the session is genuinely
+      // fresh — re-activating an existing session must respect that
+      // session's own `set_llm` history. Always clear pending after
+      // this activation so an abandoned pick (user picked LLM, then
+      // clicked an existing session) doesn't leak into a later
+      // unrelated spawn.
+      const runtimeStoreSnap = useRuntimeStore.getState();
+      const pendingLLMIndex = runtimeStoreSnap.pendingLLMIndex;
+      const msgsNow = useMessagesStore.getState().byId[id];
+      const isFreshSession =
+        (session?.turnCount ?? 0) === 0 &&
+        (!msgsNow || msgsNow.turns.length === 0);
+      const consumePending =
+        isFreshSession && pendingLLMIndex !== undefined;
+      if (pendingLLMIndex !== undefined) {
+        useRuntimeStore.setState({ pendingLLMIndex: undefined });
+      }
+      // Restore the persisted LLM choice on respawn of an existing
+      // session. Without this `set_llm` is in-memory only — bridge
+      // exits, mykey.py default takes over on next spawn. Pending
+      // pick (Empty State LLM picker) wins when present because the
+      // user just made a fresh choice that hasn't reached SQLite yet.
+      const restoredLlmIndex =
+        !consumePending && !isFreshSession
+          ? session?.selectedLlmIndex
+          : undefined;
+      // gaConfig lives in useAppStore until M6 prefsStore. Dynamic
+      // import keeps the static graph free of cycles (useAppStore
+      // imports sessionsStore via hydrateFromDB orchestration).
+      const { useAppStore } = await import("@/stores/useAppStore");
+      const gaConfig = useAppStore.getState().gaConfig;
+      await useRuntimeStore.getState().spawnBridge({
+        ...gaConfig,
+        sessionId: id,
+        cwd: undefined,
+        llmIndex: consumePending ? pendingLLMIndex : restoredLlmIndex,
+      });
+    }
+    // Already alive — runtimeStore.spawnBridge internally LRU-touches
+    // on each call, so the alive-bridge branch is now a no-op here.
   },
 
   createSession: (projectId) => {
@@ -604,7 +712,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       }
       return out;
     });
-    await clearSessionRuntime(sessionId);
+    clearSessionMessages(sessionId);
     try {
       await invoke("delete_session", { id: sessionId, origin: GUI_ORIGIN });
     } catch (e) {
@@ -695,7 +803,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       }
       return out;
     });
-    await Promise.all(sessionIds.map((id) => clearSessionRuntime(id)));
+    sessionIds.forEach((id) => clearSessionMessages(id));
     try {
       await invoke("bulk_delete_sessions", {
         ids: sessionIds,

@@ -54,10 +54,11 @@ export interface Session {
   /**
    * Transient: GA called `ask_user` and is waiting for the user to reply.
    * Surfaces as the sidebar's fourth state (yellow "⏸ 等你回复"). Mirror
-   * of the runtime's `pendingAskUser` — synced via applyRuntimeUpdate
-   * so the sidebar can flip without reading runtime state directly.
-   * NOT persisted (pending questions are cleared on app restart;
-   * the conversation history still shows the question text).
+   * of messagesStore's `pendingAskUser` — synced via
+   * `applyDerivedFromRuntime` so the sidebar can flip without reading
+   * conversation state directly. NOT persisted (pending questions are
+   * cleared on app restart; the conversation history still shows the
+   * question text).
    */
   hasPendingAskUser?: boolean;
   /**

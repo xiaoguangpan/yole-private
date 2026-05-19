@@ -1,14 +1,25 @@
 import type { BridgeStatus } from "@/stores/runtime";
-import type { SessionRuntime } from "@/stores/useAppStore";
 import type { Session, SessionBucket, SessionStatus } from "@/types/session";
 
 /**
- * Derive the live session status by overlaying runtime state (from
- * `_runtimes[id]`) onto the persisted Session row. Long-term states
- * the user / persistence sets (`archived` / `completed` / `cancelled`)
- * always win — they're "this is what this session IS", not "what's
- * happening right now". The remaining states reflect what the bridge
- * + agent are doing this second:
+ * Minimal subset of per-session conversation state needed to derive
+ * session row status. Mirror of `PerSessionMessages` from
+ * `@/stores/messages` — kept structural here so `lib/sessions.ts`
+ * doesn't depend on the store module (avoids an import cycle with
+ * messages.ts importing this file).
+ */
+export interface MessagesView {
+  pendingApprovals: { approvalId: string }[];
+  agentRunning: boolean;
+}
+
+/**
+ * Derive the live session status by overlaying conversation state
+ * (from messagesStore.byId[id]) onto the persisted Session row.
+ * Long-term states the user / persistence sets (`archived` /
+ * `completed` / `cancelled`) always win — they're "this is what this
+ * session IS", not "what's happening right now". The remaining
+ * states reflect what the bridge + agent are doing this second:
  *
  *   pendingApprovals.length > 0 → waiting_approval (highest priority —
  *                                  drives the amber pause icon)
@@ -17,13 +28,13 @@ import type { Session, SessionBucket, SessionStatus } from "@/types/session";
  *   bridgeStatus === "error"     → error           (red dot)
  *   otherwise                    → idle
  *
- * Used by Sidebar enrichment (in App.tsx) so per-row status icons
- * + badges reflect background-session activity without each
- * component poking at `_runtimes` directly.
+ * Used by Sidebar enrichment (in App.tsx) + messagesStore.fireSessionMirror
+ * so per-row status icons + badges reflect background-session
+ * activity without each component poking at `byId` directly.
  */
 export function deriveSessionStatus(
   session: Session,
-  runtime: SessionRuntime | undefined,
+  messages: MessagesView | undefined,
   bridgeStatus?: BridgeStatus | undefined,
 ): SessionStatus {
   if (
@@ -33,22 +44,15 @@ export function deriveSessionStatus(
   ) {
     return session.status;
   }
-  if (!runtime) return session.status;
-  if (runtime.pendingApprovals.length > 0) return "waiting_approval";
-  if (runtime.agentRunning) return "running";
+  if (!messages) return session.status;
+  if (messages.pendingApprovals.length > 0) return "waiting_approval";
+  if (messages.agentRunning) return "running";
   // bridgeStatus moved to runtimeStore in M3b — callers fetch it from
   // useRuntimeStore.getState().byId[sid]?.bridgeStatus and pass in.
   if (bridgeStatus === "spawning") return "connecting";
   if (bridgeStatus === "error") return "error";
   return "idle";
 }
-
-// `enrichSession` removed: the store now syncs sidebar-visible
-// fields (status, pendingApprovalCount) onto `sessions` rows in
-// place inside `applyRuntimeUpdate`, so consumers can subscribe
-// to `s.sessions` directly with default strict-equality semantics
-// — no useShallow, no derived selectors. See `applyRuntimeUpdate`
-// in stores/useAppStore.ts for the in-store sync.
 
 /**
  * Compute which sidebar bucket a session falls into.
