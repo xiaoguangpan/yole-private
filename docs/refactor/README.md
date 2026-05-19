@@ -38,16 +38,15 @@ Status:   B3 M2 COMPLETE — uiStore extracted (net -61 lines). M2 启动门
           独立 commit 5facf1e 修好 + Pet/UI 路径 dogfood 暂未发现其它问题.
           B3 M1 deliverables (3 artifact + devlog) ship in 91438f8.
           B3 prereq relaxation (scenarios + 双层 gate) ship in 62739f6.
-Next:     B3 M3 T3.1 — runtimeStore 抽离 (D36-D40)
-          单 session 内 M3 一次性推完风险大 (拆 SessionRuntime 14 字段 +
-          9 actions + cross-store onClose + 删 9 module-level symbol);
-          已 defer 到 fresh session 重开
-Blocker:  M3 启动门 (M2 override 不推广):
+Next:     B3 M3a T3a.1 — runtimeStore LLM concerns 抽离 (~300 行单 commit)
+          M3 拆 M3a (LLM) + M3b (bridge lifecycle) per B3-M3-sub-plan.md;
+          M3a dogfood 1 天后推 M3b
+Blocker:  M3a 启动门 (JC 决定可推进 — 见 N8):
           - B2 perf baseline P1-P4 ✅ ship 2026-05-19
-            (P1 short=3.15s / long=5.36s, P2=1.42 ev/s, P3 CLI RTT 13-15ms,
-             P4 bridge spawn cited prototype 430ms cold)
-          - dogfood scenarios JC 真跑过 + 签字「未发现 B2 regression」(0/35)
-            ↑ 唯一剩下的 blocker
+          - 4 B2 latent bug 修 ✅ ship 2026-05-19
+            (CLI 提问渲染 / LLM 持久化 / picker flash / picker spawning click)
+          - dogfood scenarios formal 0/35 但 JC dev dogfood 已 cover
+            主要风险面 (LLM picker / persistence / attach / multi-session)
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
