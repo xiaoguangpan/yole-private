@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { isWindows } from "@/lib/platform";
+import { findCandidateByAlias } from "@/lib/python-probe";
 import type { IPCCommand, IPCEvent } from "@/types/ipc";
 
 /**
@@ -276,12 +277,24 @@ export async function spawnBridge(
 /**
  * Resolve the Python interpreter the Rust side should spawn.
  *
- * In production with bundled mode, this returns the absolute path to the
- * packaged `python` inside `$RESOURCE/python/`. Both platforms get the
- * same call shape; Rust then `Command::new(path)`'s it directly.
+ * Three input shapes the user / prefs can supply:
  *
- * In dev or external mode, this is the user-supplied path (default
- * `python3` / `python`).
+ *   1. A capability alias name from the v0.1 era (`"python-brew-arm"`,
+ *      `"python-ga-venv"`, etc.) — these are NOT executable paths.
+ *      Translate to the absolute path the alias targets via the same
+ *      lookup table `python-probe.ts` uses.
+ *   2. The bare names `"python3"` / `"python"` — pass through so the
+ *      OS resolves them against PATH (`Command::new("python3")` does
+ *      a PATH lookup on Unix the same way the shell does).
+ *   3. An absolute path the user pasted into Settings → Python — pass
+ *      through unchanged.
+ *
+ * In production with bundled mode, the bundled interpreter wins
+ * regardless of `userPath` — same behaviour as the v0.1.1 design.
+ *
+ * v0.2 plan: retire the capability alias list entirely (now that we
+ * spawn through Rust, arbitrary absolute paths just work). Until then,
+ * this shim keeps existing dogfood `gaConfig.python` values working.
  */
 async function resolvePythonPath(
   userPath: string | undefined,
@@ -302,7 +315,43 @@ async function resolvePythonPath(
       );
     }
   }
-  return userPath ?? (isWindows ? "python" : "python3");
+  const fallback = isWindows ? "python" : "python3";
+  if (!userPath) {
+    return fallback;
+  }
+  // Absolute path or bare command name — pass through.
+  if (userPath.startsWith("/") || userPath.startsWith("\\") || /^[A-Z]:/.test(userPath)) {
+    return userPath;
+  }
+  if (userPath === "python3" || userPath === "python") {
+    return userPath;
+  }
+  // Looks like a v0.1 capability alias (e.g. "python-brew-arm",
+  // "python-ga-venv"). Translate to the absolute path the alias mapped
+  // to. If the lookup fails (legacy alias removed, unrecognized value),
+  // fall back to the default — better to try a likely-working PATH
+  // resolution than spawn with a name the OS definitely can't resolve.
+  try {
+    const candidate = await findCandidateByAlias(userPath);
+    if (candidate) {
+      // The probe's `displayPath` has placeholder strings for the
+      // PATH-resolved variants ("python3 (PATH)") — strip those back
+      // to the bare command so `Command::new` does the PATH lookup.
+      if (candidate.displayPath.endsWith("(PATH)")) {
+        return userPath; // already a bare name
+      }
+      return candidate.displayPath;
+    }
+    console.warn(
+      `[bridge] resolvePythonPath: unrecognized alias "${userPath}"; falling back to "${fallback}"`,
+    );
+  } catch (e) {
+    console.warn(
+      `[bridge] resolvePythonPath: alias lookup failed for "${userPath}"; falling back to "${fallback}"`,
+      e,
+    );
+  }
+  return fallback;
 }
 
 async function resolveProductionBridgeCwd(

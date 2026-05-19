@@ -107,7 +107,14 @@ pub struct ReadyEvent {
     pub llm_name: String,
     pub cwd: String,
     pub pid: i64,
-    #[serde(default)]
+    /// Acronym quirk: Python emits `availableLLMs` (the LLM acronym
+    /// preserves caps); serde's camelCase rule would map
+    /// `available_llms` → `availableLlms` (single capital), so we have
+    /// to spell the wire name explicitly. Without this rename the
+    /// field falls through to `#[serde(default)]` and the GUI sees an
+    /// empty list. Same convention as runner/ipc.py
+    /// (`availableLLMs: list[dict]`) and gui/src/types/ipc.ts.
+    #[serde(default, rename = "availableLLMs")]
     pub available_llms: Vec<Value>,
     pub timestamp: String,
 }
@@ -388,6 +395,32 @@ mod tests {
                 assert_eq!(r.available_llms.len(), 0);
             }
             _ => panic!("expected Ready variant"),
+        }
+    }
+
+    /// Regression guard: Python emits `availableLLMs` (uppercase LL —
+    /// matches the LLM acronym). Without the explicit `#[serde(rename]`,
+    /// serde's camelCase rule maps `available_llms` to `availableLlms`
+    /// (single capital L) and the parse silently drops the field,
+    /// surfacing as `undefined` on the GUI side. Caught 2026-05-19 in
+    /// JC's dogfood — first time the ready event flowed end-to-end
+    /// through Rust core.
+    #[test]
+    fn parse_ready_event_carries_available_llms() {
+        let line = r#"{"kind":"ready","sessionId":"s1","protocolVersion":"0.1","gaCommit":"abc","gaCommitDate":"d","gaPath":"/ga","llmName":"x","cwd":"/","pid":1,"availableLLMs":[{"index":0,"name":"llm-a"},{"index":1,"name":"llm-b"}],"timestamp":"t"}"#;
+        let event: IpcEvent = serde_json::from_str(line).expect("parse ready");
+        if let IpcEvent::Ready(r) = event {
+            assert_eq!(r.available_llms.len(), 2);
+            // Round-trip: when Rust re-serializes for the
+            // runner-event Tauri emit, the wire name must stay
+            // availableLLMs so the TS side reads it correctly.
+            let out = serde_json::to_string(&r).unwrap();
+            assert!(
+                out.contains("\"availableLLMs\":[{"),
+                "expected availableLLMs in re-serialized output, got: {out}"
+            );
+        } else {
+            panic!("expected Ready");
         }
     }
 

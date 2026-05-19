@@ -145,7 +145,24 @@ impl RunnerProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
-            .spawn()?;
+            .spawn()
+            .map_err(|e| {
+                // Wrap with the actual attempted path so the user sees
+                // *which* python the spawn failed for. Raw `io::Error`'s
+                // `NotFound` doesn't carry the program name.
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    RunnerSpawnError::PythonNotFound {
+                        detail: format!(
+                            "no such file: '{}' (set Settings → Python or check PATH)",
+                            args.python
+                        ),
+                    }
+                } else {
+                    RunnerSpawnError::SpawnIo {
+                        detail: format!("'{}': {}", args.python, e),
+                    }
+                }
+            })?;
 
         let stdin = child
             .stdin
