@@ -528,8 +528,8 @@ expose this as an array.
 
 ## 8 · Planned (future B-phases)
 
-The following are intentionally **not in `schema_version: 1` yet** —
-mentioned here so SOPs can plan their integration shape.
+The following are intentionally **not in `schema_version: 1` CLI surface
+yet** — mentioned here so SOPs can plan their integration shape.
 
 - `galley session create [--project=X] [--title=…]` — start a new
   session from the CLI.
@@ -545,6 +545,58 @@ mentioned here so SOPs can plan their integration shape.
 All future write commands will accept `--supervisor=<x>` /
 `--reason=<y>` flags following the same Origin convention `session send`
 uses today (§5.5a). Read commands stay flag-light.
+
+### 8A · `GalleyApi` trait surface (B3 M4a)
+
+The session/project CRUD methods landed in B3 M4a as Rust trait + Tauri
+invoke commands, but **not** as CLI subcommands. They are the
+authoritative write path the GUI routes through in B3 M4b; B4 will mint
+the matching `galley session ...` / `galley project ...` CLI surface.
+
+SOPs writing against the socket transport directly today can call them
+as JSON-RPC-style commands once B4 socket dispatch lands. The trait
+signatures (Rust types):
+
+| Method | Args | Returns |
+|---|---|---|
+| `create_session` | `CreateSessionInput`, `Origin` | `SessionBrief` |
+| `archive_session` | `SessionId`, `Origin` | `SessionBrief` |
+| `unarchive_session` | `SessionId`, `Origin` | `SessionBrief` |
+| `rename_session` | `SessionId`, `title: String`, `Origin` | `SessionBrief` |
+| `set_session_pinned` | `SessionId`, `pinned: bool`, `Origin` | `SessionBrief` |
+| `delete_session` | `SessionId`, `Origin` | `()` |
+| `assign_session_to_project` | `SessionId`, `Option<String>`, `Origin` | `SessionBrief` |
+| `bump_session_after_turn` | `SessionId`, `Option<String>`, `Option<u32>`, `mark_unread: bool` | `SessionBrief` |
+| `clear_session_unread` | `SessionId` | `()` |
+| `bulk_archive_sessions` | `Vec<SessionId>`, `Origin` | `u32` |
+| `bulk_unarchive_sessions` | `Vec<SessionId>`, `Origin` | `u32` |
+| `bulk_delete_sessions` | `Vec<SessionId>`, `Origin` | `u32` |
+| `list_projects` | — | `Vec<ProjectBrief>` |
+| `create_project` | `CreateProjectInput`, `Origin` | `ProjectBrief` |
+| `update_project` | `ProjectId`, `ProjectPatch`, `Origin` | `ProjectBrief` |
+| `delete_project` | `ProjectId`, `Origin` | `()` |
+
+Input types (camelCase on the JSON wire):
+
+- `CreateSessionInput { id, title, projectId?, selectedLlmIndex?, selectedLlmDisplayName? }`
+  — `id` is caller-assigned (`s-<base36>-<rand>` convention; conflicts
+  surface as `invalid_args`).
+- `CreateProjectInput { id, name, rootPath?, icon?, color? }` —
+  same id-assigned-by-caller convention (`proj_<random16>`).
+- `ProjectPatch { name?, rootPath??, icon??, color??, pinned? }` —
+  the `?` (Option) means "leave the column alone"; the `??`
+  (double-Option) on `rootPath` / `icon` / `color` means
+  `Some(None)` clears the column to SQL NULL while `Some(Some(v))`
+  writes `v`.
+
+Error categories (all map to the §3 exit codes):
+
+- `not_found` — session or project id doesn't exist.
+- `invalid_args` — empty title / name after trim, id conflict, archived
+  session pin attempt, FK violation (project_id pointing at nothing).
+- `db_unavailable` — DB pool can't open.
+
+### Transport notes
 
 For the **transport**: the read commands' direct-SQLite path is a B1
 convenience kept for "Galley Core not running" scenarios (snapshot

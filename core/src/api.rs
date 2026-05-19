@@ -22,9 +22,11 @@ pub mod status;
 pub use health::{HealthCheck, HealthReport, HealthStatus};
 pub use message::{MessageBrief, MessageId, MessageRole};
 pub use origin::{Origin, OriginVia};
-pub use project::{ProjectBrief, ProjectId};
+pub use project::{CreateProjectInput, ProjectBrief, ProjectId, ProjectPatch};
 pub use search::{SearchHit, SearchScope};
-pub use session::{SessionBrief, SessionFilter, SessionId, SessionStatus};
+pub use session::{
+    CreateSessionInput, SessionBrief, SessionFilter, SessionId, SessionStatus,
+};
 pub use status::StatusSummary;
 
 use async_trait::async_trait;
@@ -80,4 +82,176 @@ pub trait GalleyApi: Send + Sync {
         content: String,
         origin: Origin,
     ) -> Result<MessageBrief>;
+
+    // ---------------- session writes (B3 M4a) ----------------
+    //
+    // All session writes return the freshly-read `SessionBrief` so the
+    // caller doesn't have to round-trip a separate `session_brief` to
+    // mirror the new `updated_at` / column values in-memory. `delete`
+    // and the bulk variants return `()` / `u32 affected rows` instead
+    // because there's no row to read back.
+    //
+    // The `origin` parameter captures who triggered the write — GUI
+    // passes `Origin::gui()`, CLI / supervisor SOPs pass `Origin::cli()`
+    // or a `Supervisor`-flavoured value. Migration 007 already stores
+    // origin-of-creation on `sessions`; subsequent patches (rename /
+    // archive / pin / etc.) don't currently persist a per-patch origin
+    // — that lands when audit log tables join in a later phase.
+
+    /// Create a new session with the caller-assigned id from
+    /// [`CreateSessionInput`]. Frontend mints `s-…` ids before invoking
+    /// to keep the optimistic-create UI flow alive.
+    ///
+    /// **Origin**: `created_via` / `created_by_supervisor` / `created_origin_note`
+    /// land on the new row from `origin`. Any subsequent edit to the row
+    /// preserves these.
+    ///
+    /// **Errors**:
+    /// - `invalid_args` — empty title, id conflict (PRIMARY KEY violation),
+    ///   or non-existent `projectId`.
+    async fn create_session(
+        &self,
+        input: CreateSessionInput,
+        origin: Origin,
+    ) -> Result<SessionBrief>;
+
+    /// Flip status → `archived`. Bumps `updated_at` but **not**
+    /// `last_activity_at` (archive isn't a conversation event).
+    ///
+    /// **Errors**: `not_found`.
+    async fn archive_session(&self, id: SessionId, origin: Origin) -> Result<SessionBrief>;
+
+    /// Flip status → `idle` from `archived`. No-op if the row isn't
+    /// archived (returns the current brief unchanged).
+    ///
+    /// **Errors**: `not_found`.
+    async fn unarchive_session(&self, id: SessionId, origin: Origin) -> Result<SessionBrief>;
+
+    /// Replace `title`. Server-side trim; empty-after-trim falls back to
+    /// the localized default (`新对话`) to mirror the GUI behaviour and
+    /// avoid persisting a literal-empty string that would render as a
+    /// blank sidebar row.
+    ///
+    /// **Errors**: `not_found`.
+    async fn rename_session(
+        &self,
+        id: SessionId,
+        title: String,
+        origin: Origin,
+    ) -> Result<SessionBrief>;
+
+    /// Toggle `pinned`. Sessions with `status = archived` cannot be
+    /// pinned — request is rejected with `invalid_args` to surface the
+    /// constraint instead of silently no-op'ing.
+    ///
+    /// **Errors**: `not_found`, `invalid_args` (archived).
+    async fn set_session_pinned(
+        &self,
+        id: SessionId,
+        pinned: bool,
+        origin: Origin,
+    ) -> Result<SessionBrief>;
+
+    /// Permanently delete the session row. FK CASCADE removes the
+    /// associated `messages` / `tool_events` rows in the same statement.
+    ///
+    /// **Errors**: `not_found`.
+    async fn delete_session(&self, id: SessionId, origin: Origin) -> Result<()>;
+
+    /// Move a session into a different project (or detach via
+    /// `project_id = None`). Bumps `updated_at` but not
+    /// `last_activity_at`.
+    ///
+    /// **Errors**: `not_found` (session), `invalid_args` (project id
+    /// non-existent — FK violation).
+    async fn assign_session_to_project(
+        &self,
+        session_id: SessionId,
+        project_id: Option<String>,
+        origin: Origin,
+    ) -> Result<SessionBrief>;
+
+    /// Increment `turn_count`, refresh `summary` + `last_activity_at` +
+    /// `updated_at`, and flip `has_unread = 1` when the call says so
+    /// (typically when the bumped session isn't the active one in the
+    /// GUI). `summary` is server-side truncated to 80 chars.
+    ///
+    /// No `origin` — this is a system-driven write triggered by the
+    /// runner on `turn_end`.
+    ///
+    /// **Errors**: `not_found`.
+    async fn bump_session_after_turn(
+        &self,
+        id: SessionId,
+        summary: Option<String>,
+        step_number: Option<u32>,
+        mark_unread: bool,
+    ) -> Result<SessionBrief>;
+
+    /// Clear `has_unread`. Called when the user activates a session —
+    /// the inbox metaphor says opening a session reads it. No `origin`
+    /// (system write, not user action).
+    ///
+    /// Idempotent: clearing an already-zero row is a successful no-op.
+    /// **Errors**: `not_found`.
+    async fn clear_session_unread(&self, id: SessionId) -> Result<()>;
+
+    /// Bulk archive — UPDATE WHERE id IN (…). Returns count of rows
+    /// actually mutated (i.e. were not already archived). Wrapped in a
+    /// transaction so partial failure rolls back.
+    async fn bulk_archive_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        origin: Origin,
+    ) -> Result<u32>;
+
+    /// Bulk unarchive — inverse of `bulk_archive_sessions`. Returns
+    /// count of rows actually flipped (i.e. were archived).
+    async fn bulk_unarchive_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        origin: Origin,
+    ) -> Result<u32>;
+
+    /// Bulk delete — DELETE WHERE id IN (…), CASCADE handles messages /
+    /// tool_events. Returns count of rows deleted.
+    async fn bulk_delete_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        origin: Origin,
+    ) -> Result<u32>;
+
+    // ---------------- projects ----------------
+
+    /// List all projects, ordered by `pinned DESC, last_activity_at DESC`
+    /// to match the GUI Sidebar PROJECTS section sort.
+    async fn list_projects(&self) -> Result<Vec<ProjectBrief>>;
+
+    /// Create a project. `name` is trimmed server-side; empty after
+    /// trim → `invalid_args`. `root_path` empty-string normalises to
+    /// SQL NULL.
+    async fn create_project(
+        &self,
+        input: CreateProjectInput,
+        origin: Origin,
+    ) -> Result<ProjectBrief>;
+
+    /// Apply a [`ProjectPatch`]. Only present fields are updated;
+    /// `root_path` / `icon` / `color` use double-`Option` so `Some(None)`
+    /// can clear a previously-set value.
+    ///
+    /// **Errors**: `not_found`, `invalid_args` (empty name).
+    async fn update_project(
+        &self,
+        id: ProjectId,
+        patch: ProjectPatch,
+        origin: Origin,
+    ) -> Result<ProjectBrief>;
+
+    /// Delete a project. FK `ON DELETE SET NULL` on `sessions.project_id`
+    /// auto-detaches any sessions that pointed at this project; the
+    /// sessions themselves stay (per PRD §7.3).
+    ///
+    /// **Errors**: `not_found`.
+    async fn delete_project(&self, id: ProjectId, origin: Origin) -> Result<()>;
 }

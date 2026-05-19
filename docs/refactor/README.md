@@ -30,17 +30,16 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → [B3 M1 ✅ M2 ✅ M3 ✅ M4 sub-plan ✅] → M4a → M4b → v0.5
-                                                                ↑ 现在在这里
-Status:   B3 M4 sub-plan COMPLETE — [B3-M4-sub-plan.md](./B3-M4-sub-plan.md)
-          落地。M4 拆 **M4a (Rust trait + tests, 独立 commit)** +
-          **M4b (frontend sessionsStore 抽离, fresh session)** 两阶段。
-          M4a scope 精确数：12 session method + 4 project method = 16
-          (playbook 「18」是粗估)。setActiveSession / activateSession 是
-          pure display state op，不需要 trait method。R1-R8 risk register
-          + 7 verification gate 落清。
-Next:     B3 M4a T4a.1 — Rust input types (CreateSessionInput /
-          SessionPatch / CreateProjectInput / ProjectPatch / BulkResult)
+Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → [B3 M1 ✅ M2 ✅ M3 ✅ M4a ✅] → M4b → v0.5
+                                                            ↑ 现在在这里
+Status:   B3 M4a COMPLETE — 16 GalleyApi trait method (12 session +
+          4 project) + 47 cargo test 全过 (76 → 123 total) + 16 Tauri
+          command registered + agent-api.md §8A 增量。**Frontend 完全
+          不动，行为 byte-identical** — Tauri 命令 dormant 等 M4b 接 caller。
+Next:     B3 M4b T4b.1 — 新建 gui/src/stores/sessions.ts skeleton +
+          22 call site swap + 删 lib/db.ts 中 sessions/projects 写路径。
+          需 fresh session 重开（per N5 教训，M4 估总 ~2150 LOC 不能
+          单 session 推完）。
 Blocker:  无
 ```
 
@@ -53,7 +52,7 @@ Blocker:  无
 | Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../core/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
-| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1 ✅ + M2 ✅ + M3 ✅ + M4 sub-plan ✅ | T4a.1 (M4a Rust trait + tests) | [B3-store-slice.md](./B3-store-slice.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) | 2026-05-19 third session: M4 sub-plan ship (16 trait method 精确签名 + R1-R8 risk + 7 verification gate). M4a Rust trait independent commit 待推. |
+| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1 ✅ + M2 ✅ + M3 ✅ + M4a ✅ | T4b.1 (M4b 前端 sessionsStore — fresh session) | [B3-store-slice.md](./B3-store-slice.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) | 2026-05-19 third session: M4 sub-plan + M4a Rust trait shipped (16 methods, 47 new tests, agent-api §8A). Frontend untouched — behavior byte-identical. M4b 前端抽离待 fresh session. |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
 | **v0.5 milestone** | ⏳ | — | — | — |
 

@@ -24,8 +24,9 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, SqlitePool};
 
 use crate::api::{
-    GalleyApi, HealthCheck, HealthReport, HealthStatus, MessageBrief, MessageId, MessageRole,
-    SearchHit, SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
+    CreateProjectInput, CreateSessionInput, GalleyApi, HealthCheck, HealthReport, HealthStatus,
+    MessageBrief, MessageId, MessageRole, Origin, ProjectBrief, ProjectId, ProjectPatch, SearchHit,
+    SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
 };
 use crate::error::{GalleyError, Result};
 
@@ -198,6 +199,35 @@ struct StatusCounts {
     errored: i64,
 }
 
+#[derive(Debug, FromRow)]
+struct ProjectRow {
+    id: String,
+    name: String,
+    root_path: Option<String>,
+    icon: Option<String>,
+    color: Option<String>,
+    pinned: i64,
+    last_activity_at: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl ProjectRow {
+    fn into_brief(self) -> ProjectBrief {
+        ProjectBrief {
+            id: ProjectId(self.id),
+            name: self.name,
+            root_path: self.root_path,
+            icon: self.icon,
+            color: self.color,
+            pinned: self.pinned != 0,
+            last_activity_at: self.last_activity_at,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
+}
+
 // ---------------- enum parsers ----------------
 
 fn parse_session_status(s: &str) -> Result<SessionStatus> {
@@ -251,6 +281,68 @@ fn parse_message_role(s: &str) -> Result<MessageRole> {
 fn map_sqlx_err(e: sqlx::Error) -> GalleyError {
     GalleyError::Internal {
         message: format!("sqlx: {e}"),
+    }
+}
+
+/// FK / CHECK constraint violations bubble out of sqlx as
+/// `Database(...)` with no Rust-level discriminator. We want them to
+/// surface as `invalid_args` (exit code 2) rather than `internal`
+/// (exit code 1) so SOPs can distinguish "you passed a bad project id"
+/// from "something blew up server-side". This shim looks at the SQLite
+/// error message; everything else falls through to [`map_sqlx_err`].
+fn map_constraint_err(context: &str, e: sqlx::Error) -> GalleyError {
+    if let sqlx::Error::Database(ref db_err) = e {
+        let msg = db_err.message().to_ascii_lowercase();
+        if msg.contains("foreign key")
+            || msg.contains("unique")
+            || msg.contains("check")
+            || msg.contains("primary key")
+        {
+            return GalleyError::InvalidArgs {
+                message: format!("{context}: {}", db_err.message()),
+            };
+        }
+    }
+    map_sqlx_err(e)
+}
+
+/// Server-side title fallback. Mirrors the GUI's
+/// `DEFAULT_NEW_SESSION_TITLE = "新对话"` constant so renames /
+/// creates that trim to empty don't end up with a literal blank.
+const DEFAULT_NEW_SESSION_TITLE: &str = "新对话";
+
+/// Summary truncation budget. Matches `gui/src/stores/useAppStore.ts`
+/// `truncateSummary` (80 char cap then `…`). Sidebar layout assumes
+/// no wider than this for a single-line summary row.
+const SUMMARY_TRUNCATE_LEN: usize = 80;
+
+fn truncate_summary(s: &str) -> String {
+    let trimmed = s.trim();
+    if trimmed.chars().count() <= SUMMARY_TRUNCATE_LEN {
+        return trimmed.to_string();
+    }
+    let prefix: String = trimmed.chars().take(SUMMARY_TRUNCATE_LEN).collect();
+    format!("{prefix}…")
+}
+
+/// Normalise `Option<Option<String>>` patch behaviour for nullable
+/// string columns. Returns `(should_write, value)`:
+/// - `None` (outer) → leave the column alone
+/// - `Some(None)` → write SQL NULL
+/// - `Some(Some(s))` → write `s` (with leading/trailing whitespace trimmed;
+///   empty after trim also lands as NULL to match the GUI's "trim → undefined" behaviour)
+fn project_nullable_patch(field: &Option<Option<String>>) -> (bool, Option<String>) {
+    match field {
+        None => (false, None),
+        Some(None) => (true, None),
+        Some(Some(v)) => {
+            let t = v.trim();
+            if t.is_empty() {
+                (true, None)
+            } else {
+                (true, Some(t.to_string()))
+            }
+        }
     }
 }
 
@@ -649,6 +741,523 @@ impl GalleyApi for SqliteGalley {
             turn_index: Some(next_turn.max(0) as u32),
             origin: Some(origin),
         })
+    }
+
+    // ============= B3 M4a · session writes =============
+
+    async fn create_session(
+        &self,
+        input: CreateSessionInput,
+        origin: Origin,
+    ) -> Result<SessionBrief> {
+        let title = input.title.trim();
+        if title.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "create_session: title must not be empty".into(),
+            });
+        }
+        let id = input.id.trim();
+        if id.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "create_session: id must not be empty".into(),
+            });
+        }
+        let now = chrono_now_iso();
+        let llm_idx: Option<i64> = input.selected_llm_index.map(|v| v as i64);
+        sqlx::query(
+            "INSERT INTO sessions (id, project_id, title, status, summary, turn_count, \
+                pending_approval_count, error_count, pinned, has_unread, \
+                llm_index, llm_display_name, last_activity_at, created_at, updated_at, \
+                created_via, created_by_supervisor, created_origin_note) \
+             VALUES (?, ?, ?, 'idle', NULL, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(&input.project_id)
+        .bind(title)
+        .bind(llm_idx)
+        .bind(&input.selected_llm_display_name)
+        .bind(&now)
+        .bind(&now)
+        .bind(&now)
+        .bind(origin.via.as_sql())
+        .bind(&origin.supervisor)
+        .bind(&origin.reason)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| map_constraint_err("create_session", e))?;
+        self.session_brief(SessionId(id.to_string())).await
+    }
+
+    async fn archive_session(&self, id: SessionId, _origin: Origin) -> Result<SessionBrief> {
+        let now = chrono_now_iso();
+        let res = sqlx::query(
+            "UPDATE sessions SET status = 'archived', updated_at = ? WHERE id = ?",
+        )
+        .bind(&now)
+        .bind(id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("session {id} not found"),
+            });
+        }
+        self.session_brief(id).await
+    }
+
+    async fn unarchive_session(&self, id: SessionId, _origin: Origin) -> Result<SessionBrief> {
+        let now = chrono_now_iso();
+        // Only flip rows that are currently archived. A no-op on a
+        // non-archived row is still a success (returns the unchanged
+        // brief) so the GUI doesn't have to pre-check status.
+        let _ = sqlx::query(
+            "UPDATE sessions SET status = 'idle', updated_at = ? \
+             WHERE id = ? AND status = 'archived'",
+        )
+        .bind(&now)
+        .bind(id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        // Confirm the row exists — UPDATE returns 0 rows_affected for
+        // both "row missing" AND "row not archived"; we need a real
+        // existence probe to distinguish NotFound from no-op.
+        self.session_brief(id).await
+    }
+
+    async fn rename_session(
+        &self,
+        id: SessionId,
+        title: String,
+        _origin: Origin,
+    ) -> Result<SessionBrief> {
+        let trimmed = title.trim();
+        let final_title: &str = if trimmed.is_empty() {
+            DEFAULT_NEW_SESSION_TITLE
+        } else {
+            trimmed
+        };
+        let now = chrono_now_iso();
+        let res = sqlx::query(
+            "UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(final_title)
+        .bind(&now)
+        .bind(id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("session {id} not found"),
+            });
+        }
+        self.session_brief(id).await
+    }
+
+    async fn set_session_pinned(
+        &self,
+        id: SessionId,
+        pinned: bool,
+        _origin: Origin,
+    ) -> Result<SessionBrief> {
+        // Reject pin on archived rows up-front so the caller gets a
+        // distinct error category instead of a silent no-op.
+        let current_status: Option<String> =
+            sqlx::query_scalar("SELECT status FROM sessions WHERE id = ?")
+                .bind(id.as_str())
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_sqlx_err)?;
+        let status = current_status.ok_or_else(|| GalleyError::NotFound {
+            message: format!("session {id} not found"),
+        })?;
+        if status == "archived" {
+            return Err(GalleyError::InvalidArgs {
+                message: format!("session {id} is archived; cannot change pinned"),
+            });
+        }
+        let now = chrono_now_iso();
+        sqlx::query("UPDATE sessions SET pinned = ?, updated_at = ? WHERE id = ?")
+            .bind(if pinned { 1_i64 } else { 0_i64 })
+            .bind(&now)
+            .bind(id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+        self.session_brief(id).await
+    }
+
+    async fn delete_session(&self, id: SessionId, _origin: Origin) -> Result<()> {
+        let res = sqlx::query("DELETE FROM sessions WHERE id = ?")
+            .bind(id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("session {id} not found"),
+            });
+        }
+        Ok(())
+    }
+
+    async fn assign_session_to_project(
+        &self,
+        session_id: SessionId,
+        project_id: Option<String>,
+        _origin: Origin,
+    ) -> Result<SessionBrief> {
+        let now = chrono_now_iso();
+        let res = sqlx::query(
+            "UPDATE sessions SET project_id = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(&project_id)
+        .bind(&now)
+        .bind(session_id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| map_constraint_err("assign_session_to_project", e))?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("session {session_id} not found"),
+            });
+        }
+        self.session_brief(session_id).await
+    }
+
+    async fn bump_session_after_turn(
+        &self,
+        id: SessionId,
+        summary: Option<String>,
+        step_number: Option<u32>,
+        mark_unread: bool,
+    ) -> Result<SessionBrief> {
+        let now = chrono_now_iso();
+        // Only refresh summary when caller passed a non-empty value.
+        // Bridge sometimes emits turn_end with empty summary (no recap
+        // generated this round); we keep the previous summary so the
+        // sidebar row doesn't blank out mid-conversation.
+        let new_summary: Option<String> = summary
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(truncate_summary);
+        let step = step_number.map(|n| n as i64);
+
+        // bumpSessionAfterTurn historically didn't touch
+        // `last_step_index` if the bridge didn't send `stepNumber`.
+        // Sqlite COALESCE keeps the previous value when the bind is NULL.
+        if let Some(s) = new_summary {
+            let res = sqlx::query(
+                "UPDATE sessions SET \
+                    turn_count = turn_count + 1, \
+                    summary = ?, \
+                    last_activity_at = ?, \
+                    updated_at = ?, \
+                    has_unread = CASE WHEN ? = 1 THEN 1 ELSE has_unread END \
+                 WHERE id = ?",
+            )
+            .bind(&s)
+            .bind(&now)
+            .bind(&now)
+            .bind(if mark_unread { 1_i64 } else { 0_i64 })
+            .bind(id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+            if res.rows_affected() == 0 {
+                return Err(GalleyError::NotFound {
+                    message: format!("session {id} not found"),
+                });
+            }
+        } else {
+            let res = sqlx::query(
+                "UPDATE sessions SET \
+                    turn_count = turn_count + 1, \
+                    last_activity_at = ?, \
+                    updated_at = ?, \
+                    has_unread = CASE WHEN ? = 1 THEN 1 ELSE has_unread END \
+                 WHERE id = ?",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(if mark_unread { 1_i64 } else { 0_i64 })
+            .bind(id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+            if res.rows_affected() == 0 {
+                return Err(GalleyError::NotFound {
+                    message: format!("session {id} not found"),
+                });
+            }
+        }
+
+        // last_step_index isn't a column on the sessions table — it's
+        // a transient runtime field the GUI computes from per-turn
+        // events. Persisting it here was discussed in the M4 sub-plan
+        // but rejected: bumpSessionAfterTurn's GUI counterpart only
+        // mirrors it into in-memory state, not SQLite. Suppress the
+        // unused param to keep the signature stable for B4+ where a
+        // future audit table may pick it up.
+        let _ = step;
+        self.session_brief(id).await
+    }
+
+    async fn clear_session_unread(&self, id: SessionId) -> Result<()> {
+        let now = chrono_now_iso();
+        let res = sqlx::query(
+            "UPDATE sessions SET has_unread = 0, updated_at = ? WHERE id = ?",
+        )
+        .bind(&now)
+        .bind(id.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("session {id} not found"),
+            });
+        }
+        Ok(())
+    }
+
+    async fn bulk_archive_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        _origin: Origin,
+    ) -> Result<u32> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        let placeholders = vec!["?"; ids.len()].join(",");
+        let now = chrono_now_iso();
+        let sql = format!(
+            "UPDATE sessions SET status = 'archived', updated_at = ? \
+             WHERE id IN ({placeholders}) AND status != 'archived'",
+        );
+        let mut q = sqlx::query(&sql).bind(&now);
+        for id in &ids {
+            q = q.bind(id.as_str());
+        }
+        let res = q.execute(&mut *tx).await.map_err(map_sqlx_err)?;
+        tx.commit().await.map_err(map_sqlx_err)?;
+        Ok(res.rows_affected() as u32)
+    }
+
+    async fn bulk_unarchive_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        _origin: Origin,
+    ) -> Result<u32> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        let placeholders = vec!["?"; ids.len()].join(",");
+        let now = chrono_now_iso();
+        let sql = format!(
+            "UPDATE sessions SET status = 'idle', updated_at = ? \
+             WHERE id IN ({placeholders}) AND status = 'archived'",
+        );
+        let mut q = sqlx::query(&sql).bind(&now);
+        for id in &ids {
+            q = q.bind(id.as_str());
+        }
+        let res = q.execute(&mut *tx).await.map_err(map_sqlx_err)?;
+        tx.commit().await.map_err(map_sqlx_err)?;
+        Ok(res.rows_affected() as u32)
+    }
+
+    async fn bulk_delete_sessions(
+        &self,
+        ids: Vec<SessionId>,
+        _origin: Origin,
+    ) -> Result<u32> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        let placeholders = vec!["?"; ids.len()].join(",");
+        let sql = format!("DELETE FROM sessions WHERE id IN ({placeholders})");
+        let mut q = sqlx::query(&sql);
+        for id in &ids {
+            q = q.bind(id.as_str());
+        }
+        let res = q.execute(&mut *tx).await.map_err(map_sqlx_err)?;
+        tx.commit().await.map_err(map_sqlx_err)?;
+        Ok(res.rows_affected() as u32)
+    }
+
+    // ============= B3 M4a · project writes =============
+
+    async fn list_projects(&self) -> Result<Vec<ProjectBrief>> {
+        let rows = sqlx::query_as::<_, ProjectRow>(
+            "SELECT id, name, root_path, icon, color, pinned, \
+                last_activity_at, created_at, updated_at \
+             FROM projects \
+             ORDER BY pinned DESC, last_activity_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        Ok(rows.into_iter().map(ProjectRow::into_brief).collect())
+    }
+
+    async fn create_project(
+        &self,
+        input: CreateProjectInput,
+        _origin: Origin,
+    ) -> Result<ProjectBrief> {
+        let id = input.id.trim();
+        if id.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "create_project: id must not be empty".into(),
+            });
+        }
+        let name = input.name.trim();
+        if name.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "create_project: name must not be empty".into(),
+            });
+        }
+        let root_path = input
+            .root_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        let now = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO projects (id, name, root_path, icon, color, pinned, \
+                last_activity_at, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(name)
+        .bind(&root_path)
+        .bind(&input.icon)
+        .bind(&input.color)
+        .bind(&now)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| map_constraint_err("create_project", e))?;
+        self.fetch_project(id).await
+    }
+
+    async fn update_project(
+        &self,
+        id: ProjectId,
+        patch: ProjectPatch,
+        _origin: Origin,
+    ) -> Result<ProjectBrief> {
+        // Existence check up-front gives a clean NotFound vs silently
+        // 0-row UPDATE when every patch field is None.
+        let exists: Option<String> =
+            sqlx::query_scalar("SELECT id FROM projects WHERE id = ?")
+                .bind(id.as_str())
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_sqlx_err)?;
+        if exists.is_none() {
+            return Err(GalleyError::NotFound {
+                message: format!("project {id} not found"),
+            });
+        }
+        // Build SET clause incrementally so omitted patch fields stay
+        // at their current SQL value.
+        let mut sets: Vec<&str> = Vec::with_capacity(6);
+        let now = chrono_now_iso();
+        let mut name_val: Option<String> = None;
+        if let Some(raw) = patch.name.as_ref() {
+            let t = raw.trim();
+            if t.is_empty() {
+                return Err(GalleyError::InvalidArgs {
+                    message: "update_project: name must not be empty".into(),
+                });
+            }
+            name_val = Some(t.to_string());
+            sets.push("name = ?");
+        }
+        let (write_root, root_val) = project_nullable_patch(&patch.root_path);
+        if write_root {
+            sets.push("root_path = ?");
+        }
+        let (write_icon, icon_val) = project_nullable_patch(&patch.icon);
+        if write_icon {
+            sets.push("icon = ?");
+        }
+        let (write_color, color_val) = project_nullable_patch(&patch.color);
+        if write_color {
+            sets.push("color = ?");
+        }
+        if patch.pinned.is_some() {
+            sets.push("pinned = ?");
+        }
+        sets.push("updated_at = ?");
+
+        let sql = format!("UPDATE projects SET {} WHERE id = ?", sets.join(", "));
+        let mut q = sqlx::query(&sql);
+        if let Some(v) = name_val.as_ref() {
+            q = q.bind(v);
+        }
+        if write_root {
+            q = q.bind(&root_val);
+        }
+        if write_icon {
+            q = q.bind(&icon_val);
+        }
+        if write_color {
+            q = q.bind(&color_val);
+        }
+        if let Some(p) = patch.pinned {
+            q = q.bind(if p { 1_i64 } else { 0_i64 });
+        }
+        q = q.bind(&now).bind(id.as_str());
+        q.execute(&self.pool).await.map_err(map_sqlx_err)?;
+        self.fetch_project(id.as_str()).await
+    }
+
+    async fn delete_project(&self, id: ProjectId, _origin: Origin) -> Result<()> {
+        let res = sqlx::query("DELETE FROM projects WHERE id = ?")
+            .bind(id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+        if res.rows_affected() == 0 {
+            return Err(GalleyError::NotFound {
+                message: format!("project {id} not found"),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl SqliteGalley {
+    /// Internal helper used by `create_project` / `update_project` to
+    /// re-read the row after a write. Returns NotFound when the id
+    /// vanished between the write and the read (should never happen
+    /// outside of an external concurrent DELETE, but explicit beats
+    /// `unwrap`).
+    async fn fetch_project(&self, id: &str) -> Result<ProjectBrief> {
+        let row = sqlx::query_as::<_, ProjectRow>(
+            "SELECT id, name, root_path, icon, color, pinned, \
+                last_activity_at, created_at, updated_at \
+             FROM projects WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?
+        .ok_or_else(|| GalleyError::NotFound {
+            message: format!("project {id} not found"),
+        })?;
+        Ok(row.into_brief())
     }
 }
 

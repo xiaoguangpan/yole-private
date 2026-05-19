@@ -6,7 +6,10 @@ pub mod runner_commands;
 pub mod runner_manager;
 pub mod socket_listener;
 
-use api::{GalleyApi, SessionBrief, SessionFilter};
+use api::{
+    CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectBrief, ProjectId,
+    ProjectPatch, SessionBrief, SessionFilter, SessionId,
+};
 use db::SqliteGalley;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -48,6 +51,13 @@ fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
 
+/// Stringify a [`crate::error::GalleyError`] for the Tauri invoke wire.
+/// JSON-encoded so the front-end can `JSON.parse` and discriminate on
+/// the `error: <category>` field (matches agent-api.md envelope).
+fn stringify_error(e: crate::error::GalleyError) -> String {
+    serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
+}
+
 /// B1 M3 read — first GalleyApi method exposed through the Tauri
 /// invoke transport. Validates the end-to-end path
 /// (GUI → Tauri invoke → Rust core → SQLite). Used as the migration
@@ -59,13 +69,208 @@ fn path_exists(path: String) -> bool {
 /// same `error: <category>` discriminant.
 #[tauri::command]
 async fn list_sessions(filter: SessionFilter) -> std::result::Result<Vec<SessionBrief>, String> {
-    let galley = SqliteGalley::open()
-        .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
     galley
         .list_sessions(filter)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(stringify_error)
+}
+
+// ============= B3 M4a · session/project CRUD Tauri commands =============
+//
+// Each command is a thin wrapper around the matching `GalleyApi` trait
+// method:
+//   1. open the Sqlite pool (lazy — `SqliteGalley::open` is cheap; the
+//      pool is internally Arc-shared and re-used);
+//   2. forward the args;
+//   3. stringify the `GalleyError` envelope for the invoke wire.
+//
+// B3 M4a SHIPS these commands but does NOT route the GUI through them
+// yet — M4b will replace the existing `tauri-plugin-sql` direct SQL
+// writes in gui/src/lib/db.ts with `invoke("<command>", ...)`. Until
+// M4b lands, these commands compile-test the surface and stay dormant.
+
+#[tauri::command]
+async fn create_session(
+    input: CreateSessionInput,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .create_session(input, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn archive_session(
+    id: SessionId,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .archive_session(id, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn unarchive_session(
+    id: SessionId,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .unarchive_session(id, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn rename_session(
+    id: SessionId,
+    title: String,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .rename_session(id, title, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn set_session_pinned(
+    id: SessionId,
+    pinned: bool,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .set_session_pinned(id, pinned, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn delete_session(id: SessionId, origin: Origin) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .delete_session(id, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn assign_session_to_project(
+    session_id: SessionId,
+    project_id: Option<String>,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .assign_session_to_project(session_id, project_id, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn bump_session_after_turn(
+    id: SessionId,
+    summary: Option<String>,
+    step_number: Option<u32>,
+    mark_unread: bool,
+) -> std::result::Result<SessionBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .bump_session_after_turn(id, summary, step_number, mark_unread)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn clear_session_unread(id: SessionId) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .clear_session_unread(id)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn bulk_archive_sessions(
+    ids: Vec<SessionId>,
+    origin: Origin,
+) -> std::result::Result<u32, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .bulk_archive_sessions(ids, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn bulk_unarchive_sessions(
+    ids: Vec<SessionId>,
+    origin: Origin,
+) -> std::result::Result<u32, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .bulk_unarchive_sessions(ids, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn bulk_delete_sessions(
+    ids: Vec<SessionId>,
+    origin: Origin,
+) -> std::result::Result<u32, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .bulk_delete_sessions(ids, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn list_projects() -> std::result::Result<Vec<ProjectBrief>, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley.list_projects().await.map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn create_project(
+    input: CreateProjectInput,
+    origin: Origin,
+) -> std::result::Result<ProjectBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .create_project(input, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn update_project(
+    id: ProjectId,
+    patch: ProjectPatch,
+    origin: Origin,
+) -> std::result::Result<ProjectBrief, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .update_project(id, patch, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn delete_project(id: ProjectId, origin: Origin) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .delete_project(id, origin)
+        .await
+        .map_err(stringify_error)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -136,6 +341,25 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             path_exists,
             list_sessions,
+            // B3 M4a session writes
+            create_session,
+            archive_session,
+            unarchive_session,
+            rename_session,
+            set_session_pinned,
+            delete_session,
+            assign_session_to_project,
+            bump_session_after_turn,
+            clear_session_unread,
+            bulk_archive_sessions,
+            bulk_unarchive_sessions,
+            bulk_delete_sessions,
+            // B3 M4a project CRUD
+            list_projects,
+            create_project,
+            update_project,
+            delete_project,
+            // B2 runner commands
             runner_commands::spawn_runner,
             runner_commands::send_to_runner,
             runner_commands::shutdown_runner,

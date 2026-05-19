@@ -83,3 +83,27 @@ pub struct SessionFilter {
     /// force-exclude.
     pub archived: Option<bool>,
 }
+
+/// Payload for [`crate::api::GalleyApi::create_session`].
+///
+/// `id` is **caller-assigned**. The GUI currently mints
+/// `s-<base36-timestamp>-<rand>` (see useAppStore.ts createSession); the
+/// CLI / supervisor will follow the same shape. Rust-side id generation
+/// would force the caller to round-trip before they know what to render —
+/// the convention preserves the existing front-end optimistic-create
+/// flow. Conflicts surface as `invalid_args` (`session id conflict`).
+///
+/// `title` is the seed title. The GUI passes the localized default
+/// (`新对话`); the CLI / supervisor MUST pass a non-empty value.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSessionInput {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub project_id: Option<String>,
+    #[serde(default)]
+    pub selected_llm_index: Option<u32>,
+    #[serde(default)]
+    pub selected_llm_display_name: Option<String>,
+}
