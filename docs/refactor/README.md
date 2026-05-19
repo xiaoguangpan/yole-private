@@ -32,14 +32,13 @@ docs/refactor/
 ```
 Phase:    Prototype ✅ → B1 ✅ → [B2] → B3 → B4 → v0.5
                                   ↑ 现在在这里
-Status:   B1 COMPLETE — M1-M7 全部 ship (2026-05-18 单 session)
+Status:   B1 COMPLETE — M1-M7 + T7.1-T7.7 全部 ship
           11/12 A acceptance pass + 1 deferred (--pretty → B4)
-          Commits: 4ee23e3 (M1) · ff878b1 (CI hotfix) · d79558a (M2)
-                   · 9f6b369 (M3) · e3f11a1 (M4) · 3e29dbc (M5) · 80feb4c (M6)
+          Tag b1-complete · Commits 4ee23e3 (M1) → 41cdeb5 (M7) + 2026-05-19 收尾
           Devlog: docs/devlog/2026-05-18-b1-rust-core-complete.md
-Next:     B2 T1 (TBD) — runner ownership 迁 Rust
-          Action item before B2 starts: 写 B2 playbook (升格 stub),
-          tag b1-complete, 调和 invariants.md §I4 ↔ playbook T1.15 矛盾 (O8)
+          B2 playbook 升格完成 (was 106-line stub → 430-line playbook 同 B1 粒度)
+Next:     B2 M1 T1.1 — `core/src/runner_manager.rs` 顶层模块 scaffold
+          (RunnerProcess 从 prototype/registry.rs 升级到 production)
 Blocker:  无 (B2 不依赖 v0.2 Windows release，可同步推进)
 ```
 
@@ -51,7 +50,7 @@ Blocker:  无 (B2 不依赖 v0.2 Windows release，可同步推进)
 |---|---|---|---|---|
 | Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../core/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
-| B2: Bridge ownership 迁 Rust | ⏳ 待启动 (升格 stub) | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) (stub) | 2026-05-15 stub · upgrade to full sub-task list before T1 |
+| B2: Bridge ownership 迁 Rust | ⏳ 待启动 (playbook ready) | T1.1 | [B2-bridge-ownership.md](./B2-bridge-ownership.md) | 2026-05-19 升格到完整 playbook (M1-M7, ~75 sub-tasks) — 等下次 session 开 M1 实施 |
 | B3: useAppStore 拆 slice + 改订阅 | ⏳ 未启动 | — | [B3-store-slice.md](./B3-store-slice.md) (stub) | 2026-05-15 stub |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
 | **v0.5 milestone** | ⏳ | — | — | — |

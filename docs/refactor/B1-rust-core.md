@@ -1,10 +1,10 @@
 # B1 · Rust core 骨架 + CLI 只读
 
 ```
-Cursor:   T7.6 / T7.7  (写 B2 playbook + tag b1-complete · 推到下次 session)
-Status:   ✅ 实质完成 (M1-M7 全做完，T7.1-T7.5 done · T7.6 B2 playbook + T7.7 tag 留次日)
+Cursor:   ✅ COMPLETE — 全部 T7 sub-task ship (B2 已启动)
+Status:   ✅ COMPLETE (M1-M7 + T7.1-T7.7 done)
 Started:  2026-05-18
-Last touch: 2026-05-18 session-close — v0.2 prereq 撤、Stage 4 decoupling note 补、T7.x checkboxes
+Last touch: 2026-05-19 — T7.6 B2 playbook 升格完成 + T7.7 tag b1-complete
 Predecessor: M6 commit 80feb4c + B1 finish commit 41cdeb5
 Successor:   B2 (bridge ownership 迁 Rust)
 Duration:    3 周估计 → 实际单 session ~5h (~21× 加速)
@@ -310,8 +310,8 @@ GUI 里至少一个 read 是经过 Rust core 来的，行为不变。
   - cursor 总指针: B1 → B2
   - progress dashboard: B1 状态改 ✅
 - [x] **T7.5** 更新 `CLAUDE.md` 阶段表: B1 ✅
-- [ ] **T7.6** **写 B2 playbook**（之前的 stub 升级成完整）——3 周工程量值得 1 个 dedicated session 来仔细策划 — **推到下次 session**
-- [ ] **T7.7** Commit + tag: `git tag b1-complete`（不发 release，只标记） — **推到下次 session**
+- [x] **T7.6** **写 B2 playbook**（之前的 stub 升级成完整）— 2026-05-19 升格完成，[B2-bridge-ownership.md](./B2-bridge-ownership.md) 从 106 行 stub 扩到 ~430 行，M1-M7 共 ~75 sub-task，结构跟 B1 同等粒度
+- [x] **T7.7** Commit + tag: `git tag b1-complete`（不发 release，只标记） — 2026-05-19
 
 ### M7 完成标志
 
@@ -397,7 +397,7 @@ B1 全部 acceptance 跑过，devlog ship，B2 playbook 写好可以启动。
 - [O5] ~~GUI 迁移模板选哪个函数 (T6.1)：loadProjects vs loadSessions vs getPref~~ **RESOLVED 2026-05-18 → `loadSessions`** (Rust side already wired in M3 T3.13 → shortest path; M6 just adds the JS adapter + flips one call site). loadProjects deferred to B2 along with the rest of write-path.
 - [O6] cli/ 是否需要 platform-specific build (Windows .exe icon resource embedding 等)：B1 暂不做，B4 polish
 - [O7] **NEW** `schemars::JsonSchema` derive 是否要现在加 (T2.10)：M2 deferred to M5/B4 when agent-api.md schema gen actually needs it (N8). If we hit a "need schemars now" moment earlier, revisit.
-- [O8] **NEW** invariants.md §I4 (3-commit rename) vs B1 playbook T1.15 (1-commit rename) 文档内部矛盾未调和 — JC 2026-05-18 选了 T1.15 路径，但文档冲突仍在 (running note N5).
+- [O8] ~~invariants.md §I4 (3-commit rename) vs B1 playbook T1.15 (1-commit rename) 文档内部矛盾~~ **RESOLVED 2026-05-19 → §I4 重写**：允许"一组耦合 rename 一次性合并"（拆 commit 会让 HEAD broken，违反 §I2）。M1 路径合规。原"独立 commit"过严，已改文本。
 
 ## Migration pattern · 给 B2/B3 用的迁移模板
 

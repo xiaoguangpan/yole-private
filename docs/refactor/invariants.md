@@ -60,14 +60,20 @@ v0.1 已用 migration 001-005。**v0.5 起从 006 开始递增，绝不跳号、
 
 ## I4. 目录重组 commit 只做 rename，不做逻辑改动
 
-T1.1 / T1.2 / T1.3（src-tauri → core / desktop → gui / bridge → runner）每个**独立 commit**，commit message 严格 "rename only: src-tauri → core"。
+目录 rename（如 src-tauri → core / desktop → gui / bridge → runner）**不许跟业务逻辑改动混进同一个 commit**。commit message 严格 "rename only: …"，方便 git rename detection 保住 blame / history。
+
+**允许**：
+- 一次 commit 内 mv 一个 *或多个* 目录 —— 只要这组 rename 是耦合的（必须一起改 import path / 配置才能编译过）
+- 同 commit 内 mv + 改 import path / 配置文件路径引用（这是 rename 的必要配套，不是 logic 改动）
 
 **禁止**：
-- 同 commit 内既改名又改代码逻辑
-- 同 commit 内 mv 两个目录
-- 同 commit 内 mv + 改 import path（import 改 path 是必须的，但 grouped 进同一个 rename commit 是 ok 的——但不要再加任何 logic 改动）
+- 同 commit 内既改名又改业务逻辑 / 加新功能 / 重命名变量
+- 同 commit 内 mv + 重写文件内容
+- 误把"配套 codegen / target/ regen"算作 logic（这些是 build 系统自然产物）
 
 **为什么**：git log 上"rename only"是 git rename detection 能识别的，blame / history 不丢；混杂逻辑改动 git 看成 add+delete，blame 断。
+
+**历史**：2026-05-18 B1 M1 (commit [`4ee23e3`](https://github.com/wangjc683/galley/commit/4ee23e3)) 一次 commit 内 mv 三个目录 + 改 import / 配置路径，没拆三 commit。审计后判定**符合本条 §I4 的精神** —— 三个 rename 互相耦合（动 desktop/src-tauri 一个 git mv 会导致另两个未 rename 路径的代码全编译不过），拆成三 commit 中间状态都是 broken HEAD，反而违反 [§I2 每 sub-task 完成 = 全过测试](#i2-每-sub-task-完成--typecheck--cargo-check--相关测试全过)。原条文"T1.1 / T1.2 / T1.3 每个独立 commit"过严，已重写为本节当前文本。详 [B1 playbook running note N5](./B1-rust-core.md#running-notes--gotchas)。
 
 ## I5. API surface single source of truth
 
