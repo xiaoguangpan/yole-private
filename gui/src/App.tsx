@@ -26,6 +26,7 @@ import {
   buildDemoTurns,
   makeDemoToast,
 } from "@/stores/demo";
+import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore, type Screen } from "@/stores/ui";
 import { useAppStore } from "@/stores/useAppStore";
 
@@ -88,12 +89,24 @@ function App() {
   );
   const emptyArchive = useAppStore((s) => s.emptyArchive);
   const appendUserTurnExternal = useAppStore((s) => s.appendUserTurnExternal);
-  const llms = useAppStore((s) => s.llms);
-  const llmDisplayName = useAppStore((s) => s.llmDisplayName);
-  const selectLLMForNewSession = useAppStore(
+  // LLM / runtimeInfo / pet state now live in runtimeStore (M3a).
+  // Subscribe to the active session's per-runtime entry so the
+  // Composer pill + dropdown + Inspector tab re-render on changes.
+  const activeRuntimeLLMs = useRuntimeStore((s) =>
+    activeSessionId ? s.byId[activeSessionId]?.llms : undefined,
+  );
+  const activeRuntimeDisplayName = useRuntimeStore((s) =>
+    activeSessionId ? s.byId[activeSessionId]?.llmDisplayName : undefined,
+  );
+  const cachedLLMs = useRuntimeStore((s) => s.cachedLLMs);
+  const cachedLLMDisplayName = useRuntimeStore((s) => s.cachedLLMDisplayName);
+  const llms = activeRuntimeLLMs ?? cachedLLMs;
+  const llmDisplayName =
+    activeRuntimeDisplayName ?? cachedLLMDisplayName ?? "";
+  const selectLLMForNewSession = useRuntimeStore(
     (s) => s.selectLLMForNewSession,
   );
-  const runtimeInfo = useAppStore((s) => s.runtimeInfo);
+  const runtimeInfo = useRuntimeStore((s) => s.runtimeInfo);
 
   const approvalDecisions = useAppStore((s) => s.approvalDecisions);
   const recordApprovalDecision = useAppStore((s) => s.recordApprovalDecision);
@@ -108,7 +121,9 @@ function App() {
   const acknowledgeYoloIntro = useAppStore((s) => s.acknowledgeYoloIntro);
   const conversationWidth = useAppStore((s) => s.conversationWidth);
   const setConversationWidth = useAppStore((s) => s.setConversationWidth);
-  const petAttachedSessionId = useAppStore((s) => s.petAttachedSessionId);
+  const petAttachedSessionId = useRuntimeStore(
+    (s) => s.petAttachedSessionId,
+  );
   const setPendingPetMigration = useUiStore((s) => s.setPendingPetMigration);
 
   const toasts = useUiStore((s) => s.toasts);

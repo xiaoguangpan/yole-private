@@ -27,11 +27,9 @@ import { deriveSessionStatus } from "@/lib/sessions";
 import {
   DEMO_APPROVAL_CONFIG,
   DEMO_GA_CONFIG,
-  DEMO_LLM_DISPLAY_NAME,
-  DEMO_LLMS,
-  DEMO_RUNTIME_INFO,
   DEMO_SESSIONS,
 } from "@/stores/demo";
+import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore } from "@/stores/ui";
 import { makeAppError } from "@/types/app-error";
 import type {
@@ -44,7 +42,6 @@ import type {
   UserTurn,
 } from "@/types/conversation";
 import type { MessageRow } from "@/types/db";
-import type { RuntimeInfo } from "@/types/inspector";
 import type { ApprovalDecision, IPCCommand } from "@/types/ipc";
 import type { Project, Session } from "@/types/session";
 
@@ -170,11 +167,12 @@ async function _enforceLRUCap(): Promise<void> {
   }
 }
 
-export interface LLMOption {
-  index: number;
-  displayName: string;
-  isCurrent: boolean;
-}
+// LLMOption now lives in runtime.ts (M3a). Re-export here so existing
+// imports (`import { LLMOption } from "@/stores/useAppStore"`) keep
+// working during the transitional period; remove the re-export when
+// no callers reference it via useAppStore (M3b / M4 cleanup grep).
+import type { LLMOption } from "./runtime";
+export type { LLMOption };
 
 export type BridgeStatus =
   | "idle"
@@ -202,6 +200,8 @@ export interface SessionRuntime {
   bridgeStatus: BridgeStatus;
   bridgeError: string | null;
   bridgePid: number | null;
+  // LLM fields (llms / llmDisplayName) moved to runtime.ts (M3a, 2026-05-19).
+  // The runtimeStore.byId[sid] mirrors what was here.
   /**
    * LLM list + currently-selected LLM **for this session's bridge**.
    * N-active multi-session means each bridge has its own currently-
@@ -213,9 +213,11 @@ export interface SessionRuntime {
    * Seeded with the demo list so the empty-state Composer can render
    * a believable LLM name pre-bridge; gets overwritten the moment the
    * bridge sends `ready`.
+   *
+   * Moved to runtimeStore.byId[sid] in M3a (2026-05-19). The fields
+   * `llms` and `llmDisplayName` are gone from this interface — read
+   * via `useRuntimeStore(s => s.byId[activeId]?.llms)` instead.
    */
-  llms: LLMOption[];
-  llmDisplayName: string;
   /**
    * GA-initiated question awaiting reply (V0.2 ask_user wiring).
    * Set when bridge emits an `ask_user` IPC event; cleared when
@@ -403,8 +405,9 @@ function emptyRuntime(): SessionRuntime {
     bridgeStatus: "idle",
     bridgeError: null,
     bridgePid: null,
-    llms: DEMO_LLMS,
-    llmDisplayName: DEMO_LLM_DISPLAY_NAME,
+    // llms / llmDisplayName moved to runtimeStore.byId[sid] in M3a.
+    // useRuntimeStore.getState().ensureRuntime(sid, seedHints) is the
+    // parallel for setActiveSession's lazy-create path.
     pendingAskUser: null,
     turnIndexOffset: 0,
   };
@@ -431,28 +434,13 @@ interface State {
    */
   activeProjectFilter: string | undefined;
   /**
-   * Projection of `_runtimes[activeSessionId].llms` — see SessionRuntime
-   * for the rationale (LLM list is per-bridge in N-active).
+   * llms / llmDisplayName / pendingLLMIndex / runtimeInfo all moved
+   * to runtimeStore in M3a (2026-05-19). Read via:
+   *   - `useRuntimeStore(s => s.byId[activeId]?.llms ?? [])`
+   *   - `useRuntimeStore(s => s.byId[activeId]?.llmDisplayName ?? "")`
+   *   - `useRuntimeStore(s => s.pendingLLMIndex)`
+   *   - `useRuntimeStore(s => s.runtimeInfo)`
    */
-  llms: LLMOption[];
-  /**
-   * Projection of `_runtimes[activeSessionId].llmDisplayName`. Mirrors
-   * Composer / Inspector display.
-   */
-  llmDisplayName: string;
-  /**
-   * One-shot LLM index to apply when the *next* freshly-created
-   * session spawns its bridge. Set by EmptyState's inline LLM picker
-   * (no active session yet, so there's no live bridge to `set_llm`
-   * against). Consumed by `activateSession` when it spawns a bridge
-   * for a session with zero turns; cleared on any activateSession
-   * call so the pick doesn't leak into a later, unrelated session.
-   *
-   * Not persisted — a fresh launch should fall back to GA's mykey.py
-   * default until the user picks again.
-   */
-  pendingLLMIndex: number | undefined;
-  runtimeInfo: RuntimeInfo;
 
   // ---- Approval (global) ----
   /**
@@ -503,24 +491,9 @@ interface State {
    */
   yoloIntroSeen: boolean;
   /**
-   * Desktop Pet attached session id. Pet is a global feature (only
-   * one instance can run at a time since it binds a fixed local
-   * port), so we store one session id at the top level rather than
-   * on a per-session runtime. `null` when no pet is attached.
-   *
-   * Surfaced in two places:
-   *   - Sidebar session row: a small Cat badge appears next to the
-   *     title of whichever session currently holds the pet, so the
-   *     user can see "where the pet is" from any view.
-   *   - SessionTitleMenu: when the active session === this id, the
-   *     menu item label flips to "关闭桌面宠物"; otherwise it stays
-   *     "桌面宠物" and a click implicitly migrates the pet to the
-   *     active session (see pendingPetMigrationTo for the relay).
-   *
-   * Not persisted: pet's subprocess dies on app exit anyway, so
-   * "remember it across restart" would lie about state.
+   * petAttachedSessionId moved to runtimeStore in M3a (2026-05-19).
+   * Read via `useRuntimeStore(s => s.petAttachedSessionId)`.
    */
-  petAttachedSessionId: string | null;
   /**
    * Conversation reading column width. Notion-style two-mode toggle
    * (DESIGN.md tbd):
@@ -596,11 +569,9 @@ interface State {
    * mykey.py since the last bridge ready event, new models won't
    * appear in EmptyState's LLM picker until they activate an
    * existing session. `warmupLLMList` solves this by spawning a
-   * one-shot "warmup" bridge after hydrate. This flag prevents
-   * re-running the warmup on every app render. Reset to false by
-   * `setGAConfig` so a path change retriggers the warmup.
+   * _warmupComplete moved to runtimeStore (private) in M3a.
+   * setGAConfig now calls `useRuntimeStore.getState().resetWarmup()`.
    */
-  _warmupComplete: boolean;
   approvalDecisions: Record<string, ApprovalDecision>;
   bridgeStatus: BridgeStatus;
   bridgeError: string | null;
@@ -819,31 +790,13 @@ interface Actions {
    * changes). Spawns a temporary bridge with sessionId="__warmup__",
    * captures its `ready` event's `availableLLMs`, writes them into
    * top-level `state.llms` + `prefs["llm_list"]` cache, then shuts
-   * the bridge down. The whole thing finishes in ~2-3s in the
-   * background, so by the time the user clicks the LLM picker in
-   * EmptyState, the latest list (reflecting any mykey.py edits) is
-   * already there. Idempotent via `_warmupComplete` flag; skipped
-   * entirely when gaConfig is invalid (e.g. pre-onboarding).
-   */
-  warmupLLMList: () => Promise<void>;
-
   /**
-   * Replace this session's LLM list (and currently-selected
-   * displayName, derived from `llms.find(l => l.isCurrent)`). Called
-   * by ipc-handlers on `ready` (initial list) and `llm_changed`
-   * (after a successful `set_llm`). Per-session because each bridge
-   * has its own currently-selected LLM in N-active.
+   * LLM-related actions (warmupLLMList / replaceLLMs /
+   * selectLLMForNewSession) moved to runtimeStore in M3a. Call via:
+   *   useRuntimeStore.getState().warmupLLMList()
+   *   useRuntimeStore.getState().replaceLLMs(sid, list)
+   *   useRuntimeStore.getState().selectLLMForNewSession(index)
    */
-  replaceLLMs: (sessionId: string, llms: LLMOption[]) => void;
-  /**
-   * Pick the LLM for the next freshly-created session. Used by
-   * EmptyState's inline picker — there's no live bridge yet, so we
-   * can't `set_llm` over IPC; instead we stash `pendingLLMIndex` and
-   * let `activateSession`'s spawnBridge call forward it as
-   * `--llm-no`. Also flips `isCurrent` on the top-level `llms`
-   * projection so the Composer pill reflects the pick immediately.
-   */
-  selectLLMForNewSession: (index: number) => void;
 
   // Conversation (per-session — sessionId required)
   appendUserTurn: (sessionId: string, text: string) => void;
@@ -904,13 +857,9 @@ interface Actions {
    */
   setPendingAskUser: (sessionId: string, value: PendingAskUser | null) => void;
   /**
-   * Set the session id that Desktop Pet is currently attached to.
-   * `null` means no pet is running. Called from the IPC handlers
-   * when `pet_attached` / `pet_detached` events arrive — never call
-   * directly from UI; UI should send the IPC command and let the
-   * bridge's response flip this flag.
+   * setPetAttachedSession moved to runtimeStore in M3a. Call via
+   * `useRuntimeStore.getState().setPetAttachedSession(sid)`.
    */
-  setPetAttachedSession: (sessionId: string | null) => void;
 
   // Bridge runtime (per-session — sessionId required)
   setBridgeStatus: (sessionId: string, status: BridgeStatus) => void;
@@ -1028,8 +977,6 @@ function projectionFrom(rt: SessionRuntime): {
   bridgeStatus: BridgeStatus;
   bridgeError: string | null;
   bridgePid: number | null;
-  llms: LLMOption[];
-  llmDisplayName: string;
   pendingAskUser: PendingAskUser | null;
 } {
   return {
@@ -1042,8 +989,6 @@ function projectionFrom(rt: SessionRuntime): {
     bridgeStatus: rt.bridgeStatus,
     bridgeError: rt.bridgeError,
     bridgePid: rt.bridgePid,
-    llms: rt.llms,
-    llmDisplayName: rt.llmDisplayName,
     pendingAskUser: rt.pendingAskUser,
   };
 }
@@ -1199,12 +1144,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   activeSessionId: undefined,
   projects: [],
   activeProjectFilter: undefined,
-  pendingLLMIndex: undefined,
-  // llms / llmDisplayName are populated by the trailing
-  // `...projectionFrom(emptyRuntime())` spread below — emptyRuntime
-  // seeds DEMO_LLMS / DEMO_LLM_DISPLAY_NAME so Composer renders a
-  // plausible LLM pre-bridge.
-  runtimeInfo: DEMO_RUNTIME_INFO,
+  // pendingLLMIndex / runtimeInfo / petAttachedSessionId moved to
+  // runtimeStore in M3a (2026-05-19).
 
   gaConfig: DEMO_GA_CONFIG,
 
@@ -1212,15 +1153,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
   yoloMode: true,
   yoloIntroSeen: true,
   conversationWidth: "compact",
-  petAttachedSessionId: null,
 
   _runtimes: {},
 
   // Global counter, not projected from any runtime — see State's
   // userSubmitTick doc comment.
   userSubmitTick: 0,
-
-  _warmupComplete: false,
 
   // Top-level projection starts as the empty runtime (no active
   // session yet). setActiveSession refreshes these.
@@ -1242,52 +1180,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
         // KEEP `llms` / `llmDisplayName` — LLM config is shared
         // across the whole GA install (mykey.py is one file), so any
         // previously-spawned bridge has already populated the real
-        // list. Falling back to emptyRuntime's DEMO_LLMS here would
-        // make the empty-screen Composer dropdown show fake model
-        // names ("GLM 5.1" etc.) until the user lands on a session.
+        // list. (Runtime store now owns the cached LLM list; this
+        // branch's projection no longer touches LLM fields — M3a.)
         return {
           activeSessionId: undefined,
           ...projectionFrom(emptyRuntime()),
-          llms: state.llms,
-          llmDisplayName: state.llmDisplayName,
         };
       }
-      // Pre-seed a fresh runtime's `llms` / `llmDisplayName` from
-      // the hydrate-cached real LLM list + the session's persisted
-      // LLM choice (`selectedLlmIndex` / `selectedLlmDisplayName`
-      // added in 9c36f42). Without this, emptyRuntime()'s DEMO_LLMS
-      // would project to top-level via projectionFrom(rt) below AND
-      // again via every applyRuntimeUpdate that fires before bridge
-      // ready (setBridgeStatus inside spawnBridge being the first),
-      // flashing "Claude Sonnet 4.5" for ~430ms — or longer, when
-      // bridge never reaches ready, the runtime stays DEMO forever.
-      // The pre-seed makes the runtime itself authoritative, so
-      // every subsequent projection is correct.
+      // Delegate LLM-side pre-seed to runtimeStore. ensureRuntime
+      // is idempotent — re-activating an existing session won't
+      // overwrite the live bridge's authoritative llms; only first-
+      // activation creates the byId[sid] entry from seed.
       const sessionIndex = state.sessions.findIndex((s) => s.id === id);
       const sessionForActivate =
         sessionIndex !== -1 ? state.sessions[sessionIndex] : null;
-      const persistedIndex = sessionForActivate?.selectedLlmIndex;
-      const persistedDisplayName =
-        sessionForActivate?.selectedLlmDisplayName;
-      const haveCachedLLMs = state.llms.length > 0;
+      const runtimeStore = useRuntimeStore.getState();
+      runtimeStore.ensureRuntime(id, {
+        persistedIndex: sessionForActivate?.selectedLlmIndex,
+        persistedDisplayName: sessionForActivate?.selectedLlmDisplayName,
+        cachedLLMs: runtimeStore.cachedLLMs,
+        cachedDisplayName: runtimeStore.cachedLLMDisplayName,
+      });
       const existing = state._runtimes[id];
-      const seedLLMs: LLMOption[] = haveCachedLLMs
-        ? state.llms.map((l) => ({
-            ...l,
-            isCurrent:
-              persistedIndex !== undefined
-                ? l.index === persistedIndex
-                : l.isCurrent,
-          }))
-        : emptyRuntime().llms;
-      const seedDisplayName = haveCachedLLMs
-        ? (persistedDisplayName ?? state.llmDisplayName)
-        : emptyRuntime().llmDisplayName;
-      const rt = existing ?? {
-        ...emptyRuntime(),
-        llms: seedLLMs,
-        llmDisplayName: seedDisplayName,
-      };
+      const rt = existing ?? emptyRuntime();
       const _runtimes = existing
         ? state._runtimes
         : { ...state._runtimes, [id]: rt };
@@ -1472,7 +1387,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // this activation so an abandoned pick (user picked LLM,
       // then clicked an existing session) doesn't leak into a later
       // unrelated spawn.
-      const pendingLLMIndex = get().pendingLLMIndex;
+      const runtimeStoreSnap = useRuntimeStore.getState();
+      const pendingLLMIndex = runtimeStoreSnap.pendingLLMIndex;
       const rtNow = get()._runtimes[id];
       const isFreshSession =
         (session?.turnCount ?? 0) === 0 &&
@@ -1480,7 +1396,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const consumePending =
         isFreshSession && pendingLLMIndex !== undefined;
       if (pendingLLMIndex !== undefined) {
-        set({ pendingLLMIndex: undefined });
+        useRuntimeStore.setState({ pendingLLMIndex: undefined });
       }
       // Restore the persisted LLM choice on respawn of an existing
       // session. Without this `set_llm` is in-memory only — bridge
@@ -1989,24 +1905,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const { findCandidateByAlias } = await import("@/lib/python-probe");
     const displayCandidate = await findCandidateByAlias(merged.python);
     const pythonDisplay = displayCandidate?.displayPath ?? merged.python;
-    set((state) => ({
-      gaConfig: merged,
-      // Reflect into runtimeInfo so the Settings → Runtime tab and
-      // Inspector → Runtime card show the new path immediately.
-      // pythonVersion is intentionally repurposed to display the
-      // resolved interpreter path — users see where the bridge will
-      // spawn from, not the internal capability alias.
-      runtimeInfo: {
-        ...state.runtimeInfo,
-        gaPath: merged.gaPath,
-        pythonVersion: pythonDisplay,
-      },
-      // Reset the warmup flag so a new gaPath (or python interpreter)
-      // re-triggers a one-shot LLM list refresh against the new
-      // mykey.py. Without this, switching GA installs would leave
-      // the old install's LLM list cached in state.llms.
-      _warmupComplete: false,
-    }));
+    set({ gaConfig: merged });
+    // Reflect into runtimeInfo (now lives in runtimeStore) so the
+    // Settings → Runtime tab and Inspector → Runtime card show the
+    // new path immediately. pythonVersion is intentionally repurposed
+    // to display the resolved interpreter path — users see where the
+    // bridge will spawn from, not the internal capability alias.
+    useRuntimeStore.getState().patchRuntimeInfo({
+      gaPath: merged.gaPath,
+      pythonVersion: pythonDisplay,
+    });
+    // Reset the warmup flag so a new gaPath (or python interpreter)
+    // re-triggers a one-shot LLM list refresh against the new
+    // mykey.py. TRANSITIONAL (M6 prefsStore): when gaConfig moves to
+    // prefsStore, this becomes runtimeStore's listener on a
+    // prefs-updated event.
+    useRuntimeStore.getState().resetWarmup();
     try {
       await setPref("ga_config", merged);
     } catch (e) {
@@ -2037,156 +1951,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // reflects mykey.py from the new GA install without requiring
       // a Workbench restart. (Existing sessions still need a restart
       // — their bridges are already running.)
-      void get().warmupLLMList();
+      void useRuntimeStore.getState().warmupLLMList();
     }
   },
 
-  // ---- LLMs ----
-  replaceLLMs: (sessionId, llms) => {
-    let sessionSnap: Session | null = null;
-    set((state) => {
-      // displayName follows isCurrent. If for some reason no entry
-      // is flagged current, keep the previous displayName to avoid
-      // a flash of empty string in the Composer.
-      const current = llms.find((l) => l.isCurrent);
-      const update = applyRuntimeUpdate(state, sessionId, (rt) => ({
-        ...rt,
-        llms,
-        llmDisplayName: current?.displayName ?? rt.llmDisplayName,
-      }));
-      // Mirror the current selection onto the session row so it
-      // round-trips through SQLite and survives app restart. Without
-      // this, `agent.set_llm` is in-memory only — the next bridge
-      // respawn reads mykey.py's `is_default=True` entry and loses
-      // the user's choice.
-      const baseSessions = update.sessions ?? state.sessions;
-      const idx = baseSessions.findIndex((s) => s.id === sessionId);
-      if (idx !== -1 && current) {
-        const session = baseSessions[idx];
-        if (
-          session.selectedLlmIndex !== current.index ||
-          session.selectedLlmDisplayName !== current.displayName
-        ) {
-          const next = baseSessions.slice();
-          next[idx] = {
-            ...session,
-            selectedLlmIndex: current.index,
-            selectedLlmDisplayName: current.displayName,
-          };
-          update.sessions = next;
-          sessionSnap = next[idx];
-        }
-      }
-      return update;
-    });
-    // Cache LLM list to prefs so future cold-starts (before any
-    // bridge has spawned) can show the real model names instead
-    // of the DEMO_LLMS seed. The LLM list is GA-install-wide
-    // (mykey.py is one file shared across sessions), so any one
-    // bridge's `ready` event is a faithful snapshot.
-    void setPref("llm_list", llms).catch((e) => {
-      console.debug("[store] replaceLLMs llm_list cache failed.", e);
-    });
-    // Persist the session row when the selected LLM actually changed.
-    // Best-effort: SQLite errors don't block the in-memory update.
-    if (sessionSnap) {
-      void persistSession(sessionSnap).catch((e) => {
-        console.debug("[store] replaceLLMs persistSession failed.", e);
-      });
-    }
-  },
-
-  selectLLMForNewSession: (index) => {
-    set((state) => {
-      const list = state.llms;
-      if (index < 0 || index >= list.length) return {};
-      const next = list.map((opt, i) => ({ ...opt, isCurrent: i === index }));
-      return {
-        llms: next,
-        llmDisplayName: next[index].displayName,
-        pendingLLMIndex: index,
-      };
-    });
-  },
-
-  warmupLLMList: async () => {
-    if (get()._warmupComplete) return;
-    const config = get().gaConfig;
-    // Pre-onboarding / invalid config — bridge spawn would just error.
-    // setGAConfig will re-trigger us once the user picks a real path.
-    if (!config.gaPath) return;
-
-    // Set early to dedupe concurrent calls (e.g. App.tsx triggers
-    // hydrate which triggers us, while a separate effect also pings).
-    set({ _warmupComplete: true });
-
-    // Race guard: spawnBridgeProcess's stdout listener can fire
-    // `ready` between command.spawn() resolution and `client`
-    // assignment. We capture the ready inside the handler regardless
-    // and use a deferred-shutdown flag for the late case.
-    let client: BridgeClient | null = null;
-    let pendingShutdown = false;
-    let readyHandled = false;
-
-    try {
-      client = await spawnBridgeProcess(
-        {
-          ...config,
-          sessionId: "__warmup__",
-        },
-        {
-          onEvent: (event) => {
-            if (event.kind !== "ready" || readyHandled) return;
-            readyHandled = true;
-            const llms: LLMOption[] = event.availableLLMs.map((l) => ({
-              index: l.index,
-              displayName: l.displayName,
-              isCurrent: l.isCurrent,
-            }));
-            const current = llms.find((l) => l.isCurrent);
-            set((state) => ({
-              llms,
-              llmDisplayName:
-                current?.displayName ?? state.llmDisplayName,
-            }));
-            void setPref("llm_list", llms).catch((e) => {
-              console.debug("[warmup] llm_list cache failed.", e);
-            });
-            // Shutdown the warmup bridge — we only needed the
-            // ready event. If client isn't yet assigned (the
-            // spawn promise hasn't resolved on this microtask
-            // yet), defer to post-assignment below.
-            if (client) {
-              void client.shutdown(5000);
-            } else {
-              pendingShutdown = true;
-            }
-          },
-          onStderr: (line) => console.debug("[warmup stderr]", line),
-          onClose: () => console.debug("[warmup] closed"),
-          onError: (msg) => console.warn("[warmup] error:", msg),
-        },
-      );
-      if (pendingShutdown) {
-        void client.shutdown(5000);
-      }
-      // Belt-and-suspenders: if `ready` never arrives within 15s
-      // (bad gaPath, mykey.py syntax error, etc.), kill the orphan
-      // bridge so we don't leak a Python process. _warmupComplete
-      // stays true so we don't retry this app instance — the user
-      // will see stale list and can restart or update gaConfig.
-      setTimeout(() => {
-        if (!readyHandled && client) {
-          console.warn("[warmup] ready timeout, shutting down");
-          void client.shutdown(5000);
-        }
-      }, 15000);
-    } catch (e) {
-      console.warn("[store] warmupLLMList spawn failed:", e);
-      // Reset so a future setGAConfig (or app restart) can retry.
-      set({ _warmupComplete: false });
-    }
-  },
+  // ---- LLMs (DELETED M3a — replaceLLMs / selectLLMForNewSession /
+  // warmupLLMList all moved to runtime.ts) ----
 
   // ---- Conversation (per-session) ----
   appendUserTurn: (sessionId, text) => {
@@ -2477,8 +2247,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       })),
     ),
 
-  setPetAttachedSession: (sessionId) =>
-    set({ petAttachedSessionId: sessionId }),
+  // setPetAttachedSession moved to runtime.ts (M3a, 2026-05-19).
 
   // ---- Bridge runtime ----
   setBridgeStatus: (sessionId, status) =>
@@ -2688,9 +2457,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const { getVersion } = await import("@tauri-apps/api/app");
       const realVersion = await getVersion();
-      set((state) => ({
-        runtimeInfo: { ...state.runtimeInfo, workbenchVersion: realVersion },
-      }));
+      useRuntimeStore
+        .getState()
+        .patchRuntimeInfo({ workbenchVersion: realVersion });
     } catch (e) {
       console.debug("[store] hydrateFromDB: app.getVersion failed.", e);
     }
@@ -2825,11 +2594,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       const cachedLLMs = await getPref<LLMOption[]>("llm_list");
       if (cachedLLMs && cachedLLMs.length > 0) {
-        const current = cachedLLMs.find((l) => l.isCurrent);
-        set((state) => ({
-          llms: cachedLLMs,
-          llmDisplayName: current?.displayName ?? state.llmDisplayName,
-        }));
+        useRuntimeStore.getState().seedCachedLLMs(cachedLLMs);
       }
     } catch (e) {
       console.warn("[store] hydrateFromDB: llm_list pref load failed.", e);
@@ -2865,14 +2630,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...saved,
           useExternalPython: saved.useExternalPython ?? false,
         };
-        set((state) => ({
-          gaConfig: migrated,
-          runtimeInfo: {
-            ...state.runtimeInfo,
-            gaPath: saved.gaPath,
-            pythonVersion: pythonDisplay,
-          },
-        }));
+        set({ gaConfig: migrated });
+        useRuntimeStore.getState().patchRuntimeInfo({
+          gaPath: saved.gaPath,
+          pythonVersion: pythonDisplay,
+        });
       }
     } catch (e) {
       console.warn("[store] hydrateFromDB: ga_config pref load failed.", e);
@@ -2895,7 +2657,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // event; warmup ensures EmptyState shows the current list before
     // the user clicks the LLM picker. Fire-and-forget — warmup runs
     // in the background and doesn't block hydrate completion.
-    void get().warmupLLMList();
+    void useRuntimeStore.getState().warmupLLMList();
   },
 
   seedMockSessions: async () => {

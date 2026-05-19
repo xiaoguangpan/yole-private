@@ -12,6 +12,7 @@ import type {
   ToolResult as IPCToolResult,
 } from "@/types/ipc";
 
+import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore } from "@/stores/ui";
 import type { useAppStore } from "@/stores/useAppStore";
 
@@ -57,7 +58,7 @@ export function dispatchIPCEvent(
       // bridge has its own currently-selected LLM. The active session's
       // pair projects up to top-level `llms` / `llmDisplayName` for
       // Composer / Command Palette / Inspector reads.
-      s.replaceLLMs(
+      useRuntimeStore.getState().replaceLLMs(
         event.sessionId,
         event.availableLLMs.map((l) => ({
           index: l.index,
@@ -72,14 +73,11 @@ export function dispatchIPCEvent(
       // the same across every bridge (they all run against the same
       // ga_path), so writing on every `ready` is safe — N-active
       // background bridges don't conflict.
-      store.setState((state) => ({
-        runtimeInfo: {
-          ...state.runtimeInfo,
-          gaCommit: event.gaCommit,
-          gaCommitDate: event.gaCommitDate,
-          bridgePid: event.pid,
-        },
-      }));
+      useRuntimeStore.getState().patchRuntimeInfo({
+        gaCommit: event.gaCommit,
+        gaCommitDate: event.gaCommitDate,
+        bridgePid: event.pid,
+      });
       // Sync session-scoped state to the freshly-spawned bridge.
       // YOLO mode (PRD §11.5): the bridge boots with yolo_mode=false;
       // if the user has it persisted as on, push the override now —
@@ -116,13 +114,15 @@ export function dispatchIPCEvent(
         displayName: event.displayName,
         sessionId: event.sessionId,
       });
-      // Re-read this session's current LLM list from the store rather
+      // Re-read this session's current LLM list from runtimeStore rather
       // than the top-level projection — the `llm_changed` event might
       // be for a non-active session (background bridge that the user
       // had set_llm'd before switching sessions), in which case
-      // `s.llms` projects the wrong session.
-      const rtLLMs = s._runtimes[event.sessionId]?.llms ?? s.llms;
-      s.replaceLLMs(
+      // the active-session projection would otherwise be the wrong list.
+      const rtStore = useRuntimeStore.getState();
+      const rtLLMs =
+        rtStore.byId[event.sessionId]?.llms ?? rtStore.cachedLLMs;
+      rtStore.replaceLLMs(
         event.sessionId,
         rtLLMs.map((l) => ({
           ...l,
@@ -295,7 +295,7 @@ export function dispatchIPCEvent(
         sessionId: event.sessionId,
         port: event.port,
       });
-      s.setPetAttachedSession(event.sessionId);
+      useRuntimeStore.getState().setPetAttachedSession(event.sessionId);
       // Clear any stale migration target so a future detach can't
       // re-trigger an attach on a session the user no longer wants.
       useUiStore.getState().setPendingPetMigration(null);
@@ -321,8 +321,10 @@ export function dispatchIPCEvent(
       // Only clear top-level if it was attached to this session —
       // defensive against out-of-order events. In practice the bridge
       // only emits pet_detached for the session it was attached to.
-      if (s.petAttachedSessionId === event.sessionId) {
-        s.setPetAttachedSession(null);
+      if (
+        useRuntimeStore.getState().petAttachedSessionId === event.sessionId
+      ) {
+        useRuntimeStore.getState().setPetAttachedSession(null);
       }
       // Implicit-migration relay: the user clicked "桌面宠物" in a
       // non-holder session; we detached the holder, and now (port
