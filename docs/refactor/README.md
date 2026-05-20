@@ -30,24 +30,19 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → [B4 M1 sub-plan + 6 O resolved ✅] → v0.5
+Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → [B4 M1.1 prereq ✅] → v0.5
                                                 ↑ 现在在这里
-Status:   B4 M1 sub-plan shipped + 6 open decisions resolved (2026-05-20,
-          same-day paperwork session, sub-plan 793 lines). 3 decisions
-          adopted alternative path (not original sub-plan lean):
-          O1 SQLite transaction wrap (atomic create + send), O2 rename
-          `project archive` → `project delete` (honest naming), O3 rename
-          `project move` → `session move` (noun=verb subject). 3 confirmed:
-          O4 punt to M4 SOP, O5 M7 hook only, O6 no `session kill` v0.5.
-          M1.1 prereq commit scope expanded: + PRD §11.1 rename + tx-aware
-          trait methods (`*_in_tx` variants). R1/R6/R7 closed; Reject
-          #11/#12/#13 added.
-Next:     M1.1 prereq implementation (fresh session). Tray spike can run
-          in parallel. Recommended order: M1.1 prereq → M1.2 session-write
-          (6 cmd incl session move) → M1.3 project+llm (3+2 cmd) → M1.4
-          agent-api+tests → dogfood 1-2 day.
-Blocker:  None for M1.1. B4 phase-level gate (tray spike + dogfood window)
-          still pending for M2 start.
+Status:   B4 M1.1 prereq commit shipped (2026-05-20, `dd4f6cf`):
+          GalleyError::RunnerError variant + exit code 5; socket helpers
+          (origin_from_args / map_galley_err) + drive-by DbUnavailable
+          fix in dispatch_session_send; transaction-aware trait variants
+          (create_session_in_tx / send_message_in_tx / begin_tx) for O1
+          atomicity; get_pref_json for M1.3 llm list. 6 new tests cover
+          3 tx scenarios + 3 prefs scenarios. 140/140 cargo test pass.
+Next:     M1.2 session-write commands (6 cmd: new with tx wrap / btw /
+          stop / archive / restore / move). Largest M1 commit. GUI
+          ipc-handlers gains 4 new external-emit listeners.
+Blocker:  None for M1.2. M2 still gated on tray spike + dogfood window.
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
@@ -60,7 +55,7 @@ Blocker:  None for M1.1. B4 phase-level gate (tray spike + dogfood window)
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
 | B3: useAppStore 拆 slice + 改订阅 | ✅ COMPLETE · M1-M6 · A1-A11 全 tick · tag `b3-complete` | — | [B3-store-slice.md](./B3-store-slice.md) · [B3 完成 devlog](../devlog/2026-05-20-b3-store-slice-complete.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · M4 [devlog](../devlog/2026-05-19-b3-m4-complete.md) · M5 [devlog](../devlog/2026-05-19-b3-m5-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) · [M5 sub-plan](./B3-M5-sub-plan.md) · [M6 sub-plan](./B3-M6-sub-plan.md) | 2026-05-20 sixth session: M6 sub-plan + impl + M7 acceptance + devlog + tag 全 ship。B3 整体跨 6 session、2 day calendar (estimate 3-4 weeks)，21× faster. JC dev dogfood 2026-05-20 initial pass。最终 6 文件 + 1 lib orchestrator. useAppStore.ts 整文件删除. tag `b3-complete`. |
-| B4: CLI feature-complete + background + artifact | 📋 Playbook ready · M1 sub-plan + 6 O resolved · M1.1 ready to implement | T1.1 prereq commit (tray spike + dogfood window still gate M2) | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) · [B4 M1 sub-plan](./B4-M1-sub-plan.md) | 2026-05-20 same-day double paperwork: M1 sub-plan ship 661 → resolve 6 O → sub-plan 793 lines. **3 decisions adopted alt path** (O1 SQLite tx wrap atomic create+send / O2 rename `project archive`→`project delete` / O3 rename `project move`→`session move`); 3 confirm 原 lean (O4 M4 punt / O5 M7 hook only / O6 no `session kill` v0.5). M1.1 prereq scope ↑: + PRD §11.1 rename + tx-aware trait methods (`*_in_tx` variants). R1/R6/R7 closed; Reject #11/#12/#13 加. **N6 dogfood watch**: bridge wedge complaints → v0.6+ `session kill`. M1 impl 仍跟 tray spike 完全独立可并行。 |
+| B4: CLI feature-complete + background + artifact | 🔨 M1.1 prereq shipped · M1.2 session-write next | T1.2 session.new socket handler (tray spike + dogfood window still gate M2) | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) · [B4 M1 sub-plan](./B4-M1-sub-plan.md) | 2026-05-20 same-day triple-commit: M1 sub-plan ship 661 → resolve 6 O → sub-plan 793 lines → **M1.1 prereq commit `dd4f6cf`** (GalleyError::RunnerError + socket helpers + tx-aware trait variants `create_session_in_tx` / `send_message_in_tx` / `begin_tx` + get_pref_json + 6 new tests, 140/140 cargo test pass). 3 decisions adopted alt path (O1/O2/O3 sub-plan); R1/R6/R7 closed. Drive-by: dispatch_session_send DbUnavailable mapping bug fix (was collapsing to exit 1). **N6 dogfood watch**: bridge wedge complaints → v0.6+ `session kill`. |
 | **v0.5 milestone** | ⏳ | — | — | — |
 
 预计总时长：**10-12 周**（不含 v0.2 Windows release）。

@@ -1,10 +1,10 @@
 # B4 · CLI feature-complete + background mode + adapter artifact
 
 ```
-Cursor:   T1.1 · M1.1 prereq commit (sub-plan ship + 6 O resolved 2026-05-20；M1.1 实施推 fresh session)
-Status:   📋 Playbook ready · M1 sub-plan ship + 6 O resolved · M1.1 ready to implement
+Cursor:   T1.2 · session.new socket handler (M1.2 commit — session-write 6 cmd)
+Status:   📋 Playbook ready · M1 sub-plan + 6 O resolved · M1.1 prereq commit shipped 2026-05-20
 Started:  2026-05-20 (paperwork)
-Last touch: 2026-05-20 PM — M1 sub-plan 6 open decisions resolved (O1 transaction wrap / O2 project delete rename / O3 session move rename / O4-O6 confirm 原 lean)；sub-plan 793 行 含 §9 resolution section + R1/R6/R7 closed + Reject #11/#12/#13 加。M1.1 prereq commit scope 现含 PRD §11.1 rename + tx-aware trait methods + GalleyError::RunnerError + socket helpers
+Last touch: 2026-05-20 PM — M1.1 prereq commit shipped (`dd4f6cf`)：GalleyError::RunnerError + exit code 5 + socket helpers (origin_from_args / map_galley_err) + tx-aware trait variants (create_session_in_tx / send_message_in_tx / begin_tx) + get_pref_json + 6 new tests (140 total pass). PRD §11.1 rename 已在 sub-plan commit `81d27d5`。drive-by: dispatch_session_send DbUnavailable bug fix (was collapsing to exit 1)。
 Predecessor: B3 ✅ tag b3-complete
 Successor:   v0.5 milestone ship
 Duration:    PRD estimate 2-3 周（D51-D65），按 B1/B2/B3 节奏可能压缩到 1-2 周
@@ -80,6 +80,7 @@ B4 ship = v0.5 RC，dogfood 一周后 ship 正式 v0.5（dual-native orchestrato
 ### Sub-tasks
 
 - [x] **T1.0** M1 sub-plan ship (paperwork-only commit) — [B4-M1-sub-plan.md](./B4-M1-sub-plan.md) ship 2026-05-20
+- [x] **T1.1** M1.1 prereq commit — `dd4f6cf` (GalleyError::RunnerError + socket helpers + tx-aware trait variants + get_pref_json + 6 new tests, 140 total pass)
 - [ ] **T1.1** `galley session new "<task>" [--project=X] [--llm=...] [--supervisor=...] [--reason=...]`
   - Rust: `GalleyApi::create_session_with_first_message` — 复用 M4 `create_session` + B2 `send_message`，组合成 atomic 操作（防 race condition：CLI 创建 session 时 GUI 不该看到「空 session 突然来一条消息」）
   - CLI: `session new` subcommand
@@ -326,6 +327,8 @@ v0.5 RC → v0.5 GA 的 release ceremony。
 ### Session 跑下来追加的 notes（按日期）
 
 - **N1 (2026-05-20, B4 playbook 升格)** — Stub (144 行) 升格成详细 playbook (~500 行)。沿用 B3 sub-plan-then-impl 模式：M1-M9 每个 milestone 实施前**单独写 sub-plan**。Acceptance 沿用 stub A1-A14 不动。新增 B4-I1..I7 phase invariants（沿用 CLAUDE.md 4 条架构原则 + B4 特定规则如 schema freeze / SOP 路径固定 / migration 备份强制）。Sub-task 颗粒度跟 B1/B2/B3 对齐（T1.1-TN.X 数字编号 + sub-task 完成标志逐 milestone 列）。Open: [O1-O6 沿用 stub](#open-decisions)；新加 [O7 NEW](#open-decisions-new) tray spike 何时跑（prereq 阶段 vs M2 开头）+ [O8 NEW](#open-decisions-new) M3 PATH install 失败 fallback strategy。
+
+- **N7 (2026-05-20 PM, M1.1 prereq commit shipped)** — `dd4f6cf` ship: 6 files +506/-143 (cli/main.rs / core/api.rs / core/db.rs / core/error.rs / core/socket_listener.rs / core/tests/db_writes_test.rs)。**核心实现**：(a) GalleyError::RunnerError variant + Display arm + exit code 5 wired in CLI；(b) socket helpers `origin_from_args` + `map_galley_err` 提取到 socket_listener.rs，dispatch_session_send body 简化 (drive-by fix: DbUnavailable 之前被错误折叠到 "internal" exit 1，现在正确报 "db_unavailable" exit 4)；(c) **tx-aware trait variants ship**：`create_session_in_tx` + `send_message_in_tx` + `begin_tx` 加进 GalleyApi trait，SqliteGalley impl 通过 `insert_session_row_inner` + `insert_user_message_inner` 共享 helper (单源 SQL + validation logic)；(d) `get_pref_json` 加进 trait (M1.3 `llm list` 走 SQLite prefs cache 用)；(e) 6 new tests in db_writes_test (3 tx scenarios: commit / drop-rollback / second-call-fail-rollback；3 get_pref scenarios: missing key / round-trip / corrupt value)。**Tests**: 140/140 pass (was 134, +6 new)。**Decisions during impl**：(1) trait method `get_pref<T>` 改 `get_pref_json -> Value` 避开 async_trait generic 麻烦，CLI 端 from_value::<T> typed shape；(2) helpers take `&mut SqliteConnection` (PoolConnection / Transaction 都 deref 到这个)；(3) 既有 owned-pool 方法保留 byte-identical signature (GUI Tauri command path 零 breaking)。**Pre-existing clippy lints noted not fixed** (CI 不跑 clippy)：origin.rs doc list overindent (rust 1.94 new lint) + db_test.rs too_many_arguments (test fixture)。**Open for M1.2**: session.new socket handler 实现 (tx wrap + clap subcommand) 是下一步最大块；session move 是 O3 新加；GUI ipc-handlers 加 5 new listener (session-archived-external / session-unarchived-external / session-moved-external / project-created-external / project-deleted-external)。
 
 - **N6 (2026-05-20 PM, dogfood watch item · session kill v0.6+)** — O6 resolved「v0.5 不加 `session kill`」附带条件：B4 dogfood + v0.5 ship 后 dogfood 1 周期间，**主动观察 bridge wedge 报告**（Python hang / OOM / IPC deadlock 类）。如出现 1+ 用户/agent 报「bridge 不响应只能 Cmd-Q」→ v0.6+ ship `session kill` (Shutdown surface)。M2 menubar daemon mode 让 Cmd-Q 成本变高（关窗 ≠ 退出），wedge case 应更显眼。watch period: v0.5 ship → v0.6 plan kickoff (1-2 weeks)。
 
