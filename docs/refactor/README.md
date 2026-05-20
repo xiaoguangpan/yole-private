@@ -30,25 +30,23 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → [B3 M1-M6 ✅ code-complete] → M7 → v0.5
-                                                                       ↑ 现在在这里
-Status:   B3 M6 SHIPPED (2026-05-20). Single commit M6 9 files
-          +505/-580 LOC = net -75: new prefs.ts (378) + lib/hydrate.ts
-          (127), useAppStore.ts deleted entirely (-465), 5 reverse
-          cross-store callers swapped (App.tsx 14 hooks + Onboarding +
-          runtime + sessions + ipc-handlers). dispatchIPCEvent store
-          param removed (uniform with other slices). Cold-start
-          orchestrator now lives in lib/hydrate.ts (pure module, no
-          state). DevTools __store → __prefs. V3 grep verifies zero
-          useAppStore / TRANSITIONAL references remain. 126/126 Rust
-          tests + TS typecheck + lint + cargo check all clean. Rust
-          untouched (B3-I4 holds).
-Next:     B3 M5 + M6 dogfood combined (JC真跑) →
-          M7 acceptance (A6/A7/A8 tick) + B3 完成 devlog +
-          tag b3-complete.
-Blocker:  M5 + M6 dogfood (B3-I1) — JC 验证 R3 auto-scroll regression
-          + R4 turnIndexOffset PK correctness (M5) + V1-V10 + 7
-          cluster scenarios (M6). No paperwork pending.
+Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → [B4] → v0.5
+                                                ↑ 现在在这里
+Status:   B3 COMPLETE (tag b3-complete, 2026-05-20). 6 session, 2 day
+          calendar (playbook estimate 3-4 weeks could slip to 5-6).
+          Final layout: ui (66) + runtime (~680) + sessions (~1160) +
+          messages (584 + rowsToTurns 123) + prefs (378) + lib/hydrate
+          (127). useAppStore.ts deleted. V3 grep useAppStore /
+          TRANSITIONAL == 0. 126/126 Rust tests + TS typecheck + lint
+          + cargo check clean. JC dev dogfood 2026-05-20 initial pass.
+Next:     B4 playbook stub upgrade (dedicated paperwork session per
+          B1/B2/B3 established pattern). Then sub-plan-then-impl
+          chain to ship CLI feature-complete + menubar background +
+          Galley Supervisor SOP + agent-api.md v1 + discovery file.
+Blocker:  None for B4 paperwork. B4 implementation starts when
+          dogfood stability window meets JC's gut check (B4 is a
+          phase switch, should be more conservative than milestone
+          switches inside B3).
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
@@ -60,7 +58,7 @@ Blocker:  M5 + M6 dogfood (B3-I1) — JC 验证 R3 auto-scroll regression
 | Prototype: Rust-owned subprocess | ✅ COMPLETE · 17/17 · GO | — | [bridge-owner/README.md](../../core/experiments/bridge-owner/README.md) | 2026-05-18 session 1: all 5 subsections in one sprint |
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
-| B3: useAppStore 拆 slice + 改订阅 | 🟡 M1-M6 ✅ code-complete (M5+M6 dogfood pending) | M5+M6 combined dogfood → M7 acceptance + tag | [B3-store-slice.md](./B3-store-slice.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · M4 [devlog](../devlog/2026-05-19-b3-m4-complete.md) · M5 [devlog](../devlog/2026-05-19-b3-m5-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) · [M5 sub-plan](./B3-M5-sub-plan.md) · [M6 sub-plan](./B3-M6-sub-plan.md) | 2026-05-20 sixth session: M6 sub-plan + implementation 同 session 串完。Single commit M6 9 files +505/-580 LOC = net -75 (new prefs.ts 378 + lib/hydrate.ts 127, useAppStore.ts deleted entirely -465, 5 reverse callers swapped, dispatchIPCEvent store param removed, DevTools __store → __prefs, stale doc comments + TRANSITIONAL labels swept). V3 grep verifies zero useAppStore / TRANSITIONAL refs. 126/126 Rust tests + TS typecheck + lint + cargo check clean. Rust 端不动 (B3-I4). |
+| B3: useAppStore 拆 slice + 改订阅 | ✅ COMPLETE · M1-M6 · A1-A11 全 tick · tag `b3-complete` | — | [B3-store-slice.md](./B3-store-slice.md) · [B3 完成 devlog](../devlog/2026-05-20-b3-store-slice-complete.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · M4 [devlog](../devlog/2026-05-19-b3-m4-complete.md) · M5 [devlog](../devlog/2026-05-19-b3-m5-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) · [M5 sub-plan](./B3-M5-sub-plan.md) · [M6 sub-plan](./B3-M6-sub-plan.md) | 2026-05-20 sixth session: M6 sub-plan + impl + M7 acceptance + devlog + tag 全 ship。B3 整体跨 6 session、2 day calendar (estimate 3-4 weeks)，21× faster. JC dev dogfood 2026-05-20 initial pass。最终 6 文件 + 1 lib orchestrator. useAppStore.ts 整文件删除. tag `b3-complete`. |
 | B4: CLI feature-complete + background + artifact | ⏳ 未启动 | — | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) (stub) | 2026-05-15 stub |
 | **v0.5 milestone** | ⏳ | — | — | — |
 
