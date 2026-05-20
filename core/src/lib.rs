@@ -3,6 +3,7 @@ pub mod db;
 pub mod discovery;
 pub mod error;
 pub mod ipc;
+pub mod migration_backup;
 pub mod path_install;
 pub mod runner_commands;
 pub mod runner_manager;
@@ -379,6 +380,16 @@ pub fn run() {
         },
     ];
 
+    // Pre-migration backup hook (B4 M8). Derived — not hard-coded —
+    // from the migrations vec above so adding a new migration only
+    // requires editing one place. Captured into the setup closure
+    // below and evaluated BEFORE `tauri-plugin-sql` opens the DB.
+    let latest_migration_version: i64 = migrations
+        .iter()
+        .map(|m| m.version)
+        .max()
+        .unwrap_or(0);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
@@ -431,7 +442,39 @@ pub fn run() {
             runner_commands::runner_stderr_tail,
             runner_commands::shutdown_all_runners,
         ])
-        .setup(|_app| {
+        .setup(move |_app| {
+            // Pre-migration backup (B4 M8 · invariant B4-I6). Runs
+            // BEFORE `tauri-plugin-sql` opens the DB — the plugin
+            // doesn't connect until the JS side calls `Database.load()`
+            // after webview ready, which is after this setup closure
+            // returns. If the on-disk schema is older than the latest
+            // we know about, we copy the entire data dir to a sibling
+            // `app.galley.backup.<utc-timestamp>/` first. A failure
+            // here aborts startup — we'd rather refuse to open than
+            // attempt a migration with no safety net.
+            match migration_backup::ensure_backup_before_migrate(latest_migration_version) {
+                Ok(outcome) => {
+                    eprintln!("[backup] {outcome:?}");
+                }
+                Err(e) => {
+                    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                    let data_dir = migration_backup::resolve_data_dir()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "<unable to resolve app data dir>".into());
+                    let msg = format!(
+                        "Galley 无法启动：备份失败。\n\n{e}\n\n你的原始数据安全在：\n{data_dir}\n\n请检查磁盘空间或目录权限后重试。"
+                    );
+                    eprintln!("[backup] FATAL: {e}");
+                    let _ = _app
+                        .dialog()
+                        .message(&msg)
+                        .kind(MessageDialogKind::Error)
+                        .title("Galley")
+                        .blocking_show();
+                    std::process::exit(2);
+                }
+            }
+
             // Start the local socket listener (Unix socket on macOS/Linux,
             // Windows named pipe on Windows). CLI clients connect here to
             // send write commands + watch event streams from B2 M4 onward.

@@ -71,6 +71,13 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 # CLI binary has no AppHandle — see `db_path()` in `db.rs`.
 directories = "5"
 
+# UTC timestamps for migration backup directory names (B4 M8). Already in
+# the dep tree transitively via sqlx, so this declaration is zero net-new
+# crate cost. `default-features = false` drops time-zone + serde + clock
+# subfeatures we don't need — only `now()` + `format()` for the compact
+# YYYYMMDDTHHMMSSZ filename pattern. See migration_backup.rs.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
 # Tokio is a production dep (RunnerManager owns Python runner subprocesses
 # from B2 M1 onward — see runner_manager.rs). The feature set is the union
 # of what RunnerManager needs (process, sync, io-util, time, macros,
