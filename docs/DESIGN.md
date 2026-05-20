@@ -687,7 +687,7 @@ Context Window / 价格 / token estimate（V0.1 拿不到 + 信息噪音）
 ### Step 0 — 欢迎页
 
 - 大标题 `Galley`（Newsreader medium 36px）
-- 衬线副标题（italic muted 18px）："GA 的本地桌面工作台"
+- 衬线副标题（italic muted 18px）："GenericAgent 的本地 agent team 编排器"
 - 三件事简列（13px Inter，charcoal）：
   - 多 session 并行
   - 高风险动作审批

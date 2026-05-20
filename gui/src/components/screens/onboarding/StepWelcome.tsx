@@ -33,7 +33,7 @@ export function StepWelcome({ onStart }: StepWelcomeProps) {
         Galley
       </h1>
       <p className="mb-9 mt-3 font-serif text-[18px] italic leading-[1.55] text-ink-soft">
-        GenericAgent 的本地桌面工作台
+        GenericAgent 的本地 agent team 编排器
       </p>
 
       <div className="space-y-3">
