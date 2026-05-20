@@ -465,16 +465,17 @@ migration 失败 → app 拒绝启动 + 显示错误页面：
 
 ## 17. 路线图
 
-| 阶段 | 时间窗 | 目标 |
+| 阶段 | 时间窗 / 状态 | 目标 |
 |---|---|---|
-| v0.1 Mac release | 5月下旬 | 现有代码出包 (.app + .dmg) |
-| v0.2 Windows | 6-7月 | NSIS .exe + Win/Mac 跨平台 |
-| Prototype: Rust-owned subprocess | B1 前 2-3 天 | throwaway 验证（详见 [prototype spec](../core/experiments/bridge-owner/README.md)） |
-| B1: Rust core 骨架 + CLI 只读 | 3w | 目录重组、core/cli/gui/runner 四目录、6 个 read 命令 |
-| B2: Runner ownership 迁 Rust | 3w | Rust 持 child handle，CLI send_message 写命令 |
-| B3: useAppStore 拆 slice 改订阅 | 3-4w | GUI 改 presenter，最 risky 阶段 |
-| B4: CLI feature-complete + background mode | 2-3w | 全命令 + menubar + SOP + Skill + agent-api.md |
-| **v0.5** | 10月底-11月初 | dual-native orchestrator 正式发布 |
+| v0.1 Mac release | 5月下旬 ✅ | 现有代码出包 (.app + .dmg) |
+| v0.1.1 内置 Python | 2026-05-18 ✅ | bundled CPython + GA core deps，零 Python 配置；Mac arm64 + Intel + Win 全 ship |
+| v0.2 Windows | 6-7月 / B-refactor 不挡，剩 Win 机 smoke + NSIS dry-run | NSIS .exe + Win/Mac 跨平台 |
+| Prototype: Rust-owned subprocess | B1 前 2-3 天 ✅ (2026-05-18) | throwaway 验证 (17/17 PASS · GO for B1) |
+| B1: Rust core 骨架 + CLI 只读 | 1 session ✅ (2026-05-18) | 目录重组、core/cli/gui/runner 四目录、6 个 read 命令 |
+| B2: Runner ownership 迁 Rust | 1 session ✅ (2026-05-19) | Rust 持 child handle，CLI send_message 写命令 |
+| B3: useAppStore 拆 slice 改订阅 | 2 day calendar ✅ (2026-05-20, tag `b3-complete`) | GUI 改 presenter，最 risky 阶段；useAppStore.ts 删除 |
+| B4: CLI feature-complete + background mode | 进行中 (7/9 milestones shipped) | 全命令 ✅ M1 + menubar ⏳ M2 + SOP ✅ M4 T4.1 + Skill ✅ M5 + agent-api.md ✅ M6 frozen + supervisor activity GUI ✅ M7 + 数据迁移备份 ✅ M8 |
+| **v0.5** | TBD (dogfood 1 周后 ship) | dual-native orchestrator 正式发布 |
 
 详细 phase invariant、dogfood 策略、failure handling 见 [vision pivot devlog](./devlog/2026-05-15-vision-pivot-to-orchestrator.md) §D4 + §D13。
 
