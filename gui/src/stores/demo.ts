@@ -1,25 +1,27 @@
 /**
- * Demo data for V0.1 (#3-#8). All hand-rolled fixtures used by the
- * Zustand store's initial state plus a couple of derivation helpers
- * that translate approval decisions into a turn list / pending list
- * for the in-memory demo flow.
+ * Hand-rolled fixtures used by the Zustand stores' initial state plus
+ * the DevScreenToggle dev tools. Two distinct flavors live here:
  *
- * #9 starts replacing this file: SQLite persistence + bridge IPC
- * events feed real state, and these helpers go away.
+ *   - **Production defaults** (DEMO_GA_CONFIG / DEMO_APPROVAL_CONFIG /
+ *     DEMO_LLMS / DEMO_LLM_DISPLAY_NAME / DEMO_RUNTIME_INFO) — fall-
+ *     back values consumed before the bridge / SQLite hydrate
+ *     populates real state. Misleadingly prefixed `DEMO_` for legacy
+ *     reasons; they are load-bearing in prod.
+ *   - **Dev-only toast variants** (DEMO_TOAST_VARIANTS / makeDemoToast)
+ *     — wired through `DevScreenToggle` (DEV-gated) so style review
+ *     can trigger every toast variant without contriving real errors.
+ *
+ * The original V0.1 demo conversation fixtures (DEMO_SESSIONS,
+ * DEMO_USER_PROMPT, DEMO_PATCH_NEW_CONTENT, buildDemoTurns,
+ * buildDemoPending) are gone — they fed an `activeSessionId == null`
+ * fallback path in App.tsx that became unreachable once the empty
+ * state took over for "no session selected".
  */
 
 import type { ApprovalConfig } from "@/components/screens/settings/Settings";
 import { isWindows } from "@/lib/platform";
 import { type AppError, makeAppError } from "@/types/app-error";
-import type {
-  AgentTurn,
-  ConversationToolEvent,
-  PendingApproval,
-  Turn,
-} from "@/types/conversation";
 import type { RuntimeInfo } from "@/types/inspector";
-import type { ApprovalDecision } from "@/types/ipc";
-import type { Session } from "@/types/session";
 
 // ---------------- Static fixtures ----------------
 
@@ -84,211 +86,6 @@ export const DEMO_RUNTIME_INFO: RuntimeInfo = {
   gaBaseline: "cf6551516fcc836f21dcdad592b07c703d09e1d8",
   workbenchVersion: "0.1.0",
 };
-
-const NOW_ISO = new Date().toISOString();
-
-export const DEMO_SESSIONS: Session[] = [
-  {
-    id: "s-today-1",
-    title: "Galley 桌面端 SQLite schema",
-    status: "waiting_approval",
-    summary: "Turn 12 · 等待 file_patch 审批",
-    pendingApprovalCount: 1,
-    errorCount: 0,
-    lastActivityAt: NOW_ISO,
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-  {
-    id: "s-today-2",
-    title: "论文摘要：multi-agent retrieval",
-    status: "running",
-    summary: "Turn 4 · 抓取 arxiv 4 篇相关论文",
-    pendingApprovalCount: 0,
-    errorCount: 0,
-    lastActivityAt: NOW_ISO,
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-  {
-    id: "s-today-3",
-    title: "整理周会笔记",
-    status: "completed",
-    summary: "Turn 3 · 已生成会议要点",
-    pendingApprovalCount: 0,
-    errorCount: 0,
-    lastActivityAt: NOW_ISO,
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-  {
-    id: "s-week-1",
-    title: "修复 bridge 子进程 zombie",
-    status: "error",
-    summary: "Turn 5 · subprocess.kill() 抛 ProcessLookupError",
-    pendingApprovalCount: 0,
-    errorCount: 1,
-    lastActivityAt: new Date(Date.now() - 3 * 86400_000).toISOString(),
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-  {
-    id: "s-week-2",
-    title: "shadcn 组件库选型对比",
-    status: "completed",
-    summary: "Turn 6 · 推荐 shadcn + Radix",
-    pendingApprovalCount: 0,
-    errorCount: 0,
-    lastActivityAt: new Date(Date.now() - 2 * 86400_000).toISOString(),
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-  {
-    id: "s-earlier-1",
-    title: "Tauri vs Electron 调研",
-    status: "archived",
-    summary: "Turn 11 · 选定 Tauri v2",
-    pendingApprovalCount: 0,
-    errorCount: 0,
-    lastActivityAt: new Date(Date.now() - 14 * 86400_000).toISOString(),
-    createdAt: NOW_ISO,
-    updatedAt: NOW_ISO,
-  },
-];
-
-// ---------------- Conversation derivation ----------------
-
-const DEMO_USER_PROMPT =
-  "帮我把 sessions 表的 SQL schema 写到 desktop/src/db/migrations/001_init.sql。" +
-  "需要支持 PRD §8.1 里的所有字段（id, projectId, title, status, currentTool, " +
-  "pendingApprovalCount, errorCount, lastActivityAt, createdAt, updatedAt, pid, " +
-  "cwd），并加上必要的索引。";
-
-const DEMO_FINAL_ANSWER_ALLOWED =
-  "已为你生成 desktop/src/db/migrations/001_init.sql，包含 projects / sessions 两张表的初始 schema。下一步建议跑 pnpm db:migrate 验证 schema 可用。";
-
-const DEMO_FINAL_ANSWER_DENIED =
-  "收到 denied 信号。已切换方案 — 把 schema 输出为 markdown 放在回复里，由你手动落盘。";
-
-const DEMO_PATCH_NEW_CONTENT = `-- 001_init.sql · Galley v0.1
--- Created by GA agent · 2026-05-08
-
-CREATE TABLE projects (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  root_path   TEXT,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
-);
-
-CREATE TABLE sessions (
-  id                TEXT PRIMARY KEY,
-  project_id        TEXT REFERENCES projects(id) ON DELETE SET NULL,
-  title             TEXT NOT NULL,
-  status            TEXT NOT NULL CHECK (status IN
-    ('idle','running','waiting_approval','error','completed','archived')),
-  last_activity_at  TEXT NOT NULL
-);
-`;
-
-/**
- * Build a demo Turn[] from the current approval decision map. Used
- * until #10 wires real conversation state from the bridge.
- */
-export function buildDemoTurns(
-  decisions: Record<string, ApprovalDecision>,
-): Turn[] {
-  const decision = decisions["appr_demo1"];
-
-  const t1: ConversationToolEvent = {
-    id: "t1",
-    name: "file_read",
-    status: "success-historical",
-    summary: "读取 desktop/src/db/migrations/",
-    elapsed: "120ms",
-    args: { path: "desktop/src/db/migrations/" },
-  };
-  const t2: ConversationToolEvent = {
-    id: "t2",
-    name: "file_read",
-    status: "success-historical",
-    summary: "查看 docs/PRD.md §8",
-    elapsed: "80ms",
-    args: { path: "docs/PRD.md", start_line: 180, end_line: 230 },
-  };
-
-  let t3: ConversationToolEvent;
-  if (!decision) {
-    t3 = {
-      id: "t3",
-      name: "file_patch",
-      status: "waiting_approval",
-      summary: "新建 001_init.sql · 创建 sessions / projects 两张表与基础约束",
-      elapsed: "pending · 14s",
-      riskLevel: "medium",
-      approvalId: "appr_demo1",
-      args: {
-        path: "desktop/src/db/migrations/001_init.sql",
-        old_content: "",
-        new_content: DEMO_PATCH_NEW_CONTENT,
-      },
-    };
-  } else if (decision === "deny") {
-    t3 = {
-      id: "t3",
-      name: "file_patch",
-      status: "denied",
-      summary: "已拒绝 · agent 收到 denied 信号",
-      elapsed: "—",
-      args: {
-        path: "desktop/src/db/migrations/001_init.sql",
-      },
-    };
-  } else {
-    t3 = {
-      id: "t3",
-      name: "file_patch",
-      status: "success-current",
-      summary: "已写入 desktop/src/db/migrations/001_init.sql",
-      elapsed: "84ms",
-      args: {
-        path: "desktop/src/db/migrations/001_init.sql",
-      },
-      resultPreview: "[OK] 18 lines written.",
-    };
-  }
-
-  const finalAnswer = !decision
-    ? null
-    : decision === "deny"
-      ? DEMO_FINAL_ANSWER_DENIED
-      : DEMO_FINAL_ANSWER_ALLOWED;
-
-  const agent: AgentTurn = {
-    role: "agent",
-    thinking:
-      "先 file_read 看现有 migrations 目录结构，再 file_patch 加新文件。需要审批。",
-    tools: [t1, t2, t3],
-    finalAnswer,
-  };
-
-  return [{ role: "user", content: DEMO_USER_PROMPT }, agent];
-}
-
-/** Compute pending approvals for the demo turn. */
-export function buildDemoPending(
-  decisions: Record<string, ApprovalDecision>,
-): PendingApproval[] {
-  if (decisions["appr_demo1"]) return [];
-  return [
-    {
-      approvalId: "appr_demo1",
-      toolName: "file_patch",
-      target: "001_init.sql",
-      riskLevel: "medium",
-    },
-  ];
-}
 
 // ---------------- Toast variants ----------------
 

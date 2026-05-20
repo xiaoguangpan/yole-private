@@ -25,11 +25,7 @@ import {
 import { ProjectsDialog } from "@/components/screens/project/ProjectsDialog";
 import { bucketSession } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
-import {
-  buildDemoPending,
-  buildDemoTurns,
-  makeDemoToast,
-} from "@/stores/demo";
+import { makeDemoToast } from "@/stores/demo";
 import {
   EMPTY_APPROVALS,
   EMPTY_DECISIONS,
@@ -516,51 +512,15 @@ function App() {
     };
   }, [applyExternalProjectCreated, applyExternalProjectDeleted]);
 
-  // Conversation source-of-truth precedence:
-  //   1. store.turns + store.pendingApprovals — populated by IPC
-  //      handlers as bridge events arrive
-  //   2. demo fallback (buildDemoTurns / buildDemoPending) when the
-  //      store hasn't received anything yet — keeps Main View visible
-  //      in pre-bridge dev so layouts can be eyeballed
-  //
-  // Empty store + a connected bridge means "the user hasn't sent a
-  // message yet"; demo doesn't kick in then because state.turns is
-  // populated as soon as appendUserTurn fires.
-  const demoTurns = useMemo(
-    () => buildDemoTurns(approvalDecisions),
-    [approvalDecisions],
-  );
-  const demoPending = useMemo(
-    () => buildDemoPending(approvalDecisions),
-    [approvalDecisions],
-  );
-  // Single "is the user in a real conversation" signal drives both
-  // turns and pendingApprovals. Earlier code keyed each off its own
-  // length (`storeTurns.length` / `storePending.length`), which had
-  // a sharp edge: as soon as the user sent a real message that
-  // didn't trigger any tool dispatch (e.g. plain "你好"), turns
-  // came from the store but pendingApprovals fell back to demo
-  // because storePending was still []. Result: a fake "Patch file
-  // at —" Approval Card appearing out of nowhere on a chit-chat
-  // turn.
-  //
-  // We also short-circuit demo whenever an active session exists at
-  // all — even with empty turns. Activating a real session (mock
-  // fixture, freshly-created untyped session, or one whose bridge
-  // history hasn't finished replaying) used to surface the demo
-  // conversation because storeTurns was still []. The demo is only
-  // meaningful as a layout placeholder when there's literally no
-  // session selected (DevScreenToggle visual review of main view).
-  const conversationStarted =
-    activeSessionId != null || storeTurns.length > 0;
-  const turns = conversationStarted ? storeTurns : demoTurns;
-  const pendingApprovals = conversationStarted ? storePending : demoPending;
+  // Conversation source of truth: messagesStore turns + pendingApprovals,
+  // populated by ipc-handlers as bridge events stream in. When no session
+  // is active, MainView renders the empty state instead of <Conversation>,
+  // so these reduce to EMPTY_TURNS / EMPTY_APPROVALS without rendering.
+  const turns = storeTurns;
+  const pendingApprovals = storePending;
   // Composer Stop-mode is driven by the real `agentRunning` store flag
   // (set when user submits, cleared on turn_end / error / run_complete).
-  // Keep the demo heuristic OR'd in so the pre-bridge demo flow still
-  // exercises the Stop button visually.
-  const isRunning =
-    agentRunning || approvalDecisions["appr_demo1"] === "allow_once";
+  const isRunning = agentRunning;
 
   // Always show history in the sidebar (including on the empty
   // screen) so a user composing in "new chat" can still see and

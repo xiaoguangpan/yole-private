@@ -81,12 +81,12 @@ export async function deleteEmptyNewSessions(): Promise<number> {
 }
 
 /**
- * One-time migration: delete the v0.1 demo session fixtures
- * (`stores/demo.ts` DEMO_SESSIONS) from SQLite. Earlier hydrate
- * logic seeded these on first launch as visual placeholders for
- * the empty sidebar. Stage 3 ships real Session Restore +
- * onboarding, so the placeholders are now pure noise. Safe to
- * call repeatedly — `DELETE ... WHERE id IN (...)` is idempotent.
+ * One-time migration: delete the v0.1 demo session fixtures from
+ * SQLite. Early hydrate logic seeded these six rows on first launch
+ * as visual placeholders for the empty sidebar. Stage 3 ships real
+ * Session Restore + onboarding, so the placeholders are pure noise.
+ * Safe to call repeatedly — `DELETE ... WHERE id IN (...)` is
+ * idempotent.
  *
  * Returns rows deleted, primarily for debug logging.
  */
