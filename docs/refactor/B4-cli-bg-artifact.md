@@ -1,10 +1,10 @@
 # B4 · CLI feature-complete + background mode + adapter artifact
 
 ```
-Cursor:   T1.2 · session.new socket handler (M1.2 commit — session-write 6 cmd)
-Status:   📋 Playbook ready · M1 sub-plan + 6 O resolved · M1.1 prereq commit shipped 2026-05-20
+Cursor:   T1.7 · project create/list/delete + llm list/set (M1.3 commit — project + llm)
+Status:   📋 Playbook ready · M1.2 session-write 6 cmd shipped 2026-05-20
 Started:  2026-05-20 (paperwork)
-Last touch: 2026-05-20 PM — M1.1 prereq commit shipped (`dd4f6cf`)：GalleyError::RunnerError + exit code 5 + socket helpers (origin_from_args / map_galley_err) + tx-aware trait variants (create_session_in_tx / send_message_in_tx / begin_tx) + get_pref_json + 6 new tests (140 total pass). PRD §11.1 rename 已在 sub-plan commit `81d27d5`。drive-by: dispatch_session_send DbUnavailable bug fix (was collapsing to exit 1)。
+Last touch: 2026-05-20 PM — M1.2 session-write commit shipped (`3cfb8de`)：6 socket handler (session.new tx-wrapped via begin_tx + create_session_in_tx + send_message_in_tx; session.btw transient runner-only; session.stop = Abort 不 Shutdown idempotent; session.archive/restore/move thin wrappers) + 6 CLI subcommand (clap docs cover Abort-vs-Shutdown 决策 + v0.1 transient btw + noun-as-subject move grammar 自文档化) + 4 GUI listener (session-{created,archived,unarchived,moved}-external) + 2 sessionsStore action (applyExternalSessionCreated / applyExternalSessionUpdated)。1044 LOC across 4 files。Resolve LLM by display name (case-insensitive) via cached llm_list pref。Tests: 140 既有全过；integration tests 推 M1.4。M1.1 prereq commit shipped earlier same day (`dd4f6cf`).
 Predecessor: B3 ✅ tag b3-complete
 Successor:   v0.5 milestone ship
 Duration:    PRD estimate 2-3 周（D51-D65），按 B1/B2/B3 节奏可能压缩到 1-2 周
@@ -81,23 +81,11 @@ B4 ship = v0.5 RC，dogfood 一周后 ship 正式 v0.5（dual-native orchestrato
 
 - [x] **T1.0** M1 sub-plan ship (paperwork-only commit) — [B4-M1-sub-plan.md](./B4-M1-sub-plan.md) ship 2026-05-20
 - [x] **T1.1** M1.1 prereq commit — `dd4f6cf` (GalleyError::RunnerError + socket helpers + tx-aware trait variants + get_pref_json + 6 new tests, 140 total pass)
-- [ ] **T1.1** `galley session new "<task>" [--project=X] [--llm=...] [--supervisor=...] [--reason=...]`
-  - Rust: `GalleyApi::create_session_with_first_message` — 复用 M4 `create_session` + B2 `send_message`，组合成 atomic 操作（防 race condition：CLI 创建 session 时 GUI 不该看到「空 session 突然来一条消息」）
-  - CLI: `session new` subcommand
-  - socket route: `session.new`
-  - Test: 2 happy path（with/without project）+ 2 error（empty task / invalid project id）
-- [ ] **T1.2** `galley session btw <id> "<q>" [--supervisor=...]`
-  - Rust: 已有 send_message + side question 路径（B3 messagesStore appendSideQuestionUserTurn），加 `via='cli'` + `kind='btw'` 区分
-  - CLI: `session btw` subcommand
-  - Test: 验证主 agent loop 不中断（PRD §6.1 #5）
-- [ ] **T1.3** `galley session stop <id>`
-  - Rust: `GalleyApi::stop_session` — runner_manager.shutdown_bridge + emit run_complete event
-  - CLI + socket route
-  - Test: stop running session → bridge SIGKILL 路径 + GUI 状态正确
-- [ ] **T1.4** `galley session archive <id>` / `restore <id>`
-  - Rust: 复用 M4 `archive_session` / `unarchive_session` trait method（B3 已有）
-  - CLI: `session archive` / `session restore` 是 thin wrapper
-  - Test: 验证 GUI sidebar 即时更新
+- [x] **T1.2-T1.6** M1.2 session-write commit — `3cfb8de` (6 socket handler + 6 CLI subcommand + 4 GUI listener + 2 sessionsStore action; 1044 LOC; 140/140 cargo test pass; clean typecheck + lint). Detailed sub-plan numbering T1.2-T1.6 in [B4-M1-sub-plan.md §3](./B4-M1-sub-plan.md) is authoritative — the four legacy T1.1-T1.4 stub items below are subsumed.
+- [ ] ~~**T1.1** `galley session new`~~ — shipped under M1.2 above (atomic via SQLite tx wrap, sub-plan O1)
+- [ ] ~~**T1.2** `galley session btw`~~ — shipped under M1.2 above (transient, runner-only per sub-plan §1.5)
+- [ ] ~~**T1.3** `galley session stop`~~ — shipped under M1.2 above (Abort 不 Shutdown per sub-plan §1.4)
+- [ ] ~~**T1.4** `galley session archive` / `restore`~~ — shipped under M1.2 above (thin wrapper)
 - [ ] **T1.5** `galley project create / list / move / archive`
   - Rust: 复用 M4 `create_project` / `list_projects` / `assign_session_to_project` / `delete_project`（B3 已有）
   - CLI: 4 subcommand 是 thin wrapper
@@ -327,6 +315,8 @@ v0.5 RC → v0.5 GA 的 release ceremony。
 ### Session 跑下来追加的 notes（按日期）
 
 - **N1 (2026-05-20, B4 playbook 升格)** — Stub (144 行) 升格成详细 playbook (~500 行)。沿用 B3 sub-plan-then-impl 模式：M1-M9 每个 milestone 实施前**单独写 sub-plan**。Acceptance 沿用 stub A1-A14 不动。新增 B4-I1..I7 phase invariants（沿用 CLAUDE.md 4 条架构原则 + B4 特定规则如 schema freeze / SOP 路径固定 / migration 备份强制）。Sub-task 颗粒度跟 B1/B2/B3 对齐（T1.1-TN.X 数字编号 + sub-task 完成标志逐 milestone 列）。Open: [O1-O6 沿用 stub](#open-decisions)；新加 [O7 NEW](#open-decisions-new) tray spike 何时跑（prereq 阶段 vs M2 开头）+ [O8 NEW](#open-decisions-new) M3 PATH install 失败 fallback strategy。
+
+- **N9 (2026-05-20 PM, M1.2 session-write commit shipped)** — `3cfb8de` ship: 4 files +1044 (cli/main.rs +256 / core/socket_listener.rs +662 / gui/App.tsx +57 / gui/sessions.ts +69)。**核心实现**：(a) 6 socket dispatch handler 按 sub-plan §3 T1.2-T1.6 spec 1:1 落地——`session.new` 走 `begin_tx` + `create_session_in_tx` + `send_message_in_tx` + `tx.commit()`（任一 SQL fail 自动 rollback 无 partial state，O1 兑现），`session.btw` 验证 session 存在后 `IpcCommand::UserMessage{text: "/btw ..."}` 直送 runner（runner 端 `/btw` 前缀自动旁路，不进 messages 表，v0.1 transient 保持），`session.stop` 先 `agent_running()` check false → `already_stopped` idempotent / true → `IpcCommand::Abort`（ProcessGone race 也归 already_stopped），`session.archive`/`restore`/`move` 是 GalleyApi trait thin wrapper；(b) 4 个新 Tauri event emit: `session-{created,archived,unarchived,moved}-external`，payload shape `{session: SessionBrief, via: <command-name>}` 跟 `user-message-persisted` 同模板；(c) `resolve_llm_name()` helper 把 `--llm=<display-name>` case-insensitive 解析到 cached `llm_list` pref（GUI warmup 写的同 key）；空 cache → invalid_args「open Galley GUI once to warmup」；(d) `mint_session_id()` 在 socket handler 内完成（trait `create_session_in_tx` 接 caller-supplied id），格式 `s-<base36-ts>-<base36-rand>` 跟 GUI 一致；(e) `SocketResponseLite` 内部 error carrier 让 `resolve_llm_name` 不背 request_id；(f) `unary_command(req)` CLI helper 抽出 socket round-trip 共享逻辑，6 个新 CLI 子命令各 ~20 LOC；(g) sessionsStore 加 `applyExternalSessionCreated` (race-guarded prepend) + `applyExternalSessionUpdated` (durable field patch + archive-clears-active mirror)；App.tsx 一个 effect 块订阅 4 event 用 closure helper `subscribe(event, handler)`。**Tests**: 140/140 既有 cargo test 全过 + typecheck/lint clean；integration test 推 M1.4 (sub-plan T1.12)。**Decisions during impl**: (1) `session.btw` 的 supervisor/reason 字段加 `#[allow(dead_code)]` + 注释，CLI surface 对称 + M7 audit log hook 预留；(2) `session.stop` ProcessGone race（agent_running 返 true 后 process 立死）也归 already_stopped，因为 observable end state 一样；(3) 4 个 external event 用同一个 `SessionExternalPayload` struct 复用，via 字段做 discriminant；(4) GUI 侧两个 store action（创建 / 更新）而非 4 个 per event handler——同结构 patch；(5) `session.new` 没 spawn bridge（沿用 session.send policy），CLI 创建后 user 在 GUI 激活会 warmup。**Open for M1.3**: project + llm 写命令 (T1.7-T1.9 in sub-plan §3) — project create/list/delete (O2 rename from archive) + llm list (SQLite cache 直读)/set。Estimated commit ~500-700 LOC mirror M1.2 pattern。
 
 - **N8 (2026-05-20 PM, session-end handoff)** — This session pushed B4 paperwork through to M1.1 prereq ship. Commits in dependency order: `27af37c` (M1 sub-plan ship 661 行) → `81d27d5` (6 O resolved → sub-plan 793 行 + PRD §11.1 rename) → `dd4f6cf` (M1.1 prereq impl Rust：6 files +506/-143) → `78e5848` (doc sync)。**Next session pickup options**: (a) M1.2 session-write impl — 6 socket handler (new/btw/stop/archive/restore/move) + 6 CLI subcommand + 4 GUI ipc-handlers listener；预估 500-700 LOC，是 M1 最大块，tx wrap 实战验证 O1 决策；(b) tray spike 跑 — gate-blocking M2，需要 macOS + Windows 机访问；(c) B3 dogfood 继续 — JC 体感 driven。**Recommended pickup**: M1.2 fresh session。M1.1 已是完整 atomic deliverable (140/140 cargo test pass)，clean break。M1.2 跟 tray spike 仍完全独立，可并行。M1.2 启动先 read M1 sub-plan §3 T1.2-T1.6 详细 spec + N7 running note。
 
