@@ -1,6 +1,29 @@
 import { ArrowSquareOut, BookOpen, Folder, Terminal } from "@phosphor-icons/react";
+import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { usePrefsStore } from "@/stores/prefs";
+
+/**
+ * Outcome enum mirrored from Rust core/src/sop_install.rs. serde
+ * tag = "outcome" with snake_case rename, so the wire shape is
+ *   { outcome: "installed", path: "/…" } | { outcome: "already_exists", path: "/…" }
+ *   | { outcome: "ga_path_invalid", reason: "…" }
+ *   | { outcome: "write_failed", path: "/…", reason: "…" }
+ */
+type SopInstallOutcome =
+  | { outcome: "installed"; path: string }
+  | { outcome: "already_exists"; path: string }
+  | { outcome: "ga_path_invalid"; reason: string }
+  | { outcome: "write_failed"; path: string; reason: string };
+
+type SopInstallState =
+  | { kind: "idle" }
+  | { kind: "pending" }
+  | { kind: "already_exists"; path: string }
+  | { kind: "installed"; path: string }
+  | { kind: "error"; reason: string };
 
 /**
  * Settings → Integration tab. PRD §12 / B4 M3 surface — the screen
@@ -29,6 +52,9 @@ import { Button } from "@/components/ui/button";
  * T3.3 and T3.4 follow in subsequent commits.
  */
 export function SettingsIntegration() {
+  const gaPath = usePrefsStore((s) => s.gaConfig.gaPath);
+  const [sopState, setSopState] = useState<SopInstallState>({ kind: "idle" });
+
   const openExternal = (url: string) => {
     // Tauri exposes the OS shell via the plugin-shell capability;
     // an in-page anchor with target=_blank does the same in dev mode
@@ -36,6 +62,37 @@ export function SettingsIntegration() {
     // handler (Chrome / Safari). For both dev and packaged builds
     // window.open is the simplest portable hook.
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const installSop = async (overwrite: boolean) => {
+    if (!gaPath) return;
+    setSopState({ kind: "pending" });
+    try {
+      const result = await invoke<SopInstallOutcome>("install_supervisor_sop", {
+        gaPath,
+        overwrite,
+      });
+      switch (result.outcome) {
+        case "installed":
+          setSopState({ kind: "installed", path: result.path });
+          break;
+        case "already_exists":
+          setSopState({ kind: "already_exists", path: result.path });
+          break;
+        case "ga_path_invalid":
+        case "write_failed":
+          setSopState({ kind: "error", reason: result.reason });
+          break;
+      }
+    } catch (e) {
+      // Invoke-level failure — Tauri command threw / wasn't registered.
+      // Surface the raw message; this branch is rare and indicates a
+      // backend regression rather than a user-fixable problem.
+      setSopState({
+        kind: "error",
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
   };
 
   return (
@@ -77,30 +134,51 @@ export function SettingsIntegration() {
         </dl>
       </section>
 
-      {/* Supervisor SOP install. Disabled stub for T3.2; T3.4 wires
-          the Tauri command that reads gaConfig.gaPath + writes the
-          embedded SOP. */}
+      {/* Supervisor SOP install (T3.4). Reads gaConfig.gaPath from
+          prefs + invokes the Rust install_supervisor_sop command.
+          On AlreadyExists, surfaces an inline 3-button choice
+          (保留 / 覆盖 / 取消) rather than a modal — single-shot decision,
+          local to this section, modal would overweight the moment.
+
+          Disabled when gaPath is empty (user hasn't configured GA
+          location yet in Runtime tab) — the inline hint redirects
+          there. */}
       <section>
         <SubLabel>Galley Supervisor SOP</SubLabel>
         <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
           把 SOP 装进你的 GA <code className="font-mono">memory/</code>，
           下次 GA 启动时它会作为系统提示一部分读到。固定路径
           <code className="font-mono">memory/galley-supervisor-sop.md</code>
-          ，不替换同名文件。
+          ，不替换同名文件（首次提示）。
         </p>
-        <div className="mt-3 flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled
-            title="T3.4 实现中"
-          >
-            <Folder size={14} weight="thin" />
-            装到 GA memory/
-          </Button>
-          <span className="text-[11px] text-ink-muted">实现中</span>
-        </div>
+        {!gaPath ? (
+          <p className="mt-3 text-[12px] text-ink-muted">
+            先在{" "}
+            <span className="text-ink-soft">Settings → Runtime</span>{" "}
+            配置 GA Path
+          </p>
+        ) : sopState.kind === "already_exists" ? (
+          <SopAlreadyExistsRow
+            path={sopState.path}
+            onKeep={() => setSopState({ kind: "idle" })}
+            onOverwrite={() => void installSop(true)}
+            onCancel={() => setSopState({ kind: "idle" })}
+          />
+        ) : (
+          <div className="mt-3 flex items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={sopState.kind === "pending"}
+              onClick={() => void installSop(false)}
+            >
+              <Folder size={14} weight="thin" />
+              装到 GA memory/
+            </Button>
+            <SopStatus state={sopState} />
+          </div>
+        )}
       </section>
 
       {/* PATH escape hatch — disabled stub for T3.2; T3.3 wires the
@@ -159,6 +237,90 @@ function SubLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
       {children}
+    </div>
+  );
+}
+
+/**
+ * Inline status line next to the install button. Stays low-emphasis
+ * ([11px], ink-muted) so the SubLabel and prose dominate; the install
+ * button is the visual anchor.
+ */
+function SopStatus({ state }: { state: SopInstallState }) {
+  switch (state.kind) {
+    case "idle":
+      return null;
+    case "pending":
+      return <span className="text-[11px] text-ink-muted">安装中…</span>;
+    case "installed":
+      return (
+        <span
+          className="break-all text-[11px] text-ink-soft"
+          title={state.path}
+        >
+          已安装 ✓
+        </span>
+      );
+    case "error":
+      return (
+        <span
+          className="break-all text-[11px] text-error"
+          title={state.reason}
+        >
+          安装失败：{state.reason.slice(0, 80)}
+          {state.reason.length > 80 && "…"}
+        </span>
+      );
+    case "already_exists":
+      // Handled by the dedicated row component; the button itself
+      // shouldn't render in this state.
+      return null;
+  }
+}
+
+/**
+ * Three-way decision row that replaces the install button when the
+ * target file already exists. Mirrors macOS Finder's "Replace /
+ * Keep Both / Cancel" pattern but for a single file the choice
+ * collapses to 保留 / 覆盖 / 取消 (no "keep both" — the SOP filename
+ * is fixed per CLAUDE.md exception). 覆盖 is the destructive option;
+ * variant=danger makes that visually explicit.
+ */
+function SopAlreadyExistsRow({
+  path,
+  onKeep,
+  onOverwrite,
+  onCancel,
+}: {
+  path: string;
+  onKeep: () => void;
+  onOverwrite: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mt-3 space-y-2">
+      <p
+        className="break-all text-[12px] text-ink-soft"
+        title={path}
+      >
+        已存在：<code className="font-mono">{path}</code>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="secondary" size="sm" onClick={onKeep}>
+          保留现有
+        </Button>
+        <Button
+          type="button"
+          variant="destructive-soft"
+          size="sm"
+          onClick={onOverwrite}
+        >
+          覆盖
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          取消
+        </Button>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ pub mod ipc;
 pub mod runner_commands;
 pub mod runner_manager;
 pub mod socket_listener;
+pub mod sop_install;
 
 use api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectBrief, ProjectId,
@@ -50,6 +51,24 @@ const DB_URL: &str = "sqlite:workbench.db";
 #[tauri::command]
 fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
+}
+
+/// B4 M3 T3.4 — install the embedded Galley Supervisor SOP into the
+/// user's GA `memory/` folder. Wrapper over [`sop_install::install_to_ga_memory`];
+/// the Tauri command surface keeps the same caller contract.
+///
+/// The GUI calls this with `overwrite=false` first. If the response
+/// shape is `AlreadyExists`, the GUI shows a confirm dialog and may
+/// re-invoke with `overwrite=true`.
+///
+/// Returns the [`sop_install::InstallSopOutcome`] enum serialized via
+/// serde — invokers deserialize and switch on the `outcome` tag.
+#[tauri::command]
+fn install_supervisor_sop(
+    ga_path: String,
+    overwrite: bool,
+) -> sop_install::InstallSopOutcome {
+    sop_install::install_to_ga_memory(&ga_path, overwrite)
 }
 
 /// Stringify a [`crate::error::GalleyError`] for the Tauri invoke wire.
@@ -354,6 +373,7 @@ pub fn run() {
         .manage(std::sync::Arc::new(runner_manager::RunnerManager::new()))
         .invoke_handler(tauri::generate_handler![
             path_exists,
+            install_supervisor_sop,
             list_sessions,
             // B3 M4a session writes
             create_session,
