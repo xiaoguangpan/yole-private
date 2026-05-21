@@ -6,11 +6,12 @@ import type { ApprovalDecision } from "@/types/ipc";
 
 /**
  * SQLite client wrapper. Migrations run automatically through
- * tauri-plugin-sql; `getDB()` remains for prefs/search/tool-event
+ * tauri-plugin-sql; `getDB()` remains for search/tool-event/backfill
  * surfaces that still use direct SQL.
  *
- * Session/project and message history reads/writes now route through
- * Rust Core Tauri commands so the GUI and CLI use the same DB path.
+ * Session/project, message history, and prefs reads/writes now route
+ * through Rust Core Tauri commands so the GUI and CLI use the same DB
+ * path for startup-critical state.
  */
 
 const DB_URL = "sqlite:workbench.db";
@@ -531,12 +532,6 @@ export async function loadToolEventsBySession(
 // JSON-serialisable type round-trips cleanly. Keys live in the
 // caller's namespace — there's no schema for what's allowed.
 
-interface PrefRow {
-  key: string;
-  value: string;
-  updated_at: string;
-}
-
 /**
  * Load a typed pref by key. Returns `undefined` when missing or when
  * SQLite isn't available (callers fall back to their default state).
@@ -546,19 +541,7 @@ interface PrefRow {
  * gets an unsafe cast. Keep keys consistent with their types.
  */
 export async function getPref<T>(key: string): Promise<T | undefined> {
-  const db = await getDB();
-  const rows = await db.select<PrefRow[]>(
-    "SELECT * FROM prefs WHERE key = $1",
-    [key],
-  );
-  if (rows.length === 0) return undefined;
-  try {
-    return JSON.parse(rows[0].value) as T;
-  } catch {
-    // Corrupted JSON — treat as missing. Logging upstream is the
-    // store's job; we surface `undefined` to keep this primitive thin.
-    return undefined;
-  }
+  return (await invoke<T | null>("get_pref_json", { key })) ?? undefined;
 }
 
 /**
@@ -568,14 +551,5 @@ export async function getPref<T>(key: string): Promise<T | undefined> {
  * future sync / debugging.
  */
 export async function setPref<T>(key: string, value: T): Promise<void> {
-  const db = await getDB();
-  const now = new Date().toISOString();
-  await db.execute(
-    `INSERT INTO prefs (key, value, updated_at)
-     VALUES ($1, $2, $3)
-     ON CONFLICT(key) DO UPDATE SET
-       value      = excluded.value,
-       updated_at = excluded.updated_at`,
-    [key, JSON.stringify(value), now],
-  );
+  await invoke("set_pref_json", { key, value });
 }

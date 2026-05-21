@@ -310,6 +310,24 @@ async fn persist_assistant_message(
 }
 
 #[tauri::command]
+async fn get_pref_json(key: String) -> std::result::Result<Option<serde_json::Value>, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley.get_pref_json(&key).await.map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn set_pref_json(
+    key: String,
+    value: serde_json::Value,
+) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .set_pref_json(&key, value)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
 async fn bulk_archive_sessions(
     ids: Vec<SessionId>,
     origin: Origin,
@@ -481,6 +499,8 @@ pub fn run() {
             session_message_rows,
             persist_user_message,
             persist_assistant_message,
+            get_pref_json,
+            set_pref_json,
             bulk_archive_sessions,
             bulk_unarchive_sessions,
             bulk_delete_sessions,

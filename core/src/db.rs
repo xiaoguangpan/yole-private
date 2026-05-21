@@ -205,6 +205,30 @@ impl SqliteGalley {
         Ok(())
     }
 
+    pub async fn set_pref_json(&self, key: &str, value: serde_json::Value) -> Result<()> {
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "set_pref_json: key must not be empty".into(),
+            });
+        }
+        let now = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO prefs (key, value, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET
+               value = excluded.value,
+               updated_at = excluded.updated_at",
+        )
+        .bind(key)
+        .bind(value.to_string())
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        Ok(())
+    }
+
     async fn index_message_fts(
         &self,
         message_id: &str,

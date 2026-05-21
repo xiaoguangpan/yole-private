@@ -7,10 +7,9 @@
  *
  *   1. App version → runtimeInfo (so Settings → About shows the
  *      real bundle version rather than the demo "0.1.0" fixture).
- *   2. SQLite housekeeping (prune empty 新对话 rows, drop legacy demo
- *      seed sessions). Best-effort — failures fall through to step 3.
- *   3. sessionsStore.hydrate (sessions + projects from SQLite).
- *   4. FTS index backfill — idempotent, no-op when already in sync.
+ *   2. sessionsStore.hydrate (sessions + projects via Rust Core).
+ *   3. SQLite housekeeping + FTS backfill in the background.
+ *      Best-effort — never blocks first paint.
  *   5. prefsStore.hydratePrefs (yolo / conversationWidth / gaConfig).
  *      Returns hasGAConfig for the routing branch.
  *   6. Cached LLM seed → runtimeStore (short-term hint so cold-start
@@ -55,50 +54,14 @@ export async function hydrateApp(): Promise<void> {
     console.debug("[hydrate] app.getVersion failed.", e);
   }
 
-  // 2-4. SQLite housekeeping + sessions hydrate + FTS backfill
-  try {
-    // Sweep accumulated empty "新对话" rows from prior launches —
-    // each auto-created session that the user never typed into
-    // would otherwise stick around forever and crowd the sidebar.
-    try {
-      const removed = await deleteEmptyNewSessions();
-      if (removed > 0) {
-        console.info(
-          `[hydrate] pruned ${removed} empty 新对话 row(s).`,
-        );
-      }
-    } catch (e) {
-      console.debug("[hydrate] deleteEmptyNewSessions failed.", e);
-    }
-    // One-time cleanup of the v0.1 demo placeholder sessions
-    // (s-today-* / s-week-* / s-earlier-* from stores/demo.ts).
-    try {
-      const removed = await deleteDemoSessions();
-      if (removed > 0) {
-        console.info(
-          `[hydrate] pruned ${removed} legacy demo session(s).`,
-        );
-      }
-    } catch (e) {
-      console.debug("[hydrate] deleteDemoSessions failed.", e);
-    }
-    await useSessionsStore.getState().hydrate();
-    // One-time backfill of the FTS index for users upgrading past
-    // the 004 migration. Idempotent — returns immediately when the
-    // index is already in sync.
-    try {
-      const indexed = await backfillFtsIfEmpty();
-      if (indexed > 0) {
-        console.info(
-          `[hydrate] backfilled ${indexed} message(s) into messages_fts.`,
-        );
-      }
-    } catch (e) {
-      console.debug("[hydrate] backfillFtsIfEmpty failed.", e);
-    }
-  } catch (e) {
-    console.warn("[hydrate] SQLite unavailable, using demo seed.", e);
-  }
+  // 2. Startup-critical state: sessions/projects. Route through Rust
+  // Core first so a slow direct-SQL housekeeping pass cannot leave the
+  // sidebar blank on Dev hot restarts.
+  await useSessionsStore.getState().hydrate();
+
+  // 3-4. Non-critical SQLite housekeeping + FTS backfill. Fire-and-forget:
+  // these are nice cleanup/indexing tasks, not requirements for first paint.
+  void runSqlHousekeeping();
 
   // 5. Prefs hydrate — gates the routing branch below.
   const { hasGAConfig } = await usePrefsStore.getState().hydratePrefs();
@@ -125,4 +88,35 @@ export async function hydrateApp(): Promise<void> {
     return;
   }
   void useRuntimeStore.getState().warmupLLMList();
+}
+
+async function runSqlHousekeeping(): Promise<void> {
+  try {
+    const removed = await deleteEmptyNewSessions();
+    if (removed > 0) {
+      console.info(`[hydrate] pruned ${removed} empty 新对话 row(s).`);
+    }
+  } catch (e) {
+    console.debug("[hydrate] deleteEmptyNewSessions failed.", e);
+  }
+
+  try {
+    const removed = await deleteDemoSessions();
+    if (removed > 0) {
+      console.info(`[hydrate] pruned ${removed} legacy demo session(s).`);
+    }
+  } catch (e) {
+    console.debug("[hydrate] deleteDemoSessions failed.", e);
+  }
+
+  try {
+    const indexed = await backfillFtsIfEmpty();
+    if (indexed > 0) {
+      console.info(
+        `[hydrate] backfilled ${indexed} message(s) into messages_fts.`,
+      );
+    }
+  } catch (e) {
+    console.debug("[hydrate] backfillFtsIfEmpty failed.", e);
+  }
 }
