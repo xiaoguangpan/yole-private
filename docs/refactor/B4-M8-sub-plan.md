@@ -1,15 +1,15 @@
-# B4 M8 sub-plan · v0.x → v0.5 data migration 备份机制
+# B4 M8 sub-plan · v0.x → v0.2 data migration 备份机制
 
-> **Status**: draft, ship 前 review。Sub-plan 完成后开 implementation。  
-> **Parent**: [B4 playbook M8](./B4-cli-bg-artifact.md#m8--v0x--v05-data-migration-真跑-d64)  
-> **Invariant**: [B4-I6 Migration 备份强制](./B4-cli-bg-artifact.md#phase-invariants--b4-特有的硬规则)  
+> **Status**: draft, ship 前 review。Sub-plan 完成后开 implementation。
+> **Parent**: [B4 playbook M8](./B4-cli-bg-artifact.md)
+> **Invariant**: [B4-I6 Migration 备份强制](./B4-cli-bg-artifact.md#phase-invariants--b4-特有的硬规则)
 > **Date**: 2026-05-20
 
 ---
 
 ## 0. TL;DR
 
-playbook M8 写 "schema 010-014 + backup + dogfood"，今天 re-scope 后**真活儿只剩 backup**。理由：B2 M5 (mig 006/007) 已经把 supervisor / origin / created_via 字段全部 ship 进 schema，**v0.5 没新增 schema migration**。M8 实际工作 =
+playbook M8 写 "schema 010-014 + backup + dogfood"，今天 re-scope 后**真活儿只剩 backup**。理由：B2 M5 (mig 006/007) 已经把 supervisor / origin / created_via 字段全部 ship 进 schema，**v0.2 没新增 schema migration**。M8 实际工作 =
 
 1. **写入一次性 backup mechanism**（B4-I6 兑现）：startup-time 检测 on-disk migration version < code-side max → 备份 `~/Library/Application Support/app.galley/` 整目录到 `app.galley.backup.<timestamp>/` → 再让 tauri-plugin-sql 跑迁移
 2. **失败 = 拒启动**：backup 失败弹 dialog 指向数据目录 + 拒绝继续，**不**降级运行（dogfood 数据 6+ 月不允许丢）
@@ -46,17 +46,17 @@ B4-I6 字面说 "Schema migration 010-014 在 Galley 内 hard-coded 备份步骤
 
 | 策略 | trigger | pro | con |
 |---|---|---|---|
-| **A. Migration-pending only** | on-disk version < code-side max | 精准；不浪费盘 | 不保护 "v0.5 无 mig 也想 snapshot 一次" |
+| **A. Migration-pending only** | on-disk version < code-side max | 精准；不浪费盘 | 不保护 "v0.2 无 mig 也想 snapshot 一次" |
 | B. Every startup | 每次启动 | 最安全 | 浪费盘（GB 级数据×每次启动）、I/O 卡 startup |
-| C. Once-per-major-version | flag 文件标记 | 折衷 | 多一层状态；JC 数据已经在 v0.1.1，v0.5 触发不了 |
+| C. Once-per-major-version | flag 文件标记 | 折衷 | 多一层状态；JC 数据已经在 v0.1.1，v0.2 触发不了 |
 
 **选 A**：直接 honor B4-I6 字面读，最简单。
 
-**v0.5 ship 后果**：用户从 v0.1.1-alpha.X → v0.5 升级时，**on-disk = code-side**（都是 mig 007），所以**不会触发 backup**。这正确反映了 "v0.5 没改 schema" 的事实。
+**v0.2 ship 后果**：用户从 v0.1.1-alpha.X → v0.2 升级时，**on-disk = code-side**（都是 mig 007），所以**不会触发 backup**。这正确反映了 "v0.2 没改 schema" 的事实。
 
-如果将来 v0.5.x / v0.6 加 mig 008+，自动触发 backup。Forward-looking 机制比 once-and-done 更对得起 B4-I6 的 "hard-coded" 措辞。
+如果将来 v0.2.x / v0.6 加 mig 008+，自动触发 backup。Forward-looking 机制比 once-and-done 更对得起 B4-I6 的 "hard-coded" 措辞。
 
-> **O1 备选**：要不要加一个 "v0.5 首次启动 force one snapshot"？倾向**不加**。理由：(1) 没有 schema 风险 (2) 用户最近的 v0.1.1 都没让大家 backup，现在 force backup 反而显得 v0.5 出问题概率高 (3) macOS 用户量小，Time Machine 兜底已经够 (4) 真要安心，release notes 里写一句 "升级前 finder 复制一份" 让用户自决。**确认 O1=不加**则该决策进 invariant，固定不再讨论。
+> **O1 备选**：要不要加一个 "v0.2 首次启动 force one snapshot"？倾向**不加**。理由：(1) 没有 schema 风险 (2) 用户最近的 v0.1.1 都没让大家 backup，现在 force backup 反而显得 v0.2 出问题概率高 (3) macOS 用户量小，Time Machine 兜底已经够 (4) 真要安心，release notes 里写一句 "升级前 finder 复制一份" 让用户自决。**确认 O1=不加**则该决策进 invariant，固定不再讨论。
 
 ### 1.3 Backup 路径策略
 
@@ -419,14 +419,14 @@ setup hook 闭包 capture `latest_version`。优雅，no const sync 问题。
 > 3. 启动 Galley → 看到 backup log → 验证 `app.galley.backup.<ts>/` 存在 + 内含 workbench.db + Python bundle 等 sibling 文件
 > 4. revert stub，正常启动 → 看 UpToDate log
 >
-> 后续 v0.5.x 或 v0.6 加新 migration 时自然 dogfood。**T8.7 推到 v0.5 ship 后**作为 v0.6 prereq；M8 本身验收按 unit / integration test 走。
+> 后续 v0.2.x 或 v0.6 加新 migration 时自然 dogfood。**T8.7 推到 v0.2 ship 后**作为 v0.6 prereq；M8 本身验收按 unit / integration test 走。
 
 ### T8.8 · Rollback strategy 文档化
 
 `docs/release-workflow.md` 新增 "Backup & Rollback" 段：
 
 ```
-v0.5 之后每次升级如果触发 migration（罕见），Galley 自动备份你的数据目录：
+v0.2 之后每次升级如果触发 migration（罕见），Galley 自动备份你的数据目录：
 
 macOS: ~/Library/Application Support/app.galley.backup.<timestamp>/
 Linux: ~/.local/share/app.galley.backup.<timestamp>/
@@ -526,7 +526,7 @@ grep -rn "migration_backup" core/src/ | grep -v 'migration_backup\.rs'
 
 | ID | Question | Default | Need confirm? |
 |---|---|---|---|
-| O1 | v0.5 首次启动 force snapshot 即使无 mig delta？ | **不加** | sub-plan ship 前 confirm |
+| O1 | v0.2 首次启动 force snapshot 即使无 mig delta？ | **不加** | sub-plan ship 前 confirm |
 | O2 | Backup retention cap N=3？ | **不限** | sub-plan ship 前 confirm |
 | O3 | chrono vs std::time | 用 chrono 如果已在 deps，否则 std::time | impl 时定 |
 | O4 | failure dialog 文案中英 | 中文（用户主要 zh-CN） | sub-plan ship 前 confirm |
@@ -538,12 +538,12 @@ grep -rn "migration_backup" core/src/ | grep -v 'migration_backup\.rs'
 
 ## 7. References
 
-- B4 playbook M8 段：[B4-cli-bg-artifact.md §M8](./B4-cli-bg-artifact.md#m8--v0x--v05-data-migration-真跑-d64)
+- B4 playbook M8 段：[B4-cli-bg-artifact.md §M8](./B4-cli-bg-artifact.md)
 - B4-I6 invariant：[B4-cli-bg-artifact.md §Phase invariants](./B4-cli-bg-artifact.md#phase-invariants--b4-特有的硬规则)
 - migration files：[core/migrations/](../../core/migrations/) 001-007
 - migration runner 注册：[core/src/lib.rs:337-380](../../core/src/lib.rs)
 - DB path resolution：[core/src/db.rs:53-65](../../core/src/db.rs)
-- Tauri identifier 守护：[CLAUDE.md "Tauri Identifier 不可随意改"](../../CLAUDE.md)
+- Tauri identifier 守护：[desktop runtime](../desktop-runtime.md#tauri-identifier)
 
 ---
 

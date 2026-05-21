@@ -36,7 +36,7 @@ const SCHEMA_VERSION: u32 = 1;
     about = "Agent-first interface to Galley (the local agent team orchestrator)."
 )]
 struct Cli {
-    /// Pin the schema version the supervisor expects. v0.5 only knows
+    /// Pin the schema version the supervisor expects. v0.2 only knows
     /// `1`; mismatch exits 2 with `error: "schema_mismatch"`. Future
     /// binaries that speak multiple schema versions will accept all of
     /// them. Omit to let the binary use its default (currently `1`).
@@ -67,7 +67,7 @@ enum Command {
     /// Print the CLI + schema version.
     Version,
 
-    /// Project operations (create / list / delete). v0.5 has no
+    /// Project operations (create / list / delete). v0.2 has no
     /// reversible "archive" surface — `delete` is destructive (FK SET
     /// NULL detaches child sessions to ungrouped). A future v0.6+ ships
     /// `archive` separately with reversible semantics (sub-plan O2).
@@ -114,7 +114,7 @@ enum ProjectCmd {
     /// affected session ids so a supervisor agent can log the side
     /// effect.
     ///
-    /// v0.5: this is destructive. v0.6+ will ship a separate
+    /// v0.2: this is destructive. v0.6+ will ship a separate
     /// `archive` command with reversible semantics (sub-plan O2).
     Delete {
         /// Project id.
@@ -316,7 +316,7 @@ enum SessionCmd {
 async fn main() -> ExitCode {
     let cli = Cli::parse();
     // §1.2 schema pin: if the caller pinned --schema=N, verify the binary
-    // speaks that schema. v0.5 only knows SCHEMA_VERSION (1); future
+    // speaks that schema. v0.2 only knows SCHEMA_VERSION (1); future
     // multi-schema binaries widen this check to a set.
     if let Some(pinned) = cli.schema {
         if pinned != SCHEMA_VERSION {

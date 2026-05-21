@@ -1,5 +1,5 @@
 //! Install / uninstall the `galley` CLI as `/usr/local/bin/galley`
-//! (macOS only in v0.5).
+//! (macOS only in v0.2).
 //!
 //! ## Scope
 //!
@@ -8,7 +8,7 @@
 //! [`crate::discovery`]). Humans who like typing `galley` in a terminal
 //! benefit from a PATH symlink.
 //!
-//! macOS is the v0.5 target. Windows lands separately: it needs HKCU
+//! macOS is the v0.2 target. Windows lands separately: it needs HKCU
 //! `Environment\PATH` registry writes + `WM_SETTINGCHANGE` broadcast,
 //! and we don't have a Windows machine ready to dogfood that path.
 //! Both non-macOS variants compile to a no-op that returns
@@ -157,7 +157,7 @@ pub fn check_status() -> PathInstallStatus {
 #[cfg(not(target_os = "macos"))]
 pub fn check_status() -> PathInstallStatus {
     PathInstallStatus::Unsupported {
-        reason: "PATH install is macOS-only in v0.5 (Windows registry path tracked as M3 follow-up)".to_string(),
+        reason: "PATH install is macOS-only in v0.2 (Windows registry path tracked as M3 follow-up)".to_string(),
     }
 }
 
@@ -264,14 +264,14 @@ pub fn uninstall_from_path() -> PathUninstallOutcome {
 #[cfg(not(target_os = "macos"))]
 pub fn install_to_path() -> PathInstallOutcome {
     PathInstallOutcome::Unsupported {
-        reason: "PATH install is macOS-only in v0.5".to_string(),
+        reason: "PATH install is macOS-only in v0.2".to_string(),
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 pub fn uninstall_from_path() -> PathUninstallOutcome {
     PathUninstallOutcome::Unsupported {
-        reason: "PATH install is macOS-only in v0.5".to_string(),
+        reason: "PATH install is macOS-only in v0.2".to_string(),
     }
 }
 

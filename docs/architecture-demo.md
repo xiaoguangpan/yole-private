@@ -1,14 +1,17 @@
 # Galley 架构原则 · code-level demo
 
-> **Purpose**: M9 T9.1 / A13 acceptance deliverable.  
-> **Status**: v0.5 RC, draft 2026-05-20.  
+> Verification-facing document. For the readable architecture overview, start
+> with [architecture](./architecture.md).
+
+> **Purpose**: M9 T9.1 / A13 acceptance deliverable.
+> **Status**: v0.2.0-beta.1 draft, 2026-05-20.
 > **Scope**: 把 [CLAUDE.md "Galley 架构原则"](../CLAUDE.md) 4 条原则逐条 demo 到具体代码位置 + grep / 测试可验证项。
 
 ---
 
 ## 1. Localhost only
 
-> Galley Core 永远只 listen on AF_UNIX socket / named pipe，不开 TCP，不持有 token。  
+> Galley Core 永远只 listen on AF_UNIX socket / named pipe，不开 TCP，不持有 token。
 > 远程访问通过 Supervisor Agent 在外部传输层完成，**不是 Galley 的责任**。
 
 ### Code references
@@ -44,7 +47,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 
 ## 2. CLI surface 是公开契约面
 
-> Galley CLI 的 JSON 输出 schema 是 Galley 对 agent 生态的公开承诺。  
+> Galley CLI 的 JSON 输出 schema 是 Galley 对 agent 生态的公开承诺。
 > schema_version 内 additive-only；breaking 强制 bump；exit code 5 类稳定；error enum stable。
 
 ### Code references
@@ -64,7 +67,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 ### Document references
 
 - [`docs/agent-api.md`](./agent-api.md) §1 stability promise + §1.1 stable identifier sets + §1.2 schema pin pattern + §6 unified flat error envelope `{error, message}`
-- [`docs/agent-api.md`](./agent-api.md) §7 banner: `STATUS: FROZEN (v0.5 RC)`
+- [`docs/agent-api.md`](./agent-api.md) §7 banner: `STATUS: FROZEN for v0.2.0-beta.1`
 
 ### Tests demonstrating principle
 
@@ -76,7 +79,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 
 ## 3. 数据不离开 Galley
 
-> Galley 不存 Supervisor ↔ human 的对话内容。  
+> Galley 不存 Supervisor ↔ human 的对话内容。
 > Supervisor 通过 CLI 发的命令、命令的 `--reason` 标注存进 Galley（per-session 行动日志），但 supervisor 跟 user 在 IM 里聊的对话不存。
 
 ### Code references — 存的（per-action origin triple）
@@ -114,7 +117,7 @@ grep -rn "supervisor_chat\|conversation_log\|supervisor_history\|im_messages" co
 
 ## 4. 路径 B 不可逆迁移
 
-> v0.5 起，业务逻辑权威全部在 Rust 端 Galley Core：SQLite 写 / Bridge subprocess ownership / Session 生命周期 / 命令调度。  
+> v0.2 起，业务逻辑权威全部在 Rust 端 Galley Core：SQLite 写 / Bridge subprocess ownership / Session 生命周期 / 命令调度。
 > 前端（GUI / CLI / 未来扩展）：stateless presenter，订阅 event + invoke 命令。
 
 ### Code references — Rust 持有权威
@@ -191,4 +194,4 @@ This document serves M9 T9.1 acceptance:
 Future B-phase or v0.6 additions to this doc should:
 1. Keep the 4-principle structure (additive only — never remove a principle without first changing CLAUDE.md)
 2. Update code references when files move (B3 example: `desktop/src-tauri/` → `core/`)
-3. Add new principle as §5 / §6 if architecture genuinely extends (rare — last addition was v0.5 vision pivot 2026-05-15)
+3. Add new principle as §5 / §6 if architecture genuinely extends (rare — last addition was v0.2 vision pivot 2026-05-15)

@@ -98,7 +98,7 @@ export interface TopBarProps {
    * supervisor-driven user messages; non-message write commands
    * (archive / move / llm set) intentionally aren't surfaced here
    * per scope decision — they don't leave a per-event timeline
-   * row in v0.5.
+   * row in v0.2.
    */
   supervisorActivity?: SupervisorActivity;
 }
@@ -691,7 +691,7 @@ function WidthToggleButton({
  * state warning). Matches the "this is metadata, not an alert"
  * intent — supervisor activity is normal, not an exception.
  *
- * Why no animation / live "writing now" pulse: v0.5 derives entirely
+ * Why no animation / live "writing now" pulse: v0.2 derives entirely
  * from persisted messages; a real-time indicator would need a separate
  * Rust event ("supervisor wrote a command at T") which we don't emit
  * yet. If dogfood reveals "I need to see when supervisor is actively

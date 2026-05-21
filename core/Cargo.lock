@@ -1428,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "galley-cli"
-version = "0.1.0-dev"
+version = "0.2.0-beta.1"
 dependencies = [
  "clap",
  "galley-core",
@@ -1441,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "galley-core"
-version = "0.1.1-alpha.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "anyhow",
  "async-trait",

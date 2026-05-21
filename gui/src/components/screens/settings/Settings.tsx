@@ -190,7 +190,7 @@ function SettingsTabList({
       <SettingsTabButton
         active={tab === "integration"}
         Icon={PlugsConnected}
-        label="Integration"
+        label="Agent"
         onClick={() => onChange("integration")}
       />
       <SettingsTabButton

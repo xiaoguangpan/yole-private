@@ -113,10 +113,10 @@ Mac-only this session. Windows machine access gates this.
 
 After JC fills in T1-T16:
 
-- **T1-T16 all PASS on macOS** → **GO for B4 M2 Mac-first**. Implement production tray + close-handler in `core/src/lib.rs` setup hook, ship v0.5 Mac-only, defer Win to v0.6 (mirror v0.1 ship pattern).
+- **T1-T16 all PASS on macOS** → **GO for B4 M2 Mac-first**. Implement production tray + close-handler in `core/src/lib.rs` setup hook, ship v0.2 Mac-only, defer Win to v0.6 (mirror v0.1 ship pattern).
 - **T1-T12 PASS but T13/T14 FAIL** → App Nap probe urgent. Don't ship M2 until App Nap defeat verified.
 - **T1 FAIL (icon doesn't render)** → blocker. Tauri v2 tray needs investigation or workaround.
-- **T5/T11 FAIL (hide/quit broken)** → Tauri WindowEvent + app.exit aren't reliable; ditch tray daemon for v0.5, supervisor workflow needs alternative.
+- **T5/T11 FAIL (hide/quit broken)** → Tauri WindowEvent + app.exit aren't reliable; ditch tray daemon for v0.2, supervisor workflow needs alternative.
 
 ---
 
@@ -130,7 +130,7 @@ If GO:
 
 If NO-GO:
 1. Document specific failure mode + what was tried
-2. Open a decision in B4 playbook: ship v0.5 without daemon mode? or block on Win-machine to retry?
+2. Open a decision in B4 playbook: ship v0.2 without daemon mode? or block on Win-machine to retry?
 
 ---
 

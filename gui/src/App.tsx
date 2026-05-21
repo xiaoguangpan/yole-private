@@ -46,7 +46,7 @@ import type { Turn } from "@/types/conversation";
  *
  * v1 only walks UserTurn rows; non-message supervisor actions
  * (archive / move / llm set) don't leave a per-event trace in the
- * v0.5 data model. If a v0.6+ supervisor_actions table ever lands,
+ * v0.2 data model. If a v0.6+ supervisor_actions table ever lands,
  * fold its rows in here.
  */
 function deriveSupervisorActivity(

@@ -77,6 +77,11 @@ Galley **不动**用户已有的 [GenericAgent](https://github.com/lsdefine/Gene
 
 **技术栈：** Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4 / Rust (Galley Core + Galley CLI) / Python (runner，包装 GenericAgent) / SQLite + FTS5 trigram
 
+更多文档入口：
+[架构说明](./docs/architecture.md) ·
+[贡献指南](./CONTRIBUTING.md) ·
+[文档索引](./docs/README.md)
+
 ## Quick Start
 
 ### 1 · 装 GenericAgent
@@ -109,15 +114,15 @@ GUI 自动跑 Onboarding wizard：
 
 Galley 的 GUI 跟 CLI 是**对等前端**——CLI 能做的，GUI 也能做；反过来也成立。CLI 是给另一个 agent 远程托管你 session team 的入口。
 
-### 一键安装
+### Agent 接入
 
-GUI 启动后进 **Settings → Integration tab**，三个按钮：
+GUI 启动后进 **Settings → Agent**：
 
 | 按钮 | 做什么 |
 |---|---|
-| **Install galley to PATH** | 把 `galley` 命令装到 `/usr/local/bin/`（macOS sudo，Windows 用户级 PATH）—— supervisor 直接调用 |
-| **Install Supervisor SOP** | 把 [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md) 装到你 GA 的 `memory/` —— GA bot 自动学会编排 Galley |
-| **Install Claude Skill** | symlink [`.claude/skills/galley-supervisor`](./.claude/skills/galley-supervisor) 到 `~/.claude/skills/` —— Claude Code 自动识别「帮我看看 Galley」「galley 跑啥」trigger 词 |
+| **复制 SOP** | 复制 [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md)，发给你信任的 Agent，让它学会编排 Galley |
+| **安装 galley 命令** | 可选。安装后你和脚本都可以直接在终端用 `galley`；Agent SOP 不依赖它 |
+| **查看 Agent API 文档** | 打开完整命令清单、JSON schema 和 exit code |
 
 ### Supervisor 视角
 
@@ -125,10 +130,11 @@ GUI 启动后进 **Settings → Integration tab**，三个按钮：
 
 ```bash
 # 看现在跑啥
-galley session list --output=json | jq '.[] | {id, title, status}'
+galley status
+galley sessions list
 
 # 开个新 session 让 GA 跟进 PR
-galley session new --project=work --llm="Claude Sonnet 4.6" \
+galley session new --project=proj_work --llm="Claude Sonnet 4.6" \
   --supervisor=ga-claude-1 --reason="跟进 PR review" \
   "看下 #1234 的反馈"
 
@@ -136,7 +142,7 @@ galley session new --project=work --llm="Claude Sonnet 4.6" \
 galley session watch <id>
 
 # 切 LLM / 归档 / 重启
-galley session set-llm <id> --llm="GLM 5.1"
+galley llm set <id> "GLM 5.1"
 galley session archive <id> --supervisor=ga-claude-1 --reason="done"
 ```
 

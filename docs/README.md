@@ -1,0 +1,59 @@
+# Galley Docs
+
+This is the routing index for Galley documentation. Start with the section that
+matches who you are and what you are trying to do.
+
+## Read By Role
+
+| Role | Start Here |
+|---|---|
+| User evaluating Galley | [README](../README.md), then [architecture](./architecture.md) |
+| Agent / Supervisor integrator | [Supervisor SOP](./integrations/galley-supervisor-sop.md), then [agent-api](./agent-api.md) |
+| Contributor | [CONTRIBUTING](../CONTRIBUTING.md), then [engineering workflow](./engineering-workflow.md) |
+| Maintainer | [project status](./project-status.md), [release workflow](./release-workflow.md), [GA baseline](./ga-baseline.md) |
+| Historical reader | [devlog](./devlog/README.md) |
+| Coding agent | [CLAUDE.md](../CLAUDE.md), then the focused docs below |
+
+## Read By Task
+
+| Task | Read First |
+|---|---|
+| Understand current project state | [project status](./project-status.md) |
+| Understand the architecture | [architecture](./architecture.md) |
+| Change product behavior or roadmap | [PRD](./PRD.md) |
+| Change CLI output or Agent API | [agent-api](./agent-api.md) |
+| Change Supervisor / Agent integration | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
+| Work on Rust core refactor | [refactor README](./refactor/README.md) |
+| Check architecture invariants | [architecture demo](./architecture-demo.md) |
+| Prepare a release | [release workflow](./release-workflow.md) |
+| Smoke Windows builds | [Windows checklist](./windows-build-checklist.md) |
+| Touch GenericAgent integration | [GA baseline](./ga-baseline.md) |
+| Touch app packaging / runtime | [desktop runtime](./desktop-runtime.md) |
+| Touch GUI or engineering workflow | [engineering workflow](./engineering-workflow.md) |
+| Touch visual design | [DESIGN.md](./DESIGN.md) |
+| Understand history or decisions | [devlog](./devlog/README.md) |
+
+## Document Roles
+
+- [CLAUDE.md](../CLAUDE.md): short startup constitution for coding agents.
+- [CONTRIBUTING](../CONTRIBUTING.md): contributor entry point.
+- [architecture](./architecture.md): external-facing system overview.
+- [project status](./project-status.md): current milestone, release gates, and
+  compact phase state.
+- [PRD](./PRD.md): product definition and roadmap.
+- [agent-api](./agent-api.md): stable CLI / socket contract for agents.
+- [architecture demo](./architecture-demo.md): code-level proof of the four
+  architecture principles.
+- [refactor](./refactor/README.md): B-phase implementation playbooks,
+  invariants, and execution cursor.
+- [devlog](./devlog/README.md): chronological decision history and rejected
+  alternatives.
+
+## Keep Docs Lean
+
+Do not duplicate long history into task documents. Prefer:
+
+- current rule in the focused document
+- link to the devlog for why
+- link to the playbook for how
+- update `CLAUDE.md` only for global rules every session must know

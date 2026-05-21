@@ -61,7 +61,7 @@ const APP_SUBDIR: &str = "galley";
 /// The binary name to look for next to Galley Core's `current_exe`.
 /// In dev: `target/debug/galley`. In a future bundled .app:
 /// `Galley.app/Contents/MacOS/galley` (requires Tauri `externalBin`
-/// config — not yet shipped at v0.5 alpha; tracked as M3 follow-up).
+/// config — not yet shipped at v0.2 alpha; tracked as M3 follow-up).
 #[cfg(not(target_os = "windows"))]
 const CLI_BIN_NAME: &str = "galley";
 #[cfg(target_os = "windows")]

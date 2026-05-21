@@ -1,5 +1,8 @@
 # Release workflow
 
+> Maintainer-facing document. Use this when preparing or debugging a Galley
+> release.
+
 Galley 发版 SOP。本文档定义 v0.2 起的正式发版流程，配合 `.github/workflows/release.yml` 工作。
 
 > **相关文档**
@@ -13,13 +16,13 @@ Galley 发版 SOP。本文档定义 v0.2 起的正式发版流程，配合 `.git
        ↓
 版本号 bump (tauri.conf.json + package.json)
        ↓
-git commit + git tag v0.2.0 + git push origin main v0.2.0
+git commit + git tag v0.2.0-beta.1 + git push origin main v0.2.0-beta.1
        ↓
 GitHub Actions release.yml 自动触发
        │
-       ├─ macos-15 (arm64 runner, native) → Galley_0.2.0_macOS_aarch64.dmg
-       ├─ macos-15 (arm64 runner, cross)  → Galley_0.2.0_macOS_x64.dmg   ← v0.1.2 起 CI 出，cross-compile + Rosetta 2
-       └─ windows-latest                  → Galley_0.2.0_Windows_x64-setup.exe
+       ├─ macos-15 (arm64 runner, native) → Galley_0.2.0-beta.1_macOS_aarch64.dmg
+       ├─ macos-15 (arm64 runner, cross)  → Galley_0.2.0-beta.1_macOS_x64.dmg   ← v0.1.2 起 CI 出，cross-compile + Rosetta 2
+       └─ windows-latest                  → Galley_0.2.0-beta.1_Windows_x64-setup.exe
        ↓
 ubuntu-latest 收集产物 + gh release create --draft
        ↓
@@ -40,7 +43,8 @@ Semver 0.x.y，pre-1.0 阶段：
 |---|---|---|
 | `v0.2.0` | 增功能 release | 新 feature ship (e.g. Win 支持上线) |
 | `v0.2.1` | 补丁 release | 单点 bug fix (e.g. Win toggleMaximize 不灵) |
-| `v0.2.0-rc.1` | 预发版 candidate | Win 机 smoke test 前的内部验证版 |
+| `v0.2.0-beta.1` | beta 预发版 | 大重构后的公开 dogfood 版 |
+| `v0.2.0-rc.1` | release candidate | 稳定版前最后验证版 |
 | `v1.0.0` | 第一个稳定版 | 用户量起来 + 自动更新就绪 + 关键功能稳定 |
 
 预发版 tag 包含 `-`，CI 自动 mark prerelease，GitHub Release 列表不会把它推作「latest」给普通用户。
@@ -54,33 +58,34 @@ Semver 0.x.y，pre-1.0 阶段：
 - [ ] `main` 分支 CI 全绿（`check.yml` 三平台通过）
 - [ ] 本地 `pnpm typecheck` / `pnpm lint` / `cargo check` 干净
 - [ ] 本地 `pnpm tauri dev` smoke 跑通核心流程（新对话 / multi-step / 审批 / 切 LLM）
-- [ ] 如果包含 GA baseline 升级：[baseline upgrade workflow](../CLAUDE.md#baseline-upgrade-workflow) 走完、devlog 写好
+- [ ] 如果包含 GA baseline 升级：[baseline upgrade workflow](./ga-baseline.md#upgrade-procedure) 走完、devlog 写好
 
 ### 2. 文档完备
 
 - [ ] 本次 release 有对应 devlog（`docs/devlog/YYYY-MM-DD-*.md`），叙事完整 + 6 段
-- [ ] CLAUDE.md 阶段表更新到当前
+- [ ] [project status](./project-status.md) 更新到当前
 - [ ] PRD / DESIGN.md 如有变化已同步
 - [ ] 上一次 release 以来的 commits 简要回顾一遍，对应到 release notes 草稿
 
 ### 3. 版本号 bump
 
-把版本号同步改两处：
+把版本号同步改四处：
 
 ```bash
 # gui/package.json
-"version": "0.2.0"
+"version": "0.2.0-beta.1"
 
 # core/tauri.conf.json
-"version": "0.2.0"
+"version": "0.2.0-beta.1"
 
-# core/Cargo.toml (如果显式声明了 version，目前 = 0.1.0 跟其它解耦)
-# v0.2 是否同步 Cargo.toml 看具体情况：Cargo.toml 的 version 是 lib name，
-# 不直接影响 bundle 文件名（那个由 tauri.conf.json + package.json 决定）。
-# 建议同步以免日后查问题困惑。
+# core/Cargo.toml
+version = "0.2.0-beta.1"
+
+# cli/Cargo.toml
+version = "0.2.0-beta.1"
 ```
 
-提交一个独立 commit：`Bump version v0.2.0`。**不要**跟功能 commit 混在一起——回滚版本号方便。
+提交一个独立 commit：`Bump version v0.2.0-beta.1`。**不要**跟功能 commit 混在一起——回滚版本号方便。
 
 ### 4. 跑预发版
 

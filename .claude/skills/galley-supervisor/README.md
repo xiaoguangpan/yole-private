@@ -63,7 +63,7 @@ project delete).
 
 ## Schema + stability
 
-This skill targets **Galley CLI schema_version=1** (frozen at v0.5).
+This skill targets **Galley CLI schema_version=1** (frozen for v0.2.0-beta.1).
 Schema is additive-only inside v1; breaking changes bump to v2 and will
 ship as a new skill version.
 

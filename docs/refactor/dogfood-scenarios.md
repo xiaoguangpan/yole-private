@@ -4,7 +4,7 @@
 >
 > **用法**：每项一行 ✓/✗，跑过填日期 + 一句话 note。**先跑 A + B（必 cover），C/D 优先级递减**。发现 regression → 加 inline note + 必要时开 GitHub issue。
 >
-> **来源**：CLAUDE.md 阶段表 v0.1 七件事 + [B2 完成 devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) Open Questions + B2 dogfood fixes `b087f22` 抓的 3 个 bug + v0.1 七件事 polish 沉淀的高频 user path。
+> **来源**：[project status](../project-status.md) compact phase state + [B2 完成 devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) Open Questions + B2 dogfood fixes `b087f22` 抓的 3 个 bug + v0.1 七件事 polish 沉淀的高频 user path。
 
 ---
 

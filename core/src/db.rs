@@ -14,7 +14,7 @@
 //! places it. [`db_path`] reproduces that lookup without an `AppHandle`
 //! so the future Galley CLI binary (no Tauri context) can find the
 //! same DB. **Identifier change == data move** — see
-//! [CLAUDE.md "Tauri Identifier 不可随意改"](../../../CLAUDE.md).
+//! [desktop runtime](../../docs/desktop-runtime.md#tauri-identifier).
 
 use std::path::PathBuf;
 
@@ -32,7 +32,7 @@ use crate::error::{GalleyError, Result};
 
 /// Tauri bundle identifier. Must match `tauri.conf.json:identifier`
 /// otherwise the CLI binary will look in a different directory than
-/// the GUI writes to. See [CLAUDE.md "Tauri Identifier 不可随意改"](../../../CLAUDE.md).
+/// the GUI writes to. See [desktop runtime](../../docs/desktop-runtime.md#tauri-identifier).
 const APP_IDENTIFIER: &str = "app.galley";
 
 /// File name inside `app_data_dir/`. Matches `tauri-plugin-sql`'s URL
@@ -174,7 +174,7 @@ impl MessageRow {
             // here was written before B2 M5 added the field. Returning
             // None keeps the JSON shape backward-compatible. A follow-up
             // can extend MessageRow + this projection if a consumer
-            // needs it (e.g. v0.5 supervisor activity log in the GUI).
+            // needs it (e.g. v0.2 supervisor activity log in the GUI).
             origin: None,
         })
     }

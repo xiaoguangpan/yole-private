@@ -17,7 +17,7 @@ B4 M2 introduces menubar daemon mode — close window → hide (not exit), Cmd+Q
 2. **macOS App Nap** can throttle backgrounded Tauri WebView JavaScript by 10-100×, which would make CLI write commands feel "frozen" to the supervisor agent. PRD §13.1 implicitly assumes responsiveness stays — needs validation
 3. **WebView keep-alive while window hidden** isn't a documented Tauri guarantee. If Tauri pauses the WebView when no window is visible, the JS-side IPC event listeners (the slice stores) won't process incoming runner events until the window is reopened — meaning state goes stale, and history would re-stream from Rust on every show, wasting CPU
 4. **Windows tray differs from macOS menubar** — Tauri abstracts both but reports of Windows-specific quirks (icon disappears, badge not supported, click-to-show stops working after sleep/resume) exist in Tauri v2 GitHub issues
-5. **Cross-platform parity matters for v0.5 framing** — if macOS works but Windows tray is broken, we either ship Mac-only v0.5 (mirror v0.1 Mac-only decision) or block B4 on Windows-specific workarounds
+5. **Cross-platform parity matters for v0.2 framing** — if macOS works but Windows tray is broken, we either ship Mac-only v0.2 (mirror v0.1 Mac-only decision) or block B4 on Windows-specific workarounds
 
 This prototype answers these in 1 day **before** committing 2-3 weeks to B4 M2-M3.
 
@@ -30,7 +30,7 @@ To keep scope tight:
 - ❌ Do not implement CLI socket → window action — instead, simulate "CLI writes while window hidden" with a Rust `tokio::spawn` timer that emits a Tauri event every 500ms and a JS-side `listen()` that increments a counter (visible when window is re-shown)
 - ❌ Do not pretty-print the WebView UI — a plain HTML page with `<h1>Hidden time: Xs / events received: N</h1>` is enough
 - ❌ Do not test tray icon design / branding — use a placeholder icon (gradient PNG or Tauri default)
-- ❌ Do not run on macOS 26 (Tahoe) — JC's mac is macOS 14, CI is macos-15; Tahoe behavior gets deferred to post-v0.5 ([B4 O9](../../../docs/refactor/B4-cli-bg-artifact.md#open-decisionsb4-启动前要拍))
+- ❌ Do not run on macOS 26 (Tahoe) — JC's mac is macOS 14, CI is macos-15; Tahoe behavior gets deferred to post-v0.2 ([B4 O9](../../../docs/refactor/B4-cli-bg-artifact.md#open-decisionsb4-启动前要拍))
 
 This experiment is **throwaway**. Code lives in `core/experiments/tray-mode/` and is not part of the production build (excluded via `[[bin]]` + feature flag, mirror bridge-owner pattern).
 
@@ -116,7 +116,7 @@ App Nap throttles CPU + delays timers for backgrounded apps. Galley needs **Late
 
 ### Cross-platform parity (T20)
 
-- [ ] **T20**: Same spike binary, same test scenarios, both platforms pass T1-T16 (T17-T19 macOS only). If macOS PASS + Windows FAIL on any of T1-T16 → document specific failure mode + propose Mac-only v0.5 fallback strategy.
+- [ ] **T20**: Same spike binary, same test scenarios, both platforms pass T1-T16 (T17-T19 macOS only). If macOS PASS + Windows FAIL on any of T1-T16 → document specific failure mode + propose Mac-only v0.2 fallback strategy.
 
 ## Implementation outline
 
@@ -337,8 +337,8 @@ fi
 - **macOS T1-T16 all PASS + T17-T19 confirm App Nap defeated** → **GO for B4 M2 macOS**
 - **Windows T1-T16 all PASS** → **GO for B4 M2 Windows**
 - **Both platforms PASS** → **GO for full B4 M2** (default plan)
-- **macOS GO + Windows FAIL on T3-T16** → propose **Mac-only v0.5 background mode** (mirror v0.1 Mac-only decision). v0.6 budgets Windows tray fix.
-- **macOS FAIL on T14 (WebView paused while hidden)** → **NO-GO**. Background mode entire premise breaks if WebView can't process events while hidden. Alternative: stay foreground-only for v0.5, defer background to v0.6. Likely culprits: Tauri default may pause WebView; explore `WebViewBuilder::auto_hide_menu` or alternative flags.
+- **macOS GO + Windows FAIL on T3-T16** → propose **Mac-only v0.2 background mode** (mirror v0.1 Mac-only decision). v0.6 budgets Windows tray fix.
+- **macOS FAIL on T14 (WebView paused while hidden)** → **NO-GO**. Background mode entire premise breaks if WebView can't process events while hidden. Alternative: stay foreground-only for v0.2, defer background to v0.6. Likely culprits: Tauri default may pause WebView; explore `WebViewBuilder::auto_hide_menu` or alternative flags.
 - **macOS FAIL on T18 (App Nap not defeated despite NSProcessInfo)** → investigate. Likely culprits: `beginActivity` not called early enough in app lifecycle; activity object dropped prematurely. Should be fixable with implementation tuning, not a deal-breaker.
 - **Either platform FAIL on T1 (tray icon doesn't render)** → **NO-GO**. Tauri v2 tray API itself doesn't work; B4 M2 must wait for upstream Tauri fix or use platform-specific native code (much more work).
 
@@ -384,7 +384,7 @@ If no-go:
   - Tray + hide-window mechanics are mostly Tauri-tutorial-level work
   - App Nap defeat is one specific API call wrapped in a Drop guard
   - The risk is **manual verification of cross-platform behavior** — automated tests can't fully cover "did tray icon render visually"
-- **Risk if estimate overruns**: Windows machine access (JC borrows). If Windows blocked >1 day → ship spike report with Mac-only findings, plan Mac-only v0.5 contingency.
+- **Risk if estimate overruns**: Windows machine access (JC borrows). If Windows blocked >1 day → ship spike report with Mac-only findings, plan Mac-only v0.2 contingency.
 - **Pre-run TODO**:
   - [ ] Verify `tauri` crate version in `core/Cargo.toml` matches v2 (already v2 per existing code; double-check `TrayIconBuilder` is the correct API path)
   - [ ] Confirm `objc2-foundation` version compatible with existing Rust toolchain

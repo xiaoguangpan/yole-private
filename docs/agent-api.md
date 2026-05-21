@@ -3,7 +3,7 @@
 The contract between **Galley** and any agent that drives it via the
 `galley` CLI binary or the Unix-socket / named-pipe local transport.
 
-> **Status: B4 M6 — `schemaVersion: 1` FROZEN (v0.5 RC).** All 19
+> **Status: B4 M6 — `schemaVersion: 1` FROZEN for `v0.2.0-beta.1`.** All 19
 > commands documented in §5 are wired, tested, and locked. Inside
 > `schemaVersion: 1` the rules in §1 hold: additions are non-breaking;
 > renames / removals require a `schemaVersion: 2` bump. Pre-freeze
@@ -109,7 +109,7 @@ SOPs that want to defend against future schema bumps can pin to
 
 - **CLI**: pass `--schema=1` on any command (global flag). Mismatch
   with the binary's accepted set → exit 2 (`error: "invalid_args"`) +
-  message prefixed `schema_mismatch:`. v0.5 binaries only know `1`;
+  message prefixed `schema_mismatch:`. v0.2 beta binaries only know `1`;
   future binaries that speak multiple versions will accept any in
   their supported set.
 - **Socket**: include `"schemaVersion": 1` in the request JSON.
@@ -137,7 +137,7 @@ they read keep their names + semantics inside `schemaVersion: 1`.
   specific file (snapshots, isolated test fixtures, etc.).
 - **Identifier.** `app.galley` is the Tauri bundle identifier — do not
   change without a coordinated migration (see
-  [CLAUDE.md "Tauri Identifier 不可随意改"](../CLAUDE.md)).
+  [desktop runtime](./desktop-runtime.md#tauri-identifier)).
 
 ## 2A · Transports
 
@@ -287,7 +287,7 @@ Returns the CLI version + the schema version of its output protocol.
 
 ```bash
 $ galley version
-{"galleyVersion":"0.1.0-dev","schemaVersion":1}
+{"galleyVersion":"0.2.0-beta.1","schemaVersion":1}
 ```
 
 Response fields:
@@ -295,7 +295,7 @@ Response fields:
 | Field            | Type   | Notes                                              |
 | ---------------- | ------ | -------------------------------------------------- |
 | `galleyVersion`  | string | semver of the `galley` binary itself               |
-| `schemaVersion`  | int    | this document's stability key (`1` since v0.5)     |
+| `schemaVersion`  | int    | this document's stability key (`1` for v0.2.x beta) |
 
 ### 5.2 · `galley sessions list [--project=X] [--status=Y] [--archived | --all]`
 
@@ -729,8 +729,8 @@ survive. Response carries `detachedSessions` count + ids so SOPs can
 surface the side effect.
 
 Per sub-plan O2, this command is honestly named `delete` because the
-operation is destructive. A future v0.6+ may ship a separate
-reversible `project archive` alongside (§8); the v0.5 schema doesn't
+operation is destructive. A future release may ship a separate
+reversible `project archive` alongside (§8); schemaVersion 1 doesn't
 support reversible archive.
 
 ```bash
@@ -875,7 +875,7 @@ Wire example:
 
 ## 7 · Versioning
 
-`schemaVersion: 1` is **frozen at v0.5** (B4 M6). The rules in §1
+`schemaVersion: 1` is **frozen for v0.2.0-beta.1** (B4 M6). The rules in §1
 apply.
 
 Inside `schemaVersion: 1`:
@@ -911,11 +911,11 @@ yet** — mentioned here so SOPs can plan their integration shape.
 Additions will be non-breaking inside `schemaVersion: 1` per §7.
 
 - `galley session kill <id>` — runner Shutdown (vs `session stop` which
-  Aborts the turn but keeps the bridge alive). Deferred to v0.6+
+  Aborts the turn but keeps the bridge alive). Deferred to a future release,
   pending dogfood evidence that bridge-wedge cases are common enough
   to warrant a destructive surface ([B4 M1 sub-plan O6](./refactor/B4-M1-sub-plan.md)).
 - `galley project archive <id>` — true reversible archive (current
-  v0.5 `project delete` is destructive; a future schema can add an
+  `project delete` is destructive; a future schema can add an
   `archived_at` column and ship this as a separate command without
   changing the existing `delete` semantics — sub-plan O2).
 - `galley session watch <id> --from=<event-index>` — backlog/resume

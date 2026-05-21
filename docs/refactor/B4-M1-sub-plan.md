@@ -36,7 +36,7 @@
 | 6 | `session move <id> [--to=<project-id>] [--supervisor=Y]` | `assign_session_to_project` | ✓ | `session.move` | **(O3 resolved)** noun=verb subject (session 是 move 的主语，不是 project)；no `--to` = 拆出 project (project_id=None)；PRD §11.1 同步改 |
 | 7 | `project create "<name>" [--description=...] [--supervisor=Y]` | `create_project` | ✓ | `project.create` | thin wrapper |
 | 8 | `project list` | `list_projects` | — | (direct SQLite read, no socket) | thin wrapper；返 NDJSON；mirror sessions list 路径 |
-| 9 | `project delete <project-id> [--supervisor=Y] [--reason=Z]` | `delete_project` | ✓ | `project.delete` | **(O2 resolved)** v0.5 rename from `project archive` → `project delete`；honest naming (实际 SET NULL detach + DELETE)；FK CASCADE 保 sessions intact (per [api.rs:268-270](../../core/src/api.rs))；v0.6+ 再 ship 真 `project archive` reversible 语义；PRD §11.1 同步改 |
+| 9 | `project delete <project-id> [--supervisor=Y] [--reason=Z]` | `delete_project` | ✓ | `project.delete` | **(O2 resolved)** v0.2 rename from `project archive` → `project delete`；honest naming (实际 SET NULL detach + DELETE)；FK CASCADE 保 sessions intact (per [api.rs:268-270](../../core/src/api.rs))；v0.6+ 再 ship 真 `project archive` reversible 语义；PRD §11.1 同步改 |
 | 10 | `llm list` | (SQLite read prefs) | — | (direct DB read, no socket) | 读 `prefs.llm_list` pref；空 → empty NDJSON；不报错 |
 | 11 | `llm set <session-id> <llm-display-name>` | `set_session_llm` + (optional) bridge emit | — (no audit per existing pattern) | `llm.set` | DB write SessionBrief；如 bridge alive emit `IpcCommand::SetLlm`；by-name lookup against cached list |
 
@@ -84,7 +84,7 @@ M1 加 row：
 1. 用户语义：「停一下这个 turn 我想看看 / 我想改 prompt」≠「彻底关掉这个对话」
 2. 跟 GUI 行为对齐：GUI `MainView.tsx` 顶栏 "停止" 按钮 emit Abort（[grep result indicates current GUI stop = Abort 路径](../../gui/src/components/screens/main/MainView.tsx)）
 3. Shutdown 是 system-driven 操作（LRU + lifecycle），不该挂 user-facing CLI surface
-4. CLI 加 `session kill` 是另一档 destructive ops，留 [O6 NEW](#open-decisions-new) v0.6+ 再加（避免 v0.5 surface 过度复杂）
+4. CLI 加 `session kill` 是另一档 destructive ops，留 [O6 NEW](#open-decisions-new) v0.6+ 再加（避免 v0.2 surface 过度复杂）
 
 `session stop` 在 bridge 已 dead 时的行为：socket 内 `manager.agent_running()` 检查，false → 返 `{dispatch: "already_stopped"}` exit 0 (idempotent)；true → emit Abort + 返 `{dispatch: "abort_sent"}` exit 0。
 
@@ -443,7 +443,7 @@ handler:
 
 **`project delete`** (O2 resolved · was `project archive`)：socket handler 调 `delete_project(id, origin)`. FK CASCADE SET NULL 自动把 child sessions 拆到 ungrouped (保 sessions 不丢)。Emit Tauri event `project-deleted-external` (payload {projectId, detachedSessions: count})。Response: `{deleted: true, detachedSessions: count}` 让 agent 知道副作用。Exit 3 if not_found。
 
-**Naming rationale (O2 resolved 2026-05-20 PM)**: 原 PRD `project archive` 在 v0.5 实际是 `delete_project` (FK SET NULL + 行删除)。「archive」一词暗示 reversible hide，跟实际 destructive delete 不符——naming 撒谎。**修法**：v0.5 直接叫 `project delete` (honest)；v0.6+ 真 archive 落地时再 ship `project archive` 带 reversible 语义（避免现在的 archive→delete 误导成为 semantic debt）。PRD §11.1 同步改 (M1.1 prereq commit)。
+**Naming rationale (O2 resolved 2026-05-20 PM)**: 原 PRD `project archive` 在 v0.2 实际是 `delete_project` (FK SET NULL + 行删除)。「archive」一词暗示 reversible hide，跟实际 destructive delete 不符——naming 撒谎。**修法**：v0.2 直接叫 `project delete` (honest)；v0.6+ 真 archive 落地时再 ship `project archive` 带 reversible 语义（避免现在的 archive→delete 误导成为 semantic debt）。PRD §11.1 同步改 (M1.1 prereq commit)。
 
 **Note for SOP (M4)**：destructive 操作前 agent confirm + show detachedSessions preview 是 SOP-level 责任，不在 CLI surface 加 flag（O2 决策 explicit）。`project delete` 名字诚实就够了。
 
@@ -517,7 +517,7 @@ enum ProjectCmd {
     Create { name: String, #[arg(long)] description: Option<String>, #[arg(long)] supervisor: Option<String> },
     List,
     /// Permanently delete a project. Child sessions auto-detach to ungrouped
-    /// (FK SET NULL). v0.5: this is destructive. v0.6+ will ship a separate
+    /// (FK SET NULL). v0.2: this is destructive. v0.6+ will ship a separate
     /// `archive` command with reversible semantics. (O2 resolved.)
     Delete { project_id: String, #[arg(long)] supervisor: Option<String>, #[arg(long)] reason: Option<String> },
 }
@@ -756,19 +756,19 @@ M1 引入新代码 / 新 socket route / 新 trait method usage，**禁止留 TRA
 **理由**：详 §1.6。SOP agent 调 `llm list` 期待秒级返回（典型 "查一下 LLM 列表然后选一个"），5-10s spawn 延迟破坏 agent UX；SQLite cache 是 acceptable degradation；空 cache 的解决方案 "GUI 起一次 session" 已是用户 onboarding 一部分。
 
 ### Reject #6 · `project archive` 加 trait `archive_project` + `archived` 字段
-**理由**：scope creep。v0.5 project 没 archived state（B3 M4 只接 delete）；加 archived 字段 = migration 008 + GUI UI 改 + SOP 文档改 = 跑出 M1 scope；v0.6+ 加真 archive 时再 migration（O2 rename to `project delete` 后 v0.6+ `project archive` 是新加 NOT 覆盖；semantic debt 避免）。
+**理由**：scope creep。v0.2 project 没 archived state（B3 M4 只接 delete）；加 archived 字段 = migration 008 + GUI UI 改 + SOP 文档改 = 跑出 M1 scope；v0.6+ 加真 archive 时再 migration（O2 rename to `project delete` 后 v0.6+ `project archive` 是新加 NOT 覆盖；semantic debt 避免）。
 
 ### Reject #7 · CLI exit code 5 留到 M6 schema freeze 再加
 **理由**：M1 内 `session btw` 已有 runner_error 触发场景；M6 freeze 前漏掉则 schema freeze 后再加成本高（agent SOP 已写完 expect 0-4 mapping，加新 code 破坏 SOP）。M1.1 prereq commit 顺手加，干净。
 
 ### Reject #8 · CLI `session kill` 加 destructive Shutdown surface
-**理由**：[O6 NEW](#open-decisions-new) 推 v0.6+。v0.5 surface 已含 archive (destructive delete-ish) + restore；多一个 kill 增加 SOP 学习成本。Shutdown 用 GUI Cmd-Q 或 LRU 自然触发足够。
+**理由**：[O6 NEW](#open-decisions-new) 推 v0.6+。v0.2 surface 已含 archive (destructive delete-ish) + restore；多一个 kill 增加 SOP 学习成本。Shutdown 用 GUI Cmd-Q 或 LRU 自然触发足够。
 
 ### Reject #9 · `--pretty` flag 在 M1 内实现
 **理由**：B4 playbook T9 列 `--pretty` 是 M9 polish；M1 scope 聚焦写命令 + agent-api schema；pretty 是 derived view (PRD §11.2 #6)；JSON canonical 已能跑通 supervisor agent flow。
 
 ### Reject #10 · `session watch --until=idle` 在 M1 实现
-**理由**：B4 playbook A1 / PRD §11.1 列 `--until=idle` 是 watch enhancement；B2 已 ship watch 基础；M1 scope 聚焦 11 个新 subcommand 不动 watch；watch enhancement 推 [M9 catchall](./B4-cli-bg-artifact.md#m9--b4-acceptance--v05-ship-准备-d65) 或独立 follow-up commit。
+**理由**：B4 playbook A1 / PRD §11.1 列 `--until=idle` 是 watch enhancement；B2 已 ship watch 基础；M1 scope 聚焦 11 个新 subcommand 不动 watch；watch enhancement 推 [M9 catchall](./B4-cli-bg-artifact.md) 或独立 follow-up commit。
 
 ### Reject #11 · 保留 `project move` 不改成 `session move` (O3 alt)
 **理由 (O3 resolved 2026-05-20 PM)**：原 PRD literal 是「project move」，但 PRD §11.2 #5 自家 grammar rule 是「`galley <noun> <verb>` noun 是 subject」。move 的 subject 是 session 不是 project。保留 `project move` = PRD 内部 §11.1 跟 §11.2 矛盾，agent-api §5.14 doc 强补「subject is session」是绕开 grammar rule 而非守住。**rename 比 doc 补丁优**：PRD 是内部文档，纠正 §11.1 比加 §5.14 文档补丁低成本 + 高一致性。
@@ -790,7 +790,7 @@ M1 引入新代码 / 新 socket route / 新 trait method usage，**禁止留 TRA
 - [x] **O3** `project move` vs `session move` → **改 `session move <id> --to=<pid>`** (PRD §11.2 #5 grammar rule 对齐)，PRD §11.1 同步改。改完后 R6 closed。Sub-plan 原 lean (保 PRD literal) → Reject #11。
 - [x] **O4** `project delete` SOP 演示 confirm → **punt to M4 sub-plan**。M1 内 `delete_project` 返 `detachedSessions: count` payload，agent 可决定是否 pre-confirm；M4 SOP 内显式演示是好实践但不是 M1 blocker。
 - [x] **O5** `session btw` origin push Tauri event → **M1 socket handler 留 `// TODO(M7): emit btw-dispatched event with origin payload` hook 点，本 milestone 不实现**。零代码成本 + 锁住 M7 集成路径；payload shape 由 M7 sub-plan 决定。
-- [x] **O6** `session kill` Shutdown surface → **v0.5 不加**。Cmd-Q + LRU 自然触发足够；CLI surface 守简洁；**新加监测项 N5 dogfood watch**：如 dogfood 期间出现 bridge wedge complaints (Python hang / OOM / IPC deadlock)，v0.6+ 再 ship `session kill`。
+- [x] **O6** `session kill` Shutdown surface → **v0.2 不加**。Cmd-Q + LRU 自然触发足够；CLI surface 守简洁；**新加监测项 N5 dogfood watch**：如 dogfood 期间出现 bridge wedge complaints (Python hang / OOM / IPC deadlock)，v0.6+ 再 ship `session kill`。
 
 **Net impact on M1 scope**:
 - T1.2 session new 加 SQLite transaction wrap (O1) — +30 LOC handler + 2 trait method (`*_in_tx` variants) + 1 helper refactor

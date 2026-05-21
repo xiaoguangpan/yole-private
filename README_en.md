@@ -79,6 +79,11 @@ The first two letters of our name are a quiet bow to [GenericAgent](https://gith
 
 **Tech stack:** Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4 / Rust (Galley Core + Galley CLI) / Python (runner, wraps GenericAgent) / SQLite + FTS5 trigram
 
+More docs:
+[Architecture](./docs/architecture.md) ·
+[Contributing](./CONTRIBUTING.md) ·
+[Docs index](./docs/README.md)
+
 ## Quick Start
 
 ### 1 · Install GenericAgent
@@ -111,15 +116,15 @@ The GUI auto-runs an Onboarding wizard:
 
 Galley's GUI and CLI are **peer frontends** — anything the CLI can do, the GUI can do, and the other way around. The CLI is the entry point for another agent to drive your session team remotely.
 
-### One-click install
+### Agent setup
 
-In the running GUI, head to **Settings → Integration tab**:
+In the running GUI, head to **Settings → Agent**:
 
 | Button | What it does |
 |---|---|
-| **Install galley to PATH** | Installs the `galley` command to `/usr/local/bin/` (macOS sudo; user-level PATH on Windows) so the supervisor can call it directly |
-| **Install Supervisor SOP** | Drops [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md) into your GA's `memory/` — your GA bot learns to orchestrate Galley automatically |
-| **Install Claude Skill** | Symlinks [`.claude/skills/galley-supervisor`](./.claude/skills/galley-supervisor) into `~/.claude/skills/` — Claude Code auto-recognizes triggers like "check Galley" or "what's running in Galley" |
+| **Copy SOP** | Copies [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md) so you can hand it to the Agent you trust to orchestrate Galley |
+| **Install galley command** | Optional. Lets you and scripts call `galley` directly from a terminal; the Agent SOP does not depend on it |
+| **Open Agent API docs** | Opens the full command reference, JSON schemas, and exit codes |
 
 ### From the supervisor's seat
 
@@ -127,10 +132,11 @@ Once installed, a remote agent can dispatch like this:
 
 ```bash
 # What's running right now?
-galley session list --output=json | jq '.[] | {id, title, status}'
+galley status
+galley sessions list
 
 # Spin up a new session for the GA to follow up on a PR
-galley session new --project=work --llm="Claude Sonnet 4.6" \
+galley session new --project=proj_work --llm="Claude Sonnet 4.6" \
   --supervisor=ga-claude-1 --reason="follow up on PR review" \
   "look at the feedback on #1234"
 
@@ -138,7 +144,7 @@ galley session new --project=work --llm="Claude Sonnet 4.6" \
 galley session watch <id>
 
 # Swap the LLM / archive / etc.
-galley session set-llm <id> --llm="GLM 5.1"
+galley llm set <id> "GLM 5.1"
 galley session archive <id> --supervisor=ga-claude-1 --reason="done"
 ```
 

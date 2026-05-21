@@ -55,22 +55,13 @@ fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
 
-/// B4 M3 T3.4 — install the embedded Galley Supervisor SOP into the
-/// user's GA `memory/` folder. Wrapper over [`sop_install::install_to_ga_memory`];
-/// the Tauri command surface keeps the same caller contract.
-///
-/// The GUI calls this with `overwrite=false` first. If the response
-/// shape is `AlreadyExists`, the GUI shows a confirm dialog and may
-/// re-invoke with `overwrite=true`.
-///
-/// Returns the [`sop_install::InstallSopOutcome`] enum serialized via
-/// serde — invokers deserialize and switch on the `outcome` tag.
+/// Return the bundled Galley Supervisor SOP for copy / preview surfaces.
+/// The GUI deliberately copies this text to the clipboard instead of
+/// writing into GenericAgent `memory/`; the user decides which agent
+/// receives the SOP.
 #[tauri::command]
-fn install_supervisor_sop(
-    ga_path: String,
-    overwrite: bool,
-) -> sop_install::InstallSopOutcome {
-    sop_install::install_to_ga_memory(&ga_path, overwrite)
+fn get_supervisor_sop() -> String {
+    sop_install::sop_body().to_string()
 }
 
 /// B4 M3 T3.3 — query whether `/usr/local/bin/galley` exists and
@@ -410,7 +401,7 @@ pub fn run() {
         .manage(std::sync::Arc::new(runner_manager::RunnerManager::new()))
         .invoke_handler(tauri::generate_handler![
             path_exists,
-            install_supervisor_sop,
+            get_supervisor_sop,
             check_path_install_status,
             install_galley_to_path,
             uninstall_galley_from_path,
