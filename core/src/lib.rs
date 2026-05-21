@@ -14,7 +14,8 @@ use api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectBrief, ProjectId,
     ProjectPatch, SessionBrief, SessionFilter, SessionId,
 };
-use db::SqliteGalley;
+use db::{PersistAssistantMessage, PersistedMessageRow, SqliteGalley};
+use serde::Deserialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
@@ -249,6 +250,66 @@ async fn clear_session_unread(id: SessionId) -> std::result::Result<(), String> 
 }
 
 #[tauri::command]
+async fn session_message_rows(
+    session_id: SessionId,
+) -> std::result::Result<Vec<PersistedMessageRow>, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .persisted_message_rows(&session_id)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn persist_user_message(
+    session_id: SessionId,
+    turn_index: u32,
+    content: String,
+    origin: Origin,
+) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .persist_gui_user_message(session_id, turn_index, content, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistAssistantMessageInput {
+    session_id: SessionId,
+    turn_index: u32,
+    content: String,
+    tool_calls: Option<String>,
+    tool_results: Option<String>,
+    thinking: Option<String>,
+    final_answer: Option<String>,
+    summary: Option<String>,
+    preamble: Option<String>,
+}
+
+#[tauri::command]
+async fn persist_assistant_message(
+    input: PersistAssistantMessageInput,
+) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley
+        .persist_gui_assistant_message(PersistAssistantMessage {
+            session_id: input.session_id,
+            turn_index: input.turn_index,
+            content: input.content,
+            tool_calls: input.tool_calls,
+            tool_results: input.tool_results,
+            thinking: input.thinking,
+            final_answer: input.final_answer,
+            summary: input.summary,
+            preamble: input.preamble,
+        })
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
 async fn bulk_archive_sessions(
     ids: Vec<SessionId>,
     origin: Origin,
@@ -417,6 +478,9 @@ pub fn run() {
             set_session_llm,
             bump_session_after_turn,
             clear_session_unread,
+            session_message_rows,
+            persist_user_message,
+            persist_assistant_message,
             bulk_archive_sessions,
             bulk_unarchive_sessions,
             bulk_delete_sessions,

@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 import { fromIPCError, makeAppError } from "@/types/app-error";
 import type {
   AgentTurn,
@@ -888,10 +890,6 @@ async function persistTurnEndToMessages(event: {
   summary: string;
 }): Promise<void> {
   try {
-    const { getDB, indexMessageFts } = await import("@/lib/db");
-    const db = await getDB();
-    const id = `msg_${event.sessionId}_${event.turnIndex}_assistant`;
-    const createdAt = new Date().toISOString();
     const trimmedSummary = event.summary?.trim() ?? "";
     const finalAnswer = cleanFinalAnswer(event.responseContent);
     // Mirrors turnFromTurnEnd's gate: only intermediate turns persist
@@ -904,64 +902,24 @@ async function persistTurnEndToMessages(event: {
     const persistedPreamble = isFinalTurn
       ? null
       : (extractPreamble(event.responseContent) ?? null);
-    await db.execute(
-      `INSERT INTO messages (
-         id, session_id, turn_index, sequence, role, content,
-         tool_calls, tool_results, thinking, final_answer, summary,
-         preamble, created_at
-       ) VALUES ($1, $2, $3, $4, 'assistant', $5,
-                 $6, $7, $8, $9, $10,
-                 $11, $12)
-       ON CONFLICT(id) DO UPDATE SET
-         content       = excluded.content,
-         tool_calls    = excluded.tool_calls,
-         tool_results  = excluded.tool_results,
-         thinking      = excluded.thinking,
-         final_answer  = excluded.final_answer,
-         summary       = excluded.summary,
-         preamble      = excluded.preamble`,
-      [
-        id,
-        event.sessionId,
-        event.turnIndex,
-        // Sequence within turn: user is 0 (persistUserMessage in
-        // db.ts), assistant is 1. `loadMessagesBySession` orders by
-        // (turn_index, sequence) — both halves of a turn need
-        // distinct sequences for restore to come out in the right
-        // order.
-        1,
-        event.responseContent,
-        JSON.stringify(event.toolCalls),
-        JSON.stringify(event.toolResults),
-        extractThinking(event.responseContent) ?? null,
+    await invoke("persist_assistant_message", {
+      input: {
+        sessionId: event.sessionId,
+        turnIndex: event.turnIndex,
+        content: event.responseContent,
+        toolCalls: JSON.stringify(event.toolCalls),
+        toolResults: JSON.stringify(event.toolResults),
+        thinking: extractThinking(event.responseContent) ?? null,
         finalAnswer,
         // GA's third-person turn summary. NULL when empty so the
         // TurnMarker renders the bare "第 N 步" instead of an
         // empty separator.
-        trimmedSummary ? trimmedSummary : null,
+        summary: trimmedSummary ? trimmedSummary : null,
         // LLM pre-tool reasoning prose for DetailPanel restore. See
         // isFinalTurn gate above — final answers don't persist here.
-        persistedPreamble,
-        createdAt,
-      ],
-    );
-    // Index the markdown body for CommandPalette content search.
-    // We index `final_answer` rather than raw `content` so raw
-    // <thinking> blocks don't pollute search hits. Best-effort —
-    // a failure here shouldn't unwind the message write.
-    try {
-      if (finalAnswer && finalAnswer.trim() !== "") {
-        await indexMessageFts({
-          messageId: id,
-          sessionId: event.sessionId,
-          role: "assistant",
-          turnIndex: event.turnIndex,
-          body: finalAnswer,
-        });
-      }
-    } catch (e) {
-      console.debug("[ipc] persistTurnEndToMessages indexMessageFts failed.", e);
-    }
+        preamble: persistedPreamble,
+      },
+    });
   } catch (e) {
     console.debug("[ipc] persistTurnEndToMessages: SQLite unavailable.", e);
   }

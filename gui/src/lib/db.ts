@@ -1,16 +1,16 @@
+import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
 
 import type { MessageRow, ToolEventRow } from "@/types/db";
 import type { ApprovalDecision } from "@/types/ipc";
 
 /**
- * SQLite client wrapper. Migrations run automatically on first
- * connect via tauri-plugin-sql; we just call `getDB()` and translate
- * rows to domain types.
+ * SQLite client wrapper. Migrations run automatically through
+ * tauri-plugin-sql; `getDB()` remains for prefs/search/tool-event
+ * surfaces that still use direct SQL.
  *
- * V0.1 #9 ships sessions + projects read/write. Messages,
- * tool_events, approval_rules wiring lands in #10 alongside IPC
- * event handlers (each event maps to an INSERT/UPDATE here).
+ * Session/project and message history reads/writes now route through
+ * Rust Core Tauri commands so the GUI and CLI use the same DB path.
  */
 
 const DB_URL = "sqlite:workbench.db";
@@ -108,12 +108,13 @@ export async function deleteDemoSessions(): Promise<number> {
 // ---------------- messages ----------------
 //
 // Stage 3 Task 3 (Session Restore) — `messages` is the source of truth
-// for conversation history that survives restart. Two writers:
+// for conversation history that survives restart. The two logical writers
+// are still:
 //
-//   - `persistUserMessage` (this file) — called from store
+//   - `persistUserMessage` (this file, routed through Rust Core) — called from store
 //     `appendUserTurn` the moment the user submits, so a crash before
 //     turn_end doesn't lose the question.
-//   - `persistTurnEndToMessages` (lib/ipc-handlers.ts) — called on
+//   - `persistTurnEndToMessages` (lib/ipc-handlers.ts, routed through Rust Core) — called on
 //     `turn_end`, writes the assistant row with thinking / tool_calls /
 //     tool_results / final_answer + GA's raw responseContent (the latter
 //     is what the bridge replays on `load_history`).
@@ -137,33 +138,12 @@ export interface PersistUserMessageParams {
 export async function persistUserMessage(
   p: PersistUserMessageParams,
 ): Promise<void> {
-  const db = await getDB();
-  const id = `msg_${p.sessionId}_${p.turnIndex}_user`;
-  const createdAt = new Date().toISOString();
-  await db.execute(
-    `INSERT INTO messages (
-       id, session_id, turn_index, sequence, role, content,
-       tool_calls, tool_results, thinking, final_answer, created_at
-     ) VALUES ($1, $2, $3, 0, 'user', $4,
-               NULL, NULL, NULL, NULL, $5)
-     ON CONFLICT(id) DO UPDATE SET
-       content    = excluded.content,
-       created_at = excluded.created_at`,
-    [id, p.sessionId, p.turnIndex, p.content, createdAt],
-  );
-  // Index for CommandPalette content search. Best-effort: a failure
-  // here shouldn't roll back the user message write.
-  try {
-    await indexMessageFts({
-      messageId: id,
-      sessionId: p.sessionId,
-      role: "user",
-      turnIndex: p.turnIndex,
-      body: p.content,
-    });
-  } catch (e) {
-    console.debug("[db] persistUserMessage indexMessageFts failed.", e);
-  }
+  await invoke("persist_user_message", {
+    sessionId: p.sessionId,
+    turnIndex: p.turnIndex,
+    content: p.content,
+    origin: { via: "gui" },
+  });
 }
 
 /**
@@ -408,13 +388,7 @@ function highlightLike(snippet: string, q: string): string {
 export async function loadMessagesBySession(
   sessionId: string,
 ): Promise<MessageRow[]> {
-  const db = await getDB();
-  return db.select<MessageRow[]>(
-    `SELECT * FROM messages
-     WHERE session_id = $1
-     ORDER BY turn_index ASC, sequence ASC`,
-    [sessionId],
-  );
+  return invoke<MessageRow[]>("session_message_rows", { sessionId });
 }
 
 // ---------------- tool_events ----------------

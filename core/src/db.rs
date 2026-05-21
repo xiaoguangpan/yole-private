@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use directories::ProjectDirs;
+use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
@@ -105,6 +106,136 @@ impl SqliteGalley {
     pub fn from_pool(pool: SqlitePool) -> Self {
         Self { pool }
     }
+
+    pub async fn persisted_message_rows(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<Vec<PersistedMessageRow>> {
+        sqlx::query_as::<_, PersistedMessageRow>(
+            "SELECT id, session_id, turn_index, sequence, role, content, \
+                    tool_calls, tool_results, thinking, final_answer, summary, \
+                    preamble, created_via, supervisor, origin_note, created_at \
+             FROM messages \
+             WHERE session_id = ? \
+             ORDER BY turn_index ASC, sequence ASC",
+        )
+        .bind(session_id.as_str())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)
+    }
+
+    pub async fn persist_gui_user_message(
+        &self,
+        session_id: SessionId,
+        turn_index: u32,
+        content: String,
+        origin: Origin,
+    ) -> Result<()> {
+        let id = format!("msg_{}_{}_user", session_id.as_str(), turn_index);
+        let created_at = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO messages (
+               id, session_id, turn_index, sequence, role, content,
+               tool_calls, tool_results, thinking, final_answer, created_at,
+               created_via, supervisor, origin_note
+             ) VALUES (?, ?, ?, 0, 'user', ?,
+                       NULL, NULL, NULL, NULL, ?,
+                       ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               content = excluded.content,
+               created_via = excluded.created_via,
+               supervisor = excluded.supervisor,
+               origin_note = excluded.origin_note",
+        )
+        .bind(&id)
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .bind(&content)
+        .bind(&created_at)
+        .bind(origin.via.as_sql())
+        .bind(&origin.supervisor)
+        .bind(&origin.reason)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        self.index_message_fts(&id, session_id.as_str(), "user", turn_index, &content)
+            .await;
+        Ok(())
+    }
+
+    pub async fn persist_gui_assistant_message(&self, p: PersistAssistantMessage) -> Result<()> {
+        let id = format!("msg_{}_{}_assistant", p.session_id.as_str(), p.turn_index);
+        let created_at = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO messages (
+               id, session_id, turn_index, sequence, role, content,
+               tool_calls, tool_results, thinking, final_answer, summary,
+               preamble, created_at
+             ) VALUES (?, ?, ?, 1, 'assistant', ?,
+                       ?, ?, ?, ?, ?,
+                       ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               content       = excluded.content,
+               tool_calls    = excluded.tool_calls,
+               tool_results  = excluded.tool_results,
+               thinking      = excluded.thinking,
+               final_answer  = excluded.final_answer,
+               summary       = excluded.summary,
+               preamble      = excluded.preamble",
+        )
+        .bind(&id)
+        .bind(p.session_id.as_str())
+        .bind(i64::from(p.turn_index))
+        .bind(&p.content)
+        .bind(&p.tool_calls)
+        .bind(&p.tool_results)
+        .bind(&p.thinking)
+        .bind(&p.final_answer)
+        .bind(&p.summary)
+        .bind(&p.preamble)
+        .bind(&created_at)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        if let Some(body) = p.final_answer.as_deref().filter(|s| !s.trim().is_empty()) {
+            self.index_message_fts(&id, p.session_id.as_str(), "assistant", p.turn_index, body)
+                .await;
+        }
+        Ok(())
+    }
+
+    async fn index_message_fts(
+        &self,
+        message_id: &str,
+        session_id: &str,
+        role: &str,
+        turn_index: u32,
+        body: &str,
+    ) {
+        let res = async {
+            sqlx::query("DELETE FROM messages_fts WHERE message_id = ?")
+                .bind(message_id)
+                .execute(&self.pool)
+                .await?;
+            sqlx::query(
+                "INSERT INTO messages_fts (message_id, session_id, role, turn_index, body)
+                 VALUES (?, ?, ?, ?, ?)",
+            )
+            .bind(message_id)
+            .bind(session_id)
+            .bind(role)
+            .bind(i64::from(turn_index))
+            .bind(body)
+            .execute(&self.pool)
+            .await?;
+            std::result::Result::<(), sqlx::Error>::Ok(())
+        }
+        .await;
+        if let Err(e) = res {
+            eprintln!("[galley-core] index_message_fts failed: {e}");
+        }
+    }
 }
 
 // ---------------- internal row structs ----------------
@@ -178,6 +309,38 @@ impl MessageRow {
             origin: None,
         })
     }
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct PersistedMessageRow {
+    pub id: String,
+    pub session_id: String,
+    pub turn_index: i64,
+    pub sequence: i64,
+    pub role: String,
+    pub content: String,
+    pub tool_calls: Option<String>,
+    pub tool_results: Option<String>,
+    pub thinking: Option<String>,
+    pub final_answer: Option<String>,
+    pub summary: Option<String>,
+    pub preamble: Option<String>,
+    pub created_via: Option<String>,
+    pub supervisor: Option<String>,
+    pub origin_note: Option<String>,
+    pub created_at: String,
+}
+
+pub struct PersistAssistantMessage {
+    pub session_id: SessionId,
+    pub turn_index: u32,
+    pub content: String,
+    pub tool_calls: Option<String>,
+    pub tool_results: Option<String>,
+    pub thinking: Option<String>,
+    pub final_answer: Option<String>,
+    pub summary: Option<String>,
+    pub preamble: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
