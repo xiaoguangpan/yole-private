@@ -42,11 +42,12 @@ interface MarkdownViewProps {
   source: string;
   /**
    * Visual register. "agent" = serif body (final answer floating in
-   * the document). "thinking" = serif italic muted (thinking summary
-   * callout). Layout chrome (padding / background / brand bar) is
-   * the caller's job — this component renders inline content only.
+   * the document). "narration" = lower-weight intermediate assistant
+   * prose. "thinking" = serif italic muted (thinking summary callout).
+   * Layout chrome (padding / background / brand bar) is the caller's
+   * job — this component renders inline content only.
    */
-  variant: "agent" | "thinking";
+  variant: "agent" | "narration" | "thinking";
   className?: string;
 }
 
@@ -55,7 +56,12 @@ export function MarkdownView({
   variant,
   className,
 }: MarkdownViewProps) {
-  const proseClass = variant === "agent" ? PROSE_AGENT : PROSE_THINKING;
+  const proseClass =
+    variant === "agent"
+      ? PROSE_AGENT
+      : variant === "narration"
+        ? PROSE_NARRATION
+        : PROSE_THINKING;
   return (
     <div className={cn(proseClass, className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
@@ -118,6 +124,14 @@ const PROSE_AGENT = cn(
   PROSE_BASE,
   // The "final answer floats in the document" register (DESIGN.md §4.3).
   "font-serif text-[16.5px] leading-[1.7] tracking-[0.005em] text-ink",
+);
+
+const PROSE_NARRATION = cn(
+  PROSE_BASE,
+  // Intermediate LLM narrator prose: useful in the main flow, but
+  // not the final answer. Keep it smaller and softer so the eye can
+  // skim process notes without mistaking them for the deliverable.
+  "font-serif text-[14.5px] leading-[1.62] tracking-[0.003em] text-ink-soft",
 );
 
 const PROSE_THINKING = cn(

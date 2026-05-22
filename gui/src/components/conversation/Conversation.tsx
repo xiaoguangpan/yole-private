@@ -7,7 +7,10 @@ import {
 } from "react";
 
 import { MarkdownView } from "@/components/conversation/MarkdownView";
-import { MessageAgent } from "@/components/conversation/MessageAgent";
+import {
+  MessageAgent,
+  MessageAgentNarration,
+} from "@/components/conversation/MessageAgent";
 import { MessageUser } from "@/components/conversation/MessageUser";
 import { SystemMessageBubble } from "@/components/conversation/SystemMessageBubble";
 import { ToolCallout } from "@/components/conversation/ToolCallout";
@@ -110,8 +113,6 @@ function AgentTurnView({
   // Intermediate turns still show their narrator (useful "voice of
   // GA" running commentary) but without the Copy/Save chips or the
   // conclusion-rhetoric StrongHr.
-  const hasAnswerText =
-    turn.finalAnswer !== null && turn.finalAnswer.trim() !== "";
   // `ask_user` is GA's interaction tool — bridge already emitted an
   // AskUserEvent (rendered separately as AskUserBubble at the
   // conversation tail). Showing it as a tool callout here would
@@ -121,6 +122,17 @@ function AgentTurnView({
   // only drop it at render time.
   const visibleTools = turn.tools.filter((t) => t.name !== "ask_user");
   const isFinalTurn = visibleTools.every((t) => t.name === "no_tool");
+  const answerText =
+    turn.finalAnswer !== null && turn.finalAnswer.trim() !== ""
+      ? turn.finalAnswer
+      : null;
+  const narrationDuplicatesPreamble =
+    !isFinalTurn &&
+    normalizedInlineText(answerText) !== "" &&
+    normalizedInlineText(answerText) === normalizedInlineText(turn.preamble);
+  const detailPreamble = narrationDuplicatesPreamble
+    ? undefined
+    : turn.preamble;
 
   return (
     <div>
@@ -129,7 +141,7 @@ function AgentTurnView({
           index={turn.turnIndex}
           summary={turn.summary}
           thinkingContent={turn.thinking}
-          preamble={turn.preamble}
+          preamble={detailPreamble}
         />
       )}
 
@@ -147,16 +159,22 @@ function AgentTurnView({
         />
       ))}
 
-      {hasAnswerText && (
-        <>
-          {isFinalTurn && <StrongHr />}
-          <MessageAgent showActions={isFinalTurn}>
-            {turn.finalAnswer}
-          </MessageAgent>
-        </>
+      {answerText && (
+        isFinalTurn ? (
+          <>
+            <StrongHr />
+            <MessageAgent>{answerText}</MessageAgent>
+          </>
+        ) : (
+          <MessageAgentNarration>{answerText}</MessageAgentNarration>
+        )
       )}
     </div>
   );
+}
+
+function normalizedInlineText(value?: string | null): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
 /**

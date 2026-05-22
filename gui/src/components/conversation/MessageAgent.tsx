@@ -13,15 +13,11 @@ import { MessageActions } from "@/components/conversation/MessageActions";
  * passes through unchanged so demo fixtures and tests can still
  * inject hand-built content.
  *
- * Message actions (Copy / Save): only the **final** turn of a GA
- * loop run carries them — the conclusion is what users want to grab.
+ * Message actions (Copy / Save): only the **final** turn of a GA loop
+ * run carries them — the conclusion is what users want to grab.
  * Intermediate-step narrator text ("好的，我先看一下 X" before a
- * tool_use) still renders through MessageAgent so the user can see
- * GA's running commentary, but with `showActions={false}` so the
- * action chips don't suggest those mid-step lines are copyable
- * deliverables. Conversation.AgentTurnView passes
- * `tools.length === 0` (GA stops looping when no tool is dispatched,
- * so that's the definition of "final turn").
+ * tool_use) renders through MessageAgentNarration below so it remains
+ * visible in the main flow without adopting final-answer weight.
  *
  * ReactNode demo children always skip actions — there's no canonical
  * markdown source to copy back out, and demos rarely need actions.
@@ -50,6 +46,20 @@ export function MessageAgent({
           isValidElement is here to make it explicit that React
           elements are intentional pass-throughs. */}
       {isValidElement(children) || children !== undefined ? children : null}
+    </div>
+  );
+}
+
+/**
+ * Intermediate assistant narration — process prose that belongs in
+ * the main flow, but should read lighter than the final answer. No
+ * Copy/Save actions: this text is useful status context, not the
+ * user-facing deliverable.
+ */
+export function MessageAgentNarration({ children }: { children: string }) {
+  return (
+    <div className="my-1.5" data-role="agent-narration">
+      <MarkdownView source={children} variant="narration" />
     </div>
   );
 }
