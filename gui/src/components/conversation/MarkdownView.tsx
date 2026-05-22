@@ -311,7 +311,7 @@ function CodeCopyButton({ code }: { code: string }) {
       ) : (
         <Copy size={11} weight="thin" />
       )}
-      <span>{copied ? "Copied" : "Copy"}</span>
+      <span>{copied ? "已复制" : "复制"}</span>
     </button>
   );
 }

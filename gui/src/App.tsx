@@ -888,9 +888,6 @@ function App() {
                   });
                 }
               }}
-              onAdvanceApproval={(next) =>
-                console.info("[main] advance to:", next.approvalId)
-              }
               onStop={() => {
                 console.info("[main] stop");
                 if (!activeSessionId) return;

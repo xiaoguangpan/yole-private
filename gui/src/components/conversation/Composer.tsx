@@ -4,7 +4,6 @@ import {
   CaretUp,
   Check,
   Cube,
-  Plus,
   Stop,
 } from "@phosphor-icons/react";
 import {
@@ -89,6 +88,13 @@ export interface ComposerProps {
   stopMode?: boolean;
   onStop?: () => void;
 
+  /**
+   * Counter bumped by the host after it accepts a user submit.
+   * Replays a one-shot acknowledgement around the action slot, even
+   * if the slot immediately flips from Send to Stop.
+   */
+  submitAckTick?: number;
+
   /** When true, the textarea is read-only and submit/stop are disabled. */
   disabled?: boolean;
 
@@ -129,6 +135,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       onSubmit,
       stopMode = false,
       onStop,
+      submitAckTick = 0,
       disabled = false,
       placeholder = "问点什么…",
       autoFocus = false,
@@ -335,10 +342,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
         />
 
         <div className="mt-2 flex items-center gap-2">
-          <ComposerCornerButton title="Add (V0.2)" disabled>
-            <Plus size={14} weight="thin" />
-          </ComposerCornerButton>
-
           <LLMPill
             llmDisplayName={llmDisplayName}
             llms={llms}
@@ -348,32 +351,40 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
             stopMode={stopMode}
           />
 
-          {stopMode && !isSideQuestion ? (
-            <button
-              type="button"
-              onClick={onStop}
-              title="Stop"
-              aria-label="Stop"
-              className="ml-auto flex size-8 items-center justify-center rounded-full bg-warning text-white transition-colors hover:bg-warning/90"
-            >
-              <Stop size={14} weight="fill" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={disabled || !text?.trim()}
-              title="Send · Enter"
-              aria-label="Send"
-              className={cn(
-                "ml-auto flex size-8 items-center justify-center rounded-full bg-brand text-ink transition-colors hover:bg-brand-strong hover:text-white",
-                (disabled || !text?.trim()) &&
-                  "cursor-not-allowed opacity-50 hover:bg-brand hover:text-ink",
-              )}
-            >
-              <ArrowUp size={16} weight="bold" />
-            </button>
-          )}
+          <span
+            key={`composer-action-${submitAckTick}`}
+            className={cn(
+              "relative ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-full",
+              submitAckTick > 0 && "composer-submit-ack",
+            )}
+          >
+            {stopMode && !isSideQuestion ? (
+              <button
+                type="button"
+                onClick={onStop}
+                title="Stop"
+                aria-label="Stop"
+                className="composer-stop-breath flex size-8 items-center justify-center rounded-full bg-warning text-white transition-colors hover:bg-warning/90"
+              >
+                <Stop size={14} weight="fill" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={disabled || !text?.trim()}
+                title="Send · Enter"
+                aria-label="Send"
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-full bg-brand text-ink transition-colors hover:bg-brand-strong hover:text-white",
+                  (disabled || !text?.trim()) &&
+                    "cursor-not-allowed opacity-50 hover:bg-brand hover:text-ink",
+                )}
+              >
+                <ArrowUp size={16} weight="bold" />
+              </button>
+            )}
+          </span>
         </div>
       </div>
     );
@@ -492,32 +503,5 @@ function LLMPill({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function ComposerCornerButton({
-  children,
-  title,
-  disabled,
-  onClick,
-}: {
-  children: React.ReactNode;
-  title?: string;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "flex size-7 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink-soft",
-        disabled && "cursor-not-allowed opacity-50 hover:bg-transparent",
-      )}
-    >
-      {children}
-    </button>
   );
 }

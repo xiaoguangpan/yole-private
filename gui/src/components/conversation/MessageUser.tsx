@@ -115,6 +115,10 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
   const isLong =
     lineCount > COLLAPSE_LINE_THRESHOLD ||
     content.length > COLLAPSE_CHAR_THRESHOLD;
+  const expandLabel =
+    lineCount > COLLAPSE_LINE_THRESHOLD
+      ? `展开（共 ${lineCount} 行）`
+      : "展开全文";
   const [collapsed, setCollapsed] = useState(true);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -252,7 +256,7 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
           >
             {collapsed ? (
               <>
-                展开（共 {lineCount} 行）
+                {expandLabel}
                 <CaretDown size={10} weight="thin" />
               </>
             ) : (

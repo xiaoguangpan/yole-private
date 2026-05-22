@@ -160,13 +160,13 @@ function actionSentence(tool: ConversationToolEvent): string {
   if (tool.summary) return tool.summary;
   switch (tool.name) {
     case "file_patch":
-      return `Patch file at ${pathFromArgs(tool.args)}`;
+      return `将修改文件：${pathFromArgs(tool.args)}`;
     case "file_write":
-      return `Write file at ${pathFromArgs(tool.args)}`;
+      return `将写入文件：${pathFromArgs(tool.args)}`;
     case "code_run":
-      return "Run code";
+      return "将运行代码或命令";
     default:
-      return `Run ${tool.name}`;
+      return `将执行 ${tool.name}`;
   }
 }
 
@@ -176,7 +176,11 @@ function pathFromArgs(args?: Record<string, unknown>): string {
 }
 
 function RiskPill({ level }: { level: RiskLevel }) {
-  const text = `${level} risk`;
+  const text: Record<RiskLevel, string> = {
+    low: "低风险",
+    medium: "中风险",
+    high: "高风险",
+  };
   const cls: Record<RiskLevel, string> = {
     low: "bg-info/10 text-info",
     medium: "bg-warning/[0.12] text-warning",
@@ -189,7 +193,7 @@ function RiskPill({ level }: { level: RiskLevel }) {
         cls[level],
       )}
     >
-      {text}
+      {text[level]}
     </span>
   );
 }

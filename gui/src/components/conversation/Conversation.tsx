@@ -1,7 +1,11 @@
 import { CaretDown } from "@phosphor-icons/react";
-import { Fragment, useEffect, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type CSSProperties,
+} from "react";
 
-import { TypingDots } from "@/components/conversation/LiveIndicators";
 import { MarkdownView } from "@/components/conversation/MarkdownView";
 import { MessageAgent } from "@/components/conversation/MessageAgent";
 import { MessageUser } from "@/components/conversation/MessageUser";
@@ -176,9 +180,10 @@ function AgentTurnView({
  * Three rendering modes:
  *
  *   thinking placeholder (`thinking={true}`):
- *     In-flight state — TypingDots + elapsed counter. No chevron,
- *     no expand. Mounted when the user submits and unmounted when
- *     turn_progress / turn_end takes over the row.
+ *     In-flight state — the full status line runs as a sequential
+ *     opacity wave, including the elapsed counter once it appears.
+ *     No chevron, no expand. Mounted when the user submits and
+ *     unmounted when turn_progress / turn_end takes over the row.
  *
  *   settled, no detail (`thinking={false}`, no thinking/preamble):
  *     Plain `第 N 步 · {summary}` line. No interaction.
@@ -219,9 +224,10 @@ export function TurnMarker({
   /**
    * True while this step is in flight and we have nothing else to
    * show yet (no streaming partial, no approval card). Renders
-   * "· 思考中" + TypingDots in place of the summary so the user
-   * gets a live signal during LLM TTFT / tool dispatch gaps. An
-   * elapsed-seconds counter joins after 5s so long waits (thinking
+   * "· 思考中..." in place of the summary so the user gets a live
+   * signal during LLM TTFT / tool dispatch gaps. The whole status
+   * line renders as a single sequential opacity wave. An
+   * elapsed-seconds counter joins after 3s so long waits (thinking
    * models, large generations) read as "system still running" not
    * "system frozen" — see useElapsedSeconds for details.
    *
@@ -245,7 +251,7 @@ export function TurnMarker({
 }) {
   const elapsedSec = useElapsedSeconds(thinking);
   const elapsedLabel =
-    thinking && elapsedSec >= 5 ? formatElapsedSeconds(elapsedSec) : null;
+    thinking && elapsedSec >= 3 ? formatElapsedSeconds(elapsedSec) : null;
   const hasStepNumber = index != null;
   const hasDetail = !thinking && Boolean(thinkingContent || preamble);
   const [open, setOpen] = useState(false);
@@ -259,24 +265,20 @@ export function TurnMarker({
           hasDetail && "cursor-pointer transition-colors hover:text-ink-soft",
         )}
       >
-        {hasStepNumber && <>第 {index} 步</>}
         {thinking ? (
-          <>
-            {hasStepNumber ? " · 思考中" : "思考中"}
-            <TypingDots />
-            {elapsedLabel && (
-              <span className="text-ink-muted">
-                {" · "}
-                {elapsedLabel}
-              </span>
-            )}
-          </>
+          <ThinkingWaveText
+            index={hasStepNumber ? index : undefined}
+            elapsedLabel={elapsedLabel}
+          />
         ) : summary ? (
           <>
+            {hasStepNumber && <>第 {index} 步</>}
             {" · "}
             <span className="text-ink-soft">{summary}</span>
           </>
-        ) : null}
+        ) : (
+          hasStepNumber && <>第 {index} 步</>
+        )}
         {hasDetail && (
           <CaretDown
             size={11}
@@ -292,6 +294,108 @@ export function TurnMarker({
         <DetailPanel thinking={thinkingContent} preamble={preamble} />
       )}
     </div>
+  );
+}
+
+function ThinkingWaveText({
+  index,
+  elapsedLabel,
+}: {
+  index?: number;
+  elapsedLabel: string | null;
+}) {
+  const WAVE_STEP_MS = 160;
+  const WAVE_REST_MS = 240;
+  const WAVE_MIN_DURATION_MS = 1300;
+  const statusText = `${index != null ? `第 ${index} 步 · ` : ""}思考中...`;
+  const elapsedText = elapsedLabel ? ` · ${elapsedLabel}` : "";
+  const text = `${statusText}${elapsedText}`;
+  const statusTokens = toThinkingWaveTokens(statusText, 0);
+  const elapsedTokens = toThinkingWaveTokens(
+    elapsedText,
+    statusTokens.nextIndex,
+  );
+  const visibleTokenCount = elapsedTokens.nextIndex;
+  const durationMs = Math.max(
+    (Math.max(visibleTokenCount, 1) - 1) * WAVE_STEP_MS + WAVE_REST_MS,
+    WAVE_MIN_DURATION_MS,
+  );
+
+  return (
+    <span
+      className="thinking-wave"
+      aria-label={text}
+      style={
+        {
+          "--thinking-wave-duration": `${durationMs}ms`,
+        } as CSSProperties
+      }
+    >
+      {statusTokens.tokens.map((token, i) => (
+        <ThinkingWaveToken
+          // Keep keys positional so text updates (especially elapsed
+          // seconds) don't restart the existing token animations.
+          key={`status-${i}`}
+          token={token.value}
+          waveIndex={token.waveIndex}
+        />
+      ))}
+      {elapsedTokens.tokens.map((token, i) => (
+        <ThinkingWaveToken
+          key={`elapsed-${i}`}
+          token={token.value}
+          waveIndex={token.waveIndex}
+          elapsed
+        />
+      ))}
+    </span>
+  );
+}
+
+function toThinkingWaveTokens(
+  text: string,
+  startIndex: number,
+): {
+  tokens: { value: string; waveIndex: number | null }[];
+  nextIndex: number;
+} {
+  let nextIndex = startIndex;
+  const tokens = Array.from(text).map((value) => {
+    if (value === " ") return { value, waveIndex: null };
+    const waveIndex = nextIndex;
+    nextIndex += 1;
+    return { value, waveIndex };
+  });
+  return { tokens, nextIndex };
+}
+
+function ThinkingWaveToken({
+  token,
+  waveIndex,
+  elapsed = false,
+}: {
+  token: string;
+  waveIndex: number | null;
+  elapsed?: boolean;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "thinking-wave-token",
+        waveIndex == null && "thinking-wave-token-space",
+        elapsed && "thinking-wave-token-elapsed",
+      )}
+      style={
+        waveIndex == null
+          ? undefined
+          : ({
+              "--thinking-wave-index": waveIndex,
+            } as CSSProperties)
+      }
+    >
+      {token === " " ? "\u00A0" : token}
+    </span>
   );
 }
 

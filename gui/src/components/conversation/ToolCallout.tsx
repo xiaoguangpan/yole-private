@@ -132,7 +132,13 @@ function BlockToolCallout({
         cfg.bgClass,
       )}
     >
-      <div className={cn("absolute inset-y-0 left-0 w-[3px]", cfg.barClass)} />
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 w-[3px]",
+          cfg.barClass,
+          tool.status === "running" && "tool-running-bar-breath",
+        )}
+      />
 
       {/* Head */}
       <div
@@ -295,12 +301,12 @@ function StatusPill({ status }: { status: ToolEventStatus }) {
 }
 
 const STATUS_PILL_TEXT: Record<ToolEventStatus, string> = {
-  running: "running",
-  "success-current": "success",
-  "success-historical": "success",
-  waiting_approval: "awaiting approval",
-  failed: "failed",
-  denied: "denied",
+  running: "运行中",
+  "success-current": "已完成",
+  "success-historical": "已完成",
+  waiting_approval: "等待审批",
+  failed: "失败",
+  denied: "已拒绝",
 };
 
 const STATUS_PILL_CLASS: Record<ToolEventStatus, string> = {
@@ -342,7 +348,7 @@ function ResultBlock({ content }: { content: string }) {
   return (
     <div className="mt-2.5">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-        Result
+        结果
       </div>
       <pre className="overflow-x-auto whitespace-pre-wrap rounded-[8px] border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
         {content}

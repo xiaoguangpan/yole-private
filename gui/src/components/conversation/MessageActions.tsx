@@ -100,17 +100,17 @@ export function MessageActions({ source }: MessageActionsProps) {
       <ActionButton
         active={copied}
         idleIcon={<Copy size={14} weight="thin" />}
-        idleLabel="Copy"
+        idleLabel="复制"
         activeIcon={<Check size={14} weight="bold" />}
-        activeLabel="Copied"
+        activeLabel="已复制"
         onClick={onCopy}
       />
       <ActionButton
         active={saved}
         idleIcon={<FloppyDisk size={14} weight="thin" />}
-        idleLabel="Save"
+        idleLabel="保存"
         activeIcon={<Check size={14} weight="bold" />}
-        activeLabel="Saved"
+        activeLabel="已保存"
         onClick={onSave}
       />
     </div>

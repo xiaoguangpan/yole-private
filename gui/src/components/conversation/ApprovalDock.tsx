@@ -31,18 +31,22 @@ export function ApprovalDock({ pending, onAdvance }: ApprovalDockProps) {
   return (
     <div className="mb-3 flex items-center gap-3 rounded-md border border-warning/30 border-l-[3px] border-l-warning bg-brand-soft px-3.5 py-2.5 text-[13px] text-ink">
       <span className="inline-flex items-center gap-1.5 font-semibold">
-        <Pause size={14} weight="thin" className="text-warning" />
-        {pending.length} pending approval{pending.length > 1 ? "s" : ""}
+        <Pause
+          size={14}
+          weight="thin"
+          className="approval-attention-breath text-warning"
+        />
+        {pending.length} 项等待审批
       </span>
 
       <span className="text-[12.5px] text-ink-soft">
-        Next:{" "}
+        下一个：{" "}
         <span className="rounded-[4px] bg-hover px-1.5 py-px font-mono text-[12px] text-ink-soft">
           {next.toolName}
         </span>
         {next.target && (
           <>
-            {" on "}
+            {" · "}
             <span className="rounded-[4px] bg-hover px-1.5 py-px font-mono text-[12px] text-ink-soft">
               {next.target}
             </span>
@@ -53,9 +57,10 @@ export function ApprovalDock({ pending, onAdvance }: ApprovalDockProps) {
       <button
         type="button"
         onClick={() => onAdvance?.(next)}
+        aria-label={`前往处理 ${next.toolName} 审批`}
         className="ml-auto inline-flex items-center gap-1.5 rounded-sm border border-transparent px-3 py-1 text-[12.5px] font-medium text-ink transition-colors hover:bg-hover"
       >
-        Advance
+        前往处理
         <ArrowRight size={12} weight="thin" />
       </button>
     </div>

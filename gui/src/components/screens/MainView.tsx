@@ -44,7 +44,6 @@ export interface MainViewProps {
   activeSessionId?: string;
   onSubmit?: (text: string) => void;
   onApprove?: (approvalId: string, decision: ApprovalDecision) => void;
-  onAdvanceApproval?: (next: PendingApproval) => void;
   onStop?: () => void;
   /** When true, the agent is mid-run; the Composer hides Submit and
    * shows Stop, the LLM switcher disables. */
@@ -127,7 +126,6 @@ export function MainView({
   activeSessionId,
   onSubmit,
   onApprove,
-  onAdvanceApproval,
   onStop,
   isRunning = false,
   currentTurnIndex,
@@ -141,6 +139,7 @@ export function MainView({
 }: MainViewProps) {
   const stillWaiting = pendingApprovals.length > 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pendingApprovalRefs = useRef(new Map<string, HTMLDivElement>());
   // Stripped partial — empty when nothing renderable yet (e.g. only
   // `<thinking>...` partial has come through). We hide the
   // ThinkingSummary placeholder once we have user-visible streaming
@@ -225,6 +224,25 @@ export function MainView({
     // optimistically flip atBottom now so subsequent stream chunks
     // are followed without a frame's gap.
     setAtBottom(true);
+  };
+
+  const onClickAdvanceApproval = (next: PendingApproval) => {
+    const container = scrollContainerRef.current;
+    const target = pendingApprovalRefs.current.get(next.approvalId);
+    if (!container || !target) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetTop = target.getBoundingClientRect().top;
+    const TOP_PADDING = 32;
+    const delta = targetTop - containerRect.top - TOP_PADDING;
+    container.scrollBy({ top: delta, behavior: "smooth" });
+    setAtBottom(false);
+
+    window.setTimeout(() => {
+      const focusTarget =
+        target.querySelector<HTMLElement>("button:not([disabled])") ?? target;
+      focusTarget.focus({ preventScroll: true });
+    }, 180);
   };
 
   // atBottom mirror for use inside async callbacks (ResizeObserver
@@ -450,14 +468,27 @@ export function MainView({
                   <TurnMarker index={currentTurnIndex} />
                 )}
                 {pendingApprovals.map((p) => (
-                  <ToolCallout
+                  <div
                     key={p.approvalId}
-                    tool={pendingToToolEvent(p)}
-                    onApprove={(decision) =>
-                      onApprove?.(p.approvalId, decision)
-                    }
-                    projectName={projectName}
-                  />
+                    ref={(node) => {
+                      if (node) {
+                        pendingApprovalRefs.current.set(p.approvalId, node);
+                      } else {
+                        pendingApprovalRefs.current.delete(p.approvalId);
+                      }
+                    }}
+                    data-pending-approval-id={p.approvalId}
+                    tabIndex={-1}
+                    className="focus:outline-none"
+                  >
+                    <ToolCallout
+                      tool={pendingToToolEvent(p)}
+                      onApprove={(decision) =>
+                        onApprove?.(p.approvalId, decision)
+                      }
+                      projectName={projectName}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -472,8 +503,8 @@ export function MainView({
 
               Renders as TurnMarker in thinking mode — same italic
               serif 12px register as the settled marker, just with
-              "· 思考中" + TypingDots in place of the summary. Used
-              to live inside a ThinkingSummary callout (bg-surface
+              a sequential "思考中..." wave in place of the summary.
+              Used to live inside a ThinkingSummary callout (bg-surface
               + bar) but that chrome was sized for multi-paragraph
               thinking content, not a one-liner "still working"
               line. Sharing visual register with TurnMarker collapses
@@ -584,7 +615,7 @@ export function MainView({
         >
           <ApprovalDock
             pending={pendingApprovals}
-            onAdvance={onAdvanceApproval}
+            onAdvance={onClickAdvanceApproval}
           />
 
           <Composer
@@ -595,6 +626,7 @@ export function MainView({
             onSubmit={onSubmit}
             stopMode={isRunning}
             onStop={onStop}
+            submitAckTick={userSubmitTick}
             disabled={false}
             llms={llms}
             onSelectLLM={onSelectLLM}

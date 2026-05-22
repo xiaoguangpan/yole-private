@@ -131,39 +131,147 @@ body {
   animation: fade-in 0.18s ease-out;
 }
 
-/* Typing-dot indicator for the "思考中" placeholder. Three dots
-   pulse in sequence (ChatGPT / Claude / Telegram typing pattern).
-   Compensates for the perceived latency before the LLM produces
-   the first streamable chunk. */
-@keyframes typing-dot {
+/* Peripheral liveness for tool execution. Only the narrow status bar
+   breathes so long-running tools feel alive without pulling attention
+   away from the command / args / result text. */
+@keyframes tool-running-bar-breath {
   0%,
-  60%,
   100% {
-    opacity: 0.25;
+    opacity: 0.55;
+    box-shadow: none;
   }
-  30% {
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(217, 167, 138, 0.18);
+  }
+}
+.tool-running-bar-breath {
+  animation: tool-running-bar-breath 2.2s ease-in-out infinite;
+}
+
+/* Pending approval is actionable, so it gets a small attention pulse.
+   Keep the motion on the icon instead of the dock or button: the user
+   should notice the wait, not feel nagged by a flashing CTA. */
+@keyframes approval-attention-breath {
+  0%,
+  100% {
+    opacity: 0.72;
+    filter: drop-shadow(0 0 0 rgba(191, 122, 31, 0));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(191, 122, 31, 0.22));
+  }
+}
+.approval-attention-breath {
+  animation: approval-attention-breath 2.4s ease-in-out infinite;
+}
+
+/* Composer submit acknowledgement. The host bumps a counter after a
+   submit is accepted; the action slot remounts and this ring quickly
+   expands even if Send has already flipped into Stop. */
+@keyframes composer-submit-ack {
+  0% {
+    opacity: 0.48;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.42);
+  }
+}
+.composer-submit-ack::after {
+  animation: composer-submit-ack 0.36s ease-out;
+  border: 1px solid rgba(217, 167, 138, 0.46);
+  border-radius: 9999px;
+  content: "";
+  inset: -4px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+/* Running Composer state. Stop is available, but it should read as a
+   quiet live affordance instead of a flashing warning button. */
+@keyframes composer-stop-breath {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(191, 122, 31, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(191, 122, 31, 0.1);
+  }
+}
+.composer-stop-breath {
+  animation: composer-stop-breath 2.6s ease-in-out infinite;
+}
+
+/* Sequential opacity wave for the in-flight step marker. Only visible
+   glyphs consume a wave index; spaces keep layout but don't slow the
+   sequence. Duration is set by the component from visible token count
+   so the next pass starts shortly after the last visible glyph lights. */
+@keyframes thinking-wave {
+  0%,
+  6%,
+  18%,
+  100% {
+    opacity: var(--thinking-wave-floor, 0.58);
+  }
+  10%,
+  14% {
     opacity: 1;
   }
 }
-.typing-dot {
-  animation: typing-dot 1.4s ease-in-out infinite;
+.thinking-wave {
+  display: inline-block;
 }
-.typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
+.thinking-wave-token {
+  animation: thinking-wave var(--thinking-wave-duration, 2.16s) linear
+    infinite;
+  animation-delay: calc(var(--thinking-wave-index) * 160ms);
+  display: inline-block;
+  opacity: var(--thinking-wave-floor, 0.58);
 }
-.typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
+.thinking-wave-token-space {
+  animation: none;
+  opacity: 1;
+}
+.thinking-wave-token-elapsed {
+  --thinking-wave-floor: 0.74;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Streaming-content cursor — blinking vertical bar appended to the
-   partial render so the user sees something live between GA's
-   ~50-char delta pushes. steps(2) gives a clean on/off blink
-   rather than a sine-fade. */
-@keyframes streaming-cursor-blink {
-  50% {
-    opacity: 0;
+/* Streaming-content cursor — a soft breathing caret appended to the
+   partial render so the user sees liveness between GA's ~50-char
+   delta pushes without the harsher on/off blink of an input cursor. */
+@keyframes streaming-cursor-breath {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  45%,
+  60% {
+    opacity: 0.78;
   }
 }
 .streaming-cursor {
-  animation: streaming-cursor-blink 1s steps(2) infinite;
+  animation: streaming-cursor-breath 1.55s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-running-bar-breath,
+  .approval-attention-breath,
+  .composer-stop-breath,
+  .thinking-wave-token,
+  .streaming-cursor {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    box-shadow: none;
+  }
+
+  .composer-submit-ack::after {
+    animation: none;
+    opacity: 0;
+  }
 }
