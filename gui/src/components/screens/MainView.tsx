@@ -630,7 +630,7 @@ export function MainView({
             affordance sits on the scroll axis instead of competing
             with the reading column's right edge. */}
         {!atBottom && !isScrollingToBottom && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
             <button
               type="button"
               onClick={onClickScrollToBottom}
@@ -647,7 +647,6 @@ export function MainView({
               <ArrowDown
                 size={14}
                 weight="thin"
-                className="transition-transform duration-150 ease-out group-hover:translate-y-0.5"
               />
             </button>
           </div>
