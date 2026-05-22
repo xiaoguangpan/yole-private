@@ -37,10 +37,10 @@
 - 新增手动 `promote-update-channel.yml`：release publish + smoke test 之后，
   明确把某个 tag 推到 `galley-update-channel` 分支的
   `updates/beta/latest.json`，已安装 app 读取这个稳定 beta endpoint。
-- `tauri signer generate` 写出的 `.pub` 文件是 base64 包装；GitHub Variable
-  `GALLEY_UPDATER_PUBKEY` 要放 decode 后的 minisign public key 原文，否则
-  release build 会在 updater artifact signing 阶段报
-  `Missing comment in public key`。
+- `tauri signer generate` 写出的 `.pub` 文件内容就是 Tauri updater config
+  需要的 base64 public key；decode 后的 minisign public key 只适合人工检查，
+  放进 config 会在 updater artifact signing 阶段报
+  `failed to decode base64 pubkey`。
 
 ## Rejected Alternatives
 

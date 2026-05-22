@@ -125,8 +125,8 @@ jobs:
           if [[ -z "$GALLEY_UPDATER_PUBKEY" ]]; then
             echo "Missing GitHub variable GALLEY_UPDATER_PUBKEY." >&2
             missing=1
-          elif [[ "$GALLEY_UPDATER_PUBKEY" != untrusted\ comment:* ]]; then
-            echo "GitHub variable GALLEY_UPDATER_PUBKEY must be the decoded minisign public key text." >&2
+          elif ! node -e 'const key = Buffer.from(process.env.GALLEY_UPDATER_PUBKEY, "base64").toString("utf8"); if (!key.startsWith("untrusted comment:")) process.exit(1);'; then
+            echo "GitHub variable GALLEY_UPDATER_PUBKEY must be the base64 Tauri updater public key." >&2
             missing=1
           fi
           if [[ -z "$GALLEY_UPDATER_ENDPOINT" ]]; then

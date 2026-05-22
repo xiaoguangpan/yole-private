@@ -576,8 +576,9 @@ build。生成 key pair：
 pnpm --dir gui tauri signer generate -w ~/.config/galley/updater.key
 ```
 
-`updater.key.pub` 文件本身是 base64 包装；`GALLEY_UPDATER_PUBKEY` 需要的是
-decode 后的 minisign public key 原文：
+`updater.key.pub` 文件本身是 Tauri 需要的 base64 public key。可以 decode
+检查它是否还原为 minisign public key，但不要把 decode 后的两行文本放进
+GitHub Variable：
 
 ```bash
 base64 -D < ~/.config/galley/updater.key.pub
@@ -589,7 +590,7 @@ base64 -D < ~/.config/galley/updater.key.pub
   - `TAURI_SIGNING_PRIVATE_KEY`
   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，如果生成 key 时设置了密码
 - GitHub Variables:
-  - `GALLEY_UPDATER_PUBKEY`: 上面 decode 后的两行 public key 原文
+  - `GALLEY_UPDATER_PUBKEY`: `updater.key.pub` 文件内容
   - `GALLEY_UPDATER_ENDPOINT`
 
 Release workflow 会在 CI 里临时写入
