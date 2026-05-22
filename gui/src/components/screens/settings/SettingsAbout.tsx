@@ -1,5 +1,9 @@
 import { ArrowSquareOut } from "@phosphor-icons/react";
 
+import {
+  SettingsPanelHeader,
+  SettingsSectionLabel,
+} from "@/components/screens/settings/settings-ui";
 import { SettingsUpdateControl } from "@/components/screens/settings/SettingsUpdateControl";
 
 interface SettingsAboutProps {
@@ -30,20 +34,11 @@ export function SettingsAbout({
 }: SettingsAboutProps) {
   return (
     <div className="space-y-7">
-      <div>
-        {/* Wordmark uppercase treatment matches the Sidebar header
-            (also a "small wordmark" size). Onboarding's 36px hero
-            heading stays sentence-case because uppercase at that
-            scale tips from "logotype mark" into "marketing banner"
-            — see brand notes in CLAUDE.md / discussion thread
-            2026-05-13. */}
-        <h2 className="m-0 font-serif text-[20px] font-semibold uppercase tracking-[0.04em] text-ink">
-          Galley
-        </h2>
-        <p className="mt-1 font-serif text-[14px] italic text-ink-soft">
-          GenericAgent 的本地桌面工作台
-        </p>
-      </div>
+      <SettingsPanelHeader
+        title="Galley"
+        subtitle="GenericAgent 的本地桌面工作台"
+        wordmark
+      />
 
       {/* Origin story — the "Why Galley?" easter egg. Putting it in
           About means: insiders / curious users find the GenericAgent
@@ -72,7 +67,7 @@ export function SettingsAbout({
       </dl>
 
       {/* Privacy stance — structured as a bulleted list under a
-          「本地优先」 SubLabel so it reads as a proper section
+          「本地优先」 SettingsSectionLabel so it reads as a proper section
           parallel to Links below, rather than orphaning at the
           tail of the version table. Three discrete claims (data
           storage / telemetry / LLM calls) deserve three discrete
@@ -82,7 +77,7 @@ export function SettingsAbout({
           web-default disc. mt-10 mirrors the Links section's
           deliberate 40px section break above. */}
       <div className="mt-10">
-        <SubLabel>本地优先</SubLabel>
+        <SettingsSectionLabel>本地优先</SettingsSectionLabel>
         <ul className="mt-3 space-y-1.5 text-[12.5px] text-ink-soft">
           <li className="before:mr-2 before:text-ink-muted before:content-['·']">
             数据本地存储
@@ -99,11 +94,11 @@ export function SettingsAbout({
       {/* Links section gets explicit `mt-10` instead of relying on
           the parent's `space-y-7`. The dl above is visually dense
           (12.5px rows + small gaps), and the Link section's
-          uppercase SubLabel is similar weight — the default 28px
+          uppercase SettingsSectionLabel is similar weight — the default 28px
           gap reads as "still part of the same block". 40px breaks
           that visual coupling cleanly. */}
       <div className="mt-10">
-        <SubLabel>Links</SubLabel>
+        <SettingsSectionLabel>Links</SettingsSectionLabel>
         <div className="mt-3 space-y-1.5">
           <ExternalLink href="https://github.com/wangjc683/galley">
             Galley · github.com/wangjc683/galley
@@ -126,7 +121,7 @@ export function SettingsAbout({
           (off-topic but adds personality — signals the maker has
           interests beyond AI). */}
       <div className="mt-10">
-        <SubLabel>Also by wangjc683</SubLabel>
+        <SettingsSectionLabel>Also by wangjc683</SettingsSectionLabel>
         <div className="mt-3 space-y-1.5">
           <ExternalLink href="https://subsage.top">
             SubSage · AI Agent 原生订阅管家 · subsage.top
@@ -140,14 +135,6 @@ export function SettingsAbout({
       <div className="border-t border-line pt-4 text-[12px] text-ink-muted">
         Made by wangjc683 · MIT licensed · 欢迎 PR
       </div>
-    </div>
-  );
-}
-
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-      {children}
     </div>
   );
 }

@@ -1,5 +1,9 @@
+import { FolderOpen } from "@phosphor-icons/react";
+import { useEffect, useRef } from "react";
+
 import {
   Composer,
+  type ComposerHandle,
   type ComposerLLMOption,
 } from "@/components/conversation/Composer";
 import { cn } from "@/lib/utils";
@@ -54,6 +58,10 @@ export interface EmptyStateProps {
    * compact = 560 (intimate hero feel), wide = 1200 (matches MainView).
    */
   conversationWidth?: "compact" | "wide";
+  /** Active project context for the next lazily-created session. */
+  projectName?: string;
+  /** Bumped by the host when a navigation action should return focus here. */
+  focusTick?: number;
 }
 
 /**
@@ -61,9 +69,11 @@ export interface EmptyStateProps {
  * (and any time no session is active). Per DESIGN.md §7.
  *
  * Minimalist Linear-style: no heading, Composer is the focal point.
- * Placeholder "今天交代什么？" carries the invitation in product voice
- * ("交代" implies handing a task to an agent — more honest than
- * "你想做什么？" Q&A framing).
+ * Placeholder carries the invitation in product voice ("交代"
+ * implies handing a task to an agent — more honest than "你想做什么？"
+ * Q&A framing). When a project filter is active, the placeholder and
+ * context line name that project so the right pane participates in
+ * project navigation instead of leaving the signal hidden in Sidebar.
  *
  * Below the Composer, four prompt suggestions appear as ambient
  * italic-serif hints rather than chip-style buttons. The visual
@@ -85,7 +95,18 @@ export function EmptyState({
   onSelectLLM,
   onOpenLLMSwitcher,
   conversationWidth = "compact",
+  projectName,
+  focusTick = 0,
 }: EmptyStateProps) {
+  const composerRef = useRef<ComposerHandle>(null);
+  const composerPlaceholder = projectName
+    ? `在 ${projectName} 里交代什么？`
+    : "今天交代什么？";
+
+  useEffect(() => {
+    if (focusTick > 0) composerRef.current?.focus();
+  }, [focusTick]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-app px-16 py-12">
       <div
@@ -95,8 +116,9 @@ export function EmptyState({
         )}
       >
         <Composer
+          ref={composerRef}
           llmDisplayName={llmDisplayName}
-          placeholder="今天交代什么？"
+          placeholder={composerPlaceholder}
           onSubmit={onSubmit}
           autoFocus
           llms={llms}
@@ -104,7 +126,28 @@ export function EmptyState({
           onOpenLLMSwitcher={onOpenLLMSwitcher}
         />
 
-        <ul className="mt-6 flex flex-col items-center gap-2 text-center">
+        {projectName && (
+          <div className="mt-3 flex min-w-0 items-center justify-center gap-1.5 text-[12px] text-ink-muted">
+            <FolderOpen
+              size={12}
+              weight="thin"
+              className="shrink-0 text-ink-muted"
+            />
+            <span className="min-w-0 truncate">
+              将创建到{" "}
+              <span className="font-medium text-ink-soft">
+                {projectName}
+              </span>
+            </span>
+          </div>
+        )}
+
+        <ul
+          className={cn(
+            "flex flex-col items-center gap-2 text-center",
+            projectName ? "mt-5" : "mt-6",
+          )}
+        >
           {prompts.map((p) => (
             <li key={p.label}>
               <button

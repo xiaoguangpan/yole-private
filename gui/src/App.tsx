@@ -161,6 +161,7 @@ function App() {
 
   const toasts = useUiStore((s) => s.toasts);
   const dismissToast = useUiStore((s) => s.dismissToast);
+  const [emptyComposerFocusTick, setEmptyComposerFocusTick] = useState(0);
 
   const bridgeStatus = useRuntimeStore((s) =>
     activeSessionId
@@ -251,11 +252,18 @@ function App() {
         e.preventDefault();
         setActiveSession(undefined);
         setScreen("empty");
+        setEmptyComposerFocusTick((tick) => tick + 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePalette, setSettingsOpen, setActiveSession, setScreen]);
+  }, [
+    togglePalette,
+    setSettingsOpen,
+    setActiveSession,
+    setScreen,
+    setEmptyComposerFocusTick,
+  ]);
 
   // macOS menubar bridge: core/src/lib.rs installs a native menu
   // on Mac that emits `menu:<id>` events. We subscribe and route each
@@ -504,6 +512,12 @@ function App() {
   const archivedCount = sessions.length - visibleSessions.length;
   const effectiveActiveId = screen === "main" ? activeSessionId : undefined;
   const activeSession = visibleSessions.find((s) => s.id === effectiveActiveId);
+  const activeProject = activeProjectFilter
+    ? projects.find((p) => p.id === activeProjectFilter)
+    : undefined;
+  const activeSessionBusy =
+    screen === "main" &&
+    (isRunning || pendingApprovals.length > 0 || pendingAskUser !== null);
 
   // Archived dialog open state — local UI state, no need to live in
   // the global store. Persisting across reloads would be confusing
@@ -517,6 +531,13 @@ function App() {
     () => visibleSessions.filter((s) => bucketSession(s) === "earlier"),
     [visibleSessions],
   );
+  const enterProjectContext = (projectId: string) => {
+    setActiveProjectFilter(projectId);
+    if (activeSessionBusy) return;
+    setActiveSession(undefined);
+    setScreen("empty");
+    setEmptyComposerFocusTick((tick) => tick + 1);
+  };
   // CreateProjectDialog open state. Local for the same reason as the
   // other dialogs above — modal visibility shouldn't persist across
   // launches.
@@ -678,6 +699,7 @@ function App() {
               // commits to a first message.
               setActiveSession(undefined);
               setScreen("empty");
+              setEmptyComposerFocusTick((tick) => tick + 1);
             }}
             onSelectSession={(id) => {
               // Activate (re-spawns the bridge if this session has
@@ -696,7 +718,7 @@ function App() {
             projects={projects}
             activeProjectFilter={activeProjectFilter}
             onNewProject={() => setCreateProjectOpen(true)}
-            onSelectProject={(id) => setActiveProjectFilter(id)}
+            onSelectProject={enterProjectContext}
             onClearProjectFilter={() => setActiveProjectFilter(undefined)}
             onAssignSessionToProject={(sessionId, projectId) => {
               void assignSessionToProject(sessionId, projectId);
@@ -716,6 +738,8 @@ function App() {
             <EmptyState
               llmDisplayName={llmDisplayName}
               conversationWidth={conversationWidth}
+              projectName={activeProject?.name}
+              focusTick={emptyComposerFocusTick}
               llms={llms}
               onSelectLLM={(idx) => {
                 // EmptyState always configures the *next* new
@@ -918,6 +942,7 @@ function App() {
         onNewChat={() => {
           setActiveSession(undefined);
           setScreen("empty");
+          setEmptyComposerFocusTick((tick) => tick + 1);
         }}
         onNewProject={() => setCreateProjectOpen(true)}
         onOpenSession={(id) => {
@@ -1047,7 +1072,7 @@ function App() {
           // now show me it" instinct; the empty-project view is the
           // implicit "drop sessions in here" prompt.
           const created = await createProject(input);
-          setActiveProjectFilter(created.id);
+          enterProjectContext(created.id);
         }}
       />
 
@@ -1082,9 +1107,7 @@ function App() {
         onOpenChange={setProjectsBrowserOpen}
         projects={projects}
         sessions={sessions}
-        onSelectProject={(id) => {
-          setActiveProjectFilter(id);
-        }}
+        onSelectProject={enterProjectContext}
         onTogglePinProject={(id) => {
           const p = projects.find((x) => x.id === id);
           if (p) void updateProject(id, { pinned: !p.pinned });

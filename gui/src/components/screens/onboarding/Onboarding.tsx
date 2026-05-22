@@ -1,3 +1,4 @@
+import { Check } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -336,7 +337,7 @@ function StepProgress({ step }: { step: OnboardingStep }) {
                     "border border-line-strong text-ink-muted",
                 )}
               >
-                {done ? "✓" : i + 1}
+                {done ? <Check size={11} weight="bold" /> : i + 1}
               </span>
               <span
                 className={cn(
@@ -379,4 +380,3 @@ async function pickFolder(): Promise<string | null> {
     return null;
   }
 }
-

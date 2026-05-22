@@ -11,8 +11,13 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
+import {
+  SettingsPanelHeader,
+  SettingsSectionLabel,
+} from "@/components/screens/settings/settings-ui";
 import type { PathValidation } from "@/components/screens/onboarding/StepAttach";
 import { SettingsUpdateControl } from "@/components/screens/settings/SettingsUpdateControl";
+import { Button } from "@/components/ui/button";
 import {
   BUNDLED_PYTHON_VERSION,
   validateGAPath,
@@ -74,7 +79,7 @@ export function SettingsRuntime({
 }: SettingsRuntimeProps) {
   return (
     <div className="space-y-7">
-      <SectionTitle
+      <SettingsPanelHeader
         title="Runtime"
         subtitle="GenericAgent 的启动参数 · 改动后需要重启 Galley"
       />
@@ -101,19 +106,20 @@ export function SettingsRuntime({
       />
 
       <div>
-        <SubLabel>Health Check</SubLabel>
+        <SettingsSectionLabel>Health Check</SettingsSectionLabel>
         <p className="mt-2 text-[12.5px] leading-[1.55] text-ink-soft">
           不知道哪儿出问题了？跑一次完整体检 ——
           重新探测 Python 解释器、检查 GA 路径和必要文件。
         </p>
-        <button
-          type="button"
+        <Button
+          variant="accent-secondary"
+          size="md"
           onClick={onReRunHealthCheck}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-line bg-elevated px-3 py-1.5 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-brand hover:bg-brand-soft hover:text-ink"
+          className="mt-3"
+          leadingIcon={<ArrowsClockwise size={13} weight="thin" />}
         >
-          <ArrowsClockwise size={13} weight="thin" />
           跑一次 Health Check
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
@@ -164,7 +170,7 @@ function PythonPanel({
   if (!useExternal) {
     return (
       <div>
-        <SubLabel>Python</SubLabel>
+        <SettingsSectionLabel>Python</SettingsSectionLabel>
         <div className="mt-2 flex items-center gap-3 rounded-sm border border-line bg-surface px-3 py-2.5">
           <Package
             size={18}
@@ -181,13 +187,14 @@ function PythonPanel({
           </div>
         </div>
         {onToggle && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onToggle(true)}
-            className="mt-2 text-[11.5px] text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline"
+            className="mt-2 px-0 text-[11.5px] hover:bg-transparent hover:underline"
           >
             使用外部 Python…
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -206,13 +213,14 @@ function PythonPanel({
         hint="外部 Python · 改变后用下方 Re-run 重新探测"
       />
       {onToggle && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => onToggle(false)}
-          className="mt-2 text-[11.5px] text-ink-muted underline-offset-2 transition-colors hover:text-ink hover:underline"
+          className="mt-2 px-0 text-[11.5px] hover:bg-transparent hover:underline"
         >
           改回 Galley 内置 Python
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -229,7 +237,7 @@ function PythonPanel({
  * pretending to police it — no auto-update, no "outdated" badge.
  *
  * Match states:
- *   - Equal commits      → green check ✓ "已对齐 baseline"
+ *   - Equal commits      → green Check icon "已对齐 baseline"
  *   - Different commits  → muted info dot "你已自行升级"
  *   - "unknown" commit   → no comparison row (ga_path isn't a git
  *                          checkout — tarball/zip install)
@@ -251,7 +259,7 @@ function GAVersionCard({
 
   return (
     <div>
-      <SubLabel>GenericAgent 版本</SubLabel>
+      <SettingsSectionLabel>GenericAgent 版本</SettingsSectionLabel>
       <div className="mt-2 rounded-sm border border-line bg-surface px-3 py-2.5">
         <div className="flex items-center gap-2 font-mono text-[12.5px] text-ink">
           <span className="text-ink-muted">当前版本</span>
@@ -306,35 +314,6 @@ function formatCommitDate(iso: string): string {
   if (!iso || iso === "unknown") return "";
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return match ? `${match[1]}-${match[2]}-${match[3]}` : "";
-}
-
-// ---------------- atoms ----------------
-
-function SectionTitle({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div>
-      <h2 className="m-0 font-serif text-[18px] font-medium text-ink">
-        {title}
-      </h2>
-      {subtitle && (
-        <p className="mt-1 text-[12.5px] text-ink-muted">{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-      {children}
-    </div>
-  );
 }
 
 /**
@@ -454,7 +433,7 @@ function PathField({
 
   return (
     <div>
-      <SubLabel>{label}</SubLabel>
+      <SettingsSectionLabel>{label}</SettingsSectionLabel>
       <div className="mt-2 flex gap-2">
         <input
           type="text"
@@ -471,19 +450,20 @@ function PathField({
           )}
         />
         {!readOnly && (
-          <button
-            type="button"
+          <Button
+            variant="accent-secondary"
+            size="md"
             // Prevent the input's blur-commit from firing before the
             // picker's selection lands. Otherwise a dirty draft would
             // commit, then immediately get overwritten by the picker
             // result — double toast, confusing audit trail.
             onMouseDown={(e) => e.preventDefault()}
             onClick={onPick}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-line bg-elevated px-3 py-2 text-[12.5px] text-ink-soft transition-colors hover:border-brand hover:bg-brand-soft hover:text-ink"
+            className="shrink-0 px-3 py-2 text-[12.5px]"
+            leadingIcon={<FolderOpen size={13} weight="thin" />}
           >
-            <FolderOpen size={13} weight="thin" />
             选择
-          </button>
+          </Button>
         )}
       </div>
       {editable && <ValidationLine validation={validation} />}

@@ -14,6 +14,7 @@ import { SettingsApproval } from "@/components/screens/settings/SettingsApproval
 import { SettingsIntegration } from "@/components/screens/settings/SettingsIntegration";
 import { SettingsRuntime } from "@/components/screens/settings/SettingsRuntime";
 import { SettingsShortcuts } from "@/components/screens/settings/SettingsShortcuts";
+import { IconButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RuntimeInfo } from "@/types/inspector";
 
@@ -121,11 +122,13 @@ export function Settings({
           <SettingsTabList tab={tab} onChange={setTab} />
 
           <div className="relative min-w-0 flex-1 overflow-y-auto bg-app">
-            <Dialog.Close
-              aria-label="关闭"
-              className="absolute right-3 top-3 z-10 inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-            >
-              <XIcon size={14} weight="thin" />
+            <Dialog.Close asChild>
+              <IconButton
+                ariaLabel="关闭"
+                className="absolute right-3 top-3 z-10"
+              >
+                <XIcon size={14} weight="thin" />
+              </IconButton>
             </Dialog.Close>
 
             <div className="px-8 py-7">

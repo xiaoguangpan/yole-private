@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
+import { Button, IconButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Project, Session } from "@/types/session";
 
@@ -210,23 +211,21 @@ function Header({
       <span className="text-[12.5px] text-ink-muted">{summary}</span>
 
       <div className="ml-auto flex items-center gap-2">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onNewProject}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-sm border border-line bg-elevated px-2.5 py-1 text-[12px] text-ink-soft",
-            "transition-colors hover:bg-hover hover:text-ink",
-          )}
+          leadingIcon={<Plus size={12} weight="thin" />}
         >
-          <Plus size={12} weight="thin" />
           New
-        </button>
+        </Button>
         <Dialog.Close
-          aria-label="关闭"
+          asChild
           onClick={onClose}
-          className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
         >
-          <XIcon size={14} weight="thin" />
+          <IconButton ariaLabel="关闭">
+            <XIcon size={14} weight="thin" />
+          </IconButton>
         </Dialog.Close>
       </div>
     </div>

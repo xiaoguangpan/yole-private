@@ -7,6 +7,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { HealthCheckItem, HealthCheckState } from "@/types/inspector";
 
@@ -18,11 +19,10 @@ export interface HealthCheckCardProps {
    *
    *   standalone — full card chrome (surface-elevated bg, border,
    *                shadow, header with title + status pill). Used in
-   *                Onboarding Step 2, Top Bar runtime popover, and
+   *                Onboarding Step 2, Settings → Runtime, and
    *                Settings → Runtime → Re-run.
-   *   embedded   — no card chrome (rows only). Used inside Inspector →
-   *                Runtime tab where the surrounding panel already
-   *                provides chrome.
+   *   embedded   — no card chrome (rows only). Used where the
+   *                surrounding panel already provides chrome.
    */
   variant?: "standalone" | "embedded";
 
@@ -61,10 +61,10 @@ interface ItemAction {
  * appearance contexts per DESIGN.md §6.1:
  *
  *   1. Onboarding Step 2 (standalone, blocking)
- *   2. Inspector → Runtime tab (embedded)
- *   3. Top Bar runtime row → popover (standalone)
- *   4. Settings → Runtime → Re-run (standalone)
- *   5. System auto-popup on GA anomaly (standalone)
+ *   2. Settings → Runtime → Re-run (standalone)
+ *   3. Sidebar runtime unconfigured state → Settings route
+ *   4. System auto-popup on GA anomaly (standalone)
+ *   5. Onboarding background re-check failure (candidate)
  *
  * Six row states (pending / running / success / failed / warning /
  * blocked) follow the icon mapping in DESIGN.md §6.1; failed rows can
@@ -178,14 +178,14 @@ function HealthRow({
       {showActions && (
         <div className="ml-[26px] mt-2 flex flex-wrap gap-2">
           {actions.map((a) => (
-            <button
+            <Button
               key={a.id}
-              type="button"
               onClick={() => onAction(a.id)}
-              className="inline-flex items-center gap-1 rounded-sm border border-line px-2.5 py-1 text-[12px] font-medium text-brand-strong transition-colors hover:border-brand hover:bg-brand-soft hover:text-ink"
+              variant="accent-secondary"
+              size="sm"
             >
               {a.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}

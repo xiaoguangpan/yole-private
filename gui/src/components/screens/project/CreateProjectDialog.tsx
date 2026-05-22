@@ -2,7 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X as XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface CreateProjectDialogProps {
@@ -87,11 +87,10 @@ export function CreateProjectDialog({
             <Dialog.Title className="font-serif text-[16px] font-medium text-ink">
               新建项目
             </Dialog.Title>
-            <Dialog.Close
-              aria-label="关闭"
-              className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-            >
-              <XIcon size={14} weight="thin" />
+            <Dialog.Close asChild>
+              <IconButton ariaLabel="关闭">
+                <XIcon size={14} weight="thin" />
+              </IconButton>
             </Dialog.Close>
           </div>
 
@@ -116,14 +115,14 @@ export function CreateProjectDialog({
               />
             </Field>
 
-            <div className="flex justify-end gap-2 pt-1">
+            <DialogActionRow className="mt-0 pt-1">
               <Button variant="secondary" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
               <Button type="submit" disabled={!canSubmit}>
                 创建
               </Button>
-            </div>
+            </DialogActionRow>
           </form>
         </Dialog.Content>
       </Dialog.Portal>

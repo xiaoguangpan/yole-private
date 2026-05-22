@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
+import { Button, IconButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
   AppError,
@@ -89,14 +90,13 @@ export function ErrorCard({
           <div className="mt-1 text-[13px] text-ink-soft">{brief}</div>
         </div>
         {!isInline && onDismiss && (
-          <button
-            type="button"
+          <IconButton
             onClick={onDismiss}
-            aria-label="Dismiss"
-            className="-m-1 inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink"
+            ariaLabel="Dismiss"
+            className="-m-1 size-6"
           >
             <XIcon size={12} weight="thin" />
-          </button>
+          </IconButton>
         )}
       </div>
 
@@ -314,31 +314,27 @@ function ActionButton({
   const Icon = ACTION_ICONS[action.handler];
 
   return (
-    <button
-      type="button"
+    <Button
       onClick={handler}
       disabled={disabled}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-sm border px-3 py-1 text-[12.5px] font-medium transition-colors",
-        action.kind === "primary"
-          ? "border-line bg-elevated text-brand-strong hover:border-brand hover:bg-brand-soft hover:text-ink"
-          : "border-transparent text-ink-soft hover:bg-hover hover:text-ink",
-        disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
-      )}
+      variant={action.kind === "primary" ? "brand-soft" : "ghost"}
+      size="sm"
+      leadingIcon={
+        Icon ? (
+          <Icon
+            size={12}
+            weight="thin"
+            className={cn(
+              action.handler === "toggleDetails" &&
+                "transition-transform duration-150",
+              action.handler === "toggleDetails" && detailsOpen && "rotate-180",
+            )}
+          />
+        ) : undefined
+      }
     >
-      {Icon && (
-        <Icon
-          size={12}
-          weight="thin"
-          className={cn(
-            action.handler === "toggleDetails" &&
-              "transition-transform duration-150",
-            action.handler === "toggleDetails" && detailsOpen && "rotate-180",
-          )}
-        />
-      )}
       {action.label}
-    </button>
+    </Button>
   );
 }
 

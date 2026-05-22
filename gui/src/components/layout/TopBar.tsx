@@ -1,6 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import {
+  ArrowRight,
   ArrowsClockwise,
   ArrowsInLineHorizontal,
   ArrowsOutLineHorizontal,
@@ -14,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { Button, IconButton } from "@/components/ui/button";
 import { isMac, isWindowActionTarget } from "@/lib/platform";
 import { formatShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
@@ -259,7 +261,7 @@ export function TopBar({
  *   - "立即关闭" warning-tinted button (calls onDisable)
  *   - Secondary link to Settings → Approval tab
  *
- * Visual: warning-tinted pill, 1px border, ⚡ icon. No animation —
+ * Visual: warning-tinted pill, 1px border, Lightning icon. No animation —
  * users tune out blinking; static colour reads "this is a state, be
  * aware" without becoming background noise.
  */
@@ -303,25 +305,27 @@ function YoloIndicator({
           <p className="mt-1.5 text-[12px] text-ink-muted">
             所有 tool 调用跳过审批直接执行
           </p>
-          <button
-            type="button"
+          <Button
+            variant="warning"
+            size="md"
             onClick={onDisable}
-            className={cn(
-              "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-sm bg-warning px-3 py-2",
-              "text-[12.5px] font-medium text-elevated transition-colors hover:bg-warning/90",
-            )}
+            className="mt-3 w-full"
+            leadingIcon={<Lightning size={14} weight="thin" />}
           >
-            <Lightning size={14} weight="thin" />
             立即关闭
-          </button>
+          </Button>
           {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="mt-2 w-full rounded-sm px-3 py-1.5 text-[12px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-            >
-              在 Settings 中查看 →
-            </button>
+            <Popover.Close asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenSettings}
+                className="mt-2 w-full"
+                trailingIcon={<ArrowRight size={12} weight="thin" />}
+              >
+                在 Settings 中查看
+              </Button>
+            </Popover.Close>
           )}
         </Popover.Content>
       </Popover.Portal>
@@ -335,9 +339,9 @@ function YoloIndicator({
  * with low-frequency / power-user actions attached to "this current
  * session":
  *
- *   - 🔄 重新注入工具 (Reinject Tools): one-shot — re-injects GA's
+ *   - Reinject Tools: one-shot — re-injects GA's
  *     tool definitions into the active session's LLM history.
- *   - 🐱 桌面宠物 (Desktop Pet): 2-state toggle. Label is
+ *   - Desktop Pet: 2-state toggle. Label is
  *     "关闭桌面宠物" when this session holds the pet and "桌面宠物"
  *     otherwise; clicking "桌面宠物" from a non-holder session
  *     implicitly migrates the pet here. "Where is the pet right
@@ -554,35 +558,6 @@ function SessionTitleEditor({
         "border border-line outline-none ring-2 ring-brand/30 focus:border-brand",
       )}
     />
-  );
-}
-
-function IconButton({
-  children,
-  onClick,
-  title,
-  ariaLabel,
-  className,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  title?: string;
-  ariaLabel: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={ariaLabel}
-      onClick={onClick}
-      className={cn(
-        "flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink",
-        className,
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

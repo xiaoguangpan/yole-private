@@ -9,6 +9,8 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
+import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/types/session";
 
@@ -262,52 +264,44 @@ function Header({
 
       <div className="ml-auto flex items-center gap-2">
         {selectMode ? (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onCancelSelectMode}
-            className={cn(
-              "rounded-sm border border-line bg-elevated px-2.5 py-1 text-[12px] text-ink-soft",
-              "transition-colors hover:bg-hover hover:text-ink",
-            )}
           >
             取消
-          </button>
+          </Button>
         ) : (
           <>
             {count > 0 && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={onEnterSelectMode}
-                className={cn(
-                  "rounded-sm border border-line bg-elevated px-2.5 py-1 text-[12px] text-ink-soft",
-                  "transition-colors hover:bg-hover hover:text-ink",
-                )}
               >
                 多选
-              </button>
+              </Button>
             )}
             {count > 0 && (
-              <button
-                type="button"
+              <Button
+                variant="destructive-soft"
+                size="sm"
                 onClick={onEmptyAll}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-sm border border-error/30 bg-error/[0.06] px-2.5 py-1 text-[12px] font-medium text-error",
-                  "transition-colors hover:bg-error/[0.12]",
-                )}
                 title="永久删除所有归档"
+                leadingIcon={<WarningCircle size={12} weight="bold" />}
               >
-                <WarningCircle size={12} weight="bold" />
                 清空全部
-              </button>
+              </Button>
             )}
           </>
         )}
         <Dialog.Close
-          aria-label="关闭"
+          asChild
           onClick={onClose}
-          className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
         >
-          <XIcon size={14} weight="thin" />
+          <IconButton ariaLabel="关闭">
+            <XIcon size={14} weight="thin" />
+          </IconButton>
         </Dialog.Close>
       </div>
     </div>
@@ -387,24 +381,22 @@ function ArchivedRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          type="button"
+        <IconButton
           onClick={onRestore}
           title="恢复"
-          aria-label="恢复"
-          className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-elevated hover:text-ink"
+          ariaLabel="恢复"
+          className="hover:bg-elevated"
         >
           <ArrowUUpLeft size={14} weight="thin" />
-        </button>
-        <button
-          type="button"
+        </IconButton>
+        <IconButton
           onClick={onDelete}
           title="永久删除"
-          aria-label="永久删除"
-          className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-error/10 hover:text-error"
+          ariaLabel="永久删除"
+          variant="danger"
         >
           <Trash size={14} weight="thin" />
-        </button>
+        </IconButton>
       </div>
     </li>
   );
@@ -428,55 +420,46 @@ function SelectActionBar({
   const disabled = selectedCount === 0;
   return (
     <div className="flex shrink-0 items-center gap-2 border-t border-line bg-elevated px-4 py-2.5">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onToggleSelectAllVisible}
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[12px] text-ink-soft",
-          "transition-colors hover:bg-hover hover:text-ink",
-        )}
+        leadingIcon={
+          allVisibleSelected ? (
+            <CheckSquare size={13} weight="fill" className="text-brand-strong" />
+          ) : (
+            <Square size={13} weight="thin" />
+          )
+        }
       >
-        {allVisibleSelected ? (
-          <CheckSquare size={13} weight="fill" className="text-brand-strong" />
-        ) : (
-          <Square size={13} weight="thin" />
-        )}
         {allVisibleSelected ? "取消全选" : "全选"}
-      </button>
+      </Button>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onRestore}
           disabled={disabled}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-sm border border-line bg-elevated px-2.5 py-1 text-[12px] text-ink-soft",
-            "transition-colors hover:bg-hover hover:text-ink",
-            "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-elevated disabled:hover:text-ink-soft",
-          )}
+          leadingIcon={<ArrowUUpLeft size={12} weight="thin" />}
         >
-          <ArrowUUpLeft size={12} weight="thin" />
           恢复
           {selectedCount > 0 && (
             <span className="text-ink-muted">· {selectedCount}</span>
           )}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="destructive-soft"
+          size="sm"
           onClick={onDelete}
           disabled={disabled}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-sm border border-error/30 bg-error/[0.06] px-2.5 py-1 text-[12px] font-medium text-error",
-            "transition-colors hover:bg-error/[0.12]",
-            "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-error/[0.06]",
-          )}
+          leadingIcon={<Trash size={12} weight="thin" />}
         >
-          <Trash size={12} weight="thin" />
           永久删除
           {selectedCount > 0 && (
             <span className="text-error/70">· {selectedCount}</span>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -542,28 +525,19 @@ function ConfirmDeleteOneDialog({
             <span className="text-ink">此操作无法撤销。</span>
           </p>
 
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              autoFocus
-              className="rounded-sm border border-line bg-elevated px-3.5 py-1.5 text-[12.5px] text-ink transition-colors hover:bg-hover"
-            >
+          <DialogActionRow>
+            <Button variant="secondary" onClick={onCancel} autoFocus>
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => {
                 void onConfirm();
               }}
-              className={cn(
-                "rounded-sm border border-error bg-error px-3.5 py-1.5 text-[12.5px] font-medium text-elevated",
-                "transition-colors hover:bg-error/90",
-              )}
             >
               永久删除
-            </button>
-          </div>
+            </Button>
+          </DialogActionRow>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -615,28 +589,19 @@ function ConfirmDeleteManyDialog({
             <span className="text-ink">此操作无法撤销。</span>
           </p>
 
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              autoFocus
-              className="rounded-sm border border-line bg-elevated px-3.5 py-1.5 text-[12.5px] text-ink transition-colors hover:bg-hover"
-            >
+          <DialogActionRow>
+            <Button variant="secondary" onClick={onCancel} autoFocus>
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => {
                 void onConfirm();
               }}
-              className={cn(
-                "rounded-sm border border-error bg-error px-3.5 py-1.5 text-[12.5px] font-medium text-elevated",
-                "transition-colors hover:bg-error/90",
-              )}
             >
               永久删除 {count} 个
-            </button>
-          </div>
+            </Button>
+          </DialogActionRow>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -701,43 +666,35 @@ function ConfirmEmptyAllDialog({
             <span className="text-ink">此操作无法撤销。</span>
           </p>
 
-          <label className="mt-4 flex cursor-pointer select-none items-start gap-2 rounded-sm border border-line bg-app px-3 py-2.5 text-[12.5px] text-ink transition-colors hover:border-line-strong">
-            <input
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(e) => setAcknowledged(e.target.checked)}
-              className="mt-0.5 size-3.5 accent-error"
-            />
+          <Checkbox
+            checked={acknowledged}
+            onCheckedChange={setAcknowledged}
+            className="mt-4 flex cursor-pointer select-none items-start gap-2 rounded-sm border border-line bg-app px-3 py-2.5 text-[12.5px] text-ink transition-colors hover:border-line-strong"
+          >
             <span>我了解此操作无法撤销</span>
-          </label>
+          </Checkbox>
 
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
+          <DialogActionRow>
+            <Button
+              variant="secondary"
               onClick={() => {
                 setAcknowledged(false);
                 onCancel();
               }}
               autoFocus
-              className="rounded-sm border border-line bg-elevated px-3.5 py-1.5 text-[12.5px] text-ink transition-colors hover:bg-hover"
             >
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
               disabled={!acknowledged}
               onClick={() => {
                 void onConfirm().then(() => setAcknowledged(false));
               }}
-              className={cn(
-                "rounded-sm border border-error bg-error px-3.5 py-1.5 text-[12.5px] font-medium text-elevated",
-                "transition-colors hover:bg-error/90",
-                "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-error",
-              )}
             >
               清空全部
-            </button>
-          </div>
+            </Button>
+          </DialogActionRow>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -6,7 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/types/session";
 
@@ -111,11 +111,10 @@ export function EditProjectDialog({
             <Dialog.Title className="font-serif text-[16px] font-medium text-ink">
               编辑项目
             </Dialog.Title>
-            <Dialog.Close
-              aria-label="关闭"
-              className="inline-flex size-7 items-center justify-center rounded-sm text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-            >
-              <XIcon size={14} weight="thin" />
+            <Dialog.Close asChild>
+              <IconButton ariaLabel="关闭">
+                <XIcon size={14} weight="thin" />
+              </IconButton>
             </Dialog.Close>
           </div>
 
@@ -139,14 +138,14 @@ export function EditProjectDialog({
               />
             </Field>
 
-            <div className="flex justify-end gap-2 pt-1">
+            <DialogActionRow className="mt-0 pt-1">
               <Button variant="secondary" onClick={onClose}>
                 取消
               </Button>
               <Button type="submit" disabled={!canSubmit}>
                 保存
               </Button>
-            </div>
+            </DialogActionRow>
           </form>
 
           <div className="mt-5 border-t border-line pt-4">
@@ -217,28 +216,23 @@ export function ConfirmDeleteProjectDialog({
             <span className="text-ink">此操作无法撤销。</span>
           </p>
 
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
+          <DialogActionRow>
+            <Button
+              variant="secondary"
               onClick={onCancel}
               autoFocus
-              className="rounded-sm border border-line bg-elevated px-3.5 py-1.5 text-[12.5px] text-ink transition-colors hover:bg-hover"
             >
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => {
                 void onConfirm();
               }}
-              className={cn(
-                "rounded-sm border border-error bg-error px-3.5 py-1.5 text-[12.5px] font-medium text-elevated",
-                "transition-colors hover:bg-error/90",
-              )}
             >
               删除 Project
-            </button>
-          </div>
+            </Button>
+          </DialogActionRow>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

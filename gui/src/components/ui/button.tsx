@@ -1,4 +1,9 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -14,7 +19,7 @@ import { cn } from "@/lib/utils";
  *
  * ## Variants
  *
- *   primary — Main CTA. Charcoal foreground (`bg-ink`), white text.
+ *   primary — Main CTA. Charcoal foreground (`bg-ink`), elevated text.
  *             Used for "确认 / 保存 / 创建 / 继续". One per dialog
  *             or screen; the eye should know where to land.
  *
@@ -24,6 +29,18 @@ import { cn } from "@/lib/utils";
  *   ghost — No border, no bg. Hover surfaces a subtle bg tint.
  *           Used for inline links / navigation aids ("Back" without
  *           a primary on the row, "Settings 中查看" tertiary links).
+ *
+ *   brand-soft — Brand-accented secondary action. Useful when the
+ *                operation should be visually warmer than neutral
+ *                secondary, but is not the primary action.
+ *
+ *   accent-secondary — Neutral readable label + brand-accent icon/hover.
+ *                      Used for utility actions that need to be easy to
+ *                      scan in dense settings panels ("检查更新" /
+ *                      "选择" / "跑一次 Health Check").
+ *
+ *   warning — Amber filled. Used for high-attention but not destructive
+ *             actions, such as "Stop" / YOLO confirmation.
  *
  *   destructive — Red filled. Reserved for irreversible actions
  *                 ("彻底删除"). Use sparingly — its color cost is
@@ -60,6 +77,9 @@ export type ButtonVariant =
   | "primary"
   | "secondary"
   | "ghost"
+  | "brand-soft"
+  | "accent-secondary"
+  | "warning"
   | "destructive"
   | "destructive-soft";
 
@@ -72,6 +92,29 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   leadingIcon?: ReactNode;
   /** Icon node rendered after children. */
   trailingIcon?: ReactNode;
+}
+
+export type IconButtonVariant =
+  | "ghost"
+  | "secondary"
+  | "brand"
+  | "warning"
+  | "danger";
+
+export type IconButtonSize = "xs" | "sm" | "md";
+
+export interface IconButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
+  /** Accessible name. Icon-only buttons must not rely on visual icon meaning. */
+  ariaLabel: string;
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+  active?: boolean;
+}
+
+export interface DialogActionRowProps
+  extends HTMLAttributes<HTMLDivElement> {
+  align?: "start" | "end" | "between";
 }
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -87,6 +130,19 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     "border border-transparent text-ink-soft",
     "hover:bg-hover hover:text-ink",
   ),
+  "brand-soft": cn(
+    "border border-line bg-elevated font-medium text-brand-strong",
+    "hover:border-brand hover:bg-brand-soft hover:text-ink",
+  ),
+  "accent-secondary": cn(
+    "border border-line bg-elevated font-medium text-ink",
+    "hover:border-brand/40 hover:bg-brand-soft",
+    "[&>svg]:text-brand-strong",
+  ),
+  warning: cn(
+    "border border-warning bg-warning font-medium text-elevated",
+    "hover:bg-warning/90",
+  ),
   destructive: cn(
     "border border-error bg-error font-medium text-elevated",
     "hover:bg-error/90",
@@ -101,6 +157,52 @@ const SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: "gap-1 px-2.5 py-1 text-[12px]",
   md: "gap-1.5 px-3.5 py-1.5 text-[12.5px]",
   lg: "gap-2 px-5 py-2 text-[13.5px]",
+};
+
+const ICON_VARIANT_CLASSES: Record<IconButtonVariant, string> = {
+  ghost: cn(
+    "border border-transparent text-ink-soft",
+    "hover:bg-hover hover:text-ink",
+  ),
+  secondary: cn(
+    "border border-line bg-elevated text-ink-soft",
+    "hover:bg-hover hover:text-ink",
+  ),
+  brand: cn(
+    "border border-brand/30 bg-brand/10 text-brand-strong",
+    "hover:bg-brand-soft hover:text-ink",
+  ),
+  warning: cn(
+    "border border-warning/30 bg-warning/10 text-warning",
+    "hover:bg-warning/20",
+  ),
+  danger: cn(
+    "border border-transparent text-ink-soft",
+    "hover:bg-error/10 hover:text-error",
+  ),
+};
+
+const ICON_ACTIVE_CLASSES: Record<IconButtonVariant, string> = {
+  ghost: "bg-hover text-ink",
+  secondary: "bg-hover text-ink",
+  brand: "bg-brand-soft text-brand-strong",
+  warning: "bg-warning/20 text-warning",
+  danger: "bg-error/10 text-error",
+};
+
+const ICON_SIZE_CLASSES: Record<IconButtonSize, string> = {
+  xs: "size-5",
+  sm: "size-7",
+  md: "size-8",
+};
+
+const DIALOG_ACTION_ALIGN_CLASSES: Record<
+  NonNullable<DialogActionRowProps["align"]>,
+  string
+> = {
+  start: "justify-start",
+  end: "justify-end",
+  between: "justify-between",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -137,3 +239,60 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     );
   },
 );
+
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
+  function IconButton(
+    {
+      ariaLabel,
+      variant = "ghost",
+      size = "sm",
+      active = false,
+      className,
+      children,
+      type = "button",
+      title,
+      ...rest
+    },
+    ref,
+  ) {
+    return (
+      <button
+        ref={ref}
+        type={type}
+        aria-label={ariaLabel}
+        title={title ?? ariaLabel}
+        className={cn(
+          "inline-flex select-none items-center justify-center rounded-sm transition-colors",
+          "disabled:cursor-not-allowed disabled:opacity-40",
+          ICON_VARIANT_CLASSES[variant],
+          ICON_SIZE_CLASSES[size],
+          active && ICON_ACTIVE_CLASSES[variant],
+          className,
+        )}
+        {...rest}
+      >
+        {children}
+      </button>
+    );
+  },
+);
+
+export function DialogActionRow({
+  align = "end",
+  className,
+  children,
+  ...rest
+}: DialogActionRowProps) {
+  return (
+    <div
+      className={cn(
+        "mt-5 flex items-center gap-2",
+        DIALOG_ACTION_ALIGN_CLASSES[align],
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}

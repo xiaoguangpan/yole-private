@@ -118,7 +118,7 @@ export interface Project {
    * `./memory/...` reads). PRD §7.3 "B. cwd" describes the original
    * intent. */
   rootPath?: string;
-  /** Default emoji: 📁. */
+  /** Legacy metadata; current GUI renders Phosphor folder icons instead. */
   icon?: string;
   color?: string;
   /** Pin to top in sidebar PROJECTS section. PRD §8.2. */

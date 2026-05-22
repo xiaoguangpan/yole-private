@@ -4,6 +4,7 @@ import {
   Archive,
   CaretRight,
   Cat,
+  Check,
   Clock,
   Folder,
   FolderOpen,
@@ -18,7 +19,6 @@ import {
   X as XIcon,
 } from "@phosphor-icons/react";
 
-import { Button } from "@/components/ui/button";
 import {
   BUCKET_LABEL,
   groupSessions,
@@ -222,10 +222,7 @@ export function Sidebar({
 
         {filteredEmpty ? (
           activeProject ? (
-            <SidebarProjectEmptyCta
-              projectName={activeProject.name}
-              onNewChat={onNewChat}
-            />
+            <SidebarProjectEmptyHint />
           ) : globalEmpty ? (
             <div className="px-5 py-6 font-serif text-[12.5px] italic text-ink-muted">
               这里会出现你的 sessions。
@@ -373,7 +370,7 @@ function SidebarQuickActions({
   activeProjectName?: string;
 }) {
   const newChatLabel = activeProjectName
-    ? `新对话 · 📂 ${activeProjectName}`
+    ? `新对话 · ${activeProjectName}`
     : "新对话";
   return (
     <div className="border-b border-line py-1.5">
@@ -788,9 +785,11 @@ function SidebarSessionRow({
                           <Folder size={13} weight="thin" />
                           <span className="min-w-0 flex-1 truncate">{p.name}</span>
                           {isCurrent && (
-                            <span className="text-[10px] text-brand-strong">
-                              ✓
-                            </span>
+                            <Check
+                              size={11}
+                              weight="bold"
+                              className="text-brand-strong"
+                            />
                           )}
                         </ContextMenu.Item>
                       );
@@ -1171,16 +1170,16 @@ function SidebarFilterBanner({
   return (
     <div
       className={cn(
-        "mx-1.5 mb-1 mt-2 rounded-sm border border-brand/30 bg-brand-soft px-3 py-1.5 text-[12px] text-ink",
+        "mx-2 mb-1 mt-2 border-l-2 border-brand/50 px-2 py-1 text-[11.5px] text-ink-muted",
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <FolderOpen
-          size={12}
+          size={11}
           weight="thin"
           className="shrink-0 text-brand-strong"
         />
-        <span className="min-w-0 flex-1 truncate font-medium">
+        <span className="min-w-0 flex-1 truncate font-medium text-ink-soft">
           {project.name}
         </span>
         <button
@@ -1198,35 +1197,19 @@ function SidebarFilterBanner({
 }
 
 /**
- * Empty-state CTA shown when the user is in project filter mode but
- * the project has no sessions yet. Surfaces the most likely next
- * action ("+ 在 {ProjectName} 里新建对话") as a real button instead
- * of inline italic text — directly addresses the dogfood gap where
- * users couldn't tell the global "+ New Chat" would inherit the
- * active project.
+ * Empty-state hint shown when the active project has no sessions yet.
+ * The actual creation surface lives in the main EmptyState composer;
+ * keeping Sidebar quiet prevents a competing CTA from fighting the
+ * navigation hierarchy.
  */
-function SidebarProjectEmptyCta({
-  projectName,
-  onNewChat,
-}: {
-  projectName: string;
-  onNewChat?: () => void;
-}) {
+function SidebarProjectEmptyHint() {
   return (
-    <div className="mx-1.5 mt-3 flex flex-col gap-2 rounded-sm border border-dashed border-line px-3 py-3">
+    <div className="mx-1.5 mt-3 rounded-sm border border-dashed border-line px-3 py-3">
       <p className="font-serif text-[12px] italic text-ink-muted">
-        {projectName} 还没有对话。
+        这里还没有内容。
       </p>
-      <Button
-        onClick={onNewChat}
-        className="self-start"
-        title={`在 ${projectName} 里新建对话`}
-        leadingIcon={<Plus size={12} weight="thin" />}
-      >
-        在 {projectName} 里新建对话
-      </Button>
-      <p className="text-[11px] text-ink-muted">
-        或右键已有对话「加入项目」
+      <p className="mt-1.5 text-[11px] leading-[1.5] text-ink-muted">
+        在右侧开始项目对话。
       </p>
     </div>
   );

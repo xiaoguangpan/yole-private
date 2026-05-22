@@ -364,7 +364,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
                 onClick={onStop}
                 title="Stop"
                 aria-label="Stop"
-                className="composer-stop-breath flex size-8 items-center justify-center rounded-full bg-warning text-white transition-colors hover:bg-warning/90"
+                className="composer-stop-breath flex size-8 items-center justify-center rounded-full bg-warning text-elevated transition-colors hover:bg-warning/90"
               >
                 <Stop size={14} weight="fill" />
               </button>
@@ -376,7 +376,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
                 title="Send · Enter"
                 aria-label="Send"
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-full bg-brand text-ink transition-colors hover:bg-brand-strong hover:text-white",
+                  "flex size-8 items-center justify-center rounded-full bg-brand text-ink transition-colors hover:bg-brand-strong hover:text-elevated",
                   (disabled || !text?.trim()) &&
                     "cursor-not-allowed opacity-50 hover:bg-brand hover:text-ink",
                 )}

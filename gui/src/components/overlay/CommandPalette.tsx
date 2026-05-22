@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowsClockwise,
   ChatCircleText,
+  Check,
   Cube,
   FolderOpen,
   Gear,
@@ -474,7 +475,11 @@ function PaletteRow({
         <span className="shrink-0 text-[11.5px] text-ink-muted">{sub}</span>
       )}
       {checked && (
-        <span className="shrink-0 text-[12px] text-brand-strong">✓</span>
+        <Check
+          size={12}
+          weight="bold"
+          className="shrink-0 text-brand-strong"
+        />
       )}
       {shortcut && (
         <span

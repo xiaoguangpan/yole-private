@@ -16,6 +16,10 @@
 
 import { isMac } from "@/lib/platform";
 import { formatShortcut } from "@/lib/shortcuts";
+import {
+  SettingsPanelHeader,
+  SettingsSectionLabel,
+} from "@/components/screens/settings/settings-ui";
 
 interface ShortcutRow {
   /** Canonical key combo, rendered as kbd-style chips. */
@@ -77,20 +81,14 @@ const GROUPS: ShortcutGroup[] = [
 export function SettingsShortcuts() {
   return (
     <div className="space-y-7">
-      <div>
-        <h2 className="m-0 font-serif text-[18px] font-medium text-ink">
-          Shortcuts
-        </h2>
-        <p className="mt-1 text-[12.5px] text-ink-muted">
-          全部快捷键 · 当前 V0.1 不支持自定义，V0.2 会加重绑入口
-        </p>
-      </div>
+      <SettingsPanelHeader
+        title="Shortcuts"
+        subtitle="全部快捷键 · 当前 V0.1 不支持自定义，V0.2 会加重绑入口"
+      />
 
       {GROUPS.map((g) => (
         <section key={g.title}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-            {g.title}
-          </div>
+          <SettingsSectionLabel>{g.title}</SettingsSectionLabel>
           <ul className="mt-2 m-0 list-none space-y-0.5 p-0">
             {g.rows.map((r) => (
               <li

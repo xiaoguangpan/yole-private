@@ -136,9 +136,6 @@ async function invokeHydrate<T>(
 /** "新对话" — seed title set by `createSession`. */
 export const DEFAULT_NEW_SESSION_TITLE = "新对话";
 
-/** Project icon default (PRD §8.2 / DESIGN.md project section). */
-const DEFAULT_PROJECT_ICON = "📁";
-
 function sessionFromBrief(b: SessionBriefWire): Session {
   return {
     id: b.id,
@@ -837,7 +834,6 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       lastActivityAt: now,
       createdAt: now,
       updatedAt: now,
-      icon: DEFAULT_PROJECT_ICON,
     };
     set((state) => ({ projects: [next, ...state.projects] }));
     try {
@@ -846,7 +842,6 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
           id,
           name: next.name,
           rootPath: next.rootPath,
-          icon: next.icon,
         } as CreateProjectInputWire,
         origin: GUI_ORIGIN,
       });

@@ -9,6 +9,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 
+import {
+  SettingsPanelHeader,
+  SettingsSectionLabel,
+} from "@/components/screens/settings/settings-ui";
 import { Button } from "@/components/ui/button";
 import { isMac, isWindows } from "@/lib/platform";
 
@@ -218,14 +222,10 @@ export function SettingsIntegration() {
 
   return (
     <div className="space-y-7">
-      <div>
-        <h2 className="m-0 font-serif text-[20px] font-semibold uppercase tracking-[0.04em] text-ink">
-          Agent
-        </h2>
-        <p className="mt-1 font-serif text-[14px] italic text-ink-soft">
-          把 Galley 接你的 Agent
-        </p>
-      </div>
+      <SettingsPanelHeader
+        title="Agent"
+        subtitle="把 Galley 接你的 Agent"
+      />
 
       {/* Discovery file row. Informational, not interactive — the file
           is written automatically at Galley startup (B4 M3 T3.1) and
@@ -238,7 +238,7 @@ export function SettingsIntegration() {
           platform-specific paths because most users only need one,
           but a dev moving between OSes might want both. */}
       <section>
-        <SubLabel>Discovery file</SubLabel>
+        <SettingsSectionLabel>Discovery file</SettingsSectionLabel>
         <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
           Galley 启动时把 CLI 二进制的绝对路径写到这个文件。Supervisor SOP
           第一步读它来定位 <code className="font-mono text-ink">galley</code>。
@@ -259,7 +259,7 @@ export function SettingsIntegration() {
           memory; the user copies this document and gives it to the
           supervisor agent they want to empower. */}
       <section>
-        <SubLabel>Agent SOP</SubLabel>
+        <SettingsSectionLabel>Agent SOP</SettingsSectionLabel>
         <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
           复制这份 SOP，发给你信任的 Agent。它就能帮你查看、创建和管理 Galley
           会话。
@@ -295,7 +295,7 @@ export function SettingsIntegration() {
           Windows is intentionally presented as unsupported until the
           user-level PATH writer exists. */}
       <section>
-        <SubLabel>命令行快捷入口</SubLabel>
+        <SettingsSectionLabel>命令行快捷入口</SettingsSectionLabel>
         <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
           可选。安装后，你和脚本都可以直接在终端使用{" "}
           <code className="font-mono text-ink">galley</code>。Agent SOP
@@ -326,7 +326,7 @@ export function SettingsIntegration() {
           users wiring their own scripts / Skills / agents, while the
           SOP covers the normal copy-paste path. */}
       <section>
-        <SubLabel>API 文档</SubLabel>
+        <SettingsSectionLabel>API 文档</SettingsSectionLabel>
         <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
           自己写脚本、Skill 或接入别的 Agent 时看这里。包括{" "}
           <code className="font-mono text-ink">galley</code> 命令、Socket
@@ -358,14 +358,6 @@ export function SettingsIntegration() {
           )}
         </div>
       </section>
-    </div>
-  );
-}
-
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-      {children}
     </div>
   );
 }
@@ -486,8 +478,8 @@ function PathInstallRow({
 
 /**
  * Inline status line next to the install button. Stays low-emphasis
- * ([11px], ink-muted) so the SubLabel and prose dominate; the install
- * button is the visual anchor.
+ * ([11px], ink-muted) so the section label and prose dominate; the
+ * install button is the visual anchor.
  */
 function SopStatus({ state }: { state: SopCopyState }) {
   switch (state.kind) {

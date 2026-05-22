@@ -1,7 +1,14 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Lightning, X } from "@phosphor-icons/react";
+import { Lightning, X } from "@phosphor-icons/react";
 import { useState } from "react";
 
+import {
+  SettingsPanelHeader,
+  SettingsSectionLabel,
+} from "@/components/screens/settings/settings-ui";
+import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { IconTooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ApprovalConfig } from "@/components/screens/settings/Settings";
@@ -65,7 +72,7 @@ export function SettingsApproval({
 
   return (
     <div className="space-y-7">
-      <SectionTitle
+      <SettingsPanelHeader
         title="Approval"
         subtitle="哪些工具需要审批 · 哪些已加白名单"
       />
@@ -107,26 +114,26 @@ export function SettingsApproval({
         }
       >
         <div>
-          <SubLabel>Approval-required tools</SubLabel>
+          <SettingsSectionLabel>
+            Approval-required tools
+          </SettingsSectionLabel>
           <div className="mt-2 space-y-1">
             {DEFAULT_TOOLS.map((tool) => {
               const required = config.requiredTools.includes(tool);
               return (
-                <label
+                <Checkbox
                   key={tool}
+                  checked={required}
+                  onCheckedChange={(c) => toggleRequired(tool, c)}
                   className="flex items-center gap-2.5 rounded-sm px-2 py-1.5 transition-colors hover:bg-hover"
                 >
-                  <Checkbox
-                    checked={required}
-                    onChange={(c) => toggleRequired(tool, c)}
-                  />
                   <span className="font-mono text-[12.5px] text-ink">
                     {tool}
                   </span>
                   <span className="ml-auto text-[11px] text-ink-muted">
                     {TOOL_DESCRIPTIONS[tool]}
                   </span>
-                </label>
+                </Checkbox>
               );
             })}
           </div>
@@ -134,9 +141,9 @@ export function SettingsApproval({
 
         {showPerProject && (
           <div>
-            <SubLabel>
+            <SettingsSectionLabel>
               Always allow · Per-project ({config.alwaysAllowProject.length})
-            </SubLabel>
+            </SettingsSectionLabel>
             <RuleList
               rules={config.alwaysAllowProject}
               onRemove={(tool) => onRemoveAlwaysAllow?.("project", tool)}
@@ -146,9 +153,9 @@ export function SettingsApproval({
         )}
 
         <div>
-          <SubLabel>
+          <SettingsSectionLabel>
             Always allow · Global ({config.alwaysAllowGlobal.length})
-          </SubLabel>
+          </SettingsSectionLabel>
           <RuleList
             rules={config.alwaysAllowGlobal}
             onRemove={(tool) => onRemoveAlwaysAllow?.("global", tool)}
@@ -218,51 +225,28 @@ function YoloSection({
             </div>
           </div>
         </div>
-        <Switch checked={enabled} onChange={onToggle} />
+        <Switch
+          checked={enabled}
+          onCheckedChange={onToggle}
+          ariaLabel="Toggle YOLO mode"
+          tone="warning"
+        />
       </div>
       {enabled && (
         <div className="mt-3 flex items-center justify-between border-t border-warning/20 pt-3 text-[12px]">
           <span className="text-warning">
-            ⚡ YOLO 已启用 · TopBar 显示状态
+            YOLO 已启用 · TopBar 显示状态
           </span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onToggle(false)}
-            className="rounded-sm px-2 py-1 text-[12px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
           >
             立即关闭
-          </button>
+          </Button>
         </div>
       )}
     </div>
-  );
-}
-
-function Switch({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (c: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-        checked ? "bg-warning" : "bg-line-strong",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block size-4 rounded-full bg-elevated shadow-sm transition-transform",
-          checked ? "translate-x-[18px]" : "translate-x-0.5",
-        )}
-      />
-    </button>
   );
 }
 
@@ -317,27 +301,27 @@ function YoloActivationModal({
               ：生产代码 / 共享系统 / 不熟悉的 agent / 敏感数据
             </p>
             <p className="text-[12px] text-ink-muted">
-              打开后 TopBar 会显示 ⚡ YOLO 标识，随时可一键关闭。
+              打开后 TopBar 会显示 Lightning icon + YOLO 标识，随时可一键关闭。
             </p>
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-2">
-            <button
-              type="button"
+          <DialogActionRow className="mt-6">
+            <Button
+              variant="ghost"
+              size="lg"
               onClick={() => onOpenChange(false)}
               autoFocus
-              className="rounded-sm px-3 py-2 text-[13px] text-ink transition-colors hover:bg-hover"
             >
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="warning"
+              size="lg"
               onClick={onConfirm}
-              className="rounded-sm bg-warning px-3 py-2 text-[13px] font-medium text-elevated transition-colors hover:bg-warning/90"
             >
               是的，我知道在做什么
-            </button>
-          </div>
+            </Button>
+          </DialogActionRow>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -359,58 +343,6 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   file_patch: "修改已有文件",
   start_long_term_update: "写入 GenericAgent 长期记忆",
 };
-
-function SectionTitle({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div>
-      <h2 className="m-0 font-serif text-[18px] font-medium text-ink">
-        {title}
-      </h2>
-      {subtitle && (
-        <p className="mt-1 text-[12.5px] text-ink-muted">{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-      {children}
-    </div>
-  );
-}
-
-function Checkbox({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
-        checked
-          ? "border-ink bg-ink text-elevated"
-          : "border-line bg-elevated hover:border-ink",
-      )}
-    >
-      {checked && <Check size={10} weight="bold" />}
-    </button>
-  );
-}
 
 function RuleList({
   rules,
@@ -436,15 +368,15 @@ function RuleList({
           className="flex items-center justify-between rounded-sm bg-surface px-3 py-2 text-[12.5px]"
         >
           <span className="font-mono text-ink">{tool}</span>
-          <button
-            type="button"
+          <IconButton
             onClick={() => onRemove(tool)}
-            className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-error"
-            aria-label={`Remove ${tool}`}
+            ariaLabel={`Remove ${tool}`}
             title="Remove rule"
+            variant="danger"
+            size="xs"
           >
             <X size={12} weight="thin" />
-          </button>
+          </IconButton>
         </div>
       ))}
     </div>

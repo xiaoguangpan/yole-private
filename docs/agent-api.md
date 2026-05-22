@@ -683,7 +683,7 @@ server-side; empty after trim → `invalid_args`.
 | Flag           | Default        | Notes                                                                                                     |
 | -------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
 | `--root-path`  | (none)         | Filesystem root. Stored for forward compatibility — runner spawn no longer injects this (see 2026-05-14). |
-| `--icon`       | (GUI default `📁`) | Emoji icon for the sidebar.                                                                          |
+| `--icon`       | (none)         | Legacy icon metadata. Current GUI renders the standard Phosphor folder icon.                             |
 | `--color`      | (none)         | Hex accent color (e.g. `#7c84ff`).                                                                       |
 
 ```bash

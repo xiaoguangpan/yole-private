@@ -91,7 +91,7 @@ enum ProjectCmd {
         /// 2026-05-14 devlog on the rootPath rollback).
         #[arg(long)]
         root_path: Option<String>,
-        /// Optional emoji icon. Defaults to GUI's `📁` if omitted.
+        /// Optional legacy icon metadata. Current GUI renders Phosphor folder icons.
         #[arg(long)]
         icon: Option<String>,
         /// Optional accent color (hex e.g. `#7c84ff`).
