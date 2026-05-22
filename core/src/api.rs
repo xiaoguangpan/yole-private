@@ -222,8 +222,9 @@ pub trait GalleyApi: Send + Sync {
 
     // ---------------- projects ----------------
 
-    /// List all projects, ordered by `pinned DESC, last_activity_at DESC`
-    /// to match the GUI Sidebar PROJECTS section sort.
+    /// List all projects, ordered by `pinned DESC`, then effective
+    /// non-archived project content activity desc to match the GUI
+    /// Sidebar PROJECTS section sort.
     async fn list_projects(&self) -> Result<Vec<ProjectBrief>>;
 
     /// Create a project. `name` is trimmed server-side; empty after

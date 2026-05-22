@@ -3,6 +3,7 @@ import {
   CaretDown,
   Cube,
   FileCode,
+  FolderOpen,
   Info,
   Warning,
   X as XIcon,
@@ -26,6 +27,8 @@ export interface ErrorCardActions {
   onOpenMyKey?: () => void;
   /** Open the GA install / config docs (check_llm_config hint). */
   onOpenGADocs?: () => void;
+  /** Open a project scope from a positive feedback toast. */
+  onViewProject?: (projectId: string) => void;
 }
 
 interface ErrorCardProps extends ErrorCardActions {
@@ -58,6 +61,7 @@ export function ErrorCard({
   onSwitchLLM,
   onOpenMyKey,
   onOpenGADocs,
+  onViewProject,
 }: ErrorCardProps) {
   const [open, setOpen] = useState(false);
   const isInline = variant === "inline";
@@ -111,6 +115,7 @@ export function ErrorCard({
               onSwitchLLM={onSwitchLLM}
               onOpenMyKey={onOpenMyKey}
               onOpenGADocs={onOpenGADocs}
+              onViewProject={onViewProject}
               onToggleDetails={() => setOpen((v) => !v)}
               detailsOpen={open}
             />
@@ -148,6 +153,7 @@ interface ActionDef {
     | "onSwitchLLM"
     | "onOpenMyKey"
     | "onOpenGADocs"
+    | "onViewProject"
     | "toggleDetails";
 }
 
@@ -258,6 +264,14 @@ function defaultTitle(error: AppError): string {
 
 function defaultActions(error: AppError): ActionDef[] {
   const actions: ActionDef[] = [];
+  if (error.action?.kind === "view_project") {
+    actions.push({
+      id: "view-project",
+      label: error.action.label,
+      kind: "ghost",
+      handler: "onViewProject",
+    });
+  }
   if (error.retryable) {
     actions.push({
       id: "retry",
@@ -279,11 +293,12 @@ function defaultActions(error: AppError): ActionDef[] {
 
 function ActionButton({
   action,
-  error: _error,
+  error,
   onRetry,
   onSwitchLLM,
   onOpenMyKey,
   onOpenGADocs,
+  onViewProject,
   onToggleDetails,
   detailsOpen,
 }: {
@@ -293,6 +308,7 @@ function ActionButton({
   onSwitchLLM?: () => void;
   onOpenMyKey?: () => void;
   onOpenGADocs?: () => void;
+  onViewProject?: (projectId: string) => void;
   onToggleDetails: () => void;
   detailsOpen: boolean;
 }) {
@@ -306,6 +322,14 @@ function ActionButton({
         return onOpenMyKey;
       case "onOpenGADocs":
         return onOpenGADocs;
+      case "onViewProject":
+        if (error.action?.kind !== "view_project" || !onViewProject) {
+          return undefined;
+        }
+        {
+          const { projectId } = error.action;
+          return () => onViewProject(projectId);
+        }
       case "toggleDetails":
         return onToggleDetails;
     }
@@ -342,5 +366,6 @@ const ACTION_ICONS: Partial<Record<ActionDef["handler"], typeof Cube>> = {
   onSwitchLLM: Cube,
   onOpenMyKey: FileCode,
   onOpenGADocs: ArrowSquareOut,
+  onViewProject: FolderOpen,
   toggleDetails: CaretDown,
 };

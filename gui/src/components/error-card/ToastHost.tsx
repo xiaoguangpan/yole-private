@@ -58,10 +58,11 @@ function ToastFrame({
   actions: ErrorCardActions;
 }) {
   useEffect(() => {
-    if (autoDismissMs <= 0) return;
-    const t = setTimeout(() => onDismiss(toast.id), autoDismissMs);
+    const dismissMs = toast.autoDismissMs ?? autoDismissMs;
+    if (dismissMs <= 0) return;
+    const t = setTimeout(() => onDismiss(toast.id), dismissMs);
     return () => clearTimeout(t);
-  }, [toast.id, onDismiss, autoDismissMs]);
+  }, [toast.id, toast.autoDismissMs, onDismiss, autoDismissMs]);
 
   return (
     <div className="pointer-events-auto animate-fade-in">

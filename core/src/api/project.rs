@@ -34,8 +34,8 @@ pub struct ProjectBrief {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
     pub pinned: bool,
-    /// max(sessions.lastActivityAt where projectId = this.id) — falls
-    /// back to created_at when the project has no session yet.
+    /// max(non-archived sessions.lastActivityAt where projectId = this.id) —
+    /// falls back to created_at when the project has no active content.
     pub last_activity_at: String,
     pub created_at: String,
     pub updated_at: String,

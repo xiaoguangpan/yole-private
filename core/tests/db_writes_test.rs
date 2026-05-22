@@ -723,33 +723,78 @@ async fn bulk_delete_sessions_skips_unknown_ids() {
 // ---------------- list_projects ----------------
 
 #[tokio::test]
-async fn list_projects_orders_pinned_then_recency() {
+async fn list_projects_orders_pinned_then_content_recency() {
     let pool = fresh_pool().await;
-    seed_project(&pool, "p_old", "Old").await;
-    seed_project(&pool, "p_new", "New").await;
+    seed_project(&pool, "p_content", "Content").await;
+    seed_project(&pool, "p_empty_new", "Empty New").await;
+    seed_project(&pool, "p_archived_only", "Archived Only").await;
     seed_project(&pool, "p_pinned", "Pinned").await;
-    // Distinct timestamps so the ORDER BY can resolve unambiguously
-    // (seed_project sets them all equal by default).
-    sqlx::query("UPDATE projects SET pinned = 1, last_activity_at = ? WHERE id = 'p_pinned'")
-        .bind("2026-05-15T00:00:00Z")
+
+    sqlx::query(
+        "UPDATE projects SET pinned = 1, created_at = ?, last_activity_at = ? \
+         WHERE id = 'p_pinned'",
+    )
+    .bind("2026-05-01T00:00:00Z")
+    .bind("2026-05-01T00:00:00Z")
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE projects SET created_at = ?, last_activity_at = ? WHERE id = 'p_content'")
+        .bind("2026-05-01T00:00:00Z")
+        .bind("2026-05-01T00:00:00Z")
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("UPDATE projects SET last_activity_at = ? WHERE id = 'p_new'")
-        .bind("2026-05-19T00:00:00Z")
+    sqlx::query(
+        "UPDATE projects SET created_at = ?, last_activity_at = ? \
+         WHERE id = 'p_empty_new'",
+    )
+    .bind("2026-05-20T00:00:00Z")
+    .bind("2026-05-20T00:00:00Z")
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE projects SET created_at = ?, last_activity_at = ? \
+         WHERE id = 'p_archived_only'",
+    )
+    .bind("2026-05-18T00:00:00Z")
+    .bind("2026-05-18T00:00:00Z")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    seed_session_idle(&pool, "s_content").await;
+    sqlx::query("UPDATE sessions SET project_id = ?, last_activity_at = ? WHERE id = ?")
+        .bind("p_content")
+        .bind("2026-05-21T00:00:00Z")
+        .bind("s_content")
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("UPDATE projects SET last_activity_at = ? WHERE id = 'p_old'")
-        .bind("2026-05-10T00:00:00Z")
-        .execute(&pool)
-        .await
-        .unwrap();
+    seed_session_idle(&pool, "s_archived").await;
+    sqlx::query(
+        "UPDATE sessions SET project_id = ?, status = 'archived', last_activity_at = ? \
+         WHERE id = ?",
+    )
+    .bind("p_archived_only")
+    .bind("2026-05-25T00:00:00Z")
+    .bind("s_archived")
+    .execute(&pool)
+    .await
+    .unwrap();
+
     let galley = SqliteGalley::from_pool(pool);
     let ps = galley.list_projects().await.expect("list projects");
     let ids: Vec<&str> = ps.iter().map(|p| p.id.as_str()).collect();
-    // pinned first (regardless of activity), then unpinned by recency.
-    assert_eq!(ids, vec!["p_pinned", "p_new", "p_old"]);
+    // pinned first; unpinned projects use non-archived session activity,
+    // with empty projects falling back to created_at.
+    assert_eq!(
+        ids,
+        vec!["p_pinned", "p_content", "p_empty_new", "p_archived_only"]
+    );
+    assert_eq!(ps[1].last_activity_at, "2026-05-21T00:00:00Z");
+    assert_eq!(ps[3].last_activity_at, "2026-05-18T00:00:00Z");
 }
 
 // ---------------- create_project ----------------

@@ -121,11 +121,11 @@ export interface Project {
   /** Legacy metadata; current GUI renders Phosphor folder icons instead. */
   icon?: string;
   color?: string;
-  /** Pin to top in sidebar PROJECTS section. PRD §8.2. */
+  /** Pin to top in Project Review. PRD §8.2. */
   pinned: boolean;
-  /** max(sessions.lastActivityAt where projectId = this.id),
-   * fallback to createdAt when project has no session.
-   * Drives default sort (pinned desc, lastActivityAt desc). */
+  /** max(non-archived sessions.lastActivityAt where projectId = this.id),
+   * fallback to createdAt when project has no active content.
+   * Drives default sort: pinned first, then active content recency. */
   lastActivityAt: string;
   createdAt: string;
   updatedAt: string;

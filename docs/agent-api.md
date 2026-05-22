@@ -697,8 +697,8 @@ Exit codes: `0` success / `2 invalid_args` (empty name) /
 ### 5.15 · `galley project list`
 
 **Read-only** — direct SQLite, no socket needed. NDJSON, one
-`ProjectBrief` per line, ordered `pinned DESC, last_activity_at DESC`
-(matches the GUI sidebar).
+`ProjectBrief` per line, ordered `pinned DESC`, then effective project
+content activity descending (matches the GUI sidebar).
 
 ```bash
 $ galley project list
@@ -716,7 +716,7 @@ $ galley project list
 | `icon`           | string?          | Emoji                                                                |
 | `color`          | string?          | Hex                                                                  |
 | `pinned`         | bool             |                                                                      |
-| `lastActivityAt` | string (ISO8601) | `max(sessions.lastActivityAt WHERE projectId = this.id)` or `createdAt` fallback |
+| `lastActivityAt` | string (ISO8601) | `max(non-archived sessions.lastActivityAt WHERE projectId = this.id)` or `createdAt` fallback |
 | `createdAt`      | string (ISO8601) |                                                                      |
 | `updatedAt`      | string (ISO8601) |                                                                      |
 

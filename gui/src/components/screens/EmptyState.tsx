@@ -60,6 +60,9 @@ export interface EmptyStateProps {
   conversationWidth?: "compact" | "wide";
   /** Active project context for the next lazily-created session. */
   projectName?: string;
+  /** Global showcase prompts are useful on the welcome surface, but
+   * noisy inside a project context where the user already has intent. */
+  showPromptSuggestions?: boolean;
   /** Bumped by the host when a navigation action should return focus here. */
   focusTick?: number;
 }
@@ -75,13 +78,13 @@ export interface EmptyStateProps {
  * context line name that project so the right pane participates in
  * project navigation instead of leaving the signal hidden in Sidebar.
  *
- * Below the Composer, four prompt suggestions appear as ambient
- * italic-serif hints rather than chip-style buttons. The visual
- * weight is deliberately quiet — these are positioning signals
+ * On the global welcome surface, four prompt suggestions appear as
+ * ambient italic-serif hints rather than chip-style buttons. The
+ * visual weight is deliberately quiet — these are positioning signals
  * (Galley is built for web research / local-file ops / multi-source
- * comparison / reasoning), not call-to-action chips. A reader's eye
- * walks the Composer first; the prompts read as "btw, here are some
- * directions" only when they choose to look down.
+ * comparison / reasoning), not call-to-action chips. In a project
+ * context, App can hide them so the right pane stays focused on
+ * creating work inside that project.
  *
  * Click any line → submits that prompt directly (still actionable,
  * just without button chrome).
@@ -96,12 +99,15 @@ export function EmptyState({
   onOpenLLMSwitcher,
   conversationWidth = "compact",
   projectName,
+  showPromptSuggestions = true,
   focusTick = 0,
 }: EmptyStateProps) {
   const composerRef = useRef<ComposerHandle>(null);
   const composerPlaceholder = projectName
     ? `在 ${projectName} 里交代什么？`
     : "今天交代什么？";
+  const shouldShowPromptSuggestions =
+    showPromptSuggestions && prompts.length > 0;
 
   useEffect(() => {
     if (focusTick > 0) composerRef.current?.focus();
@@ -142,27 +148,29 @@ export function EmptyState({
           </div>
         )}
 
-        <ul
-          className={cn(
-            "flex flex-col items-center gap-2 text-center",
-            projectName ? "mt-5" : "mt-6",
-          )}
-        >
-          {prompts.map((p) => (
-            <li key={p.label}>
-              <button
-                type="button"
-                onClick={() => onQuickPrompt?.(p.prompt ?? p.label)}
-                className={cn(
-                  "rounded-sm font-serif text-[12.5px] italic leading-[1.55] text-ink-muted",
-                  "transition-colors hover:text-ink",
-                )}
-              >
-                {p.label}
-              </button>
-            </li>
-          ))}
-        </ul>
+        {shouldShowPromptSuggestions && (
+          <ul
+            className={cn(
+              "flex flex-col items-center gap-2 text-center",
+              projectName ? "mt-5" : "mt-6",
+            )}
+          >
+            {prompts.map((p) => (
+              <li key={p.label}>
+                <button
+                  type="button"
+                  onClick={() => onQuickPrompt?.(p.prompt ?? p.label)}
+                  className={cn(
+                    "rounded-sm font-serif text-[12.5px] italic leading-[1.55] text-ink-muted",
+                    "transition-colors hover:text-ink",
+                  )}
+                >
+                  {p.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* Keyboard hints intentionally not shown here. Empty state
             is the user's first impression; loading it with shortcut

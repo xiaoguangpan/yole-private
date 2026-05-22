@@ -17,7 +17,7 @@ interface TutorialModalProps {
  * absent, etc), plus an outbound link to the full Datawhale Hello GA
  * chapter for users who want depth.
  *
- * Styling mirrors EditProjectDialog / ProjectsDialog so onboarding's
+ * Styling mirrors EditProjectDialog so onboarding's
  * help layer feels like part of the same surface family the rest of
  * the app uses for modal flows. Reuses MarkdownView (agent variant)
  * so code fences / lists / blockquotes render with the same typography

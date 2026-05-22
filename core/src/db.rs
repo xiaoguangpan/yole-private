@@ -1606,10 +1606,21 @@ impl GalleyApi for SqliteGalley {
 
     async fn list_projects(&self) -> Result<Vec<ProjectBrief>> {
         let rows = sqlx::query_as::<_, ProjectRow>(
-            "SELECT id, name, root_path, icon, color, pinned, \
-                last_activity_at, created_at, updated_at \
-             FROM projects \
-             ORDER BY pinned DESC, last_activity_at DESC",
+            "SELECT p.id, p.name, p.root_path, p.icon, p.color, p.pinned, \
+                CASE \
+                    WHEN MAX(s.last_activity_at) IS NOT NULL \
+                         AND MAX(s.last_activity_at) > p.created_at \
+                    THEN MAX(s.last_activity_at) \
+                    ELSE p.created_at \
+                END AS last_activity_at, \
+                p.created_at, p.updated_at \
+             FROM projects p \
+             LEFT JOIN sessions s \
+                ON s.project_id = p.id AND s.status != 'archived' \
+             GROUP BY p.id, p.name, p.root_path, p.icon, p.color, \
+                p.pinned, p.created_at, p.updated_at \
+             ORDER BY p.pinned DESC, last_activity_at DESC, \
+                p.name COLLATE NOCASE ASC",
         )
         .fetch_all(&self.pool)
         .await
@@ -1803,9 +1814,20 @@ impl SqliteGalley {
     /// `unwrap`).
     async fn fetch_project(&self, id: &str) -> Result<ProjectBrief> {
         let row = sqlx::query_as::<_, ProjectRow>(
-            "SELECT id, name, root_path, icon, color, pinned, \
-                last_activity_at, created_at, updated_at \
-             FROM projects WHERE id = ?",
+            "SELECT p.id, p.name, p.root_path, p.icon, p.color, p.pinned, \
+                CASE \
+                    WHEN MAX(s.last_activity_at) IS NOT NULL \
+                         AND MAX(s.last_activity_at) > p.created_at \
+                    THEN MAX(s.last_activity_at) \
+                    ELSE p.created_at \
+                END AS last_activity_at, \
+                p.created_at, p.updated_at \
+             FROM projects p \
+             LEFT JOIN sessions s \
+                ON s.project_id = p.id AND s.status != 'archived' \
+             WHERE p.id = ? \
+             GROUP BY p.id, p.name, p.root_path, p.icon, p.color, \
+                p.pinned, p.created_at, p.updated_at",
         )
         .bind(id)
         .fetch_optional(&self.pool)

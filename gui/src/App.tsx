@@ -18,7 +18,6 @@ import {
   ConfirmDeleteProjectDialog,
   EditProjectDialog,
 } from "@/components/screens/project/EditProjectDialog";
-import { ProjectsDialog } from "@/components/screens/project/ProjectsDialog";
 import { ensureHistoryReplayComplete } from "@/lib/ipc-handlers";
 import { bucketSession } from "@/lib/sessions";
 import {
@@ -160,6 +159,7 @@ function App() {
   const setPendingPetMigration = useUiStore((s) => s.setPendingPetMigration);
 
   const toasts = useUiStore((s) => s.toasts);
+  const pushToast = useUiStore((s) => s.pushToast);
   const dismissToast = useUiStore((s) => s.dismissToast);
   const [emptyComposerFocusTick, setEmptyComposerFocusTick] = useState(0);
 
@@ -250,6 +250,7 @@ function App() {
         setSettingsOpen(true);
       } else if (e.key === "n" || e.key === "N") {
         e.preventDefault();
+        setActiveProjectFilter(undefined);
         setActiveSession(undefined);
         setScreen("empty");
         setEmptyComposerFocusTick((tick) => tick + 1);
@@ -260,6 +261,7 @@ function App() {
   }, [
     togglePalette,
     setSettingsOpen,
+    setActiveProjectFilter,
     setActiveSession,
     setScreen,
     setEmptyComposerFocusTick,
@@ -288,6 +290,7 @@ function App() {
       [
         "menu:new_chat",
         () => {
+          setActiveProjectFilter(undefined);
           setActiveSession(undefined);
           setScreen("empty");
         },
@@ -321,7 +324,13 @@ function App() {
       cancelled = true;
       unlisteners.forEach((fn) => fn());
     };
-  }, [setSettingsOpen, setActiveSession, setScreen, setConversationWidth]);
+  }, [
+    setSettingsOpen,
+    setActiveProjectFilter,
+    setActiveSession,
+    setScreen,
+    setConversationWidth,
+  ]);
 
   // `user-message-persisted` listener: Rust core's socket_listener emits
   // this Tauri event whenever a user message is persisted via the socket
@@ -531,20 +540,108 @@ function App() {
     () => visibleSessions.filter((s) => bucketSession(s) === "earlier"),
     [visibleSessions],
   );
-  const enterProjectContext = (projectId: string) => {
+  const [projectViewOpen, setProjectViewOpen] = useState(false);
+  const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
+  const [projectReviewNowMs, setProjectReviewNowMs] = useState(0);
+  const toggleProjectView = () => {
+    if (projectViewOpen) {
+      setActiveProjectFilter(undefined);
+      setProjectViewOpen(false);
+      return;
+    }
+    setExpandedProjectIds([]);
+    setProjectReviewNowMs(Date.now());
+    setProjectViewOpen(true);
+  };
+  const openProjectInSidebar = (projectId: string) => {
+    setProjectReviewNowMs(Date.now());
+    setProjectViewOpen(true);
+    setExpandedProjectIds((ids) =>
+      ids.includes(projectId) ? ids : [...ids, projectId],
+    );
+  };
+  const toggleProjectExpanded = (projectId: string) => {
+    if (!projectViewOpen) {
+      setProjectReviewNowMs(Date.now());
+      setExpandedProjectIds([projectId]);
+      setProjectViewOpen(true);
+      return;
+    }
+    setExpandedProjectIds((ids) =>
+      ids.includes(projectId)
+        ? ids.filter((id) => id !== projectId)
+        : [...ids, projectId],
+    );
+  };
+  const startProjectConversation = (projectId: string) => {
     setActiveProjectFilter(projectId);
     if (activeSessionBusy) return;
     setActiveSession(undefined);
     setScreen("empty");
     setEmptyComposerFocusTick((tick) => tick + 1);
   };
+  const assignSessionToProjectWithToast = (
+    sessionId: string,
+    projectId: string | null,
+  ) => {
+    const session = visibleSessions.find((s) => s.id === sessionId);
+    const previousProject = session?.projectId
+      ? projects.find((p) => p.id === session.projectId)
+      : undefined;
+    const nextProject = projectId
+      ? projects.find((p) => p.id === projectId)
+      : undefined;
+    const sessionTitle = session?.title ?? "对话已更新";
+
+    void assignSessionToProject(sessionId, projectId).then(() => {
+      if (projectId) {
+        const projectName = nextProject?.name ?? "项目";
+        const title =
+          session?.projectId && session.projectId !== projectId
+            ? `已移到 ${projectName}`
+            : `已加入 ${projectName}`;
+        pushToast(
+          makeAppError({
+            category: "business",
+            severity: "info",
+            title,
+            message: sessionTitle,
+            hint: null,
+            retryable: false,
+            context: null,
+            traceback: null,
+            action: {
+              kind: "view_project",
+              label: "查看项目",
+              projectId,
+            },
+            autoDismissMs: 4000,
+          }),
+        );
+        return;
+      }
+
+      pushToast(
+        makeAppError({
+          category: "business",
+          severity: "info",
+          title: previousProject
+            ? `已从 ${previousProject.name} 移除`
+            : "已从项目移除",
+          message: sessionTitle,
+          hint: null,
+          retryable: false,
+          context: null,
+          traceback: null,
+          autoDismissMs: 3000,
+        }),
+      );
+    });
+  };
   // CreateProjectDialog open state. Local for the same reason as the
   // other dialogs above — modal visibility shouldn't persist across
   // launches.
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
-  // ProjectsDialog: opens when the sidebar's "查看全部 (N)" link is
-  // clicked at 9+ projects. Sibling to EarlierDialog in role.
-  const [projectsBrowserOpen, setProjectsBrowserOpen] = useState(false);
   // EditProjectDialog: stores the full project being edited so the
   // dialog can reset its inputs from the row that triggered it.
   // `null` = closed.
@@ -697,6 +794,7 @@ function App() {
               // placeholder in the sidebar. submitOnEmpty does the
               // createSession + activateSession when the user
               // commits to a first message.
+              setActiveProjectFilter(undefined);
               setActiveSession(undefined);
               setScreen("empty");
               setEmptyComposerFocusTick((tick) => tick + 1);
@@ -705,6 +803,7 @@ function App() {
               // Activate (re-spawns the bridge if this session has
               // been idle / closed / errored) and switch to main.
               // Other sessions' bridges keep running in background.
+              setActiveProjectFilter(undefined);
               void activateSession(id);
               setScreen("main");
             }}
@@ -717,19 +816,20 @@ function App() {
             onSearch={() => setPaletteOpen(true)}
             projects={projects}
             activeProjectFilter={activeProjectFilter}
+            projectViewOpen={projectViewOpen}
+            expandedProjectIds={expandedProjectIds}
+            projectReviewNowMs={projectReviewNowMs || undefined}
             onNewProject={() => setCreateProjectOpen(true)}
-            onSelectProject={enterProjectContext}
-            onClearProjectFilter={() => setActiveProjectFilter(undefined)}
-            onAssignSessionToProject={(sessionId, projectId) => {
-              void assignSessionToProject(sessionId, projectId);
-            }}
+            onToggleProjectView={toggleProjectView}
+            onToggleProjectExpanded={toggleProjectExpanded}
+            onStartProjectConversation={startProjectConversation}
+            onAssignSessionToProject={assignSessionToProjectWithToast}
             onTogglePinProject={(id) => {
               const p = projects.find((x) => x.id === id);
               if (p) void updateProject(id, { pinned: !p.pinned });
             }}
             onEditProject={(id) => setEditingProjectId(id)}
             onDeleteProject={(id) => setDeletingProjectId(id)}
-            onOpenProjectsBrowser={() => setProjectsBrowserOpen(true)}
             petAttachedSessionId={petAttachedSessionId}
           />
         }
@@ -739,6 +839,7 @@ function App() {
               llmDisplayName={llmDisplayName}
               conversationWidth={conversationWidth}
               projectName={activeProject?.name}
+              showPromptSuggestions={!activeProject}
               focusTick={emptyComposerFocusTick}
               llms={llms}
               onSelectLLM={(idx) => {
@@ -761,7 +862,9 @@ function App() {
                   sendIPCCommand,
                   setScreen,
                   activeProjectFilter,
-                );
+                ).then(() => {
+                  if (activeProjectFilter) setActiveProjectFilter(undefined);
+                });
               }}
               onQuickPrompt={(p) => {
                 void submitOnEmpty(
@@ -773,7 +876,9 @@ function App() {
                   sendIPCCommand,
                   setScreen,
                   activeProjectFilter,
-                );
+                ).then(() => {
+                  if (activeProjectFilter) setActiveProjectFilter(undefined);
+                });
               }}
             />
           ) : (
@@ -940,12 +1045,14 @@ function App() {
         sessions={visibleSessions}
         llms={llms}
         onNewChat={() => {
+          setActiveProjectFilter(undefined);
           setActiveSession(undefined);
           setScreen("empty");
           setEmptyComposerFocusTick((tick) => tick + 1);
         }}
         onNewProject={() => setCreateProjectOpen(true)}
         onOpenSession={(id) => {
+          setActiveProjectFilter(undefined);
           void activateSession(id);
           setScreen("main");
         }}
@@ -1055,6 +1162,7 @@ function App() {
         onOpenChange={setEarlierOpen}
         sessions={earlierSessions}
         onSelectSession={(id) => {
+          setActiveProjectFilter(undefined);
           void activateSession(id);
           setScreen("main");
         }}
@@ -1067,12 +1175,12 @@ function App() {
         open={createProjectOpen}
         onOpenChange={setCreateProjectOpen}
         onCreate={async (input) => {
-          // Create + immediately enter filter mode for the new
-          // project. Feels right for the "I just made this drawer,
-          // now show me it" instinct; the empty-project view is the
-          // implicit "drop sessions in here" prompt.
+          // Create + immediately open the new project in Project
+          // View. Creation is organization, not conversation
+          // creation; the row's inline + is the explicit "start a
+          // project conversation" action.
           const created = await createProject(input);
-          enterProjectContext(created.id);
+          openProjectInSidebar(created.id);
         }}
       />
 
@@ -1102,27 +1210,13 @@ function App() {
         }}
       />
 
-      <ProjectsDialog
-        open={projectsBrowserOpen}
-        onOpenChange={setProjectsBrowserOpen}
-        projects={projects}
-        sessions={sessions}
-        onSelectProject={enterProjectContext}
-        onTogglePinProject={(id) => {
-          const p = projects.find((x) => x.id === id);
-          if (p) void updateProject(id, { pinned: !p.pinned });
-        }}
-        onEditProject={(id) => setEditingProjectId(id)}
-        onDeleteProject={(id) => setDeletingProjectId(id)}
-        onNewProject={() => setCreateProjectOpen(true)}
-      />
-
       <ToastHost
         toasts={toasts}
         onDismiss={dismissToast}
         onSwitchLLM={() => console.info("[toast] switch llm action")}
         onOpenMyKey={() => console.info("[toast] open mykey.py")}
         onOpenGADocs={() => console.info("[toast] open GA docs")}
+        onViewProject={openProjectInSidebar}
         onRetry={() => console.info("[toast] retry")}
       />
 
@@ -1175,9 +1269,10 @@ async function submitOnEmpty(
 ): Promise<void> {
   let id = existingId;
   if (!id) {
-    // Inherit project assignment when the EmptyState composer fires
-    // while a project filter is active. New chat instantly belongs
-    // to the same drawer the user is looking at.
+    // Inherit project assignment when the EmptyState composer was
+    // opened from a project's inline +. The context is one-shot:
+    // after the first message creates the session, App clears the
+    // pending project id.
     id = createSession(inheritProjectId);
     await activateSession(id);
   }
