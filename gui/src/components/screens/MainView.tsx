@@ -581,27 +581,29 @@ export function MainView({
           turns={turns}
           scrollContainerRef={scrollContainerRef}
         />
-      </div>
 
-      {/* Scroll-to-bottom floating button (DESIGN.md §4.3 streaming
-          generation). Visible only when the user has scrolled away
-          from the bottom. Anchored just above the Composer so it
-          doesn't fight with the dock for space when both are
-          present. */}
-      {!atBottom && (
-        <button
-          type="button"
-          onClick={onClickScrollToBottom}
-          aria-label="Scroll to latest"
-          className={cn(
-            "absolute bottom-[140px] right-8 z-10 inline-flex size-9 items-center justify-center rounded-full",
-            "border border-line bg-elevated text-ink-soft shadow-elevated",
-            "transition-colors hover:bg-hover hover:text-ink",
-          )}
-        >
-          <ArrowDown size={16} weight="thin" />
-        </button>
-      )}
+        {/* Scroll-to-bottom floating button (DESIGN.md §4.3 streaming
+            generation). Visible only when the user has scrolled away
+            from the bottom. Centered above the bottom stack so the
+            affordance sits on the scroll axis instead of competing
+            with the reading column's right edge. */}
+        {!atBottom && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
+            <button
+              type="button"
+              onClick={onClickScrollToBottom}
+              aria-label="Scroll to latest"
+              className={cn(
+                "pointer-events-auto inline-flex size-7 items-center justify-center rounded-full",
+                "border border-line-subtle bg-app/70 text-ink-muted backdrop-blur-sm",
+                "transition-colors hover:border-line hover:bg-elevated hover:text-ink",
+              )}
+            >
+              <ArrowDown size={13} weight="thin" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Bottom stack: dock + composer + hint. Matches the conversation
           column width in lockstep — see MainViewProps `conversationWidth`
