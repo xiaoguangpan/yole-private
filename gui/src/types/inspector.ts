@@ -49,8 +49,8 @@ export interface RuntimeInfo {
    * fallback. Pairs with `gaCommit` for the Settings → Runtime
    * version row. */
   gaCommitDate: string;
-  /** Workbench-side tested baseline commit (from CLAUDE.md GA
-   * Baseline section). Hardcoded — bumped whenever we re-verify
+  /** Galley-side tested baseline commit (from docs/ga-baseline.md).
+   * Hardcoded — bumped whenever we re-verify
    * upstream compatibility. */
   gaBaseline: string;
   /** Workbench app version (e.g. "0.1.0"). */

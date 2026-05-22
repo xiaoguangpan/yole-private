@@ -8,34 +8,41 @@ the upstream GenericAgent commit that Galley has audited and tested against.
 
 ## Current Baseline
 
-Locked commit: `b0635186a52d3119a46efbaab42e7acd08dffb59`
+Locked commit: `1a8abc4fda00d4324c41e148b64e2f3475114ade`
 
 - Source: `lsdefine/GenericAgent` upstream `main`
-- Date audited: 2026-05-18
-- Previous baseline: `fc6b5ad`
-- Delta: 49 commits
-- Result: zero breaking changes on Galley's integration surface
-- Devlog: [GA baseline upgrade fc6b5ad -> b063518](./devlog/2026-05-18-ga-baseline-upgrade-fc6b5ad-to-b063518.md)
+- Date audited: 2026-05-22
+- Previous baseline: `b063518`
+- Delta: 36 commits
+- Result: one compatibility adapter for dispatch callback removal; no schema
+  or dependency changes
+- Devlog: [GA baseline upgrade b063518 -> 1a8abc4](./devlog/2026-05-22-ga-baseline-upgrade-b063518-to-1a8abc4.md)
 
 Relevant compatibility notes:
 
-- `agent_loop.py`: `agent_runner_loop` gained additive kwarg
-  `yield_info=False`; Galley does not pass it.
-- `agentmain.py`: display queue payload gained `turn` / `outputs`; Galley reads
-  existing `next` / `done` / `source`.
-- `ga.py`: prompt and summary behavior changed internally; `BaseHandler`
-  callbacks and `_turn_end_hooks` stayed compatible.
-- `llmcore.py`: model property behavior changed internally; Galley reads
-  `client.backend.model`.
+- `agent_loop.py`: `BaseHandler.dispatch` replaced
+  `tool_before_callback` / `tool_after_callback` calls with
+  `plugins.hooks` triggers. Galley now feature-detects this and emits its
+  own `turn_start` signal around dispatch when the loaded GA no longer calls
+  the callback.
+- `agent_loop.py`: `BaseHandler.dispatch` still has the
+  `(tool_name, args, response, index=0, tool_num=1)` generator protocol.
+- `agentmain.py`: `plugins.hooks.discover_and_load()` now runs at import time;
+  Galley still patches `agentmain.GenericAgentHandler` after import.
+- `ga.py`: `_turn_end_hooks` stayed compatible.
+- `llmcore.py`: mykey import error reporting changed and langfuse plugin
+  loading moved to the hook loader. Galley reads `client.backend.model` and
+  `llmclient.backend.history`; both stayed compatible.
+- `pyproject.toml`: no dependency changes.
 
 ## Contract Surface
 
 When auditing a GenericAgent upgrade, focus on these surfaces:
 
-1. `BaseHandler.tool_before_callback`
-2. `BaseHandler.tool_after_callback`
-3. `BaseHandler.turn_end_callback`
-4. `BaseHandler.dispatch` generator protocol
+1. `BaseHandler.dispatch` signature and generator protocol
+2. Whether `BaseHandler.dispatch` calls callbacks or `plugins.hooks`
+3. Galley's `WorkbenchHandler.dispatch` approval gate before `super()`
+4. `BaseHandler.turn_end_callback`
 5. `agent._turn_end_hooks`
 6. `agentmain.GenericAgentHandler` import path
 7. `llmclient.backend.history` read/write semantics

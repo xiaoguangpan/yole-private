@@ -445,8 +445,8 @@ class Bridge:
         self.run_in_progress = threading.Event()
         self.current_turn: int = 0
         # turn_start dedupe state. Two emitters share this:
-        #   1. WorkbenchHandler.tool_before_callback (real-time, fires
-        #      when GA enters tool dispatch for the current turn).
+        #   1. WorkbenchHandler dispatch wrapper (real-time, fires when
+        #      GA enters tool dispatch for the current turn).
         #   2. _on_turn_end's predict-emit (fires turn_start(turn+1)
         #      right after the just-finished turn's TurnEndEvent, so
         #      the sidebar updates immediately instead of waiting
@@ -486,7 +486,7 @@ class Bridge:
         # frontend helpers (currently: btw_cmd; future: possibly
         # continue_cmd).
         #
-        # Coupling point (CLAUDE.md constitution §"关于读取"):
+        # Coupling point (AGENTS.md constitution §"Non-Invasive To GenericAgent"):
         # `<ga_path>/frontends/` layout is GA-owned; re-audit at
         # each baseline upgrade. An absent btw_cmd is handled
         # below in the try/except — the bridge stays functional.
@@ -576,10 +576,9 @@ class Bridge:
                     yolo_check=lambda: bridge_self.state.yolo_mode,
                     # turn_start emission: GA's agent_runner_loop has no
                     # turn_start_callback, but it sets handler.current_turn
-                    # before each tool dispatch and calls
-                    # tool_before_callback. WorkbenchHandler detects the
-                    # turn change there and invokes this callback so the
-                    # desktop sidebar can show "正在工作 · 第 N 步" live.
+                    # before each tool dispatch. WorkbenchHandler invokes
+                    # this callback around dispatch so the desktop sidebar
+                    # can show "正在工作 · 第 N 步" live.
                     turn_started_callback=bridge_self._emit_turn_start,
                 )
 
@@ -600,11 +599,11 @@ class Bridge:
 
         Two emitters call this (both deduped via _last_emitted_turn):
 
-          1. WorkbenchHandler.tool_before_callback: real-time emission
-             when GA actually reaches tool dispatch for the current
-             turn. This is the authoritative "we are on step N" signal,
-             but it lands several seconds *after* the turn started
-             (LLM call has to complete first).
+          1. WorkbenchHandler dispatch wrapper: real-time emission when
+             GA actually reaches tool dispatch for the current turn. This
+             is the authoritative "we are on step N" signal, but it lands
+             several seconds *after* the turn started (LLM call has to
+             complete first).
           2. _on_turn_end predict-emit: right after the just-finished
              turn's TurnEndEvent, if GA is going to keep looping
              (exit_reason empty), we pre-announce turn N+1. The sidebar
@@ -863,14 +862,14 @@ class Bridge:
                 self.run_in_progress.clear()
             else:
                 # Predict-emit turn_start(turn+1): GA is going to keep
-                # looping, but the actual `tool_before_callback` for the
+                # looping, but the real dispatch-wrapper signal for the
                 # next turn won't fire until that turn's LLM call has
                 # fully completed (several seconds later). Without this,
                 # the sidebar subline drops to "正在工作…" during the
                 # next turn's LLM streaming even though the main view
                 # is clearly already showing N+1's content. The dedupe
                 # inside `_emit_turn_start` makes the eventual real
-                # tool_before_callback a no-op.
+                # dispatch-wrapper signal a no-op.
                 self._emit_turn_start(turn + 1)
         except Exception as e:
             self._emit_error(f"turn_end_hook failed: {e}", traceback.format_exc())
@@ -1101,10 +1100,10 @@ class Bridge:
         drifted (compression / forgetting) and the agent is confused
         about what tools exist or how to call them.
 
-        Coupling point (CLAUDE.md constitution §"关于读取"):
+        Coupling point (AGENTS.md constitution §"Non-Invasive To GenericAgent"):
           - Direct read of `<ga_path>/assets/tool_usable_history.json`
           - Path + JSON schema are GA internal — re-audit at each GA
-            baseline upgrade. As of baseline 6bb31046cc this matches
+            baseline upgrade. As of baseline 1a8abc4f this matches
             stapp.py:67-74 and the file exists in the expected layout.
         """
         import json as _json
@@ -1222,7 +1221,7 @@ class Bridge:
         at a time. If a pet is already attached to this session, the
         old one is detached first.
 
-        Coupling point (CLAUDE.md constitution §"关于读取"):
+        Coupling point (AGENTS.md constitution §"Non-Invasive To GenericAgent"):
           - File path: `<ga_path>/frontends/desktop_pet_v2.pyw`
             (falls back to `desktop_pet.pyw` mirroring stapp.py:77-78)
           - The pet subprocess is GA-owned code that we simply spawn;
@@ -1271,7 +1270,7 @@ class Bridge:
         # against the same agent — unusual but possible) doesn't clash.
         port = cmd.port
 
-        def _pet_hook(ctx: dict) -> None:
+        def _pet_hook(ctx: dict[str, Any]) -> None:
             from urllib.parse import quote
             from urllib.request import urlopen
 

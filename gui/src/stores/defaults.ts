@@ -65,13 +65,13 @@ export const DEFAULT_RUNTIME_INFO: RuntimeInfo = {
   pythonVersion: "3.11.9 (system)",
   llmDisplayName: DEFAULT_LLM_DISPLAY_NAME,
   bridgePid: 48213,
-  gaCommit: "cf6551516fcc836f21dcdad592b07c703d09e1d8",
-  // Matches cf65515's actual `git log -1 --format=%cI`. Bump alongside
-  // the baseline pin in CLAUDE.md whenever the baseline moves; this is
+  gaCommit: "1a8abc4fda00d4324c41e148b64e2f3475114ade",
+  // Matches 1a8abc4's actual `git log -1 --format=%cI`. Bump alongside
+  // the baseline pin in AGENTS.md whenever the baseline moves; this is
   // only the pre-bridge placeholder, overwritten by the bridge `ready`
   // event in production.
-  gaCommitDate: "2026-05-12T12:59:30+08:00",
-  gaBaseline: "cf6551516fcc836f21dcdad592b07c703d09e1d8",
+  gaCommitDate: "2026-05-22T10:21:25+08:00",
+  gaBaseline: "1a8abc4fda00d4324c41e148b64e2f3475114ade",
   // Empty string is the honest "not yet known" sentinel — `hydrate.ts`
   // overwrites with the real value from `getVersion()` during app boot.
   workbenchVersion: "",

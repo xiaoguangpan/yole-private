@@ -347,7 +347,7 @@ class ReinjectToolsCommand:
     """Re-inject GA's tool definitions into the LLM history of this
     session. Useful when an agent's long-running context has caused
     its tool understanding to drift. Reads from GA's
-    `assets/tool_usable_history.json` (read-only — see CLAUDE.md
+    `assets/tool_usable_history.json` (read-only — see AGENTS.md
     constitution §"关于读取" — direct read of GA internal asset is
     allowed because read-only, but path is a coupling point that must
     be re-audited at GA baseline upgrades).

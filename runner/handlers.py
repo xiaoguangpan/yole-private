@@ -1,9 +1,9 @@
 """WorkbenchHandler: extends GenericAgentHandler with approval interception.
 
-The approval gate sits in front of `super().dispatch()`. We don't rewrite
-dispatch's body; we add a check before delegating to GA's original logic.
-GA upgrades that change dispatch internals won't break this subclass as
-long as the dispatch signature stays stable.
+The approval gate sits in front of `super().dispatch()`. We keep GA's tool
+execution path as the authority, and only add Galley's approval + progress
+signals around it. GA upgrades can move internals around; this module uses
+runtime feature detection for the pieces Galley depends on.
 
 This module imports GA modules (`agent_loop`, `ga`). The caller must put
 the GA installation path on sys.path before importing this module.
@@ -23,7 +23,7 @@ from ga import GenericAgentHandler
 # kwarg to `BaseHandler.dispatch` so do_* tools can scale output length
 # by the number of parallel calls. Workbench's baseline is past that
 # commit, but the user's local GA repo may not be — and we are
-# explicitly non-invasive (CLAUDE.md "GA upgrade cadence is the user's
+# explicitly non-invasive (AGENTS.md "GA upgrade cadence is the user's
 # call"). So we detect support at import time and forward `tool_num`
 # only when the actually-loaded BaseHandler supports it. Without this
 # guard, an older GA crashes the agent loop with `TypeError: dispatch()
@@ -31,6 +31,25 @@ from ga import GenericAgentHandler
 # first tool dispatch, leaving the desktop stuck on "思考中".
 _BASE_DISPATCH_SUPPORTS_TOOL_NUM: bool = (
     "tool_num" in inspect.signature(BaseHandler.dispatch).parameters
+)
+
+
+def _base_dispatch_calls_tool_before_callback() -> bool:
+    try:
+        source = inspect.getsource(BaseHandler.dispatch)
+    except (OSError, TypeError):
+        return hasattr(BaseHandler, "tool_before_callback")
+    return "tool_before_callback" in source
+
+
+# Upstream GA commit 1a8abc4 (post-b063518 baseline) replaced the
+# BaseHandler.dispatch callback calls with plugins.hooks triggers.
+# Approval still happens in WorkbenchHandler.dispatch before super(),
+# but Galley's live turn_start signal used tool_before_callback as its
+# hook. Detect whether the loaded GA still calls it; if not, emit the
+# signal ourselves immediately before delegating to GA's dispatch.
+_BASE_DISPATCH_CALLS_TOOL_BEFORE_CALLBACK: bool = (
+    _base_dispatch_calls_tool_before_callback()
 )
 
 # Tools that require user approval by default. See PRD §11.2.
@@ -106,12 +125,14 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
         # "always False" when not provided (test paths, legacy callers).
         self._yolo_check: Callable[[], bool] = yolo_check or (lambda: False)
         # GA has no turn_start_callback extension point, so we synthesize
-        # one: tool_before_callback fires before every dispatch and by
-        # then agent_runner_loop has already set `self.current_turn`.
-        # Dedupe (multi-tool turn → single emit, plus coordination with
-        # the bridge's predict-emit path) lives on the bridge side now
-        # — see workbench_bridge._emit_turn_start. The handler just
-        # passes the current turn number through.
+        # one around dispatch. Older GA called tool_before_callback
+        # inside BaseHandler.dispatch. Newer GA switched to plugins.hooks,
+        # so WorkbenchHandler emits the same signal itself when feature
+        # detection says the base dispatch no longer does. Dedupe
+        # (multi-tool turn → single emit, plus coordination with the
+        # bridge's predict-emit path) lives on the bridge side now —
+        # see workbench_bridge._emit_turn_start. The handler just passes
+        # the current turn number through.
         self._turn_started_callback: Callable[[int], None] | None = (
             turn_started_callback
         )
@@ -124,10 +145,11 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
     ) -> None:
         """Notify the bridge of the GA-side turn number.
 
-        Called by `agent_runner_loop` via `try_call_generator` before
-        each tool dispatch (agent_loop.py:22). By this point, the loop
-        has set `self.current_turn` (agent_loop.py:74) to the current
-        1-based turn number.
+        Older GA baselines call this from `BaseHandler.dispatch` via
+        `try_call_generator` before each tool dispatch. Newer baselines
+        no longer do; WorkbenchHandler.dispatch calls this method itself
+        when needed. In both cases, `agent_runner_loop` has already set
+        `self.current_turn` to the current 1-based turn number.
 
         Even the "no-tool" final-answer turn fires dispatch (with
         tool_name='no_tool', backed by GenericAgentHandler.do_no_tool),
@@ -139,8 +161,9 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
         but both paths funnel through `_emit_turn_start` which suppresses
         repeat-Ns.
 
-        We don't call super().tool_before_callback(): GA's BaseHandler
-        default is `pass` and GenericAgentHandler does not override it.
+        We don't call super().tool_before_callback(): older GA's
+        BaseHandler default is `pass`, newer GA no longer defines it,
+        and GenericAgentHandler does not override it.
         """
         current = int(getattr(self, "current_turn", 0) or 0)
         if current and self._turn_started_callback is not None:
@@ -228,6 +251,11 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
                     {"status": "denied", "msg": f"Unknown approval decision: {decision}"},
                     next_prompt="\n",
                 )
+        if (
+            not _BASE_DISPATCH_CALLS_TOOL_BEFORE_CALLBACK
+            and hasattr(self, f"do_{tool_name}")
+        ):
+            self.tool_before_callback(tool_name, args, response)
         if _BASE_DISPATCH_SUPPORTS_TOOL_NUM:
             return (
                 yield from super().dispatch(

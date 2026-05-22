@@ -91,6 +91,37 @@ def test_approval_tool_calls_request_approval(fake_parent: MagicMock) -> None:
     assert any("code_run ran" in y for y in yielded)
 
 
+def test_turn_started_callback_fires_for_loaded_ga_dispatch(fake_parent: MagicMock) -> None:
+    """Galley must keep live step progress across GA dispatch internals.
+
+    Older GA calls WorkbenchHandler.tool_before_callback from
+    BaseHandler.dispatch. Newer GA switched BaseHandler.dispatch to
+    plugins.hooks, so WorkbenchHandler emits this signal itself when
+    feature detection says the base dispatch will not.
+    """
+    seen: list[int] = []
+    h = _make_handler(
+        fake_parent,
+        MagicMock(),
+        turn_started_callback=seen.append,
+    )
+    h.current_turn = 3
+    _drain(h.dispatch("test_tool", {"a": 1}, response=MagicMock()))
+    assert seen == [3]
+
+
+def test_denied_tool_does_not_emit_turn_started(fake_parent: MagicMock) -> None:
+    seen: list[int] = []
+    h = _make_handler(
+        fake_parent,
+        MagicMock(return_value="deny"),
+        turn_started_callback=seen.append,
+    )
+    h.current_turn = 4
+    _drain(h.dispatch("code_run", {"type": "python"}, response=MagicMock()))
+    assert seen == []
+
+
 def test_pre_loaded_global_rule_skips_request(fake_parent: MagicMock) -> None:
     approval = MagicMock()
     h = _make_handler(fake_parent, approval, always_allow_global={"code_run"})
