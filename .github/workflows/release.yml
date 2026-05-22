@@ -4,7 +4,7 @@ name: Release
 # to fire this workflow. It produces two artifacts in parallel:
 #
 #   - Galley_<version>_aarch64.dmg    (Apple Silicon Mac, macos-15 runner)
-#   - Galley_<version>_x64-setup.exe  (Windows,           windows-latest runner)
+#   - Galley_<version>_x64-setup.exe  (Windows,           windows-2025-vs2026 runner)
 #
 # Mac Intel (x86_64-apple-darwin) was dropped from the matrix in
 # v0.1.0-alpha.2 — JC's dev machine is an Intel Mac so an Intel bundle
@@ -71,7 +71,7 @@ jobs:
             arch: x64
             bundle_dir: dmg
             bundle_glob: "*.dmg"
-          - platform: windows-latest
+          - platform: windows-2025-vs2026
             target: x86_64-pc-windows-msvc
             arch: x64
             bundle_dir: nsis
@@ -204,12 +204,12 @@ jobs:
       # the cargo check is therefore load-bearing, not just for the
       # later `tauri build` artifact.
       - name: Setup Python (for bundle pip install)
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Cache python-build-standalone tarball
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/pbs
           key: pbs-tarball-${{ matrix.target }}-20260510
