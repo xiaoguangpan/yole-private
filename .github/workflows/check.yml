@@ -14,7 +14,7 @@ name: Check
 # needs a multi-platform check.
 #
 # Matrix covers day-to-day platform health: macos-15 (Apple Silicon) +
-# windows-2025. release.yml also builds the Mac Intel bundle, but Check
+# windows-2022. release.yml also builds the Mac Intel bundle, but Check
 # keeps that slower cross-compile in the release path.
 
 on:
@@ -31,7 +31,7 @@ jobs:
         include:
           - platform: macos-15
             target: aarch64-apple-darwin
-          - platform: windows-2025
+          - platform: windows-2022
             target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
