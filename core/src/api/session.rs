@@ -33,6 +33,16 @@ pub enum SessionStatus {
     Archived,
 }
 
+/// GenericAgent runtime ownership for a session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeKind {
+    /// Galley-owned managed / bundled GA runtime.
+    Managed,
+    /// User-owned attached GenericAgent checkout.
+    External,
+}
+
 /// Summary projection of a session — the fields a sidebar row needs.
 /// "Brief" means: enough to list / display, not enough to render the
 /// full conversation. For history, see [`super::MessageBrief`] plus
@@ -69,6 +79,11 @@ pub struct SessionBrief {
     /// re-confirms with the live `availableLLMs` list.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_llm_display_name: Option<String>,
+    pub ga_runtime_kind: RuntimeKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ga_runtime_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_profile: Option<String>,
 }
 
 /// Filter / scope for `list_sessions`. All fields optional — None means
@@ -82,6 +97,8 @@ pub struct SessionFilter {
     /// default). Set Some(true) to fetch only archived, Some(false) to
     /// force-exclude.
     pub archived: Option<bool>,
+    /// When present, return sessions created for this runtime only.
+    pub runtime_kind: Option<RuntimeKind>,
 }
 
 /// Payload for [`crate::api::GalleyApi::create_session`].
@@ -106,4 +123,10 @@ pub struct CreateSessionInput {
     pub selected_llm_index: Option<u32>,
     #[serde(default)]
     pub selected_llm_display_name: Option<String>,
+    #[serde(default)]
+    pub ga_runtime_kind: Option<RuntimeKind>,
+    #[serde(default)]
+    pub ga_runtime_id: Option<String>,
+    #[serde(default)]
+    pub prompt_profile: Option<String>,
 }

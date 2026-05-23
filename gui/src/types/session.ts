@@ -21,6 +21,8 @@ export type SessionStatus =
   | "cancelled"
   | "archived";
 
+export type RuntimeKind = "managed" | "external";
+
 /**
  * Sidebar grouping bucket. Computed from `lastActivityAt` and `pinned`
  * via `bucketSession()` — not stored on the entity.
@@ -107,6 +109,13 @@ export interface Session {
    * spawned bridge re-confirms with `ready`.
    */
   selectedLlmDisplayName?: string;
+
+  /** GenericAgent runtime ownership captured when the session was created. */
+  gaRuntimeKind: RuntimeKind;
+  /** Stable runtime id for future multi-runtime support. */
+  gaRuntimeId?: string;
+  /** Managed prompt profile applied at session creation, if any. */
+  promptProfile?: string;
 }
 
 export interface Project {

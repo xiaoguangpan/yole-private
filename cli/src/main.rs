@@ -375,6 +375,7 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
                 project_id: project,
                 status: status.as_deref().map(parse_status_arg).transpose()?,
                 archived: archived_flag,
+                runtime_kind: None,
             };
             let rows = galley.list_sessions(filter).await?;
             // NDJSON — one object per line, so agents can stream-parse.

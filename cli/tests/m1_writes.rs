@@ -36,6 +36,7 @@ const MIG_004: &str = include_str!("../../core/migrations/004_add_messages_fts.s
 const MIG_005: &str = include_str!("../../core/migrations/005_add_message_preamble.sql");
 const MIG_006: &str = include_str!("../../core/migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../../core/migrations/007_sessions_origin.sql");
+const MIG_008: &str = include_str!("../../core/migrations/008_runtime_identity.sql");
 
 async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
     let opts = SqliteConnectOptions::new()
@@ -43,7 +44,7 @@ async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
         .create_if_missing(true);
     let pool = SqlitePool::connect_with(opts).await.expect("open db");
     for sql in [
-        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007,
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)

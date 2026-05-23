@@ -20,8 +20,25 @@ const MIG_004: &str = include_str!("../migrations/004_add_messages_fts.sql");
 const MIG_005: &str = include_str!("../migrations/005_add_message_preamble.sql");
 const MIG_006: &str = include_str!("../migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../migrations/007_sessions_origin.sql");
+const MIG_008: &str = include_str!("../migrations/008_runtime_identity.sql");
 
 async fn fresh_pool() -> SqlitePool {
+    let pool = SqlitePool::connect("sqlite::memory:")
+        .await
+        .expect("open in-memory sqlite");
+    for sql in [
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
+    ] {
+        sqlx::raw_sql(sql)
+            .execute(&pool)
+            .await
+            .expect("run migration");
+    }
+    pool
+}
+
+#[tokio::test]
+async fn runtime_identity_migration_preserves_existing_attach_users() {
     let pool = SqlitePool::connect("sqlite::memory:")
         .await
         .expect("open in-memory sqlite");
@@ -31,9 +48,27 @@ async fn fresh_pool() -> SqlitePool {
         sqlx::raw_sql(sql)
             .execute(&pool)
             .await
-            .expect("run migration");
+            .expect("run pre-runtime migration");
     }
-    pool
+    sqlx::query("INSERT INTO prefs (key, value, updated_at) VALUES (?, ?, ?)")
+        .bind("ga_config")
+        .bind(r#"{"gaPath":"/Users/jc/GenericAgent"}"#)
+        .bind("2026-05-23T00:00:00Z")
+        .execute(&pool)
+        .await
+        .expect("seed ga_config");
+
+    sqlx::raw_sql(MIG_008)
+        .execute(&pool)
+        .await
+        .expect("run runtime migration");
+
+    let active: String =
+        sqlx::query_scalar("SELECT value FROM prefs WHERE key = 'active_runtime_kind'")
+            .fetch_one(&pool)
+            .await
+            .expect("read active runtime");
+    assert_eq!(active, r#""external""#);
 }
 
 async fn seed_session(pool: &SqlitePool, id: &str, title: &str, status: &str, ts: &str) {

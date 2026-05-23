@@ -22,6 +22,9 @@ export interface SessionRow {
   pinned: number; // 0 / 1
   llm_index: number | null;
   llm_display_name: string | null;
+  ga_runtime_kind: "managed" | "external";
+  ga_runtime_id: string | null;
+  prompt_profile: string | null;
   /** 0/1 — sessions.has_unread. See Session.hasUnread for semantics. */
   has_unread: number;
   last_activity_at: string;

@@ -1024,6 +1024,9 @@ async fn dispatch_session_new(
         project_id: parsed.project_id,
         selected_llm_index: llm_index,
         selected_llm_display_name: llm_display_name,
+        ga_runtime_kind: None,
+        ga_runtime_id: None,
+        prompt_profile: None,
     };
     let origin = origin_from_args(parsed.supervisor.clone(), parsed.reason.clone());
 
@@ -1729,6 +1732,7 @@ async fn dispatch_project_delete(
             project_id: Some(parsed.project_id.clone()),
             status: None,
             archived: None,
+            runtime_kind: None,
         })
         .await
     {

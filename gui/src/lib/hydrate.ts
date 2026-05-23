@@ -7,11 +7,14 @@
  *
  *   1. App version → runtimeInfo (so Settings → About shows the
  *      real bundle version rather than the demo "0.1.0" fixture).
- *   2. sessionsStore.hydrate (sessions + projects via Rust Core).
- *   3. SQLite housekeeping + FTS backfill in the background.
+ *   2. prefsStore.hydratePrefs (runtime mode, yolo / conversationWidth /
+ *      gaConfig). Runtime mode must be known before sessions hydrate so
+ *      the sidebar can show the current runtime's sessions only.
+ *   3. Managed runtime layout ensure (creates state dirs if missing and
+ *      records diagnostics for Settings).
+ *   4. sessionsStore.hydrate (sessions + projects via Rust Core).
+ *   5. SQLite housekeeping + FTS backfill in the background.
  *      Best-effort — never blocks first paint.
- *   5. prefsStore.hydratePrefs (yolo / conversationWidth / gaConfig).
- *      Returns hasGAConfig for the routing branch.
  *   6. Cached LLM seed → runtimeStore (short-term hint so cold-start
  *      cosmetics show the user's real GA-configured models instead
  *      of the demo placeholders before any bridge has spawned).
@@ -26,6 +29,7 @@
  */
 
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
   backfillFtsIfEmpty,
@@ -39,6 +43,7 @@ import type { LLMOption } from "@/stores/runtime";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import type { ManagedRuntimeDiagnostics } from "@/types/inspector";
 
 export async function hydrateApp(): Promise<void> {
   // 1. App version — replace the empty-string sentinel in
@@ -55,8 +60,23 @@ export async function hydrateApp(): Promise<void> {
     console.debug("[hydrate] app.getVersion failed.", e);
   }
 
-  // 2. Startup-critical state: sessions/projects. Route through Rust
-  // Core first so a slow direct-SQL housekeeping pass cannot leave the
+  // 2. Prefs hydrate. Runtime mode gates the sessions hydrate below:
+  // the sidebar should list only the current runtime's sessions.
+  const { hasGAConfig } = await usePrefsStore.getState().hydratePrefs();
+
+  // 3. Managed runtime layout. This is intentionally safe to run on
+  // every cold start: it only creates missing Galley-owned directories.
+  try {
+    const managedRuntime = await invoke<ManagedRuntimeDiagnostics>(
+      "ensure_managed_runtime_layout",
+    );
+    useRuntimeStore.getState().patchRuntimeInfo({ managedRuntime });
+  } catch (e) {
+    console.warn("[hydrate] managed runtime layout init failed.", e);
+  }
+
+  // 4. Startup-critical state: sessions/projects. Route through Rust
+  // Core so a slow direct-SQL housekeeping pass cannot leave the
   // sidebar blank on Dev hot restarts.
   await useSessionsStore.getState().hydrate();
   // Update auto-prepare is deliberately after sessions hydrate. If a
@@ -66,12 +86,9 @@ export async function hydrateApp(): Promise<void> {
     .getState()
     .check({ silent: true, downloadIfAvailable: true });
 
-  // 3-4. Non-critical SQLite housekeeping + FTS backfill. Fire-and-forget:
+  // 5. Non-critical SQLite housekeeping + FTS backfill. Fire-and-forget:
   // these are nice cleanup/indexing tasks, not requirements for first paint.
   void runSqlHousekeeping();
-
-  // 5. Prefs hydrate — gates the routing branch below.
-  const { hasGAConfig } = await usePrefsStore.getState().hydratePrefs();
 
   // 6. Restore cached LLM list (written by replaceLLMs whenever a
   // bridge's `ready` event arrives). Lets cold-start cosmetics show

@@ -43,6 +43,7 @@
     ],
     "resources": {
       "../runner": "runner",
+      "../managed-ga": "managed-ga",
       "python-bundle/python": "python"
     },
     "windows": {

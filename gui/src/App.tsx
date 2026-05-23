@@ -220,8 +220,9 @@ function App() {
   );
 
   // Drives the slice-store hydrate sequence in order: app version →
-  // SQLite housekeeping → sessions hydrate → FTS backfill → prefs
-  // hydrate → cached LLM seed → Onboarding routing OR warmup.
+  // prefs hydrate → managed runtime layout → sessions hydrate →
+  // SQLite housekeeping / FTS backfill → cached LLM seed →
+  // Onboarding routing OR warmup.
   useEffect(() => {
     void hydrateApp();
   }, []);

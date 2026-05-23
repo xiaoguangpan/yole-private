@@ -9,7 +9,7 @@
 
 use galley_core_lib::api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectId, ProjectPatch,
-    SessionFilter, SessionId, SessionStatus,
+    RuntimeKind, SessionFilter, SessionId, SessionStatus,
 };
 use galley_core_lib::db::SqliteGalley;
 use galley_core_lib::error::GalleyError;
@@ -23,6 +23,7 @@ const MIG_004: &str = include_str!("../migrations/004_add_messages_fts.sql");
 const MIG_005: &str = include_str!("../migrations/005_add_message_preamble.sql");
 const MIG_006: &str = include_str!("../migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../migrations/007_sessions_origin.sql");
+const MIG_008: &str = include_str!("../migrations/008_runtime_identity.sql");
 
 async fn fresh_pool() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
@@ -36,7 +37,7 @@ async fn fresh_pool() -> SqlitePool {
         .await
         .expect("enable foreign keys");
     for sql in [
-        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007,
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -99,6 +100,9 @@ async fn create_session_happy_path_persists_all_fields() {
                 project_id: None,
                 selected_llm_index: Some(2),
                 selected_llm_display_name: Some("Claude Sonnet 4.6".into()),
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::gui(),
         )
@@ -112,6 +116,53 @@ async fn create_session_happy_path_persists_all_fields() {
         brief.selected_llm_display_name.as_deref(),
         Some("Claude Sonnet 4.6")
     );
+    assert!(matches!(brief.ga_runtime_kind, RuntimeKind::Managed));
+    assert!(brief.ga_runtime_id.is_none());
+    assert!(brief.prompt_profile.is_none());
+}
+
+#[tokio::test]
+async fn create_session_can_snapshot_explicit_external_runtime() {
+    let pool = fresh_pool().await;
+    let galley = SqliteGalley::from_pool(pool);
+    let brief = galley
+        .create_session(
+            CreateSessionInput {
+                id: "sess_external_1".into(),
+                title: "External session".into(),
+                project_id: None,
+                selected_llm_index: None,
+                selected_llm_display_name: None,
+                ga_runtime_kind: Some(RuntimeKind::External),
+                ga_runtime_id: Some("external-default".into()),
+                prompt_profile: None,
+            },
+            Origin::gui(),
+        )
+        .await
+        .expect("create external session");
+
+    assert!(matches!(brief.ga_runtime_kind, RuntimeKind::External));
+    assert_eq!(brief.ga_runtime_id.as_deref(), Some("external-default"));
+
+    let managed = galley
+        .list_sessions(SessionFilter {
+            runtime_kind: Some(RuntimeKind::Managed),
+            ..Default::default()
+        })
+        .await
+        .expect("list managed");
+    assert!(managed.is_empty());
+
+    let external = galley
+        .list_sessions(SessionFilter {
+            runtime_kind: Some(RuntimeKind::External),
+            ..Default::default()
+        })
+        .await
+        .expect("list external");
+    assert_eq!(external.len(), 1);
+    assert_eq!(external[0].id.as_str(), "sess_external_1");
 }
 
 #[tokio::test]
@@ -126,6 +177,9 @@ async fn create_session_persists_origin_creation_triple() {
                 project_id: None,
                 selected_llm_index: None,
                 selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::cli(Some("ga-test-1".into()), Some("auto-trigger".into())),
         )
@@ -156,6 +210,9 @@ async fn create_session_rejects_empty_title() {
                 project_id: None,
                 selected_llm_index: None,
                 selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::gui(),
         )
@@ -177,6 +234,9 @@ async fn create_session_id_conflict_returns_invalid_args() {
                 project_id: None,
                 selected_llm_index: None,
                 selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::gui(),
         )
@@ -197,6 +257,9 @@ async fn create_session_with_missing_project_rejects() {
                 project_id: Some("proj_does_not_exist".into()),
                 selected_llm_index: None,
                 selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::gui(),
         )
@@ -1038,6 +1101,9 @@ async fn tx_commit_persists_both_session_and_message() {
                 project_id: None,
                 selected_llm_index: None,
                 selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
             },
             Origin::cli(Some("ga-claude".into()), Some("user asked".into())),
         )
@@ -1109,6 +1175,9 @@ async fn tx_drop_without_commit_rolls_back() {
                     project_id: None,
                     selected_llm_index: None,
                     selected_llm_display_name: None,
+                    ga_runtime_kind: None,
+                    ga_runtime_id: None,
+                    prompt_profile: None,
                 },
                 Origin::gui(),
             )
@@ -1147,6 +1216,9 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
                     project_id: None,
                     selected_llm_index: None,
                     selected_llm_display_name: None,
+                    ga_runtime_kind: None,
+                    ga_runtime_id: None,
+                    prompt_profile: None,
                 },
                 Origin::gui(),
             )

@@ -26,8 +26,9 @@ use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
 use crate::api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, HealthCheck, HealthReport, HealthStatus,
-    MessageBrief, MessageId, MessageRole, Origin, ProjectBrief, ProjectId, ProjectPatch, SearchHit,
-    SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
+    MessageBrief, MessageId, MessageRole, Origin, ProjectBrief, ProjectId, ProjectPatch,
+    RuntimeKind, SearchHit, SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus,
+    StatusSummary,
 };
 use crate::error::{GalleyError, Result};
 
@@ -516,6 +517,9 @@ struct SessionRow {
     updated_at: String,
     llm_index: Option<i64>,
     llm_display_name: Option<String>,
+    ga_runtime_kind: String,
+    ga_runtime_id: Option<String>,
+    prompt_profile: Option<String>,
 }
 
 impl SessionRow {
@@ -542,6 +546,9 @@ impl SessionRow {
                 },
             ),
             selected_llm_display_name: self.llm_display_name,
+            ga_runtime_kind: parse_runtime_kind(&self.ga_runtime_kind)?,
+            ga_runtime_id: self.ga_runtime_id,
+            prompt_profile: self.prompt_profile,
         })
     }
 }
@@ -732,6 +739,25 @@ fn session_status_sql(s: SessionStatus) -> &'static str {
     }
 }
 
+fn parse_runtime_kind(s: &str) -> Result<RuntimeKind> {
+    Ok(match s {
+        "managed" => RuntimeKind::Managed,
+        "external" => RuntimeKind::External,
+        other => {
+            return Err(GalleyError::Internal {
+                message: format!("unknown runtime kind: {other}"),
+            })
+        }
+    })
+}
+
+fn runtime_kind_sql(kind: RuntimeKind) -> &'static str {
+    match kind {
+        RuntimeKind::Managed => "managed",
+        RuntimeKind::External => "external",
+    }
+}
+
 fn parse_message_role(s: &str) -> Result<MessageRole> {
     Ok(match s {
         "user" => MessageRole::User,
@@ -811,12 +837,18 @@ async fn insert_session_row_inner(
     }
     let now = chrono_now_iso();
     let llm_idx: Option<i64> = input.selected_llm_index.map(|v| v as i64);
+    let runtime_kind = match input.ga_runtime_kind {
+        Some(kind) => kind,
+        None => active_runtime_kind_inner(conn).await?,
+    };
+    let runtime_kind_value = runtime_kind_sql(runtime_kind);
     sqlx::query(
         "INSERT INTO sessions (id, project_id, title, status, summary, turn_count, \
             pending_approval_count, error_count, pinned, has_unread, \
             llm_index, llm_display_name, last_activity_at, created_at, updated_at, \
-            created_via, created_by_supervisor, created_origin_note) \
-         VALUES (?, ?, ?, 'idle', NULL, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+            created_via, created_by_supervisor, created_origin_note, \
+            ga_runtime_kind, ga_runtime_id, prompt_profile) \
+         VALUES (?, ?, ?, 'idle', NULL, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(&input.project_id)
@@ -829,6 +861,9 @@ async fn insert_session_row_inner(
     .bind(origin.via.as_sql())
     .bind(&origin.supervisor)
     .bind(&origin.reason)
+    .bind(runtime_kind_value)
+    .bind(&input.ga_runtime_id)
+    .bind(&input.prompt_profile)
     .execute(&mut *conn)
     .await
     .map_err(|e| map_constraint_err("create_session", e))?;
@@ -847,7 +882,46 @@ async fn insert_session_row_inner(
         has_unread: Some(false),
         selected_llm_index: input.selected_llm_index,
         selected_llm_display_name: input.selected_llm_display_name.clone(),
+        ga_runtime_kind: runtime_kind,
+        ga_runtime_id: input.ga_runtime_id.clone(),
+        prompt_profile: input.prompt_profile.clone(),
     })
+}
+
+async fn active_runtime_kind_inner(conn: &mut SqliteConnection) -> Result<RuntimeKind> {
+    let raw: Option<String> =
+        sqlx::query_scalar("SELECT value FROM prefs WHERE key = 'active_runtime_kind' LIMIT 1")
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(map_sqlx_err)?;
+
+    if let Some(raw) = raw {
+        let value = serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| {
+            GalleyError::InvalidArgs {
+                message: format!("pref 'active_runtime_kind' stored value is not valid JSON: {e}"),
+            }
+        })?;
+        let Some(kind) = value.as_str() else {
+            return Err(GalleyError::InvalidArgs {
+                message: "pref 'active_runtime_kind' must be a string".into(),
+            });
+        };
+        return parse_runtime_kind(kind);
+    }
+
+    // Defensive fallback for dev/test DBs that have not run migration 008:
+    // an existing GA path means attach/external, otherwise fresh managed.
+    let ga_path: Option<String> = sqlx::query_scalar(
+        "SELECT json_extract(value, '$.gaPath') FROM prefs WHERE key = 'ga_config' LIMIT 1",
+    )
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(map_sqlx_err)?;
+    if ga_path.as_deref().is_some_and(|s| !s.trim().is_empty()) {
+        Ok(RuntimeKind::External)
+    } else {
+        Ok(RuntimeKind::Managed)
+    }
 }
 
 /// INSERT a user message row + bump session `last_activity_at`.
@@ -966,7 +1040,7 @@ fn project_nullable_patch(field: &Option<Option<String>>) -> (bool, Option<Strin
 
 const SESSIONS_SELECT_COLS: &str = "id, project_id, title, status, summary, turn_count, \
     pinned, has_unread, last_activity_at, created_at, updated_at, \
-    llm_index, llm_display_name";
+    llm_index, llm_display_name, ga_runtime_kind, ga_runtime_id, prompt_profile";
 
 #[async_trait]
 impl GalleyApi for SqliteGalley {
@@ -980,6 +1054,9 @@ impl GalleyApi for SqliteGalley {
         }
         if filter.status.is_some() {
             sql.push_str(" AND status = ?");
+        }
+        if filter.runtime_kind.is_some() {
+            sql.push_str(" AND ga_runtime_kind = ?");
         }
         // Standard Option<bool> filter semantics:
         //   None        → no archived filter (active + archived both returned)
@@ -1001,6 +1078,9 @@ impl GalleyApi for SqliteGalley {
         }
         if let Some(status) = filter.status {
             q = q.bind(session_status_sql(status));
+        }
+        if let Some(kind) = filter.runtime_kind {
+            q = q.bind(runtime_kind_sql(kind));
         }
         let rows = q.fetch_all(&self.pool).await.map_err(map_sqlx_err)?;
         rows.into_iter().map(SessionRow::into_brief).collect()

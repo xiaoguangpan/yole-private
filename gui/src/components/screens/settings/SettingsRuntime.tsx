@@ -1,5 +1,7 @@
 import {
   ArrowsClockwise,
+  CaretDown,
+  CaretRight,
   Check,
   CheckCircle,
   CircleNotch,
@@ -23,7 +25,7 @@ import {
   validateGAPath,
 } from "@/lib/onboarding-validation";
 import { cn } from "@/lib/utils";
-import type { RuntimeInfo } from "@/types/inspector";
+import type { ManagedRuntimeDiagnostics, RuntimeInfo } from "@/types/inspector";
 
 interface SettingsRuntimeProps {
   info: RuntimeInfo;
@@ -104,6 +106,8 @@ export function SettingsRuntime({
         gaCommitDate={info.gaCommitDate}
         gaBaseline={info.gaBaseline}
       />
+
+      <ManagedRuntimeCard diagnostics={info.managedRuntime} />
 
       <div>
         <SettingsSectionLabel>Health Check</SettingsSectionLabel>
@@ -222,6 +226,92 @@ function PythonPanel({
           改回 Galley 内置 Python
         </Button>
       )}
+    </div>
+  );
+}
+
+// ---------------- Managed runtime diagnostics ----------------
+
+function ManagedRuntimeCard({
+  diagnostics,
+}: {
+  diagnostics?: ManagedRuntimeDiagnostics;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const upstreamShort = diagnostics?.upstreamCommit.slice(0, 7) ?? "未加载";
+  return (
+    <div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setExpanded((v) => !v)}
+        className="px-0 text-[11.5px] hover:bg-transparent hover:underline"
+        leadingIcon={
+          expanded ? (
+            <CaretDown size={12} weight="bold" />
+          ) : (
+            <CaretRight size={12} weight="bold" />
+          )
+        }
+      >
+        高级诊断
+      </Button>
+      {expanded && (
+        <>
+          <div className="mt-2 rounded-sm border border-line bg-surface px-3 py-2.5">
+            <RuntimeDiagnosticRow label="内核版本" value={upstreamShort} />
+            <RuntimeDiagnosticRow
+              label="Patch stack"
+              value={
+                diagnostics
+                  ? `${diagnostics.patchStackId} · ${diagnostics.patchCount} patches`
+                  : "未加载"
+              }
+            />
+            <RuntimeDiagnosticRow
+              label="Code"
+              value={
+                diagnostics
+                  ? diagnostics.code.agentmainExists
+                    ? diagnostics.paths.codeRoot
+                    : `${diagnostics.paths.codeRoot} · 待打包`
+                  : "未加载"
+              }
+            />
+            <RuntimeDiagnosticRow
+              label="State"
+              value={diagnostics?.paths.stateRoot ?? "未加载"}
+            />
+            <RuntimeDiagnosticRow
+              label="Model config"
+              value={diagnostics?.paths.modelConfigDir ?? "未加载"}
+            />
+          </div>
+          <p className="mt-2 text-[11.5px] leading-[1.55] text-ink-muted">
+            诊断只显示路径和版本。API Key 不会显示在这里。
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RuntimeDiagnosticRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-3 py-1">
+      <div className="w-24 shrink-0 text-[11.5px] text-ink-muted">{label}</div>
+      <div
+        className="min-w-0 truncate font-mono text-[11.5px] text-ink-soft"
+        title={value}
+      >
+        {value}
+      </div>
     </div>
   );
 }

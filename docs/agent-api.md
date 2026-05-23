@@ -335,6 +335,11 @@ $ galley sessions list --project=proj_demo
 | `updatedAt`       | string (ISO8601)| last metadata write                                                                |
 | `pinned`          | bool?           | sidebar pin. `null` = column never set (treat as `false`); `true` / `false` = explicit |
 | `hasUnread`       | bool?           | new content arrived while session was not the active one (GUI signal; B2+ writes). `null` = never set (treat as `false`) |
+| `selectedLlmIndex` | int?           | persisted per-session LLM index, when set                                          |
+| `selectedLlmDisplayName` | string?   | cached display name for the persisted LLM selection                                |
+| `gaRuntimeKind`   | string enum     | `managed` / `external`; runtime ownership captured at session creation             |
+| `gaRuntimeId`     | string?         | stable runtime id for future multi-runtime support                                 |
+| `promptProfile`   | string?         | managed prompt profile id, when applied                                            |
 
 ### 5.3 · `galley sessions search <query> [--all]`
 
@@ -965,7 +970,7 @@ Trait signatures (Rust types):
 
 Input types (camelCase on the JSON wire):
 
-- `CreateSessionInput { id, title, projectId?, selectedLlmIndex?, selectedLlmDisplayName? }`
+- `CreateSessionInput { id, title, projectId?, selectedLlmIndex?, selectedLlmDisplayName?, gaRuntimeKind?, gaRuntimeId?, promptProfile? }`
   — `id` is caller-assigned (`s-<base36>-<rand>` convention; conflicts
   surface as `invalid_args`).
 - `CreateProjectInput { id, name, rootPath?, icon?, color? }` —

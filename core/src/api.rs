@@ -24,7 +24,9 @@ pub use message::{MessageBrief, MessageId, MessageRole};
 pub use origin::{Origin, OriginVia};
 pub use project::{CreateProjectInput, ProjectBrief, ProjectId, ProjectPatch};
 pub use search::{SearchHit, SearchScope};
-pub use session::{CreateSessionInput, SessionBrief, SessionFilter, SessionId, SessionStatus};
+pub use session::{
+    CreateSessionInput, RuntimeKind, SessionBrief, SessionFilter, SessionId, SessionStatus,
+};
 pub use status::StatusSummary;
 
 use async_trait::async_trait;

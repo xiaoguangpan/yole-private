@@ -11,7 +11,12 @@ import { usePrefsStore } from "@/stores/prefs";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore } from "@/stores/ui";
 import { makeAppError } from "@/types/app-error";
-import type { Project, Session, SessionStatus } from "@/types/session";
+import type {
+  Project,
+  RuntimeKind,
+  Session,
+  SessionStatus,
+} from "@/types/session";
 
 /**
  * B3 M4b · sessionsStore — authoritative session/project list slice.
@@ -63,6 +68,9 @@ interface SessionBriefWire {
   hasUnread?: boolean;
   selectedLlmIndex?: number;
   selectedLlmDisplayName?: string;
+  gaRuntimeKind?: RuntimeKind;
+  gaRuntimeId?: string;
+  promptProfile?: string;
 }
 
 // Mirror of Rust `ProjectBrief`.
@@ -90,6 +98,9 @@ interface CreateSessionInputWire {
   projectId?: string;
   selectedLlmIndex?: number;
   selectedLlmDisplayName?: string;
+  gaRuntimeKind?: RuntimeKind;
+  gaRuntimeId?: string;
+  promptProfile?: string;
 }
 
 interface CreateProjectInputWire {
@@ -137,6 +148,7 @@ async function invokeHydrate<T>(
 export const DEFAULT_NEW_SESSION_TITLE = "新对话";
 
 function sessionFromBrief(b: SessionBriefWire): Session {
+  const gaRuntimeKind = b.gaRuntimeKind ?? "external";
   return {
     id: b.id,
     projectId: b.projectId,
@@ -156,7 +168,14 @@ function sessionFromBrief(b: SessionBriefWire): Session {
     updatedAt: b.updatedAt,
     selectedLlmIndex: b.selectedLlmIndex,
     selectedLlmDisplayName: b.selectedLlmDisplayName,
+    gaRuntimeKind,
+    gaRuntimeId: b.gaRuntimeId,
+    promptProfile: b.promptProfile,
   };
+}
+
+function briefRuntimeKind(b: SessionBriefWire): RuntimeKind {
+  return b.gaRuntimeKind ?? "external";
 }
 
 function projectFromBrief(b: ProjectBriefWire): Project {
@@ -467,6 +486,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       .toString(36)
       .slice(2, 6)}`;
     const now = new Date().toISOString();
+    const gaRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
     const newSession: Session = {
       id,
       title: DEFAULT_NEW_SESSION_TITLE,
@@ -477,6 +497,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       lastActivityAt: now,
       createdAt: now,
       updatedAt: now,
+      gaRuntimeKind,
     };
     set((state) => ({
       sessions: [newSession, ...state.sessions],
@@ -487,6 +508,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         id,
         title: DEFAULT_NEW_SESSION_TITLE,
         projectId,
+        gaRuntimeKind,
       } as CreateSessionInputWire,
       origin: GUI_ORIGIN,
     }).catch((e) => {
@@ -1018,6 +1040,16 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
 
   applyExternalSessionCreated: (brief) => {
     set((state) => {
+      const activeRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
+      if (briefRuntimeKind(brief) !== activeRuntimeKind) {
+        const sessions = state.sessions.filter((s) => s.id !== brief.id);
+        const activeSessionId =
+          state.activeSessionId === brief.id ? undefined : state.activeSessionId;
+        return sessions.length === state.sessions.length &&
+          activeSessionId === state.activeSessionId
+          ? {}
+          : { sessions, activeSessionId };
+      }
       // Race guard: GUI may have just created the same id locally. The
       // SessionBriefWire from Rust is authoritative for durable fields
       // (status / title / project_id) but the GUI's local insert already
@@ -1035,6 +1067,16 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
 
   applyExternalSessionUpdated: (brief) => {
     set((state) => {
+      const activeRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
+      if (briefRuntimeKind(brief) !== activeRuntimeKind) {
+        const sessions = state.sessions.filter((s) => s.id !== brief.id);
+        const activeSessionId =
+          state.activeSessionId === brief.id ? undefined : state.activeSessionId;
+        return sessions.length === state.sessions.length &&
+          activeSessionId === state.activeSessionId
+          ? {}
+          : { sessions, activeSessionId };
+      }
       const { sessions, changed } = patchSessionInList(
         state.sessions,
         brief.id,
@@ -1053,6 +1095,9 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
           selectedLlmIndex: brief.selectedLlmIndex ?? s.selectedLlmIndex,
           selectedLlmDisplayName:
             brief.selectedLlmDisplayName ?? s.selectedLlmDisplayName,
+          gaRuntimeKind: briefRuntimeKind(brief),
+          gaRuntimeId: brief.gaRuntimeId,
+          promptProfile: brief.promptProfile,
           lastActivityAt: brief.lastActivityAt,
           updatedAt: brief.updatedAt,
         }),
@@ -1106,8 +1151,9 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
 
   hydrate: async () => {
     try {
+      const activeRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
       const briefs = await invokeHydrate<SessionBriefWire[]>("list_sessions", {
-        filter: {},
+        filter: { runtimeKind: activeRuntimeKind },
       });
       set({ sessions: briefs.map(sessionFromBrief) });
     } catch (e) {

@@ -4,6 +4,7 @@ pub mod db;
 pub mod discovery;
 pub mod error;
 pub mod ipc;
+pub mod managed_runtime;
 pub mod migration_backup;
 pub mod path_install;
 pub mod runner_commands;
@@ -25,7 +26,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
 /// platform's app-data directory:
 ///
-///   macOS:  ~/Library/Application Support/app.gaworkbench/
+///   macOS:  ~/Library/Application Support/app.galley/
 ///
 /// Schema lives in core/migrations/001_init.sql; tauri-plugin-sql
 /// runs Up migrations in version order on first connect.
@@ -92,6 +93,13 @@ fn install_galley_to_path() -> path_install::PathInstallOutcome {
 #[tauri::command]
 fn uninstall_galley_from_path() -> path_install::PathUninstallOutcome {
     path_install::uninstall_from_path()
+}
+
+#[tauri::command]
+fn ensure_managed_runtime_layout(
+    app: tauri::AppHandle,
+) -> std::result::Result<managed_runtime::ManagedRuntimeDiagnostics, String> {
+    managed_runtime::ensure_for_app(&app).map_err(|e| e.to_string())
 }
 
 /// Stringify a [`crate::error::GalleyError`] for the Tauri invoke wire.
@@ -538,6 +546,12 @@ pub fn run() {
             sql: include_str!("../migrations/007_sessions_origin.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "add managed/external runtime identity",
+            sql: include_str!("../migrations/008_runtime_identity.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     // Pre-migration backup hook (B4 M8). Derived — not hard-coded —
@@ -569,6 +583,7 @@ pub fn run() {
             check_path_install_status,
             install_galley_to_path,
             uninstall_galley_from_path,
+            ensure_managed_runtime_layout,
             list_sessions,
             // B3 M4a session writes
             create_session,

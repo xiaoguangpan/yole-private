@@ -7,6 +7,7 @@ import { DEFAULT_APPROVAL_CONFIG, DEFAULT_GA_CONFIG } from "@/stores/defaults";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useUiStore } from "@/stores/ui";
 import { makeAppError } from "@/types/app-error";
+import type { RuntimeKind } from "@/types/session";
 
 /**
  * prefsStore — user preferences + GA spawn config.
@@ -15,6 +16,7 @@ import { makeAppError } from "@/types/app-error";
  * persistable):
  *
  *   - gaConfig            (python / gaPath / bridgeCwd / useExternalPython)
+ *   - activeRuntimeKind   (managed / external)
  *   - approvalConfig      (in-memory only, v0.1 doesn't persist rules)
  *   - yoloMode            (pref: yolo_mode)
  *   - yoloIntroSeen       (pref: yolo_intro_seen)
@@ -60,6 +62,12 @@ interface PrefsState {
    * has opened Settings. Persists to pref `ga_config` (JSON).
    */
   gaConfig: GAConfig;
+
+  /**
+   * Current GenericAgent runtime mode. New installs default to managed;
+   * existing users with a persisted GA path migrate to external.
+   */
+  activeRuntimeKind: RuntimeKind;
 
   approvalConfig: ApprovalConfig;
 
@@ -139,6 +147,9 @@ interface PrefsActions {
    */
   setGAConfig: (partial: Partial<GAConfig>) => Promise<void>;
 
+  // ---- Runtime mode ----
+  setActiveRuntimeKind: (kind: RuntimeKind) => Promise<void>;
+
   // ---- Hydration ----
   /**
    * Load the four persistable prefs (yolo_mode / yolo_intro_seen /
@@ -156,6 +167,7 @@ export type PrefsStore = PrefsState & PrefsActions;
 export const usePrefsStore = create<PrefsStore>((set, get) => ({
   // ---- Initial state (demo fixtures until hydratePrefs) ----
   gaConfig: DEFAULT_GA_CONFIG,
+  activeRuntimeKind: "managed",
   approvalConfig: DEFAULT_APPROVAL_CONFIG,
   yoloMode: true,
   yoloIntroSeen: true,
@@ -290,6 +302,16 @@ export const usePrefsStore = create<PrefsStore>((set, get) => ({
     }
   },
 
+  // ---- Runtime mode ----
+  setActiveRuntimeKind: async (kind) => {
+    set({ activeRuntimeKind: kind });
+    try {
+      await setPref("active_runtime_kind", kind);
+    } catch (e) {
+      console.warn("[prefs] setActiveRuntimeKind: pref persistence failed.", e);
+    }
+  },
+
   // ---- Hydration ----
   hydratePrefs: async () => {
     // YOLO mode — sticky preference. Best-effort load.
@@ -361,6 +383,25 @@ export const usePrefsStore = create<PrefsStore>((set, get) => ({
       }
     } catch (e) {
       console.warn("[prefs] hydratePrefs: ga_config pref load failed.", e);
+    }
+    try {
+      const activeRuntimeKind = await getPref<RuntimeKind>(
+        "active_runtime_kind",
+      );
+      if (
+        activeRuntimeKind === "managed" ||
+        activeRuntimeKind === "external"
+      ) {
+        set({ activeRuntimeKind });
+      } else {
+        set({ activeRuntimeKind: hasGAConfig ? "external" : "managed" });
+      }
+    } catch (e) {
+      console.warn(
+        "[prefs] hydratePrefs: active_runtime_kind pref load failed.",
+        e,
+      );
+      set({ activeRuntimeKind: hasGAConfig ? "external" : "managed" });
     }
     return { hasGAConfig };
   },

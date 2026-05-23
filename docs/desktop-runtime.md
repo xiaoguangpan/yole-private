@@ -115,6 +115,23 @@ Implementation notes:
 Bundled GenericAgent core deps are audited during baseline upgrades. See
 [GA baseline](./ga-baseline.md).
 
+## Managed GenericAgent Runtime
+
+Managed / bundled GA keeps code and state separate:
+
+- App resources contain `managed-ga/manifest.json`, `managed-ga/code/`, and
+  `managed-ga/patches/`.
+- Application Support contains `managed-ga-state/` and
+  `managed-model-config/`.
+
+Galley may replace the managed code payload during an app update, but it must
+not overwrite managed state. Startup may create missing state directories only.
+Advanced diagnostics can show managed runtime paths, baseline commit, and patch
+stack status; diagnostics must never display API keys.
+
+The managed-runtime product and upgrade rules live in
+[managed GA runtime](./managed-ga-runtime.md).
+
 ## Release Artifacts
 
 Current release path:

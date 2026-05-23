@@ -55,4 +55,47 @@ export interface RuntimeInfo {
   gaBaseline: string;
   /** Workbench app version (e.g. "0.1.0"). */
   workbenchVersion: string;
+  /** Galley-owned managed GA runtime layout and version diagnostics. */
+  managedRuntime?: ManagedRuntimeDiagnostics;
+}
+
+export interface ManagedRuntimeDiagnostics {
+  manifestSchemaVersion: number;
+  upstreamSource: string;
+  upstreamBranch: string;
+  upstreamCommit: string;
+  upstreamAuditedAt: string;
+  patchStackId: string;
+  patchCount: number;
+  stateSchemaVersion: number;
+  paths: ManagedRuntimePaths;
+  code: ManagedCodeDiagnostics;
+  state: ManagedStateDiagnostics;
+}
+
+export interface ManagedRuntimePaths {
+  resourceRoot: string;
+  codeRoot: string;
+  manifestPath: string;
+  patchManifestPath: string;
+  stateRoot: string;
+  memoryDir: string;
+  sopDir: string;
+  skillsDir: string;
+  tempDir: string;
+  modelResponsesDir: string;
+  modelConfigDir: string;
+}
+
+export interface ManagedCodeDiagnostics {
+  resourceRootExists: boolean;
+  codeRootExists: boolean;
+  agentmainExists: boolean;
+  manifestExists: boolean;
+  patchManifestExists: boolean;
+}
+
+export interface ManagedStateDiagnostics {
+  initialized: boolean;
+  createdDirs: string[];
 }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "source": "lsdefine/GenericAgent",
+    "branch": "main",
+    "commit": "1a8abc4fda00d4324c41e148b64e2f3475114ade",
+    "auditedAt": "2026-05-22"
+  },
+  "patchStack": {
+    "id": "galley-managed-ga-patches-v1",
+    "patches": []
+  },
+  "stateSchemaVersion": 1
+}
