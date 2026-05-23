@@ -3,6 +3,7 @@ import {
   Cpu,
   Info,
   Keyboard,
+  Key,
   PlugsConnected,
   ShieldCheck,
   X as XIcon,
@@ -12,6 +13,7 @@ import { useState } from "react";
 import { SettingsAbout } from "@/components/screens/settings/SettingsAbout";
 import { SettingsApproval } from "@/components/screens/settings/SettingsApproval";
 import { SettingsIntegration } from "@/components/screens/settings/SettingsIntegration";
+import { SettingsModels } from "@/components/screens/settings/SettingsModels";
 import { SettingsRuntime } from "@/components/screens/settings/SettingsRuntime";
 import { SettingsShortcuts } from "@/components/screens/settings/SettingsShortcuts";
 import { IconButton } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import type { RuntimeInfo } from "@/types/inspector";
 
 export type SettingsTab =
   | "runtime"
+  | "models"
   | "approval"
   | "integration"
   | "shortcuts"
@@ -144,6 +147,7 @@ export function Settings({
                   onCommitGAPath={onCommitGAPath}
                 />
               )}
+              {tab === "models" && <SettingsModels />}
               {tab === "approval" && (
                 <SettingsApproval
                   config={approval}
@@ -187,6 +191,12 @@ function SettingsTabList({
         Icon={Cpu}
         label="Runtime"
         onClick={() => onChange("runtime")}
+      />
+      <SettingsTabButton
+        active={tab === "models"}
+        Icon={Key}
+        label="Models"
+        onClick={() => onChange("models")}
       />
       <SettingsTabButton
         active={tab === "approval"}

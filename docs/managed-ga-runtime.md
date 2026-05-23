@@ -764,6 +764,20 @@ Scope:
 - Ensure attach mode never reads Galley's model records.
 - Ensure managed mode never reads the user's external GA `mykey.py`.
 
+Current implementation slice:
+
+- `managed_models` stores model metadata only.
+- API keys are saved through `keyring` into the OS credential store.
+- `managed-model-config/managed-models.json` is generated with `apiKeyRef`
+  values, never real API keys.
+- Settings -> Models supports adding, listing, and deleting model entries.
+
+Remaining M3 work before M4 onboarding can call this path:
+
+- Connection test / model list fetch.
+- Rename / edit existing model metadata without re-entering the key.
+- Actionable credential-missing error mapping for managed session start.
+
 Acceptance:
 
 - The database and generated config do not contain real API key values.

@@ -21,13 +21,14 @@ const MIG_005: &str = include_str!("../migrations/005_add_message_preamble.sql")
 const MIG_006: &str = include_str!("../migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../migrations/007_sessions_origin.sql");
 const MIG_008: &str = include_str!("../migrations/008_runtime_identity.sql");
+const MIG_009: &str = include_str!("../migrations/009_managed_models.sql");
 
 async fn fresh_pool() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
         .await
         .expect("open in-memory sqlite");
     for sql in [
-        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008, MIG_009,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -62,6 +63,10 @@ async fn runtime_identity_migration_preserves_existing_attach_users() {
         .execute(&pool)
         .await
         .expect("run runtime migration");
+    sqlx::raw_sql(MIG_009)
+        .execute(&pool)
+        .await
+        .expect("run managed models migration");
 
     let active: String =
         sqlx::query_scalar("SELECT value FROM prefs WHERE key = 'active_runtime_kind'")

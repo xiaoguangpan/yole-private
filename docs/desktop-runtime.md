@@ -123,11 +123,18 @@ Managed / bundled GA keeps code and state separate:
   `managed-ga/patches/`.
 - Application Support contains `managed-ga-state/` and
   `managed-model-config/`.
+- System credential storage contains managed model API keys. Galley stores only
+  an `apiKeyRef` in SQLite and generated runtime config.
 
 Galley may replace the managed code payload during an app update, but it must
 not overwrite managed state. Startup may create missing state directories only.
-Advanced diagnostics can show managed runtime paths, baseline commit, and patch
-stack status; diagnostics must never display API keys.
+Advanced diagnostics can show managed runtime paths, baseline commit, patch
+stack status, and generated config presence; diagnostics must never display API
+keys.
+
+Backups of Application Support are expected to restore sessions, managed GA
+state, and non-secret model metadata. They do not restore API keys; a restored
+machine should ask the user to re-enter missing managed model credentials.
 
 The managed-runtime product and upgrade rules live in
 [managed GA runtime](./managed-ga-runtime.md).

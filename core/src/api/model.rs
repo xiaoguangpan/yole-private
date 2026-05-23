@@ -1,0 +1,45 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManagedModelProtocol {
+    Anthropic,
+    Openai,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManagedModelCredentialStatus {
+    Present,
+    Missing,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagedModelRecord {
+    pub id: String,
+    pub display_name: String,
+    pub protocol: ManagedModelProtocol,
+    pub api_base: String,
+    pub model: String,
+    pub api_key_ref: String,
+    pub advanced_options: serde_json::Value,
+    pub is_default: bool,
+    pub credential_status: ManagedModelCredentialStatus,
+    pub last_validated_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveManagedModelInput {
+    pub id: Option<String>,
+    pub display_name: Option<String>,
+    pub protocol: ManagedModelProtocol,
+    pub api_base: String,
+    pub model: String,
+    pub api_key: Option<String>,
+    pub make_default: Option<bool>,
+}

@@ -1,9 +1,11 @@
 pub mod api;
 pub mod app_update;
+pub mod credential_store;
 pub mod db;
 pub mod discovery;
 pub mod error;
 pub mod ipc;
+pub mod managed_model_config;
 pub mod managed_runtime;
 pub mod migration_backup;
 pub mod path_install;
@@ -14,11 +16,11 @@ pub mod sop_install;
 
 use api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectBrief, ProjectId,
-    ProjectPatch, SessionBrief, SessionFilter, SessionId,
+    ProjectPatch, SaveManagedModelInput, SessionBrief, SessionFilter, SessionId,
 };
 use db::{
     MessageSearchHit, PersistAssistantMessage, PersistToolEventPending, PersistedMessageRow,
-    SqliteGalley, ToolEventRow,
+    SqliteGalley, ToolEventRow, UpsertManagedModelMetadata,
 };
 use serde::Deserialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -100,6 +102,124 @@ fn ensure_managed_runtime_layout(
     app: tauri::AppHandle,
 ) -> std::result::Result<managed_runtime::ManagedRuntimeDiagnostics, String> {
     managed_runtime::ensure_for_app(&app).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_managed_models() -> std::result::Result<Vec<api::ManagedModelRecord>, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    galley.list_managed_models().await.map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn save_managed_model(
+    app: tauri::AppHandle,
+    input: SaveManagedModelInput,
+) -> std::result::Result<api::ManagedModelRecord, String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let id = input
+        .id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(new_managed_model_id);
+    let api_key_ref = credential_store::managed_model_api_key_ref(&id);
+    let api_key = input
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if let Some(api_key) = api_key {
+        credential_store::set_secret(&api_key_ref, api_key).map_err(stringify_error)?;
+    } else if !credential_store::has_secret(&api_key_ref) {
+        return Err(stringify_error(error::GalleyError::InvalidArgs {
+            message: "managed model API key is required".into(),
+        }));
+    }
+
+    let display_name = input
+        .display_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| input.model.trim())
+        .to_string();
+    let saved = galley
+        .upsert_managed_model_metadata(UpsertManagedModelMetadata {
+            id,
+            display_name,
+            protocol: input.protocol,
+            api_base: input.api_base,
+            model: input.model,
+            api_key_ref,
+            advanced_options: managed_model_advanced_defaults(input.protocol),
+            make_default: input.make_default.unwrap_or(false),
+        })
+        .await
+        .map_err(stringify_error)?;
+    sync_managed_model_config(&app, &galley).await?;
+    Ok(saved)
+}
+
+#[tauri::command]
+async fn delete_managed_model(
+    app: tauri::AppHandle,
+    id: String,
+) -> std::result::Result<(), String> {
+    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let id = id.trim();
+    if id.is_empty() {
+        return Err(stringify_error(error::GalleyError::InvalidArgs {
+            message: "managed model id must not be empty".into(),
+        }));
+    }
+    let api_key_ref = credential_store::managed_model_api_key_ref(id);
+    credential_store::delete_secret(&api_key_ref).map_err(stringify_error)?;
+    galley
+        .delete_managed_model_metadata(id)
+        .await
+        .map_err(stringify_error)?;
+    sync_managed_model_config(&app, &galley).await?;
+    Ok(())
+}
+
+async fn sync_managed_model_config(
+    app: &tauri::AppHandle,
+    galley: &SqliteGalley,
+) -> std::result::Result<(), String> {
+    let diagnostics = managed_runtime::ensure_for_app(app).map_err(|e| e.to_string())?;
+    let models = galley
+        .list_managed_models()
+        .await
+        .map_err(stringify_error)?;
+    managed_model_config::write_nonsecret_config(
+        std::path::Path::new(&diagnostics.paths.model_config_dir),
+        &models,
+    )
+    .map_err(stringify_error)
+}
+
+fn new_managed_model_id() -> String {
+    format!("mm_{}", chrono::Utc::now().timestamp_millis())
+}
+
+fn managed_model_advanced_defaults(protocol: api::ManagedModelProtocol) -> serde_json::Value {
+    match protocol {
+        api::ManagedModelProtocol::Anthropic => serde_json::json!({
+            "thinking_type": "adaptive",
+            "temperature": 1,
+            "max_retries": 3,
+            "connect_timeout": 10,
+            "read_timeout": 180
+        }),
+        api::ManagedModelProtocol::Openai => serde_json::json!({
+            "api_mode": "chat_completions",
+            "temperature": 1,
+            "max_retries": 3,
+            "connect_timeout": 10,
+            "read_timeout": 180
+        }),
+    }
 }
 
 /// Stringify a [`crate::error::GalleyError`] for the Tauri invoke wire.
@@ -552,6 +672,12 @@ pub fn run() {
             sql: include_str!("../migrations/008_runtime_identity.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 9,
+            description: "add managed model metadata",
+            sql: include_str!("../migrations/009_managed_models.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     // Pre-migration backup hook (B4 M8). Derived — not hard-coded —
@@ -584,6 +710,9 @@ pub fn run() {
             install_galley_to_path,
             uninstall_galley_from_path,
             ensure_managed_runtime_layout,
+            list_managed_models,
+            save_managed_model,
+            delete_managed_model,
             list_sessions,
             // B3 M4a session writes
             create_session,

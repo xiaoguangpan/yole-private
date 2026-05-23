@@ -8,10 +8,11 @@
 //! `tests/common/mod.rs` scaffold that adds noise for two test files.
 
 use galley_core_lib::api::{
-    CreateProjectInput, CreateSessionInput, GalleyApi, Origin, ProjectId, ProjectPatch,
-    RuntimeKind, SessionFilter, SessionId, SessionStatus,
+    CreateProjectInput, CreateSessionInput, GalleyApi, ManagedModelCredentialStatus,
+    ManagedModelProtocol, Origin, ProjectId, ProjectPatch, RuntimeKind, SessionFilter, SessionId,
+    SessionStatus,
 };
-use galley_core_lib::db::SqliteGalley;
+use galley_core_lib::db::{SqliteGalley, UpsertManagedModelMetadata};
 use galley_core_lib::error::GalleyError;
 use sqlx::SqlitePool;
 
@@ -24,6 +25,7 @@ const MIG_005: &str = include_str!("../migrations/005_add_message_preamble.sql")
 const MIG_006: &str = include_str!("../migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../migrations/007_sessions_origin.sql");
 const MIG_008: &str = include_str!("../migrations/008_runtime_identity.sql");
+const MIG_009: &str = include_str!("../migrations/009_managed_models.sql");
 
 async fn fresh_pool() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
@@ -37,7 +39,7 @@ async fn fresh_pool() -> SqlitePool {
         .await
         .expect("enable foreign keys");
     for sql in [
-        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008, MIG_009,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -84,6 +86,46 @@ async fn seed_project(pool: &SqlitePool, id: &str, name: &str) {
     .execute(pool)
     .await
     .expect("seed project");
+}
+
+// ---------------- managed model metadata ----------------
+
+#[tokio::test]
+async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
+    let pool = fresh_pool().await;
+    let galley = SqliteGalley::from_pool(pool.clone());
+
+    let row = galley
+        .upsert_managed_model_metadata(UpsertManagedModelMetadata {
+            id: "mm_test".into(),
+            display_name: "Claude".into(),
+            protocol: ManagedModelProtocol::Anthropic,
+            api_base: "https://api.anthropic.com".into(),
+            model: "claude-sonnet-4-6".into(),
+            api_key_ref: "managed-model:mm_test".into(),
+            advanced_options: serde_json::json!({
+                "thinking_type": "adaptive",
+                "read_timeout": 180
+            }),
+            make_default: true,
+        })
+        .await
+        .expect("upsert managed model metadata");
+
+    assert_eq!(row.api_key_ref, "managed-model:mm_test");
+    assert!(matches!(
+        row.credential_status,
+        ManagedModelCredentialStatus::Missing
+    ));
+    assert!(row.is_default);
+
+    let raw_rows: Vec<(String,)> =
+        sqlx::query_as("SELECT api_key_ref FROM managed_models WHERE id = ?")
+            .bind("mm_test")
+            .fetch_all(&pool)
+            .await
+            .expect("read raw model row");
+    assert_eq!(raw_rows, vec![("managed-model:mm_test".to_string(),)]);
 }
 
 // ---------------- create_session ----------------

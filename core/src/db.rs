@@ -26,10 +26,11 @@ use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
 use crate::api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, HealthCheck, HealthReport, HealthStatus,
-    MessageBrief, MessageId, MessageRole, Origin, ProjectBrief, ProjectId, ProjectPatch,
-    RuntimeKind, SearchHit, SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus,
-    StatusSummary,
+    ManagedModelCredentialStatus, ManagedModelProtocol, ManagedModelRecord, MessageBrief,
+    MessageId, MessageRole, Origin, ProjectBrief, ProjectId, ProjectPatch, RuntimeKind, SearchHit,
+    SearchScope, SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
 };
+use crate::credential_store;
 use crate::error::{GalleyError, Result};
 
 /// Tauri bundle identifier. Must match `tauri.conf.json:identifier`
@@ -467,6 +468,155 @@ impl SqliteGalley {
         .map_err(map_sqlx_err)
     }
 
+    pub async fn list_managed_models(&self) -> Result<Vec<ManagedModelRecord>> {
+        let rows = sqlx::query_as::<_, ManagedModelRow>(
+            "SELECT id, display_name, protocol, api_base, model, api_key_ref, \
+                    advanced_options, is_default, last_validated_at, created_at, updated_at \
+             FROM managed_models \
+             ORDER BY is_default DESC, updated_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        rows.into_iter().map(ManagedModelRow::into_record).collect()
+    }
+
+    pub async fn upsert_managed_model_metadata(
+        &self,
+        record: UpsertManagedModelMetadata,
+    ) -> Result<ManagedModelRecord> {
+        let id = record.id.trim();
+        if id.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "managed model id must not be empty".into(),
+            });
+        }
+        let display_name = record.display_name.trim();
+        if display_name.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "managed model displayName must not be empty".into(),
+            });
+        }
+        let api_base = record.api_base.trim();
+        if api_base.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "managed model Base URL must not be empty".into(),
+            });
+        }
+        let model = record.model.trim();
+        if model.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "managed model name must not be empty".into(),
+            });
+        }
+
+        let existing_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM managed_models")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+        let make_default = record.make_default || existing_count == 0;
+        let now = chrono_now_iso();
+        let protocol = managed_model_protocol_sql(record.protocol);
+        let advanced_options = record.advanced_options.to_string();
+
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        if make_default {
+            sqlx::query("UPDATE managed_models SET is_default = 0")
+                .execute(&mut *tx)
+                .await
+                .map_err(map_sqlx_err)?;
+        }
+        sqlx::query(
+            "INSERT INTO managed_models (
+               id, display_name, protocol, api_base, model, api_key_ref,
+               advanced_options, is_default, last_validated_at, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               display_name = excluded.display_name,
+               protocol = excluded.protocol,
+               api_base = excluded.api_base,
+               model = excluded.model,
+               api_key_ref = excluded.api_key_ref,
+               advanced_options = excluded.advanced_options,
+               is_default = excluded.is_default,
+               updated_at = excluded.updated_at",
+        )
+        .bind(id)
+        .bind(display_name)
+        .bind(protocol)
+        .bind(api_base)
+        .bind(model)
+        .bind(&record.api_key_ref)
+        .bind(&advanced_options)
+        .bind(if make_default { 1_i64 } else { 0_i64 })
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| map_constraint_err("upsert_managed_model", e))?;
+        tx.commit().await.map_err(map_sqlx_err)?;
+
+        self.managed_model_by_id(id).await
+    }
+
+    pub async fn delete_managed_model_metadata(&self, id: &str) -> Result<Option<String>> {
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            return Err(GalleyError::InvalidArgs {
+                message: "managed model id must not be empty".into(),
+            });
+        }
+        let row: Option<(String, i64)> =
+            sqlx::query_as("SELECT api_key_ref, is_default FROM managed_models WHERE id = ?")
+                .bind(trimmed)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_sqlx_err)?;
+        let Some((api_key_ref, was_default)) = row else {
+            return Ok(None);
+        };
+
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        sqlx::query("DELETE FROM managed_models WHERE id = ?")
+            .bind(trimmed)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx_err)?;
+        if was_default != 0 {
+            sqlx::query(
+                "UPDATE managed_models
+                 SET is_default = 1
+                 WHERE id = (
+                   SELECT id FROM managed_models ORDER BY updated_at DESC LIMIT 1
+                 )",
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx_err)?;
+        }
+        tx.commit().await.map_err(map_sqlx_err)?;
+        Ok(Some(api_key_ref))
+    }
+
+    async fn managed_model_by_id(&self, id: &str) -> Result<ManagedModelRecord> {
+        let row = sqlx::query_as::<_, ManagedModelRow>(
+            "SELECT id, display_name, protocol, api_base, model, api_key_ref, \
+                    advanced_options, is_default, last_validated_at, created_at, updated_at \
+             FROM managed_models \
+             WHERE id = ? \
+             LIMIT 1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?
+        .ok_or_else(|| GalleyError::NotFound {
+            message: format!("managed model {id} not found"),
+        })?;
+        row.into_record()
+    }
+
     async fn index_message_fts(
         &self,
         message_id: &str,
@@ -628,6 +778,60 @@ pub struct PersistToolEventPending {
     pub started_at: String,
 }
 
+pub struct UpsertManagedModelMetadata {
+    pub id: String,
+    pub display_name: String,
+    pub protocol: ManagedModelProtocol,
+    pub api_base: String,
+    pub model: String,
+    pub api_key_ref: String,
+    pub advanced_options: serde_json::Value,
+    pub make_default: bool,
+}
+
+#[derive(Debug, FromRow)]
+struct ManagedModelRow {
+    id: String,
+    display_name: String,
+    protocol: String,
+    api_base: String,
+    model: String,
+    api_key_ref: String,
+    advanced_options: String,
+    is_default: i64,
+    last_validated_at: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+impl ManagedModelRow {
+    fn into_record(self) -> Result<ManagedModelRecord> {
+        let advanced_options = serde_json::from_str::<serde_json::Value>(&self.advanced_options)
+            .map_err(|e| GalleyError::Internal {
+                message: format!("managed model advanced_options JSON invalid: {e}"),
+            })?;
+        let credential_status = if credential_store::has_secret(&self.api_key_ref) {
+            ManagedModelCredentialStatus::Present
+        } else {
+            ManagedModelCredentialStatus::Missing
+        };
+        Ok(ManagedModelRecord {
+            id: self.id,
+            display_name: self.display_name,
+            protocol: parse_managed_model_protocol(&self.protocol)?,
+            api_base: self.api_base,
+            model: self.model,
+            api_key_ref: self.api_key_ref,
+            advanced_options,
+            is_default: self.is_default != 0,
+            credential_status,
+            last_validated_at: self.last_validated_at,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageSearchHit {
@@ -755,6 +959,25 @@ fn runtime_kind_sql(kind: RuntimeKind) -> &'static str {
     match kind {
         RuntimeKind::Managed => "managed",
         RuntimeKind::External => "external",
+    }
+}
+
+fn parse_managed_model_protocol(s: &str) -> Result<ManagedModelProtocol> {
+    Ok(match s {
+        "anthropic" => ManagedModelProtocol::Anthropic,
+        "openai" => ManagedModelProtocol::Openai,
+        other => {
+            return Err(GalleyError::Internal {
+                message: format!("unknown managed model protocol: {other}"),
+            })
+        }
+    })
+}
+
+fn managed_model_protocol_sql(protocol: ManagedModelProtocol) -> &'static str {
+    match protocol {
+        ManagedModelProtocol::Anthropic => "anthropic",
+        ManagedModelProtocol::Openai => "openai",
     }
 }
 

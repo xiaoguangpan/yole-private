@@ -13,6 +13,7 @@
 
 pub mod health;
 pub mod message;
+pub mod model;
 pub mod origin;
 pub mod project;
 pub mod search;
@@ -21,6 +22,9 @@ pub mod status;
 
 pub use health::{HealthCheck, HealthReport, HealthStatus};
 pub use message::{MessageBrief, MessageId, MessageRole};
+pub use model::{
+    ManagedModelCredentialStatus, ManagedModelProtocol, ManagedModelRecord, SaveManagedModelInput,
+};
 pub use origin::{Origin, OriginVia};
 pub use project::{CreateProjectInput, ProjectBrief, ProjectId, ProjectPatch};
 pub use search::{SearchHit, SearchScope};

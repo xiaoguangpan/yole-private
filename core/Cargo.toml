@@ -94,6 +94,10 @@ anyhow = { version = "1", optional = true }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
+# Managed model API keys live in the platform credential store
+# (macOS Keychain, Windows Credential Manager, Linux Secret Service).
+keyring = "3"
+
 [features]
 # Enables the bridge-owner-experiment binary. Not part of any default set.
 # Use: `cargo build --features experiments --bin bridge-owner-experiment`.
