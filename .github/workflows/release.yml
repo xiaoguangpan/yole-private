@@ -225,6 +225,9 @@ jobs:
           esac
           ./scripts/bundle-python.sh "$ARCH"
 
+      - name: Managed GA payload gate
+        run: node scripts/check-managed-ga-payload.mjs
+
       - name: Cargo check
         working-directory: ./core
         run: cargo check --target ${{ matrix.target }}

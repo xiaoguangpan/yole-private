@@ -1060,12 +1060,70 @@ Current implementation slice:
 - Release-gate tests also reject generated source-tree artifacts such as
   `.DS_Store`, `__pycache__/`, and `*.pyc` under `managed-ga/code`.
 
+### M9 · Packaged Runtime Release Gate
+
+Goal: make sure the managed runtime that works in dev is the same runtime that
+ships inside the app bundle.
+
+Scope:
+
+- Verify `core/tauri.conf.json` bundles `../managed-ga` as app resource
+  `managed-ga`.
+- Verify `managed-ga/manifest.json` pins an upstream commit and lists the
+  replayable patch stack.
+- Verify required runtime files exist:
+  - `managed-ga/code/agentmain.py`
+  - `managed-ga/code/agent_loop.py`
+  - `managed-ga/code/llmcore.py`
+  - `managed-ga/galley-prompts/runtime-v1.md`
+  - `managed-ga/galley-prompts/persona-v1.md`
+  - `managed-ga/patches/manifest.md`
+- Reject generated, local, or secret-bearing artifacts in the managed code
+  payload:
+  - `.DS_Store`
+  - `__pycache__/`
+  - `*.pyc`
+  - `.git/`
+  - venv directories
+  - `.env`
+  - `auth.json`
+  - `mykey.py`
+  - `mykey.json`
+  - root user-state directories such as `memory/`, `skills/`, `temp/`, and
+    `model_responses/`
+
+Acceptance:
+
+- Local release-prep can run `node scripts/check-managed-ga-payload.mjs`.
+- `check.yml` runs the managed GA payload gate on macOS and Windows.
+- `release.yml` runs the same gate before `tauri build`, so bad payloads fail
+  before artifacts are uploaded.
+- The gate does not inspect or require API keys.
+- The gate is structural; it does not replace real managed-mode dogfood.
+
+Do not build:
+
+- A dynamic upstream GA downloader.
+- A runtime marketplace.
+- A production package-size optimizer unless measured bundle size becomes a
+  release blocker.
+
+Current implementation slice:
+
+- `scripts/check-managed-ga-payload.mjs` parses `tauri.conf.json` and
+  `managed-ga/manifest.json`, verifies required files and patch entries, and
+  recursively rejects generated / local / secret / user-state artifacts.
+- `.github/workflows/check.yml` runs the payload gate after frontend lint and
+  before Cargo validation.
+- `.github/workflows/release.yml` runs the payload gate after bundled Python is
+  prepared and before `tauri build`.
+
 ### Milestone Dependencies
 
 Recommended execution order:
 
 ```text
-M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8
+M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9
 ```
 
 Useful parallelism:
@@ -1075,7 +1133,8 @@ Useful parallelism:
 - M4 can start with mocked model records, but cannot ship before M3 credential
   storage and connection testing work.
 - M7 can begin after M1, but its write-path verification needs M5.
-- M8 should accumulate checks throughout, then become the final release gate.
+- M8 should accumulate runtime reliability checks throughout.
+- M9 is the final packaging gate before release ceremony / RC.
 
 Avoid building a general runtime manager, provider marketplace, encrypted key
 export, memory UI, persona UI, or cross-mode session copy before the first
@@ -1099,3 +1158,4 @@ Before shipping managed runtime, verify:
   or other state.
 - Galley backup restores managed sessions and state; API keys require re-entry
   on a new machine.
+- `node scripts/check-managed-ga-payload.mjs` passes locally and in CI.

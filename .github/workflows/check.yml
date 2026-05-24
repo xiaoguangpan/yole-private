@@ -75,6 +75,9 @@ jobs:
         working-directory: ./gui
         run: pnpm lint
 
+      - name: Managed GA payload gate
+        run: node scripts/check-managed-ga-payload.mjs
+
       # tauri-build's build.rs validates that every path in
       # tauri.conf.json's bundle.resources exists at cargo check time
       # (not just at `tauri build` time). `core/python-bundle/python` is

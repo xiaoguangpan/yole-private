@@ -139,6 +139,11 @@ machine should ask the user to re-enter missing managed model credentials.
 The managed-runtime product and upgrade rules live in
 [managed GA runtime](./managed-ga-runtime.md).
 
+Release builds run `node scripts/check-managed-ga-payload.mjs` before packaging.
+That gate verifies the Tauri resource mapping, managed GA manifest, prompt
+files, patch stack, and absence of generated / local / secret-bearing artifacts
+inside `managed-ga/code`.
+
 ## Release Artifacts
 
 Current release path:
