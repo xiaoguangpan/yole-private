@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
+import { ManagedModelOptionPicker } from "@/components/managed-models/ManagedModelOptionPicker";
 import { Button, IconButton } from "@/components/ui/button";
 import {
   listManagedModelOptions,
@@ -252,7 +253,8 @@ export function StepModelConfig({
         apiKey: apiKey.trim(),
         apiBase: apiBase.trim(),
         displayName:
-          providerDisplayNameValue || providerDisplayName(apiBase.trim()),
+          providerDisplayNameValue.trim() ||
+          providerDisplayName(apiBase.trim()),
       });
       await saveModel({
         providerId: provider.id,
@@ -372,22 +374,25 @@ export function StepModelConfig({
         <SetupErrorLine state={state} action="list" />
 
         {modelOptions.length > 0 && (
-          <select
+          <ManagedModelOptionPicker
             value={modelOptions.includes(model) ? model : ""}
-            onChange={(e) => {
-              setModel(e.target.value);
+            options={modelOptions}
+            placeholder={modelCopy.chooseDetectedModel}
+            onChange={(value) => {
+              setModel(value);
               resetConnectionTest();
             }}
-            className="w-full rounded-sm border border-line bg-elevated px-3 py-2 font-mono text-[13px] text-ink outline-none transition-colors focus:border-brand focus:ring-[3px] focus:ring-brand/20"
-          >
-            <option value="">{modelCopy.chooseDetectedModel}</option>
-            {modelOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          />
         )}
+
+        <div className="border-t border-line pt-3">
+          <SetupInput
+            label={modelCopy.providerName}
+            value={providerDisplayNameValue}
+            onChange={setProviderDisplayNameValue}
+            placeholder={modelCopy.providerNamePlaceholder}
+          />
+        </div>
       </div>
 
       <div className="mt-9 flex flex-wrap items-start gap-2">

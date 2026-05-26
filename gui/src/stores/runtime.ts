@@ -31,6 +31,10 @@ import type { IPCCommand } from "@/types/ipc";
  */
 export interface LLMOption {
   index: number;
+  /** Raw runtime name when available. External GA uses this as stable key. */
+  name?: string;
+  /** Stable identity: managed model id or external GA raw LLM name. */
+  key?: string;
   displayName: string;
   isCurrent: boolean;
 }
@@ -70,6 +74,7 @@ export interface PerSessionRuntime {
  */
 export interface RuntimeSeedHints {
   persistedIndex?: number;
+  persistedKey?: string;
   persistedDisplayName?: string;
   /**
    * Cross-session hydrate cache; passed in by setActiveSession so
@@ -208,12 +213,12 @@ export type RuntimeStore = RuntimeState & RuntimeActions;
  * Build a fresh per-session runtime from seed hints. Centralised so
  * `ensureRuntime` and any future setters use identical semantics:
  *
- *   1. If the session has a persisted LLM choice (`selectedLlmIndex`
- *      column → seed.persistedIndex), re-flag `isCurrent` on the
- *      cached list to match it.
- *   2. Otherwise honour the cached list's own `isCurrent` (cross-
+ *   1. If the session has a persisted stable LLM key, re-flag `isCurrent`
+ *      on the cached list to match it.
+ *   2. Else if it only has the legacy persisted index, re-flag by index.
+ *   3. Otherwise honour the cached list's own `isCurrent` (cross-
  *      session hydrate cache = whichever LLM was current last).
- *   3. If no cached list exists at all (first-ever cold start with
+ *   4. If no cached list exists at all (first-ever cold start with
  *      no `llm_list` pref), fall through to DEFAULT_LLMS so the picker
  *      isn't empty during onboarding.
  */
@@ -334,9 +339,18 @@ function buildSeedRuntime(seed: RuntimeSeedHints): PerSessionRuntime {
     };
   }
   const hasPersistedIndex =
+    !seed.persistedKey &&
     seed.persistedIndex !== undefined &&
     cached.some((l) => l.index === seed.persistedIndex);
-  const llms = hasPersistedIndex
+  const hasPersistedKey =
+    seed.persistedKey !== undefined &&
+    cached.some((l) => llmStableKey(l) === seed.persistedKey);
+  const llms = hasPersistedKey
+    ? cached.map((l) => ({
+        ...l,
+        isCurrent: llmStableKey(l) === seed.persistedKey,
+      }))
+    : hasPersistedIndex
     ? cached.map((l) => ({
         ...l,
         isCurrent: l.index === seed.persistedIndex,
@@ -363,6 +377,10 @@ function selectLLMInList(
       isCurrent: l.index === index,
     })),
   };
+}
+
+function llmStableKey(llm: LLMOption): string {
+  return llm.key ?? llm.name ?? llm.displayName;
 }
 
 function makeBridgeHandlers(sessionId: string): BridgeHandlers {
@@ -496,6 +514,7 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
     // restart (routes through the Rust `set_session_llm` trait
     // method for SQLite persistence).
     if (current) {
+      maybeToastMissingSelectedLLM(sid, llms, current);
       void mirrorSelectedLLMOnSession(sid, current).catch((e) => {
         console.debug("[runtime] replaceLLMs session mirror failed.", e);
       });
@@ -574,6 +593,8 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
             readyHandled = true;
             const llms: LLMOption[] = event.availableLLMs.map((l) => ({
               index: l.index,
+              name: l.name,
+              key: l.name,
               displayName: l.displayName,
               isCurrent: l.isCurrent,
             }));
@@ -831,7 +852,33 @@ async function mirrorSelectedLLMOnSession(sid: string, current: LLMOption) {
   // separate persistSession call.
   await useSessionsStore
     .getState()
-    .setSessionLlm(sid, current.index, current.displayName);
+    .setSessionLlm(sid, current.index, llmStableKey(current), current.displayName);
+}
+
+function maybeToastMissingSelectedLLM(
+  sid: string,
+  llms: LLMOption[],
+  current: LLMOption,
+) {
+  const session = useSessionsStore.getState().sessions.find((s) => s.id === sid);
+  const expectedKey = session?.selectedLlmKey;
+  if (!expectedKey) return;
+  const expectedStillExists = llms.some((llm) => llmStableKey(llm) === expectedKey);
+  if (expectedStillExists || llmStableKey(current) === expectedKey) return;
+  const copy = currentCopy();
+  useUiStore.getState().pushToast(
+    makeAppError({
+      id: `llm-selection-fallback-${sid}`,
+      category: "business",
+      severity: "info",
+      title: copy.toasts.modelSelectionChanged,
+      message: copy.toasts.modelSelectionChangedMessage,
+      hint: null,
+      retryable: false,
+      context: "replace_llms",
+      traceback: null,
+    }),
+  );
 }
 
 function shouldCacheLLMListForSession(sid: string): boolean {

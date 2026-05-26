@@ -436,6 +436,7 @@ class Bridge:
         session_id: str,
         cwd: str | None,
         llm_no: int,
+        llm_name: str | None,
         stdout: IO[str],
         stdin: IO[str],
     ) -> None:
@@ -443,6 +444,7 @@ class Bridge:
         self.session_id = session_id
         self.cwd = cwd
         self.llm_no = llm_no
+        self.llm_name = llm_name
         self._stdout = stdout
         self._stdin = stdin
         self.state = SessionState()
@@ -519,7 +521,7 @@ class Bridge:
 
         self.agentmain = agentmain
         self.agent = agentmain.GeneraticAgent()
-        self.agent.next_llm(self.llm_no)
+        self.agent.next_llm(self._initial_llm_index())
         if _is_managed_runtime():
             self._install_managed_prompt_profile()
         # verbose=True enables GA's per-token LLM streaming
@@ -568,6 +570,21 @@ class Bridge:
                 severity="warning",
                 context="setup_ga",
             )
+
+    def _initial_llm_index(self) -> int:
+        if not self.llm_name:
+            return self.llm_no
+        try:
+            for index, name, _ in self.agent.list_llms():
+                if name == self.llm_name:
+                    return int(index)
+        except Exception as e:
+            print(f"Could not resolve LLM name {self.llm_name!r}: {e}", file=sys.stderr)
+        print(
+            f"LLM name {self.llm_name!r} is no longer available; falling back to default",
+            file=sys.stderr,
+        )
+        return 0
 
     def _install_managed_mykey_loader(self) -> None:
         """Patch managed GA's llmcore to read Galley-owned model config.
@@ -1502,6 +1519,7 @@ def main() -> int:
     parser.add_argument("--session-id", required=True)
     parser.add_argument("--cwd", default=None)
     parser.add_argument("--llm-no", type=int, default=0)
+    parser.add_argument("--llm-name", default=None)
     args = parser.parse_args()
 
     ga_path = str(Path(args.ga_path).expanduser().resolve())
@@ -1518,6 +1536,7 @@ def main() -> int:
         session_id=args.session_id,
         cwd=args.cwd,
         llm_no=args.llm_no,
+        llm_name=args.llm_name,
         stdout=real_stdout,
         stdin=real_stdin,
     )

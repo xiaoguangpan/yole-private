@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 
 export interface ComposerLLMOption {
   index: number;
+  key?: string;
+  name?: string;
   displayName: string;
   isCurrent: boolean;
 }

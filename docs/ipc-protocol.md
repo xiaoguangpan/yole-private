@@ -158,6 +158,7 @@ bridge 启动并完成 GA 初始化后**立刻**发的第一条事件。desktop 
 - `gaCommitDate`：HEAD commit 的提交时间（ISO 8601，来自 `git log -1 --format=%cI`）。同样 `"unknown"` 退化处理
 - `llmName`：当前激活的 LLM raw name（GA 内部 `f"{ClassName}/{model}"` 格式）
 - `availableLLMs`：所有可用 LLM 的列表。`name` 是 raw 名字。`displayName` 是 UI 标签：external GA 保留完整 raw name；managed GA 使用 Galley 模型配置里的显示名，未设置时使用原始 model id。
+- session 持久化不要只存 `index`：external GA 使用 `name` 作为稳定身份；managed GA 使用 Galley `managed_models.id`，再在启动时解析到当前 index。
 
 desktop 必须验证 `protocolVersion` 与自身一致；不一致应主动 `shutdown`。
 

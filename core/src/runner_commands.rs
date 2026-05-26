@@ -67,6 +67,10 @@ pub struct SpawnRunnerArgs {
     pub bridge_cwd: String,
     #[serde(default)]
     pub llm_index: Option<i64>,
+    /// Stable model identity. Managed runtime interprets this as
+    /// managed_models.id; external runtime forwards it as GA's raw LLM name.
+    #[serde(default)]
+    pub llm_key: Option<String>,
     /// Extra environment variables as a flat list of [key, value] pairs.
     /// (Object form would mean JS could pass a plain Record<string,string>,
     /// which serde would happily parse — but pair-form is unambiguous and
@@ -92,6 +96,7 @@ impl From<SpawnRunnerArgs> for SpawnArgs {
             cwd: args.cwd.map(PathBuf::from),
             bridge_cwd: PathBuf::from(args.bridge_cwd),
             llm_index: args.llm_index,
+            llm_key: args.llm_key,
             env: args.env,
         }
     }
@@ -192,11 +197,16 @@ pub(crate) async fn prepare_managed_spawn_args(
         }
     })?;
     let mut runtime_models = Vec::new();
+    let requested_model_id = args.llm_key.clone();
+    let mut requested_model_index: Option<i64> = None;
     for model in models {
         let api_key = match credential_store::get_secret(&galley, &model.api_key_ref).await {
             Ok(secret) if !secret.trim().is_empty() => secret,
             _ => continue,
         };
+        if requested_model_id.as_deref() == Some(model.id.as_str()) {
+            requested_model_index = Some(runtime_models.len() as i64);
+        }
         runtime_models.push(ManagedRuntimeModel {
             display_name: model.display_name,
             protocol: model.protocol,
@@ -211,6 +221,14 @@ pub(crate) async fn prepare_managed_spawn_args(
             detail: "no managed model has a usable credential; open Settings -> Models to re-enter the model key".into(),
         });
     }
+    if requested_model_id.is_some() {
+        // The selected managed model may have been deleted or lost its
+        // credential since the session last ran. Falling back to the current
+        // default is safer than reusing the stale numeric index, which could
+        // silently point at a different model after reordering.
+        args.llm_index = requested_model_index;
+    }
+    args.llm_key = None;
 
     let model_config_dir = PathBuf::from(&diagnostics.paths.model_config_dir);
     let model_config_path = model_config_dir.join(managed_model_config::GENERATED_CONFIG_FILENAME);

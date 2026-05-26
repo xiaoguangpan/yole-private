@@ -21,6 +21,7 @@ export interface SessionRow {
   cwd: string | null;
   pinned: number; // 0 / 1
   llm_index: number | null;
+  llm_key: string | null;
   llm_display_name: string | null;
   ga_runtime_kind: "managed" | "external";
   ga_runtime_id: string | null;

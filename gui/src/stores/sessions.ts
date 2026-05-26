@@ -74,6 +74,7 @@ interface SessionBriefWire {
   pinned?: boolean;
   hasUnread?: boolean;
   selectedLlmIndex?: number;
+  selectedLlmKey?: string;
   selectedLlmDisplayName?: string;
   runtimeKind?: RuntimeKind;
   runtimeLabel?: string;
@@ -139,6 +140,7 @@ interface CreateSessionInputWire {
   title: string;
   projectId?: string;
   selectedLlmIndex?: number;
+  selectedLlmKey?: string;
   selectedLlmDisplayName?: string;
   gaRuntimeKind?: RuntimeKind;
   gaRuntimeId?: string;
@@ -209,6 +211,7 @@ function sessionFromBrief(b: SessionBriefWire): Session {
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,
     selectedLlmIndex: b.selectedLlmIndex,
+    selectedLlmKey: b.selectedLlmKey,
     selectedLlmDisplayName: b.selectedLlmDisplayName,
     runtimeKind: b.runtimeKind ?? gaRuntimeKind,
     runtimeLabel:
@@ -303,17 +306,21 @@ interface SessionsActions {
   deleteSessionsPermanentlyBulk: (sessionIds: string[]) => Promise<void>;
   emptyArchive: () => Promise<number>;
   /** Server-side bump on turn_end. Optimistic in-memory update +
-   * fire-and-forget invoke. Mark unread when target isn't active. */
+   * fire-and-forget invoke. Callers decide whether this turn is user-visible
+   * enough to mark unread; intermediate agent-loop steps should only update
+   * progress. */
   bumpSessionAfterTurn: (
     sessionId: string,
     summary?: string,
     stepNumber?: number,
+    markUnread?: boolean,
   ) => void;
   /** Update the persisted per-session LLM choice. Called from
    * runtimeStore.replaceLLMs whenever a bridge picks a current LLM. */
   setSessionLlm: (
     sessionId: string,
     index: number,
+    key: string,
     displayName: string,
   ) => Promise<void>;
 
@@ -450,6 +457,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         : undefined;
     runtimeStore.ensureRuntime(id, {
       persistedIndex: session?.selectedLlmIndex,
+      persistedKey: session?.selectedLlmKey,
       persistedDisplayName:
         runtimeKind === "managed" ? undefined : session?.selectedLlmDisplayName,
       cachedLLMs: managedSeedLLMs ?? runtimeStore.cachedLLMs,
@@ -523,9 +531,11 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       // pick (Empty State LLM picker) wins when present because the
       // user just made a fresh choice that hasn't reached SQLite yet.
       const restoredLlmIndex =
-        !consumePending && !isFreshSession
+        !consumePending && !isFreshSession && !session?.selectedLlmKey
           ? session?.selectedLlmIndex
           : undefined;
+      const restoredLlmKey =
+        !consumePending && !isFreshSession ? session?.selectedLlmKey : undefined;
       // prefsStore is a leaf in the slice DAG (AD-09) — no cycle
       // concern with the cross-store static import block at the
       // top of this file.
@@ -535,6 +545,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         sessionId: id,
         cwd: undefined,
         llmIndex: consumePending ? pendingLLMIndex : restoredLlmIndex,
+        llmKey: restoredLlmKey,
         runtimeKind,
       });
     }
@@ -836,9 +847,9 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
     return archived.length;
   },
 
-  bumpSessionAfterTurn: (sessionId, summary, stepNumber) => {
+  bumpSessionAfterTurn: (sessionId, summary, stepNumber, markUnread = true) => {
     const now = new Date().toISOString();
-    const becameUnread = sessionId !== get().activeSessionId;
+    const becameUnread = markUnread && sessionId !== get().activeSessionId;
     let didUpdate = false;
     set((state) => {
       const { sessions, changed } = patchSessionInList(
@@ -881,7 +892,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
     );
   },
 
-  setSessionLlm: async (sessionId, index, displayName) => {
+  setSessionLlm: async (sessionId, index, key, displayName) => {
     let didUpdate = false;
     set((state) => {
       const { sessions, changed } = patchSessionInList(
@@ -890,6 +901,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         (s) => {
           if (
             s.selectedLlmIndex === index &&
+            s.selectedLlmKey === key &&
             s.selectedLlmDisplayName === displayName
           ) {
             return s;
@@ -898,6 +910,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
           return {
             ...s,
             selectedLlmIndex: index,
+            selectedLlmKey: key,
             selectedLlmDisplayName: displayName,
           };
         },
@@ -909,6 +922,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       await invoke("set_session_llm", {
         id: sessionId,
         index,
+        key,
         displayName,
       });
     } catch (e) {
@@ -1170,6 +1184,7 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
           // persisted LLM fields so the Composer pill / Inspector pick
           // up CLI-driven changes immediately.
           selectedLlmIndex: brief.selectedLlmIndex ?? s.selectedLlmIndex,
+          selectedLlmKey: brief.selectedLlmKey ?? s.selectedLlmKey,
           selectedLlmDisplayName:
             brief.selectedLlmDisplayName ?? s.selectedLlmDisplayName,
           gaRuntimeKind: briefRuntimeKind(brief),

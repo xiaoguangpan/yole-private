@@ -1,4 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   ArrowDown,
   ArrowUp,
@@ -10,7 +11,6 @@ import {
   Eye,
   EyeSlash,
   Info,
-  Key,
   ListMagnifyingGlass,
   MagnifyingGlass,
   PencilSimple,
@@ -24,11 +24,13 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
+import { ManagedModelOptionPicker } from "@/components/managed-models/ManagedModelOptionPicker";
 import {
   SettingsPanelHeader,
   SettingsSectionLabel,
 } from "@/components/screens/settings/settings-ui";
 import { Button, IconButton } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   listManagedModelOptions,
   managedModelProbeErrorMessage,
@@ -36,6 +38,7 @@ import {
   type TimedManagedModelConnectionResult,
 } from "@/lib/managed-models";
 import { useCopy } from "@/lib/i18n";
+import { makeAppError } from "@/types/app-error";
 import {
   advancedOptionsForManagedModelProvider,
   customManagedModelProviderPresetId,
@@ -43,10 +46,12 @@ import {
   getManagedModelProviderPreset,
   managedModelProviderPresetDraft,
   managedModelProtocolLabel,
+  recommendedAdvancedOptionsForManagedModelProvider,
   type ManagedModelProviderPresetId,
 } from "@/lib/managed-model-presets";
 import { cn } from "@/lib/utils";
 import { useManagedModelsStore } from "@/stores/managed-models";
+import { useUiStore } from "@/stores/ui";
 import type {
   ManagedModelProtocol,
   ManagedModelProviderRecord,
@@ -82,6 +87,8 @@ type ModelDraftState = {
   id?: string;
   model: string;
   displayName: string;
+  advancedOptions: Record<string, unknown>;
+  recommendedAdvancedOptions: Record<string, unknown>;
 };
 
 type ModelMoveDirection = "up" | "down";
@@ -153,8 +160,9 @@ export function SettingsModels({
   const [providerFormProbeState, setProviderFormProbeState] =
     useState<ProbeState>({ kind: "idle" });
   const [expandedProviderIds, setExpandedProviderIds] = useState<string[]>([]);
-  const [providerProbeStates, setProviderProbeStates] =
-    useState<ProbeStateMap>({});
+  const [providerProbeStates, setProviderProbeStates] = useState<ProbeStateMap>(
+    {},
+  );
   const [modelProbeStates, setModelProbeStates] = useState<ProbeStateMap>({});
   const [savedModelProbeStates, setSavedModelProbeStates] =
     useState<ProbeStateMap>({});
@@ -200,6 +208,7 @@ export function SettingsModels({
   const providerHasSavedKey =
     !!editingProvider && editingProvider.credentialStatus !== "missing";
   const isCreatingProvider = !!visibleProviderForm && !visibleProviderForm.id;
+  const providerFormIsInlineEdit = !!visibleProviderForm?.id;
   const canSaveProvider =
     !!visibleProviderForm &&
     visibleProviderForm.apiBase.trim() !== "" &&
@@ -217,6 +226,23 @@ export function SettingsModels({
     visibleProviderForm.apiBase.trim() !== "" &&
     visibleProviderForm.apiKey.trim() !== "" &&
     providerFormProbeState.kind !== "loading";
+
+  const showModelConfigSavedToast = () => {
+    useUiStore.getState().pushToast(
+      makeAppError({
+        id: "managed-model-config-saved",
+        category: "business",
+        severity: "info",
+        title: copy.toasts.modelConfigSaved,
+        message: copy.toasts.modelConfigSavedMessage,
+        hint: null,
+        retryable: false,
+        context: "save_managed_model_config",
+        traceback: null,
+        autoDismissMs: 4200,
+      }),
+    );
+  };
 
   const expandProvider = (id: string) => {
     setExpandedProviderIds((current) =>
@@ -276,9 +302,7 @@ export function SettingsModels({
     const providerId = modelDraft?.providerId;
     setModelDraft(null);
     if (providerId) {
-      setModelProbeStates((current) =>
-        withoutProbeState(current, providerId),
-      );
+      setModelProbeStates((current) => withoutProbeState(current, providerId));
     }
   };
 
@@ -374,12 +398,11 @@ export function SettingsModels({
           makeDefault: models.length === 0,
         });
       }
-      setProviderProbeStates((current) =>
-        withoutProbeState(current, saved.id),
-      );
+      setProviderProbeStates((current) => withoutProbeState(current, saved.id));
       setModelProbeStates((current) => withoutProbeState(current, saved.id));
       expandProvider(saved.id);
       resetProviderForm();
+      showModelConfigSavedToast();
     } catch {
       // Store-level error is shown inline.
     }
@@ -440,10 +463,14 @@ export function SettingsModels({
         [provider.id]: result.models,
       }));
       if (result.models.length === 0) {
+        const recommendedAdvancedOptions =
+          recommendedAdvancedOptionsForManagedModelProvider(provider);
         setModelDraft({
           providerId: provider.id,
           model: "",
           displayName: "",
+          advancedOptions: recommendedAdvancedOptions,
+          recommendedAdvancedOptions,
         });
       }
       setModelProbeStates((current) =>
@@ -510,20 +537,13 @@ export function SettingsModels({
     const existingModel = draft.id
       ? models.find((item) => item.id === draft.id)
       : undefined;
-    const draftProvider = providers.find(
-      (item) => item.id === draft.providerId,
-    );
     try {
       await saveModel({
         id: draft.id,
         providerId: draft.providerId,
         model: draft.model,
         displayName: normalizedModelDisplayName(draft),
-        advancedOptions:
-          existingModel?.advancedOptions ??
-          (draftProvider
-            ? advancedOptionsForManagedModelProvider(draftProvider)
-            : undefined),
+        advancedOptions: draft.advancedOptions,
         makeDefault: draft.id
           ? (existingModel?.isDefault ?? false)
           : models.length === 0,
@@ -534,6 +554,7 @@ export function SettingsModels({
         );
       }
       resetModelDraft();
+      showModelConfigSavedToast();
     } catch {
       // Store-level error is shown inline.
     }
@@ -555,6 +576,7 @@ export function SettingsModels({
         advancedOptions: advancedOptionsForManagedModelProvider(provider),
         makeDefault: models.length === 0,
       });
+      showModelConfigSavedToast();
     } catch {
       // Store-level error is shown inline.
     }
@@ -594,6 +616,7 @@ export function SettingsModels({
         makeDefault: true,
       });
       setOptimisticModelIds(null);
+      showModelConfigSavedToast();
     } catch {
       setOptimisticModelIds(null);
       // Store-level error is shown inline.
@@ -695,6 +718,7 @@ export function SettingsModels({
     try {
       await reorderModels(next.map((item) => item.id));
       setOptimisticModelIds(null);
+      showModelConfigSavedToast();
     } catch {
       setOptimisticModelIds(null);
     }
@@ -721,7 +745,7 @@ export function SettingsModels({
         }}
       />
 
-      {visibleProviderForm && (
+      {visibleProviderForm && !providerFormIsInlineEdit && (
         <ProviderEditor
           form={visibleProviderForm}
           saving={saving}
@@ -766,17 +790,39 @@ export function SettingsModels({
                   providerProbeStates,
                   provider.id,
                 )}
-                modelProbeState={probeStateFor(
-                  modelProbeStates,
-                  provider.id,
-                )}
+                modelProbeState={probeStateFor(modelProbeStates, provider.id)}
                 modelOptions={modelOptionsByProvider[provider.id] ?? []}
                 modelFilter={modelFilterByProvider[provider.id] ?? ""}
                 modelDraft={
                   modelDraft?.providerId === provider.id ? modelDraft : null
                 }
+                providerEditor={
+                  visibleProviderForm?.id === provider.id ? (
+                    <ProviderEditor
+                      form={visibleProviderForm}
+                      saving={saving}
+                      canSave={canSaveProvider}
+                      canTest={canTestProvider}
+                      canFetchModels={canFetchProviderFormModels}
+                      canCancel={
+                        providers.length > 0 || !!visibleProviderForm.id
+                      }
+                      providerHasSavedKey={providerHasSavedKey}
+                      probeState={providerFormProbeState}
+                      modelOptions={providerFormModelOptions}
+                      onChange={updateProviderForm}
+                      onSelectProviderPreset={selectProviderPreset}
+                      onTest={() => void handleProviderFormTest()}
+                      onFetchModels={() => void handleProviderFormFetchModels()}
+                      onSave={() => void handleProviderSave()}
+                      onCancel={resetProviderForm}
+                      className="border-brand/30 bg-elevated/65"
+                    />
+                  ) : null
+                }
                 onToggle={() => toggleProvider(provider.id)}
                 onEditProvider={() => {
+                  expandProvider(provider.id);
                   setProviderForm({
                     id: provider.id,
                     providerPresetId: customManagedModelProviderPresetId(
@@ -812,11 +858,24 @@ export function SettingsModels({
                             model.displayName === model.model
                               ? ""
                               : model.displayName,
+                          advancedOptions: model.advancedOptions,
+                          recommendedAdvancedOptions:
+                            recommendedAdvancedOptionsForManagedModelProvider(
+                              provider,
+                            ),
                         }
                       : {
                           providerId: provider.id,
                           model: "",
                           displayName: "",
+                          advancedOptions:
+                            recommendedAdvancedOptionsForManagedModelProvider(
+                              provider,
+                            ),
+                          recommendedAdvancedOptions:
+                            recommendedAdvancedOptionsForManagedModelProvider(
+                              provider,
+                            ),
                         },
                   );
                   setModelProbeStates((current) =>
@@ -872,16 +931,20 @@ function ConfiguredModelsPanel({
   const copy = appCopy.settings.models;
   return (
     <div className="rounded-sm border border-line bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
             {copy.configuredModels}
           </div>
-          <div className="mt-1 text-[12.5px] text-ink-muted">
+          <ModelScopeHint copy={copy} />
+          <span aria-hidden="true" className="text-[11.5px] text-ink-muted/45">
+            ·
+          </span>
+          <span className="text-[12px] text-ink-muted">
             {models.length > 0
               ? copy.enabledModelsCount(models.length)
               : copy.noEnabledModels}
-          </div>
+          </span>
         </div>
         <Button
           variant="primary"
@@ -912,6 +975,52 @@ function ConfiguredModelsPanel({
   );
 }
 
+function ModelScopeHint({
+  copy,
+}: {
+  copy: ReturnType<typeof useCopy>["settings"]["models"];
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <button
+          type="button"
+          aria-label={copy.sessionModelScopeTitle}
+          className={cn(
+            "inline-flex size-5 items-center justify-center rounded-sm border border-transparent",
+            "text-ink-muted transition-[background-color,border-color,color,transform]",
+            "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+            "hover:border-line hover:bg-hover hover:text-ink",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+            "active:translate-y-[0.5px]",
+          )}
+        >
+          <Info size={12} weight="bold" />
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          className={cn(
+            "z-[80] max-w-[300px] rounded-sm border border-line bg-elevated p-2.5",
+            "text-left shadow-elevated",
+          )}
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
+            {copy.sessionModelScopeTitle}
+          </div>
+          <div className="mt-1 text-[11.5px] leading-4 text-ink-soft">
+            {copy.sessionModelScopeHint}
+          </div>
+          <Tooltip.Arrow className="fill-elevated" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
 function ConfiguredModelRow({
   model,
   isDefault,
@@ -937,7 +1046,7 @@ function ConfiguredModelRow({
   return (
     <div
       className={cn(
-        "group flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors duration-150",
+        "group flex min-w-0 items-center gap-3 px-3 py-2 transition-colors duration-150",
         "hover:bg-elevated/55 focus-within:bg-elevated/55",
         swapClass,
       )}
@@ -986,17 +1095,20 @@ function ConfiguredModelRowContent({
           {display.title}
         </div>
         {isDefault && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-brand-soft px-1.5 py-px text-[10.5px] text-brand-strong">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-brand/10 px-1.5 py-px text-[10.5px] leading-4 text-brand-strong/90">
             <Star size={10} weight="fill" />
             {copy.defaultModel}
           </span>
         )}
-        <span className="inline-flex shrink-0 rounded-sm border border-line bg-elevated px-1.5 py-px text-[10.5px] text-ink-muted">
+        <span
+          className="inline-flex max-w-[180px] shrink-0 truncate rounded-sm bg-ink-muted/10 px-1.5 py-px text-[10.5px] leading-4 text-ink-muted/80"
+          title={model.providerDisplayName}
+        >
           {model.providerDisplayName}
         </span>
       </div>
       {display.subtitle && (
-        <div className="mt-0.5 truncate font-mono text-[11.5px] text-ink-muted">
+        <div className="mt-0.5 truncate font-mono text-[11px] text-ink-muted/85">
           {display.subtitle}
         </div>
       )}
@@ -1034,6 +1146,7 @@ function ProviderEditor({
   onFetchModels,
   onSave,
   onCancel,
+  className,
 }: {
   form: ProviderFormState;
   saving: boolean;
@@ -1052,16 +1165,21 @@ function ProviderEditor({
   onFetchModels: () => void;
   onSave: () => void;
   onCancel: () => void;
+  className?: string;
 }) {
   const copy = useCopy().settings.models;
   const isCreatingProvider = !form.id;
   const selectedPreset = getManagedModelProviderPreset(form.providerPresetId);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const apiKeyRevealLabel = apiKeyVisible ? copy.hideApiKey : copy.showApiKey;
 
   return (
-    <div className="rounded-sm border border-line bg-surface px-3 py-3">
+    <div
+      className={cn(
+        "rounded-sm border border-line bg-surface px-3 py-3",
+        className,
+      )}
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[13px] font-medium text-ink">
@@ -1165,44 +1283,22 @@ function ProviderEditor({
             </div>
             <ProbeErrorLine state={probeState} action="model-list" />
             {modelOptions.length > 0 && (
-              <select
+              <ManagedModelOptionPicker
                 value={modelOptions.includes(form.model) ? form.model : ""}
-                onChange={(e) => onChange({ model: e.target.value })}
-                className="w-full rounded-sm border border-line bg-elevated px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors focus:border-brand focus:ring-[3px] focus:ring-brand/20"
-              >
-                <option value="">{copy.chooseDetectedModel}</option>
-                {modelOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+                options={modelOptions}
+                placeholder={copy.chooseDetectedModel}
+                onChange={(model) => onChange({ model })}
+              />
             )}
           </div>
         )}
-        <div className="border-t border-line pt-2">
-          <button
-            type="button"
-            onClick={() => setMoreOpen((open) => !open)}
-            className="inline-flex items-center gap-1 rounded-sm px-0 py-1 text-[12px] text-ink-muted transition-colors hover:text-ink"
-          >
-            {moreOpen ? (
-              <CaretDown size={11} weight="bold" />
-            ) : (
-              <CaretRight size={11} weight="bold" />
-            )}
-            {copy.moreOptions}
-          </button>
-          {moreOpen && (
-            <div className="mt-2">
-              <SettingsInput
-                label={copy.providerName}
-                value={form.displayName}
-                onChange={(displayName) => onChange({ displayName })}
-                placeholder={copy.providerNamePlaceholder}
-              />
-            </div>
-          )}
+        <div className="border-t border-line pt-3">
+          <SettingsInput
+            label={copy.providerName}
+            value={form.displayName}
+            onChange={(displayName) => onChange({ displayName })}
+            placeholder={copy.providerNamePlaceholder}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1261,6 +1357,7 @@ function ProviderCard({
   modelOptions,
   modelFilter,
   modelDraft,
+  providerEditor,
   onToggle,
   onEditProvider,
   onDeleteProvider,
@@ -1289,6 +1386,7 @@ function ProviderCard({
   modelOptions: string[];
   modelFilter: string;
   modelDraft: ModelDraftState | null;
+  providerEditor?: ReactNode;
   onToggle: () => void;
   onEditProvider: () => void;
   onDeleteProvider: () => void;
@@ -1321,24 +1419,24 @@ function ProviderCard({
     option.toLowerCase().includes(normalizedFilter),
   );
   const visibleOptions = filteredOptions.slice(0, 80);
+  const open = expanded || !!providerEditor;
 
   return (
     <div>
       <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">
         <button
           type="button"
-          aria-expanded={expanded}
+          aria-expanded={open}
           className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
           onClick={onToggle}
         >
           <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors group-hover:bg-surface group-hover:text-ink">
-            {expanded ? (
+            {open ? (
               <CaretDown size={12} weight="bold" />
             ) : (
               <CaretRight size={12} weight="bold" />
             )}
           </span>
-          <Key size={16} weight="thin" className="shrink-0 text-ink-soft" />
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span
               className="min-w-0 truncate text-[13px] font-medium text-ink transition-colors group-hover:text-brand-strong"
@@ -1358,8 +1456,14 @@ function ProviderCard({
         </button>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
+            className={cn(
+              "px-2 text-ink-muted",
+              providerProbeState.kind === "loading" &&
+                providerProbeState.action === "provider-test" &&
+                "bg-hover text-ink",
+            )}
             disabled={!canUseProvider}
             onClick={onTestProvider}
             leadingIcon={
@@ -1391,122 +1495,130 @@ function ProviderCard({
         action="provider-test"
         className="px-4 pb-3"
       />
-
-      {expanded && (
+      {open && (
         <div className="border-t border-line bg-elevated/40 px-3 py-3">
           <div className="space-y-3">
-            {keyMissing && <ErrorLine message={copy.keyNeedsResave} />}
+            {providerEditor}
+            {expanded && (
+              <>
+                {keyMissing && <ErrorLine message={copy.keyNeedsResave} />}
 
-            {models.length > 0 ? (
-              <div className="divide-y divide-line border-y border-line">
-                {models.map((model) => (
-                  <EnabledModelRow
-                    key={model.id}
-                    model={model}
-                    isDefault={model.id === defaultModelId}
-                    saving={saving}
-                    keyMissing={keyMissing}
-                    probeState={modelProbeStateFor(model.id)}
-                    onEdit={() => onStartModelDraft(model)}
-                    onSetDefault={() => onSetDefaultModel(model)}
-                    onTest={() => onTestModel(model)}
-                    onDelete={() => onDeleteModel(model)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="border-y border-line py-3 text-[12.5px] text-ink-muted">
-                {copy.noEnabledModels}
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="accent-secondary"
-                size="sm"
-                disabled={!canFetchModels}
-                onClick={onFetchModels}
-                leadingIcon={
-                  modelProbeState.kind === "loading" &&
-                  modelProbeState.action === "model-list" ? (
-                    <span className="spin">
-                      <CircleNotch size={12} weight="thin" />
-                    </span>
-                  ) : (
-                    <ListMagnifyingGlass size={12} weight="thin" />
-                  )
-                }
-              >
-                {copy.fetchModelList}
-              </Button>
-              <InlineProbeStatus state={modelProbeState} action="model-list" />
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={keyMissing || saving}
-                onClick={() => onStartModelDraft()}
-                leadingIcon={<Plus size={12} weight="bold" />}
-              >
-                {copy.addManually}
-              </Button>
-            </div>
-            <ProbeErrorLine state={modelProbeState} action="model-list" />
-
-            {modelOptions.length > 0 && (
-              <div className="space-y-2 border-t border-line pt-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-[12.5px] font-medium text-ink">
-                    {copy.availableModels}
+                {models.length > 0 ? (
+                  <div className="divide-y divide-line border-y border-line">
+                    {models.map((model) => (
+                      <EnabledModelRow
+                        key={model.id}
+                        model={model}
+                        isDefault={model.id === defaultModelId}
+                        saving={saving}
+                        keyMissing={keyMissing}
+                        probeState={modelProbeStateFor(model.id)}
+                        onEdit={() => onStartModelDraft(model)}
+                        onSetDefault={() => onSetDefaultModel(model)}
+                        onTest={() => onTestModel(model)}
+                        onDelete={() => onDeleteModel(model)}
+                      />
+                    ))}
                   </div>
-                  <div className="relative w-full max-w-[260px]">
-                    <MagnifyingGlass
-                      size={12}
-                      weight="thin"
-                      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
-                    />
-                    <input
-                      value={modelFilter}
-                      onChange={(e) => onSetModelFilter(e.target.value)}
-                      placeholder={copy.filterModels}
-                      spellCheck={false}
-                      className="w-full rounded-sm border border-line bg-surface py-1.5 pl-7 pr-2.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
-                    />
-                  </div>
-                </div>
-                <div className="max-h-[260px] divide-y divide-line overflow-auto rounded-sm border border-line bg-surface">
-                  {visibleOptions.length === 0 && (
-                    <EmptyRow text={copy.noMatchingModels} />
-                  )}
-                  {visibleOptions.map((option) => (
-                    <DetectedModelRow
-                      key={option}
-                      modelName={option}
-                      enabled={enabledModelNames.has(option)}
-                      saving={saving}
-                      onEnable={() => onEnableDetectedModel(option)}
-                    />
-                  ))}
-                </div>
-                {filteredOptions.length > visibleOptions.length && (
-                  <div className="text-[11.5px] text-ink-muted">
-                    {copy.visibleOptionsHint(visibleOptions.length)}
+                ) : (
+                  <div className="border-y border-line py-3 text-[12.5px] text-ink-muted">
+                    {copy.noEnabledModels}
                   </div>
                 )}
-              </div>
-            )}
 
-            {modelDraft && (
-              <ModelDraftEditor
-                draft={modelDraft}
-                saving={saving}
-                keyMissing={keyMissing}
-                modelProbeState={modelProbeState}
-                allModelCount={allModelCount}
-                onChange={onChangeModelDraft}
-                onCancel={onCancelModelDraft}
-                onTest={() => onTestModelDraft(modelDraft)}
-                onSave={() => onSaveModelDraft(modelDraft)}
-              />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="accent-secondary"
+                    size="sm"
+                    disabled={!canFetchModels}
+                    onClick={onFetchModels}
+                    leadingIcon={
+                      modelProbeState.kind === "loading" &&
+                      modelProbeState.action === "model-list" ? (
+                        <span className="spin">
+                          <CircleNotch size={12} weight="thin" />
+                        </span>
+                      ) : (
+                        <ListMagnifyingGlass size={12} weight="thin" />
+                      )
+                    }
+                  >
+                    {copy.fetchModelList}
+                  </Button>
+                  <InlineProbeStatus
+                    state={modelProbeState}
+                    action="model-list"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={keyMissing || saving}
+                    onClick={() => onStartModelDraft()}
+                    leadingIcon={<Plus size={12} weight="bold" />}
+                  >
+                    {copy.addManually}
+                  </Button>
+                </div>
+                <ProbeErrorLine state={modelProbeState} action="model-list" />
+
+                {modelOptions.length > 0 && (
+                  <div className="space-y-2 border-t border-line pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[12.5px] font-medium text-ink">
+                        {copy.availableModels}
+                      </div>
+                      <div className="relative w-full max-w-[260px]">
+                        <MagnifyingGlass
+                          size={12}
+                          weight="thin"
+                          className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                        />
+                        <input
+                          value={modelFilter}
+                          onChange={(e) => onSetModelFilter(e.target.value)}
+                          placeholder={copy.filterModels}
+                          spellCheck={false}
+                          className="w-full rounded-sm border border-line bg-surface py-1.5 pl-7 pr-2.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-[260px] divide-y divide-line overflow-auto rounded-sm border border-line bg-surface">
+                      {visibleOptions.length === 0 && (
+                        <EmptyRow text={copy.noMatchingModels} />
+                      )}
+                      {visibleOptions.map((option) => (
+                        <DetectedModelRow
+                          key={option}
+                          modelName={option}
+                          enabled={enabledModelNames.has(option)}
+                          saving={saving}
+                          onEnable={() => onEnableDetectedModel(option)}
+                        />
+                      ))}
+                    </div>
+                    {filteredOptions.length > visibleOptions.length && (
+                      <div className="text-[11.5px] text-ink-muted">
+                        {copy.visibleOptionsHint(visibleOptions.length)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {modelDraft && (
+                  <ModelDraftEditor
+                    draft={modelDraft}
+                    protocol={provider.protocol}
+                    saving={saving}
+                    keyMissing={keyMissing}
+                    modelProbeState={modelProbeState}
+                    allModelCount={allModelCount}
+                    onChange={onChangeModelDraft}
+                    onCancel={onCancelModelDraft}
+                    onTest={() => onTestModelDraft(modelDraft)}
+                    onSave={() => onSaveModelDraft(modelDraft)}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1679,20 +1791,26 @@ function DetectedModelRow({
         {modelName}
       </div>
       {enabled ? (
-        <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] text-success">
-          <CheckCircle size={11} weight="fill" />
+        <span className="inline-flex min-h-8 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent bg-success/[0.06] px-2.5 text-[12px] leading-none text-success">
+          <CheckCircle size={12} weight="fill" />
           {copy.enabled}
         </span>
       ) : (
-        <Button
-          variant="secondary"
-          size="sm"
+        <button
+          type="button"
+          aria-label={`${copy.enable} ${modelName}`}
           disabled={saving}
           onClick={onEnable}
-          leadingIcon={<Plus size={12} weight="bold" />}
+          className={cn(
+            "inline-flex min-h-8 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent px-2.5 text-[12px] leading-none text-ink-muted",
+            "transition-[background-color,border-color,color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+            "hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20 active:translate-y-[0.5px]",
+            "disabled:cursor-not-allowed disabled:opacity-40 disabled:translate-y-0",
+          )}
         >
+          <Plus size={12} weight="bold" />
           {copy.enable}
-        </Button>
+        </button>
       )}
     </div>
   );
@@ -1700,6 +1818,7 @@ function DetectedModelRow({
 
 function ModelDraftEditor({
   draft,
+  protocol,
   saving,
   keyMissing,
   modelProbeState,
@@ -1710,6 +1829,7 @@ function ModelDraftEditor({
   onSave,
 }: {
   draft: ModelDraftState;
+  protocol: ManagedModelProtocol;
   saving: boolean;
   keyMissing: boolean;
   modelProbeState: ProbeState;
@@ -1721,6 +1841,7 @@ function ModelDraftEditor({
 }) {
   const appCopy = useCopy();
   const copy = appCopy.settings.models;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const canTest =
     !keyMissing &&
     draft.model.trim() !== "" &&
@@ -1740,9 +1861,13 @@ function ModelDraftEditor({
             </div>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {appCopy.common.cancel}
-        </Button>
+        <IconButton
+          ariaLabel={copy.closeModelEditor}
+          size="sm"
+          onClick={onCancel}
+        >
+          <X size={12} weight="thin" />
+        </IconButton>
       </div>
       <SettingsInput
         label={copy.modelName}
@@ -1755,6 +1880,14 @@ function ModelDraftEditor({
         value={draft.displayName}
         onChange={(displayName) => onChange({ displayName })}
         placeholder={copy.displayNamePlaceholder}
+      />
+      <AdvancedModelOptions
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        protocol={protocol}
+        options={draft.advancedOptions}
+        recommendedOptions={draft.recommendedAdvancedOptions}
+        onChange={(advancedOptions) => onChange({ advancedOptions })}
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -1797,6 +1930,409 @@ function ModelDraftEditor({
       <ProbeErrorLine state={modelProbeState} action="model-test" />
     </div>
   );
+}
+
+type AdvancedChoiceOption<TValue extends string> = {
+  value: TValue;
+  label: string;
+};
+
+function AdvancedModelOptions({
+  open,
+  onOpenChange,
+  protocol,
+  options,
+  recommendedOptions,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  protocol: ManagedModelProtocol;
+  options: Record<string, unknown>;
+  recommendedOptions: Record<string, unknown>;
+  onChange: (options: Record<string, unknown>) => void;
+}) {
+  const copy = useCopy().settings.models;
+  const effectiveOptions = { ...recommendedOptions, ...options };
+  const customCount = advancedCustomCount(
+    effectiveOptions,
+    recommendedOptions,
+    protocol,
+  );
+
+  const setOption = (key: string, value: string | number | boolean | null) => {
+    const next = { ...effectiveOptions };
+    if (value === null || value === "") {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+    onChange(next);
+  };
+
+  const maxRetries = numberAdvancedOption(
+    effectiveOptions.max_retries,
+    recommendedOptions.max_retries,
+    3,
+  );
+  const readTimeout = numberAdvancedOption(
+    effectiveOptions.read_timeout,
+    recommendedOptions.read_timeout,
+    180,
+  );
+  const stream = booleanAdvancedOption(
+    effectiveOptions.stream,
+    recommendedOptions.stream,
+    true,
+  );
+  const rawApiMode = stringAdvancedOption(
+    effectiveOptions.api_mode,
+    recommendedOptions.api_mode,
+    "chat_completions",
+  );
+  const apiMode: "chat_completions" | "responses" =
+    rawApiMode === "responses" ? "responses" : "chat_completions";
+  const openaiReasoning = stringAdvancedOption(
+    effectiveOptions.reasoning_effort,
+    null,
+    "",
+  ) as "" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  const claudeReasoning = stringAdvancedOption(
+    effectiveOptions.reasoning_effort,
+    null,
+    "",
+  ) as "" | "low" | "medium" | "high" | "xhigh";
+  const rawThinkingType = stringAdvancedOption(
+    effectiveOptions.thinking_type,
+    recommendedOptions.thinking_type,
+    "adaptive",
+  );
+  const thinkingType: "adaptive" | "disabled" =
+    rawThinkingType === "disabled" ? "disabled" : "adaptive";
+  const claudeCodePassthrough = booleanAdvancedOption(
+    effectiveOptions.fake_cc_system_prompt,
+    recommendedOptions.fake_cc_system_prompt,
+    false,
+  );
+
+  return (
+    <div className="rounded-sm border border-line/70 bg-elevated/35">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {open ? (
+            <CaretDown size={12} weight="bold" className="text-ink-muted" />
+          ) : (
+            <CaretRight size={12} weight="bold" className="text-ink-muted" />
+          )}
+          <span className="text-[12.5px] font-medium text-ink">
+            {copy.advancedConfig}
+          </span>
+        </span>
+        <span className="shrink-0 text-[11.5px] text-ink-muted">
+          {customCount > 0
+            ? copy.advancedConfigSetCount(customCount)
+            : copy.advancedConfigUsingRecommended}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-line px-3 py-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdvancedNumberField
+              label={copy.maxRetries}
+              value={maxRetries}
+              min={0}
+              onChange={(value) => setOption("max_retries", value)}
+            />
+            <AdvancedNumberField
+              label={copy.readTimeout}
+              value={readTimeout}
+              min={5}
+              suffix={copy.secondsSuffix}
+              onChange={(value) => setOption("read_timeout", value)}
+            />
+          </div>
+
+          <AdvancedSwitchRow
+            label={copy.streamResponse}
+            checked={stream}
+            onCheckedChange={(checked) => setOption("stream", checked)}
+          />
+
+          {protocol === "openai" ? (
+            <>
+              <AdvancedChoiceField
+                label={copy.apiMode}
+                value={apiMode}
+                options={[
+                  { value: "chat_completions", label: copy.apiModeChat },
+                  { value: "responses", label: copy.apiModeResponses },
+                ]}
+                onChange={(value) => setOption("api_mode", value)}
+              />
+              <AdvancedChoiceField
+                label={copy.reasoningEffort}
+                value={openaiReasoning}
+                options={[
+                  { value: "", label: copy.reasoningDefault },
+                  { value: "none", label: copy.reasoningNone },
+                  { value: "minimal", label: copy.reasoningMinimal },
+                  { value: "low", label: copy.reasoningLow },
+                  { value: "medium", label: copy.reasoningMedium },
+                  { value: "high", label: copy.reasoningHigh },
+                  { value: "xhigh", label: copy.reasoningXHigh },
+                ]}
+                onChange={(value) =>
+                  setOption("reasoning_effort", value || null)
+                }
+              />
+            </>
+          ) : (
+            <>
+              <AdvancedChoiceField
+                label={copy.thinkingType}
+                value={thinkingType}
+                options={[
+                  { value: "adaptive", label: copy.thinkingAdaptive },
+                  { value: "disabled", label: copy.thinkingDisabled },
+                ]}
+                onChange={(value) => setOption("thinking_type", value)}
+              />
+              <AdvancedChoiceField
+                label={copy.reasoningEffort}
+                value={claudeReasoning}
+                options={[
+                  { value: "", label: copy.reasoningDefault },
+                  { value: "low", label: copy.reasoningLow },
+                  { value: "medium", label: copy.reasoningMedium },
+                  { value: "high", label: copy.reasoningHigh },
+                  { value: "xhigh", label: copy.reasoningXHigh },
+                ]}
+                onChange={(value) =>
+                  setOption("reasoning_effort", value || null)
+                }
+              />
+              <AdvancedSwitchRow
+                label={copy.claudeCodePassthrough}
+                checked={claudeCodePassthrough}
+                onCheckedChange={(checked) =>
+                  setOption("fake_cc_system_prompt", checked)
+                }
+                info={copy.claudeCodePassthroughInfo}
+              />
+            </>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0 text-ink-muted"
+            onClick={() => onChange(recommendedOptions)}
+          >
+            {copy.restoreRecommended}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdvancedNumberField({
+  label,
+  value,
+  min,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </span>
+      <span className="relative block">
+        <input
+          type="number"
+          min={min}
+          value={value}
+          onChange={(event) => {
+            const next = Number.parseInt(event.currentTarget.value, 10);
+            if (Number.isFinite(next)) onChange(Math.max(min, next));
+          }}
+          className={cn(
+            "w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors",
+            "placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20",
+            suffix && "pr-12",
+          )}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11.5px] text-ink-muted">
+            {suffix}
+          </span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+function AdvancedChoiceField<TValue extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: TValue;
+  options: AdvancedChoiceOption<TValue>[];
+  onChange: (value: TValue) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {options.map((option) => {
+          const active = option.value === value;
+          return (
+            <button
+              key={option.value || "default"}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "inline-flex min-h-7 items-center rounded-sm border px-2 text-[12px] transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+                active
+                  ? "border-line bg-elevated text-ink shadow-card"
+                  : "border-transparent text-ink-muted hover:bg-hover hover:text-ink",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedSwitchRow({
+  label,
+  checked,
+  onCheckedChange,
+  info,
+}: {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  info?: string;
+}) {
+  return (
+    <div className="flex min-h-8 items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink">
+        <span>{label}</span>
+        {info && <InfoTooltip label={label} text={info} />}
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        ariaLabel={label}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+function InfoTooltip({ label, text }: { label: string; text: string }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="inline-flex size-5 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink"
+        >
+          <Info size={11} weight="bold" />
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="z-[80] max-w-[260px] rounded-sm border border-line bg-elevated p-2 text-[11.5px] leading-4 text-ink-soft shadow-elevated"
+        >
+          {text}
+          <Tooltip.Arrow className="fill-elevated" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
+function advancedCustomCount(
+  options: Record<string, unknown>,
+  recommended: Record<string, unknown>,
+  protocol: ManagedModelProtocol,
+): number {
+  const keys =
+    protocol === "openai"
+      ? ["max_retries", "read_timeout", "stream", "api_mode", "reasoning_effort"]
+      : [
+          "max_retries",
+          "read_timeout",
+          "stream",
+          "thinking_type",
+          "reasoning_effort",
+          "fake_cc_system_prompt",
+        ];
+  return keys.filter((key) => {
+    const current = options[key] ?? null;
+    const baseline = recommended[key] ?? null;
+    return current !== baseline;
+  }).length;
+}
+
+function numberAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: number,
+): number {
+  const raw = value ?? recommended;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function booleanAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: boolean,
+): boolean {
+  const raw = value ?? recommended;
+  return typeof raw === "boolean" ? raw : fallback;
+}
+
+function stringAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: string,
+): string {
+  const raw = value ?? recommended;
+  return typeof raw === "string" ? raw : fallback;
 }
 
 function SettingsInput({
@@ -1930,19 +2466,12 @@ function CredentialBadge({
   status: "present" | "missing" | "unknown";
 }) {
   const copy = useCopy().settings.models;
-  if (status === "present") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-success/10 px-1.5 py-px text-[10.5px] text-success">
-        <CheckCircle size={10} weight="fill" />
-        {copy.keyVerified}
-      </span>
-    );
-  }
+  if (status === "present") return null;
   if (status === "unknown") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-ink-muted/10 px-1.5 py-px text-[10.5px] text-ink-muted">
-        <Key size={10} weight="fill" />
-        {copy.keySaved}
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-warning/10 px-1.5 py-px text-[10.5px] text-warning">
+        <WarningCircle size={10} weight="fill" />
+        {copy.keyStatusUnknownShort}
       </span>
     );
   }
@@ -1964,7 +2493,7 @@ function ProtocolBadge({
   const label = protocolLabel(protocol);
   return (
     <span
-      className="inline-flex shrink-0 rounded-sm border border-line bg-surface/70 px-1.5 py-px font-mono text-[10.5px] text-ink-muted"
+      className="inline-flex max-w-[180px] shrink-0 truncate rounded-sm bg-ink-muted/10 px-1.5 py-px text-[10.5px] leading-4 text-ink-muted/80"
       title={`${label} · ${apiBase}`}
     >
       {label}

@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import type { Project, Session, SessionBucket } from "@/types/session";
 
 type ProjectScopePhase = "entering" | "entered" | "exiting";
+type SidebarAttention = "none" | "error" | "ask_user" | "approval" | "unread";
 
 const GLOBAL_TIMELINE_EXIT_MS = 180;
 const PROJECT_REVIEW_EXIT_MS = 150;
@@ -816,11 +817,11 @@ function SidebarSessionRow({
   // Four-state sidebar display (Stage 3 round 7+10, V0.2 ask_user):
   //   1. running                  — bold brand spinner + italic "正在工作 · 第 N 步" subline
   //   2. pending ask_user         — warning PauseCircle + "⏸ 等你回复" subline (V0.2)
-  //   3. idle  + hasUnread=true   — static icon + brand dot + bold title
-  //   4. idle  + hasUnread=false  — static icon, no dot
+  //   3. settled + hasUnread=true — static icon + brand dot + bold title
+  //   4. settled + hasUnread=false — static icon, no dot
   // Active row is always treated as read (the user is looking at
-  // it); even if turn_end fires there, bumpSessionAfterTurn skips
-  // the unread mark for sessionId === activeSessionId.
+  // it); even if the final turn_end fires there, bumpSessionAfterTurn
+  // skips the unread mark for sessionId === activeSessionId.
   //
   // Pending ask_user takes precedence over hasUnread when both are
   // true (rare — would mean ask_user fired on a session the user
@@ -833,8 +834,20 @@ function SidebarSessionRow({
   // shift so the running state is identifiable at a glance, not
   // just by the icon's rotation.
   const hasPendingAsk = !!session.hasPendingAskUser;
-  const showUnread = !!session.hasUnread && !active && !hasPendingAsk;
   const isRunning = session.status === "running";
+  const hasPendingApproval =
+    session.status === "waiting_approval" || session.pendingApprovalCount > 0;
+  const hasBlockingError = session.status === "error";
+  const showRunningActivity =
+    isRunning && !hasPendingAsk && !hasPendingApproval && !hasBlockingError;
+  const showUnread =
+    !!session.hasUnread && !active && !hasPendingAsk && !isRunning;
+  const attention = resolveSidebarAttention({
+    hasBlockingError,
+    hasPendingAsk,
+    hasPendingApproval,
+    showUnread,
+  });
   // Subline composition:
   //
   //   running + last completed step known → "第 N 步 · {summary}"
@@ -868,7 +881,7 @@ function SidebarSessionRow({
     : null;
   const sublineText = hasPendingAsk
     ? copy.sidebar.pendingAskPrefix
-    : isRunning
+    : showRunningActivity
       ? session.lastStepIndex != null && cleanSummary
         ? copy.sidebar.stepSummary(session.lastStepIndex, cleanSummary)
         : copy.sidebar.thinking
@@ -879,13 +892,34 @@ function SidebarSessionRow({
     <div
       onClick={isEditing ? undefined : onClick}
       className={cn(
-        "mx-1.5 flex min-h-[44px] items-start gap-2 rounded-sm px-3 py-1.5 transition-colors",
+        "relative mx-1.5 grid min-h-[48px] grid-cols-[16px_minmax(0,1fr)_12px] items-start gap-2 overflow-hidden rounded-sm px-3 py-1.5",
+        "transition-[background-color,box-shadow,color]",
         isEditing
           ? "bg-elevated ring-1 ring-brand/30"
-          : cn("cursor-pointer", active ? "bg-selected" : "hover:bg-hover"),
+          : cn(
+              "cursor-pointer",
+              active
+                ? "bg-selected"
+                : showRunningActivity
+                  ? "bg-brand-soft/45 ring-1 ring-brand/10 hover:bg-brand-soft/70"
+                  : "hover:bg-hover",
+            ),
       )}
     >
-      <span className="pt-0.5">
+      {showRunningActivity && !isEditing && (
+        <>
+          <span
+            aria-hidden
+            className="sidebar-liveness-rail absolute bottom-1.5 left-0 top-1.5 w-[2px] rounded-full bg-brand-strong/55"
+          />
+          <span
+            key={`${session.id}:${session.lastStepIndex ?? "thinking"}:${cleanSummary ?? ""}`}
+            aria-hidden
+            className="sidebar-liveness-tick absolute bottom-1.5 left-0 top-1.5 w-[2px] rounded-full bg-brand-strong"
+          />
+        </>
+      )}
+      <span className="flex h-5 w-4 items-center justify-center pt-0.5">
         {hasPendingAsk ? (
           <PauseCircle size={14} weight="fill" className="text-warning" />
         ) : (
@@ -893,7 +927,7 @@ function SidebarSessionRow({
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-5 items-center gap-1.5">
           {isEditing ? (
             <SessionTitleEditor
               initial={session.title}
@@ -904,7 +938,9 @@ function SidebarSessionRow({
             <div
               className={cn(
                 "min-w-0 flex-1 truncate text-[13px] text-ink",
-                showUnread || hasPendingAsk ? "font-semibold" : "font-medium",
+                isRunning || showUnread || hasPendingAsk || hasPendingApproval
+                  ? "font-semibold"
+                  : "font-medium",
               )}
             >
               {session.title}
@@ -919,28 +955,16 @@ function SidebarSessionRow({
               <Cat size={12} weight="thin" />
             </span>
           )}
-          {hasPendingAsk ? (
-            <span
-              aria-label={copy.sidebar.waitingForYou}
-              title={copy.sidebar.gaWaitingForReply}
-              className="size-2 shrink-0 rounded-full bg-warning"
-            />
-          ) : showUnread ? (
-            <span
-              aria-label={copy.sidebar.unread}
-              title={copy.sidebar.newReplyTitle}
-              className="size-2 shrink-0 rounded-full bg-brand"
-            />
-          ) : null}
         </div>
         {sublineText && (
           <div
+            key={`${session.id}:${showRunningActivity ? `running:${session.lastStepIndex ?? "thinking"}:${cleanSummary ?? ""}` : `settled:${sublineText}`}`}
             className={cn(
               "mt-0.5 truncate text-[11px] leading-[1.4]",
               hasPendingAsk
                 ? "font-medium text-warning"
-                : isRunning
-                  ? "font-serif italic text-ink-soft"
+                : showRunningActivity
+                  ? "sidebar-step-tick font-serif italic text-brand-strong/85"
                   : "text-ink-muted",
             )}
           >
@@ -965,6 +989,37 @@ function SidebarSessionRow({
             )}
           </div>
         )}
+      </div>
+      <div className="flex h-5 w-3 items-center justify-center pt-[5px]">
+        {attention === "error" ? (
+          <span
+            aria-label={copy.sidebar.errorBadge(session.errorCount || 1)}
+            title={copy.sidebar.errorBadge(session.errorCount || 1)}
+            className="sidebar-attention-pop size-2 rounded-full bg-error"
+          />
+        ) : attention === "ask_user" ? (
+          <span
+            aria-label={copy.sidebar.waitingForYou}
+            title={copy.sidebar.gaWaitingForReply}
+            className="sidebar-attention-pop size-2 rounded-full bg-warning"
+          />
+        ) : attention === "approval" ? (
+          <span
+            aria-label={copy.sidebar.pendingApprovalBadge(
+              session.pendingApprovalCount || 1,
+            )}
+            title={copy.sidebar.pendingApprovalBadge(
+              session.pendingApprovalCount || 1,
+            )}
+            className="sidebar-attention-pop size-2 rounded-full bg-warning"
+          />
+        ) : attention === "unread" ? (
+          <span
+            aria-label={copy.sidebar.unread}
+            title={copy.sidebar.newReplyTitle}
+            className="sidebar-unread-pop size-2 rounded-full bg-brand"
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -1758,4 +1813,22 @@ function SidebarFooter({
  */
 function stripLegacyStepPrefix(s: string): string {
   return s.replace(/^第\s*\d+\s*步\s*·\s*/, "");
+}
+
+function resolveSidebarAttention({
+  hasBlockingError,
+  hasPendingAsk,
+  hasPendingApproval,
+  showUnread,
+}: {
+  hasBlockingError: boolean;
+  hasPendingAsk: boolean;
+  hasPendingApproval: boolean;
+  showUnread: boolean;
+}): SidebarAttention {
+  if (hasBlockingError) return "error";
+  if (hasPendingAsk) return "ask_user";
+  if (hasPendingApproval) return "approval";
+  if (showUnread) return "unread";
+  return "none";
 }

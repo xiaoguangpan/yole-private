@@ -44,13 +44,12 @@ export interface Session {
   pendingApprovalCount: number;
   errorCount: number;
   /**
-   * "There is new content the user hasn't seen yet." Set when a
-   * turn_end (or `error`) IPC event arrives for a session that is
-   * NOT the active session; cleared when the user activates that
-   * session via the sidebar. Persisted to SQLite (column
-   * `has_unread`) so the inbox-style signal survives app restart.
-   * Orthogonal to the runtime status — see DESIGN.md sidebar three-
-   * way display (running spinner / idle + dot / idle).
+   * "There is a completed reply the user hasn't seen yet." Set when
+   * the final turn_end for a run arrives for a session that is NOT the
+   * active session; cleared when the user activates that session via
+   * the sidebar. Persisted to SQLite (column `has_unread`) so the
+   * inbox-style signal survives app restart. Orthogonal to the runtime
+   * status — the Sidebar suppresses the dot while a run is still active.
    */
   hasUnread?: boolean;
   /**
@@ -94,15 +93,16 @@ export interface Session {
   pinned?: boolean;
 
   /**
-   * Last LLM the user picked for this session (zero-based index into
-   * GA's `agent.list_llms()`). Written on every `replaceLLMs` (bridge
-   * `ready` event with the GA-default LLM marked current, or
-   * `llm_changed` after a successful `set_llm`). Read at activation
-   * time to seed the next bridge respawn with the same LLM —
-   * otherwise GA resets to mykey.py's `is_default=True` entry and the
-   * user's choice is lost on app restart.
+   * Last LLM index reported by the runtime. Kept for bridge command
+   * compatibility and old rows; restore logic prefers `selectedLlmKey`
+   * because indexes drift when model order changes.
    */
   selectedLlmIndex?: number;
+  /**
+   * Stable identity for the selected LLM. Managed runtime stores
+   * `managed_models.id`; external runtime stores GA's raw LLM name.
+   */
+  selectedLlmKey?: string;
   /**
    * Display-name companion to {@link selectedLlmIndex}. Lets the
    * sidebar pill render the persisted label before the freshly

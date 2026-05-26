@@ -79,10 +79,15 @@ pub struct SessionBrief {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_unread: Option<bool>,
     /// Last LLM the user picked for this session (`agent.set_llm` index).
-    /// Restored at bridge respawn so the user's choice survives app
-    /// restart instead of reverting to the GA default in mykey.py.
+    /// Kept for backwards compatibility and for the bridge's index-based
+    /// command surface; new restore paths prefer `selectedLlmKey`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_llm_index: Option<u32>,
+    /// Stable LLM identity for this session. Managed runtime stores
+    /// Galley's `managed_models.id`; external runtime stores GA's raw
+    /// `agent.list_llms()` name. This survives model reordering.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_llm_key: Option<String>,
     /// Display name of the persisted LLM. Cached alongside the index so
     /// the sidebar can label the pill before the bridge ready event
     /// re-confirms with the live `availableLLMs` list.
@@ -136,6 +141,8 @@ pub struct CreateSessionInput {
     pub project_id: Option<String>,
     #[serde(default)]
     pub selected_llm_index: Option<u32>,
+    #[serde(default)]
+    pub selected_llm_key: Option<String>,
     #[serde(default)]
     pub selected_llm_display_name: Option<String>,
     #[serde(default)]

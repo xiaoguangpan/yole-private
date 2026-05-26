@@ -54,7 +54,10 @@
 use crate::api::message::MessageBrief;
 use crate::api::project::{CreateProjectInput, ProjectBrief, ProjectId};
 use crate::api::session::{CreateSessionInput, SessionBrief};
-use crate::api::{GalleyApi, Origin, OriginVia, RuntimeKind, SessionFilter, SessionId};
+use crate::api::{
+    GalleyApi, ManagedModelCredentialStatus, Origin, OriginVia, RuntimeKind, SessionFilter,
+    SessionId,
+};
 use crate::db::SqliteGalley;
 use crate::ipc::{IpcCommand, SetLlmCommand, UserMessageCommand};
 use crate::managed_runtime;
@@ -823,6 +826,7 @@ async fn spawn_args_for_session_new(
     app: Option<&AppHandle>,
     session_id: &str,
     llm_index: Option<u32>,
+    llm_key: Option<String>,
     runtime_kind: RuntimeKind,
 ) -> Result<SpawnArgs, SocketResponseLite> {
     if runtime_kind == RuntimeKind::Managed {
@@ -838,6 +842,7 @@ async fn spawn_args_for_session_new(
             cwd: None,
             bridge_cwd: PathBuf::new(),
             llm_index: llm_index.map(i64::from),
+            llm_key,
             env: Vec::new(),
         };
         return prepare_managed_spawn_args(args, app)
@@ -876,6 +881,7 @@ async fn spawn_args_for_session_new(
         cwd: None,
         bridge_cwd,
         llm_index: llm_index.map(i64::from),
+        llm_key,
         env: Vec::new(),
     })
 }
@@ -1033,14 +1039,6 @@ async fn dispatch_session_new(
         }
     };
 
-    // Resolve --llm=<name> against the cached llm_list pref. CLI is
-    // allowed to omit the flag (selected_llm = None → bridge uses GA's
-    // default at spawn time).
-    let (llm_index, llm_display_name) = match resolve_llm_name(&galley, parsed.llm_name).await {
-        Ok(pair) => pair,
-        Err(resp) => return resp.with_request_id(request_id),
-    };
-
     let active_runtime_kind = match galley.active_runtime_kind().await {
         Ok(kind) => kind,
         Err(e) => return map_galley_err(request_id, e),
@@ -1058,19 +1056,37 @@ async fn dispatch_session_new(
             })
         });
 
-    let id = mint_session_id();
-    let spawn_args =
-        match spawn_args_for_session_new(&galley, app, &id, llm_index, target_runtime_kind).await {
-            Ok(args) => args,
+    // Resolve --llm=<name> against the selected runtime's current model
+    // source. Managed runtime resolves Galley model records; external
+    // runtime resolves the cached raw GA LLM list.
+    let llm_selection =
+        match resolve_llm_selection(&galley, parsed.llm_name, target_runtime_kind).await {
+            Ok(selection) => selection,
             Err(resp) => return resp.with_request_id(request_id),
         };
+
+    let id = mint_session_id();
+    let spawn_args = match spawn_args_for_session_new(
+        &galley,
+        app,
+        &id,
+        llm_selection.index,
+        llm_selection.key.clone(),
+        target_runtime_kind,
+    )
+    .await
+    {
+        Ok(args) => args,
+        Err(resp) => return resp.with_request_id(request_id),
+    };
 
     let input = CreateSessionInput {
         id: id.clone(),
         title: DEFAULT_NEW_SESSION_TITLE.to_string(),
         project_id: parsed.project_id,
-        selected_llm_index: llm_index,
-        selected_llm_display_name: llm_display_name,
+        selected_llm_index: llm_selection.index,
+        selected_llm_key: llm_selection.key,
+        selected_llm_display_name: llm_selection.display_name,
         ga_runtime_kind: Some(target_runtime_kind),
         ga_runtime_id: None,
         prompt_profile: None,
@@ -1478,24 +1494,36 @@ async fn dispatch_session_move(
     }
 }
 
-/// Look up an `--llm=<display-name>` against the cached `llm_list` pref
-/// (the same key GUI's hydrate.ts seeds after a bridge warmup). Returns
-/// `(index, display_name)` on hit; a `SocketResponse` error otherwise.
-///
-/// Resolution rules (sub-plan §1.7):
-///   - `None` input → `Ok((None, None))` — caller didn't supply a flag,
-///     bridge uses GA's default at spawn time.
-///   - `Some(name)` + cache empty → `invalid_args` "llm cache empty;
-///     open Galley GUI once to warmup".
-///   - `Some(name)` + cache populated but name absent → `invalid_args`
-///     "unknown llm '<name>'".
-///   - `Some(name)` + match (case-insensitive) → `Ok((Some(i), Some(n)))`.
-async fn resolve_llm_name(
+struct ResolvedLlmSelection {
+    index: Option<u32>,
+    key: Option<String>,
+    display_name: Option<String>,
+}
+
+async fn resolve_llm_selection(
     galley: &SqliteGalley,
     name: Option<String>,
-) -> Result<(Option<u32>, Option<String>), SocketResponseLite> {
+    runtime_kind: RuntimeKind,
+) -> Result<ResolvedLlmSelection, SocketResponseLite> {
+    match runtime_kind {
+        RuntimeKind::Managed => resolve_managed_llm_name(galley, name).await,
+        RuntimeKind::External => resolve_external_llm_name(galley, name).await,
+    }
+}
+
+/// Look up an external `--llm=<display-name>` against the cached `llm_list`
+/// pref. The stable key is the raw GA LLM name, falling back to display name
+/// for old cache entries.
+async fn resolve_external_llm_name(
+    galley: &SqliteGalley,
+    name: Option<String>,
+) -> Result<ResolvedLlmSelection, SocketResponseLite> {
     let Some(name) = name else {
-        return Ok((None, None));
+        return Ok(ResolvedLlmSelection {
+            index: None,
+            key: None,
+            display_name: None,
+        });
     };
     let cached = match galley.get_pref_json("llm_list").await {
         Ok(v) => v,
@@ -1519,7 +1547,11 @@ async fn resolve_llm_name(
     }
     let target = name.to_lowercase();
     if let Some(entry) = entries.iter().find(|e| e.name.to_lowercase() == target) {
-        Ok((Some(entry.index), Some(entry.name.clone())))
+        Ok(ResolvedLlmSelection {
+            index: Some(entry.index),
+            key: Some(entry.key.clone().unwrap_or_else(|| entry.name.clone())),
+            display_name: Some(entry.name.clone()),
+        })
     } else {
         Err(SocketResponseLite::invalid_args(format!(
             "unknown llm '{name}'; try `galley llm list` to see available"
@@ -1532,6 +1564,53 @@ struct LlmListEntry {
     index: u32,
     #[serde(alias = "displayName")]
     name: String,
+    #[serde(default)]
+    key: Option<String>,
+}
+
+async fn resolve_managed_llm_name(
+    galley: &SqliteGalley,
+    name: Option<String>,
+) -> Result<ResolvedLlmSelection, SocketResponseLite> {
+    let Some(name) = name else {
+        return Ok(ResolvedLlmSelection {
+            index: None,
+            key: None,
+            display_name: None,
+        });
+    };
+    let models = match galley.list_managed_models().await {
+        Ok(models) => models,
+        Err(e) => return Err(SocketResponseLite::from_err(e)),
+    };
+    let target = name.to_lowercase();
+    let mut index = 0_u32;
+    for model in models {
+        if model.credential_status == ManagedModelCredentialStatus::Missing {
+            continue;
+        }
+        let display_name = managed_model_display_name(&model.display_name, &model.model);
+        if display_name.to_lowercase() == target || model.model.to_lowercase() == target {
+            return Ok(ResolvedLlmSelection {
+                index: Some(index),
+                key: Some(model.id),
+                display_name: Some(display_name),
+            });
+        }
+        index += 1;
+    }
+    Err(SocketResponseLite::invalid_args(format!(
+        "unknown managed llm '{name}'; configure it in Settings > Models"
+    )))
+}
+
+fn managed_model_display_name(display_name: &str, model: &str) -> String {
+    let trimmed = display_name.trim();
+    if trimmed.is_empty() {
+        model.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Carrier for errors raised before we know the request_id — bound to
@@ -1859,30 +1938,39 @@ async fn dispatch_llm_set(
         }
     };
 
-    // 1. Resolve display name → index via the cached llm_list pref.
-    //    Reuses the same resolver as `session.new --llm=...` so the two
-    //    surfaces agree on case-insensitive matching + cache-empty
-    //    diagnostics.
-    let (index, display_name) = match resolve_llm_name(&galley, Some(parsed.llm_name.clone())).await
+    // 1. Validate the session exists and use its runtime mode to resolve the
+    //    display name against the correct model source.
+    let sid = SessionId(parsed.session_id.clone());
+    let session = match galley.session_brief(sid.clone()).await {
+        Ok(session) => session,
+        Err(e) => return map_galley_err(request_id, e),
+    };
+    let selection = match resolve_llm_selection(
+        &galley,
+        Some(parsed.llm_name.clone()),
+        session.ga_runtime_kind,
+    )
+    .await
     {
-        Ok((Some(i), Some(n))) => (i, n),
-        Ok(_) => {
-            return SocketResponse::err(
-                request_id,
-                "invalid_args",
-                "llm.set: llm name resolved to empty (cache shape unexpected)",
-            );
-        }
+        Ok(selection) => selection,
         Err(resp) => return resp.with_request_id(request_id),
     };
-
-    // 2. Validate the session exists. set_session_llm itself returns
-    //    NotFound on a missing row, but we surface a clearer error here
-    //    by checking up-front.
-    let sid = SessionId(parsed.session_id.clone());
+    let (Some(index), Some(display_name)) = (selection.index, selection.display_name.clone())
+    else {
+        return SocketResponse::err(
+            request_id,
+            "invalid_args",
+            "llm.set: llm name resolved to empty (cache shape unexpected)",
+        );
+    };
 
     let brief = match galley
-        .set_session_llm(sid, Some(index), Some(display_name.clone()))
+        .set_session_llm(
+            sid,
+            Some(index),
+            selection.key.clone(),
+            Some(display_name.clone()),
+        )
         .await
     {
         Ok(b) => b,

@@ -37,6 +37,11 @@ const MIG_005: &str = include_str!("../../core/migrations/005_add_message_preamb
 const MIG_006: &str = include_str!("../../core/migrations/006_messages_origin.sql");
 const MIG_007: &str = include_str!("../../core/migrations/007_sessions_origin.sql");
 const MIG_008: &str = include_str!("../../core/migrations/008_runtime_identity.sql");
+const MIG_009: &str = include_str!("../../core/migrations/009_managed_models.sql");
+const MIG_010: &str = include_str!("../../core/migrations/010_managed_model_providers.sql");
+const MIG_011: &str = include_str!("../../core/migrations/011_managed_model_sort_order.sql");
+const MIG_012: &str = include_str!("../../core/migrations/012_managed_model_local_secrets.sql");
+const MIG_013: &str = include_str!("../../core/migrations/013_session_llm_key.sql");
 
 async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
     let opts = SqliteConnectOptions::new()
@@ -45,6 +50,7 @@ async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
     let pool = SqlitePool::connect_with(opts).await.expect("open db");
     for sql in [
         MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
+        MIG_009, MIG_010, MIG_011, MIG_012, MIG_013,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)

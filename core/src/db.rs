@@ -977,6 +977,7 @@ struct SessionRow {
     created_at: String,
     updated_at: String,
     llm_index: Option<i64>,
+    llm_key: Option<String>,
     llm_display_name: Option<String>,
     ga_runtime_kind: String,
     ga_runtime_id: Option<String>,
@@ -1007,6 +1008,7 @@ impl SessionRow {
                     }
                 },
             ),
+            selected_llm_key: self.llm_key,
             selected_llm_display_name: self.llm_display_name,
             runtime_kind,
             runtime_label: runtime_kind.label().into(),
@@ -1476,15 +1478,16 @@ async fn insert_session_row_inner(
     sqlx::query(
         "INSERT INTO sessions (id, project_id, title, status, summary, turn_count, \
             pending_approval_count, error_count, pinned, has_unread, \
-            llm_index, llm_display_name, last_activity_at, created_at, updated_at, \
+            llm_index, llm_key, llm_display_name, last_activity_at, created_at, updated_at, \
             created_via, created_by_supervisor, created_origin_note, \
             ga_runtime_kind, ga_runtime_id, prompt_profile) \
-         VALUES (?, ?, ?, 'idle', NULL, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, 'idle', NULL, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(&input.project_id)
     .bind(title)
     .bind(llm_idx)
+    .bind(&input.selected_llm_key)
     .bind(&input.selected_llm_display_name)
     .bind(&now)
     .bind(&now)
@@ -1512,6 +1515,7 @@ async fn insert_session_row_inner(
         pinned: Some(false),
         has_unread: Some(false),
         selected_llm_index: input.selected_llm_index,
+        selected_llm_key: input.selected_llm_key.clone(),
         selected_llm_display_name: input.selected_llm_display_name.clone(),
         runtime_kind,
         runtime_label: runtime_kind.label().into(),
@@ -1673,7 +1677,7 @@ fn project_nullable_patch(field: &Option<Option<String>>) -> (bool, Option<Strin
 
 const SESSIONS_SELECT_COLS: &str = "id, project_id, title, status, summary, turn_count, \
     pinned, has_unread, last_activity_at, created_at, updated_at, \
-    llm_index, llm_display_name, ga_runtime_kind, ga_runtime_id, prompt_profile";
+    llm_index, llm_key, llm_display_name, ga_runtime_kind, ga_runtime_id, prompt_profile";
 
 #[async_trait]
 impl GalleyApi for SqliteGalley {
@@ -2141,15 +2145,17 @@ impl GalleyApi for SqliteGalley {
         &self,
         id: SessionId,
         index: Option<u32>,
+        key: Option<String>,
         display_name: Option<String>,
     ) -> Result<SessionBrief> {
         let now = chrono_now_iso();
         let idx: Option<i64> = index.map(|v| v as i64);
         let res = sqlx::query(
-            "UPDATE sessions SET llm_index = ?, llm_display_name = ?, updated_at = ? \
+            "UPDATE sessions SET llm_index = ?, llm_key = ?, llm_display_name = ?, updated_at = ? \
              WHERE id = ?",
         )
         .bind(idx)
+        .bind(&key)
         .bind(&display_name)
         .bind(&now)
         .bind(id.as_str())

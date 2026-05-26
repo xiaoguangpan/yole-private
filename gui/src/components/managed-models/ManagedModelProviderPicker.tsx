@@ -7,6 +7,7 @@ import {
   MANAGED_MODEL_PROVIDER_PRESETS,
   type ManagedModelProviderPresetId,
 } from "@/lib/managed-model-presets";
+import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ManagedModelProtocol } from "@/types/managed-models";
 
@@ -23,6 +24,7 @@ export function ManagedModelProviderPicker({
   onChange,
   className,
 }: ManagedModelProviderPickerProps) {
+  const copy = useCopy().settings.models;
   const selectedPreset = getManagedModelProviderPreset(value);
 
   return (
@@ -65,17 +67,18 @@ export function ManagedModelProviderPicker({
         >
           {MANAGED_MODEL_PROVIDER_PRESETS.map((preset) => {
             const selected = preset.id === value;
+            const description = providerPresetDescription(copy, preset.id);
             return (
               <Popover.Close asChild key={preset.id}>
                 <button
                   type="button"
                   onClick={() => onChange(preset.id)}
                   className={cn(
-                    "flex w-full min-w-0 items-center gap-2 rounded-sm px-2.5 py-2 text-left outline-none transition-colors hover:bg-hover focus:bg-hover",
+                    "flex w-full min-w-0 items-start gap-2 rounded-sm px-2.5 py-2 text-left outline-none transition-colors hover:bg-hover focus:bg-hover",
                     selected ? "text-ink" : "text-ink-soft",
                   )}
                 >
-                  <span className="flex w-3.5 shrink-0 items-center justify-center">
+                  <span className="mt-0.5 flex w-3.5 shrink-0 items-center justify-center">
                     {selected && (
                       <Check
                         size={12}
@@ -88,6 +91,11 @@ export function ManagedModelProviderPicker({
                     <span className="block truncate text-[12.5px] font-medium">
                       {preset.label}
                     </span>
+                    {description && (
+                      <span className="mt-0.5 block truncate text-[11.5px] leading-4 text-ink-muted">
+                        {description}
+                      </span>
+                    )}
                   </span>
                 </button>
               </Popover.Close>
@@ -97,4 +105,17 @@ export function ManagedModelProviderPicker({
       </Popover.Portal>
     </Popover.Root>
   );
+}
+
+function providerPresetDescription(
+  copy: ReturnType<typeof useCopy>["settings"]["models"],
+  presetId: ManagedModelProviderPresetId,
+): string | null {
+  if (presetId === "custom-openai") {
+    return copy.openaiPresetDescription;
+  }
+  if (presetId === "custom-anthropic") {
+    return copy.anthropicPresetDescription;
+  }
+  return null;
 }

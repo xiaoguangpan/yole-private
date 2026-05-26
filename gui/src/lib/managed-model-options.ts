@@ -29,6 +29,7 @@ export function managedModelsToLLMs(
 
   return usableModels.map((model, index) => ({
     index,
+    key: model.id,
     displayName: model.displayName.trim() || model.model,
     isCurrent: index === selectedIndex,
   }));

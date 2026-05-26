@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
 import type { AgentTurn, Turn } from "@/types/conversation";
 import type { ApprovalDecision } from "@/types/ipc";
 
+const THINKING_ELAPSED_VISIBLE_AFTER_SEC = 3;
+const THINKING_STILL_RUNNING_VISIBLE_AFTER_SEC = 60;
+
 export interface ConversationProps {
   turns: Turn[];
   /** Map of approvalId -> recorded decision. When a tool's
@@ -240,9 +243,9 @@ export function TurnMarker({
    * "· 思考中..." in place of the summary so the user gets a live
    * signal during LLM TTFT / tool dispatch gaps. The whole status
    * line renders as a single sequential opacity wave. An
-   * elapsed-seconds counter joins after 30s so ordinary model latency
-   * stays quiet, while truly long waits read as "system still running"
-   * rather than "system frozen" — see useElapsedSeconds for details.
+   * elapsed-seconds counter joins after 3s: immediate readout feels
+   * mechanical, but waiting longer makes a real model pause feel like
+   * a frozen UI. See useElapsedSeconds for details.
    *
    * Caller is expected to pass `key={index}` when the marker can
    * outlive multiple steps' worth of placeholder transitions, so
@@ -265,7 +268,7 @@ export function TurnMarker({
   const copy = useCopy();
   const elapsedSec = useElapsedSeconds(thinking);
   const elapsedLabel =
-    thinking && elapsedSec >= 30
+    thinking && elapsedSec >= THINKING_ELAPSED_VISIBLE_AFTER_SEC
       ? formatElapsedSeconds(elapsedSec, copy)
       : null;
   const hasStepNumber = index != null;
@@ -285,6 +288,9 @@ export function TurnMarker({
           <ThinkingWaveText
             index={hasStepNumber ? index : undefined}
             elapsedLabel={elapsedLabel}
+            showStillRunning={
+              thinking && elapsedSec >= THINKING_STILL_RUNNING_VISIBLE_AFTER_SEC
+            }
           />
         ) : summary ? (
           <>
@@ -316,9 +322,11 @@ export function TurnMarker({
 function ThinkingWaveText({
   index,
   elapsedLabel,
+  showStillRunning,
 }: {
   index?: number;
   elapsedLabel: string | null;
+  showStillRunning: boolean;
 }) {
   const copy = useCopy();
   const WAVE_STEP_MS = 160;
@@ -326,7 +334,9 @@ function ThinkingWaveText({
   const WAVE_MIN_DURATION_MS = 1300;
   const statusText = `${index != null ? `${copy.conversation.step(index)} · ` : ""}${copy.conversation.thinking}`;
   const elapsedText = elapsedLabel
-    ? ` · ${elapsedLabel} · ${copy.conversation.stillRunning}`
+    ? ` · ${elapsedLabel}${
+        showStillRunning ? ` · ${copy.conversation.stillRunning}` : ""
+      }`
     : "";
   const text = `${statusText}${elapsedText}`;
   const statusTokens = toThinkingWaveTokens(statusText, 0);
@@ -476,10 +486,10 @@ function useElapsedSeconds(active: boolean): number {
 /**
  * Elapsed-time formatter for the thinking placeholder.
  *
- *   30-59s → "32 秒"             (neutral info — "this is how long")
+ *   3-59s  → "32 秒"             (neutral info — "this is how long")
  *   60s+   → "已 1 分 23 秒"     ("已" prefix softens the longer wait,
  *                                  acknowledging the duration without
- *                                  alarming the user)
+ *                                  alarming the user) + "仍在运行"
  *
  * Seconds component always shown past the minute boundary (including
  * "已 1 分 0 秒") so the display ticks continuously each second

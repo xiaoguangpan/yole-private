@@ -33,6 +33,7 @@ const MIG_009: &str = include_str!("../migrations/009_managed_models.sql");
 const MIG_010: &str = include_str!("../migrations/010_managed_model_providers.sql");
 const MIG_011: &str = include_str!("../migrations/011_managed_model_sort_order.sql");
 const MIG_012: &str = include_str!("../migrations/012_managed_model_local_secrets.sql");
+const MIG_013: &str = include_str!("../migrations/013_session_llm_key.sql");
 
 async fn fresh_pool() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
@@ -47,7 +48,7 @@ async fn fresh_pool() -> SqlitePool {
         .expect("enable foreign keys");
     for sql in [
         MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008, MIG_009, MIG_010,
-        MIG_011, MIG_012,
+        MIG_011, MIG_012, MIG_013,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -283,6 +284,7 @@ async fn create_session_happy_path_persists_all_fields() {
                 title: "First session".into(),
                 project_id: None,
                 selected_llm_index: Some(2),
+                selected_llm_key: Some("managed-model-2".into()),
                 selected_llm_display_name: Some("Claude Sonnet 4.6".into()),
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -296,6 +298,7 @@ async fn create_session_happy_path_persists_all_fields() {
     assert_eq!(brief.title, "First session");
     assert!(matches!(brief.status, SessionStatus::Idle));
     assert_eq!(brief.selected_llm_index, Some(2));
+    assert_eq!(brief.selected_llm_key.as_deref(), Some("managed-model-2"));
     assert_eq!(
         brief.selected_llm_display_name.as_deref(),
         Some("Claude Sonnet 4.6")
@@ -319,6 +322,7 @@ async fn create_session_can_snapshot_explicit_external_runtime() {
                 title: "External session".into(),
                 project_id: None,
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: Some(RuntimeKind::External),
                 ga_runtime_id: Some("external-default".into()),
@@ -363,6 +367,7 @@ async fn create_session_persists_origin_creation_triple() {
                 title: "From CLI".into(),
                 project_id: None,
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -396,6 +401,7 @@ async fn create_session_rejects_empty_title() {
                 title: "   ".into(),
                 project_id: None,
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -420,6 +426,7 @@ async fn create_session_id_conflict_returns_invalid_args() {
                 title: "Conflicting".into(),
                 project_id: None,
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -443,6 +450,7 @@ async fn create_session_with_missing_project_rejects() {
                 title: "Has bad project".into(),
                 project_id: Some("proj_does_not_exist".into()),
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -716,10 +724,19 @@ async fn set_session_llm_persists_choice() {
     seed_session_idle(&pool, "s1").await;
     let galley = SqliteGalley::from_pool(pool);
     let brief = galley
-        .set_session_llm(sid("s1"), Some(3), Some("Claude Opus 4.7".into()))
+        .set_session_llm(
+            sid("s1"),
+            Some(3),
+            Some("NativeClaudeSession/claude-opus-4.7".into()),
+            Some("Claude Opus 4.7".into()),
+        )
         .await
         .expect("set llm");
     assert_eq!(brief.selected_llm_index, Some(3));
+    assert_eq!(
+        brief.selected_llm_key.as_deref(),
+        Some("NativeClaudeSession/claude-opus-4.7")
+    );
     assert_eq!(
         brief.selected_llm_display_name.as_deref(),
         Some("Claude Opus 4.7")
@@ -730,16 +747,19 @@ async fn set_session_llm_persists_choice() {
 async fn set_session_llm_clear_with_none() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    sqlx::query("UPDATE sessions SET llm_index = 2, llm_display_name = 'old' WHERE id = 's1'")
+    sqlx::query(
+        "UPDATE sessions SET llm_index = 2, llm_key = 'old-key', llm_display_name = 'old' WHERE id = 's1'",
+    )
         .execute(&pool)
         .await
         .unwrap();
     let galley = SqliteGalley::from_pool(pool);
     let brief = galley
-        .set_session_llm(sid("s1"), None, None)
+        .set_session_llm(sid("s1"), None, None, None)
         .await
         .expect("clear");
     assert!(brief.selected_llm_index.is_none());
+    assert!(brief.selected_llm_key.is_none());
     assert!(brief.selected_llm_display_name.is_none());
 }
 
@@ -748,7 +768,7 @@ async fn set_session_llm_not_found() {
     let pool = fresh_pool().await;
     let galley = SqliteGalley::from_pool(pool);
     let err = galley
-        .set_session_llm(sid("ghost"), Some(1), Some("x".into()))
+        .set_session_llm(sid("ghost"), Some(1), Some("key".into()), Some("x".into()))
         .await
         .expect_err("missing");
     assert!(matches!(err, GalleyError::NotFound { .. }));
@@ -1287,6 +1307,7 @@ async fn tx_commit_persists_both_session_and_message() {
                 title: "From CLI session.new".into(),
                 project_id: None,
                 selected_llm_index: None,
+                selected_llm_key: None,
                 selected_llm_display_name: None,
                 ga_runtime_kind: None,
                 ga_runtime_id: None,
@@ -1361,6 +1382,7 @@ async fn tx_drop_without_commit_rolls_back() {
                     title: "Will be rolled back".into(),
                     project_id: None,
                     selected_llm_index: None,
+                    selected_llm_key: None,
                     selected_llm_display_name: None,
                     ga_runtime_kind: None,
                     ga_runtime_id: None,
@@ -1402,6 +1424,7 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
                     title: "Atomic create".into(),
                     project_id: None,
                     selected_llm_index: None,
+                    selected_llm_key: None,
                     selected_llm_display_name: None,
                     ga_runtime_kind: None,
                     ga_runtime_id: None,

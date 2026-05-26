@@ -68,6 +68,11 @@ pub struct SpawnArgs {
     /// Initial LLM index (forwarded as `--llm-no`). None = runner's
     /// default (the first LLM in mykey.py).
     pub llm_index: Option<i64>,
+    /// Stable LLM identity for runtimes that can resolve by name. For
+    /// external GA this is the raw `agent.list_llms()` name and is
+    /// forwarded as `--llm-name`; managed GA resolves its model id before
+    /// process spawn and clears this field.
+    pub llm_key: Option<String>,
     /// Extra environment variables passed to the child.
     pub env: Vec<(String, String)>,
 }
@@ -134,6 +139,9 @@ impl RunnerProcess {
         }
         if let Some(idx) = args.llm_index {
             cmd.args(["--llm-no", &idx.to_string()]);
+        }
+        if let Some(ref key) = args.llm_key {
+            cmd.args(["--llm-name", key]);
         }
         for (k, v) in &args.env {
             cmd.env(k, v);
@@ -389,6 +397,7 @@ mod tests {
             cwd: None,
             bridge_cwd: PathBuf::from("/no/such/dir/anywhere"),
             llm_index: None,
+            llm_key: None,
             env: vec![],
         };
         match RunnerProcess::spawn(args).await {
@@ -409,6 +418,7 @@ mod tests {
             // to the spawn step.
             bridge_cwd: env::temp_dir(),
             llm_index: None,
+            llm_key: None,
             env: vec![],
         };
         match RunnerProcess::spawn(args).await {

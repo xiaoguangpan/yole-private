@@ -71,6 +71,9 @@ export interface BridgeSpawnArgs {
   bridgeCwd?: string;
   /** Initial LLM index (--llm-no). */
   llmIndex?: number;
+  /** Stable LLM identity. External GA uses the raw `agent.list_llms()` name;
+   * managed GA uses the Galley managed model id. */
+  llmKey?: string;
   /** Extra environment variables passed to the Python child. */
   env?: Record<string, string>;
   /** Runtime profile. External is the legacy attach path. */
@@ -128,6 +131,7 @@ interface SpawnRunnerArgsJson {
   cwd?: string;
   bridgeCwd: string;
   llmIndex?: number;
+  llmKey?: string;
   env: Array<[string, string]>;
   runtimeKind?: RuntimeKind;
   activeSessionId?: string;
@@ -166,6 +170,7 @@ export async function spawnBridge(
     cwd: args.cwd,
     bridgeCwd,
     llmIndex: args.llmIndex,
+    llmKey: args.llmKey,
     env: args.env ? Object.entries(args.env) : [],
     runtimeKind: args.runtimeKind,
   };

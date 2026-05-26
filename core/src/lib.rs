@@ -448,14 +448,16 @@ fn managed_model_advanced_defaults(protocol: api::ManagedModelProtocol) -> serde
             "temperature": 1,
             "max_retries": 3,
             "connect_timeout": 10,
-            "read_timeout": 180
+            "read_timeout": 180,
+            "stream": true
         }),
         api::ManagedModelProtocol::Openai => serde_json::json!({
             "api_mode": "chat_completions",
             "temperature": 1,
             "max_retries": 3,
             "connect_timeout": 10,
-            "read_timeout": 180
+            "read_timeout": 180,
+            "stream": true
         }),
     }
 }
@@ -582,11 +584,12 @@ async fn assign_session_to_project(
 async fn set_session_llm(
     id: SessionId,
     index: Option<u32>,
+    key: Option<String>,
     display_name: Option<String>,
 ) -> std::result::Result<SessionBrief, String> {
     let galley = SqliteGalley::open().await.map_err(stringify_error)?;
     galley
-        .set_session_llm(id, index, display_name)
+        .set_session_llm(id, index, key, display_name)
         .await
         .map_err(stringify_error)
 }
@@ -932,6 +935,12 @@ pub fn run() {
             version: 12,
             description: "add managed model local encrypted secrets",
             sql: include_str!("../migrations/012_managed_model_local_secrets.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 13,
+            description: "add stable per-session LLM identity",
+            sql: include_str!("../migrations/013_session_llm_key.sql"),
             kind: MigrationKind::Up,
         },
     ];

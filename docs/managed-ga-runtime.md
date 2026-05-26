@@ -423,6 +423,7 @@ Anthropic-compatible
 - max_retries: 3
 - connect_timeout: 10
 - read_timeout: 180
+- stream: true
 
 OpenAI-compatible
 - api_mode: chat_completions
@@ -430,12 +431,18 @@ OpenAI-compatible
 - max_retries: 3
 - connect_timeout: 10
 - read_timeout: 180
+- stream: true
 ```
 
-`reasoning_effort`, `max_tokens`, `stream`, provider-specific thinking controls,
-and timeout/retry overrides belong in Settings -> Models -> Advanced. Leave
-`reasoning_effort` unset by default unless a provider preset later has a clear
-product reason to set it.
+Settings -> Models -> model edit exposes a folded Advanced section for
+connection adaptation, not as a full `mykey.py` editor. First-version exposed
+fields are `max_retries`, `read_timeout`, `stream`, OpenAI-compatible
+`api_mode` / `reasoning_effort`, and Anthropic-compatible `thinking_type`,
+`reasoning_effort`, and `fake_cc_system_prompt` surfaced as "Claude Code
+passthrough". `thinking_budget_tokens`, `max_tokens`, `temperature`,
+`context_win`, proxy, TLS verify, user agent, and mixin/fallback stay hidden
+until there is a concrete product flow for them. Leave `reasoning_effort` unset
+by default unless a provider preset later has a clear product reason to set it.
 
 Unsigned beta builds store API keys as encrypted payloads in Galley's SQLite
 database. The database also stores the local encryption key so app-data backups
@@ -1016,6 +1023,10 @@ Current implementation slice:
 - Composer and Command Palette model pickers are runtime-aware: managed mode
   reads Galley's usable managed model records, while attach mode continues to
   read the external GA model cache from bridge `ready` events.
+- Session model persistence uses stable identity, not just list position:
+  managed sessions store `managed_models.id`; external sessions store the raw
+  GA LLM name. The numeric index is retained only to talk to the current
+  bridge and to migrate old rows.
 - New session-facing output includes `runtimeKind` and `runtimeLabel` alongside
   the existing `gaRuntimeKind` / `gaRuntimeId` fields.
 - Explicit cross-runtime `session new` returns a structured

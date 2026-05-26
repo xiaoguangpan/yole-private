@@ -32,6 +32,29 @@ export interface ManagedModelProviderPresetDraft {
   advancedOptions?: Record<string, unknown>;
 }
 
+export function managedModelProtocolAdvancedDefaults(
+  protocol: ManagedModelProtocol,
+): Record<string, unknown> {
+  if (protocol === "openai") {
+    return {
+      api_mode: "chat_completions",
+      temperature: 1,
+      max_retries: 3,
+      connect_timeout: 10,
+      read_timeout: 180,
+      stream: true,
+    };
+  }
+  return {
+    thinking_type: "adaptive",
+    temperature: 1,
+    max_retries: 3,
+    connect_timeout: 10,
+    read_timeout: 180,
+    stream: true,
+  };
+}
+
 export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
   {
     id: "custom-openai",
@@ -60,8 +83,8 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     displayName: "DeepSeek",
     modelPlaceholder: "deepseek-v4-pro",
     advancedOptions: {
-      thinking_type: "enabled",
-      reasoning_effort: "high",
+      thinking_type: "adaptive",
+      max_retries: 3,
       read_timeout: 180,
       stream: true,
     },
@@ -77,6 +100,7 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     advancedOptions: {
       max_retries: 3,
       read_timeout: 180,
+      stream: true,
     },
   },
   {
@@ -90,6 +114,7 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     advancedOptions: {
       fake_cc_system_prompt: true,
       thinking_type: "adaptive",
+      max_retries: 3,
       read_timeout: 180,
       stream: true,
     },
@@ -105,6 +130,7 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     advancedOptions: {
       max_retries: 3,
       read_timeout: 180,
+      stream: true,
     },
   },
   {
@@ -118,7 +144,8 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     advancedOptions: {
       api_mode: "chat_completions",
       max_retries: 3,
-      read_timeout: 120,
+      read_timeout: 180,
+      stream: true,
     },
   },
 ];
@@ -169,6 +196,15 @@ export function advancedOptionsForManagedModelProvider(
       item.apiBase === provider.apiBase,
   );
   return preset?.advancedOptions;
+}
+
+export function recommendedAdvancedOptionsForManagedModelProvider(
+  provider: ManagedModelProviderRecord,
+): Record<string, unknown> {
+  return (
+    advancedOptionsForManagedModelProvider(provider) ??
+    managedModelProtocolAdvancedDefaults(provider.protocol)
+  );
 }
 
 export function managedModelProtocolLabel(

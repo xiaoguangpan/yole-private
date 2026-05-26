@@ -129,13 +129,13 @@ enum ProjectCmd {
 #[derive(Subcommand, Debug)]
 enum LlmCmd {
     /// List LLMs configured in the user's `mykey.py`. Read-only — opens
-    /// SQLite directly. Returns the same `{index, name}` shape the GUI
-    /// caches after a bridge warmup. Empty NDJSON when the cache is
-    /// unwarmed (open the GUI once to populate).
+    /// SQLite directly. Returns the same cached shape the GUI stores after
+    /// a bridge warmup. Empty NDJSON when the cache is unwarmed (open the
+    /// GUI once to populate).
     List,
     /// Pick the LLM for a session by display name (case-insensitive).
-    /// Persists `selectedLlmIndex` + `selectedLlmDisplayName` on the
-    /// session row + best-effort tells the live runner via
+    /// Persists stable `selectedLlmKey` plus the legacy index/display
+    /// companion on the session row + best-effort tells the live runner via
     /// `IpcCommand::SetLlm`. The DB write is the source of truth; the
     /// runner dispatch is opportunistic. `dispatch=dispatched` /
     /// `persisted_only` indicates which path ran.

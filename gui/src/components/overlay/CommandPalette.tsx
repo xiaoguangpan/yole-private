@@ -25,6 +25,8 @@ import "./command-palette.css";
 
 export interface LLMOption {
   index: number;
+  key?: string;
+  name?: string;
   displayName: string;
   isCurrent: boolean;
 }

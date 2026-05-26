@@ -337,7 +337,8 @@ $ galley sessions list --project=proj_demo
 | `updatedAt`       | string (ISO8601)| last metadata write                                                                |
 | `pinned`          | bool?           | sidebar pin. `null` = column never set (treat as `false`); `true` / `false` = explicit |
 | `hasUnread`       | bool?           | new content arrived while session was not the active one (GUI signal; B2+ writes). `null` = never set (treat as `false`) |
-| `selectedLlmIndex` | int?           | persisted per-session LLM index, when set                                          |
+| `selectedLlmIndex` | int?           | legacy per-session LLM index, when set; retained for bridge compatibility          |
+| `selectedLlmKey`  | string?         | stable per-session LLM identity: managed model id or external GA raw LLM name      |
 | `selectedLlmDisplayName` | string?   | cached display name for the persisted LLM selection                                |
 | `runtimeKind`     | string enum     | `managed` / `external`; product-facing alias for CLI callers                       |
 | `runtimeLabel`    | string          | `Galley` / `Attached GenericAgent`                                                 |
@@ -768,8 +769,8 @@ line.
 
 ```bash
 $ galley llm list
-{"index":0,"name":"glm-4.5-x"}
-{"index":1,"name":"claude-opus-4-7"}
+{"index":0,"name":"glm-5.1","key":"NativeClaudeSession/glm-5.1","displayName":"NativeClaudeSession/glm-5.1"}
+{"index":1,"name":"claude-opus-4-7","key":"NativeClaudeSession/claude-opus-4-7","displayName":"NativeClaudeSession/claude-opus-4-7"}
 ```
 
 **Cache-miss is success**: an empty `llm_list` pref returns empty
@@ -788,13 +789,15 @@ effort tells any live runner the new pick. Two-step semantics mirror
 `session send`: DB row is source of truth; runner dispatch is
 opportunistic.
 
-`<llm-name>` is matched case-insensitively against `galley llm list`
-display names — same resolver as `session new --llm=...` so the two
-surfaces stay aligned (sub-plan §1.7).
+`<llm-name>` is matched case-insensitively against the session runtime's
+model list — managed sessions resolve Galley model records; external GA
+sessions resolve `galley llm list` entries. The persisted row keeps
+`selectedLlmKey` so reordering models does not silently point the
+session at a different model.
 
 ```bash
 $ galley llm set sess_abc glm-4.5-x
-{"session":{"id":"sess_abc","selectedLlmIndex":0,"selectedLlmDisplayName":"glm-4.5-x",…},
+{"session":{"id":"sess_abc","selectedLlmIndex":0,"selectedLlmKey":"NativeClaudeSession/glm-4.5-x","selectedLlmDisplayName":"glm-4.5-x",…},
  "dispatch":"dispatched"}
 
 $ galley llm set sess_other glm-4.5-x   # no live bridge
@@ -803,7 +806,7 @@ $ galley llm set sess_other glm-4.5-x   # no live bridge
 
 | Response field | Type           | Notes                                                                                                  |
 | -------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `session`      | `SessionBrief` | Updated row (carries the new `selectedLlmIndex` + `selectedLlmDisplayName`).                           |
+| `session`      | `SessionBrief` | Updated row (carries `selectedLlmKey` plus legacy index/display companions).                            |
 | `dispatch`     | string enum    | `"dispatched"` = live runner received `SetLlm`; `"persisted_only"` = no live runner (DB has the choice). |
 
 **No Origin** flags — mirrors the trait signature: `set_session_llm`
@@ -963,7 +966,7 @@ Trait signatures (Rust types):
 | `set_session_pinned` | `SessionId`, `pinned: bool`, `Origin` | `SessionBrief` |
 | `delete_session` | `SessionId`, `Origin` | `()` |
 | `assign_session_to_project` | `SessionId`, `Option<String>`, `Origin` | `SessionBrief` |
-| `set_session_llm` | `SessionId`, `index: Option<u32>`, `display_name: Option<String>` | `SessionBrief` |
+| `set_session_llm` | `SessionId`, `index: Option<u32>`, `key: Option<String>`, `display_name: Option<String>` | `SessionBrief` |
 | `bump_session_after_turn` | `SessionId`, `Option<String>`, `Option<u32>`, `mark_unread: bool` | `SessionBrief` |
 | `clear_session_unread` | `SessionId` | `()` |
 | `bulk_archive_sessions` | `Vec<SessionId>`, `Origin` | `u32` |
@@ -976,7 +979,7 @@ Trait signatures (Rust types):
 
 Input types (camelCase on the JSON wire):
 
-- `CreateSessionInput { id, title, projectId?, selectedLlmIndex?, selectedLlmDisplayName?, gaRuntimeKind?, gaRuntimeId?, promptProfile? }`
+- `CreateSessionInput { id, title, projectId?, selectedLlmIndex?, selectedLlmKey?, selectedLlmDisplayName?, gaRuntimeKind?, gaRuntimeId?, promptProfile? }`
   — `id` is caller-assigned (`s-<base36>-<rand>` convention; conflicts
   surface as `invalid_args`).
 - `CreateProjectInput { id, name, rootPath?, icon?, color? }` —

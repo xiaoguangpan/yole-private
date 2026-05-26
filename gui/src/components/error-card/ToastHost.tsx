@@ -22,6 +22,11 @@ interface ToastHostProps extends ErrorCardActions {
  * corner under the macOS chrome (the `top-14` value clears the 44px
  * top bar + a bit of padding).
  *
+ * Toasts sit above modal dialogs because they are system feedback,
+ * not content inside the active dialog. The container stays
+ * pointer-events-none so it remains visually present without stealing
+ * the surrounding interaction surface.
+ *
  * Each toast auto-dismisses after `autoDismissMs` (default 6s) unless
  * the user dismisses it manually first.
  */
@@ -32,7 +37,7 @@ export function ToastHost({
   ...actions
 }: ToastHostProps) {
   return (
-    <div className="pointer-events-none fixed right-4 top-14 z-40 flex w-[360px] flex-col gap-2">
+    <div className="pointer-events-none fixed right-4 top-14 z-[90] flex w-[360px] flex-col gap-2">
       {toasts.map((t) => (
         <ToastFrame
           key={t.id}

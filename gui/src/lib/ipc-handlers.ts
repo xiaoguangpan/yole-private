@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { copyForLanguage } from "@/lib/i18n";
 import { resolveLanguagePreference } from "@/lib/language";
+import { managedModelsToLLMs } from "@/lib/managed-model-options";
 import { fromIPCError, makeAppError } from "@/types/app-error";
 import type {
   AgentTurn,
@@ -17,6 +18,7 @@ import type {
 } from "@/types/ipc";
 
 import { useMessagesStore } from "@/stores/messages";
+import { useManagedModelsStore } from "@/stores/managed-models";
 import { usePrefsStore } from "@/stores/prefs";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
@@ -81,13 +83,31 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       // bridge has its own currently-selected LLM. The active session's
       // pair projects up to top-level `llms` / `llmDisplayName` for
       // Composer / Command Palette / Inspector reads.
+      const sessionForRuntime = useSessionsStore
+        .getState()
+        .sessions.find((item) => item.id === event.sessionId);
+      const runtimeKind =
+        sessionForRuntime?.gaRuntimeKind ??
+        usePrefsStore.getState().activeRuntimeKind;
+      const currentIndex = event.availableLLMs.find((l) => l.isCurrent)?.index;
+      const managedLLMs =
+        runtimeKind === "managed"
+          ? managedModelsToLLMs(
+              useManagedModelsStore.getState().models,
+              currentIndex,
+            )
+          : [];
       useRuntimeStore.getState().replaceLLMs(
         event.sessionId,
-        event.availableLLMs.map((l) => ({
-          index: l.index,
-          displayName: l.displayName,
-          isCurrent: l.isCurrent,
-        })),
+        managedLLMs.length > 0
+          ? managedLLMs
+          : event.availableLLMs.map((l) => ({
+              index: l.index,
+              name: l.name,
+              key: l.name,
+              displayName: l.displayName,
+              isCurrent: l.isCurrent,
+            })),
       );
       useRuntimeStore.getState().setBridgeStatus(event.sessionId, "connected");
       // Sync the user's actual GA HEAD into runtimeInfo so the
@@ -122,10 +142,7 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       // SQLite query result so we skip the round-trip for newly
       // created sessions (the common case). For the cold-start case
       // turnCount comes from `loadSessions` during hydrate.
-      const session = useSessionsStore
-        .getState()
-        .sessions.find((x) => x.id === event.sessionId);
-      if (session && (session.turnCount ?? 0) > 0) {
+      if (sessionForRuntime && (sessionForRuntime.turnCount ?? 0) > 0) {
         markHistoryReplayStale(event.sessionId);
         void ensureHistoryReplayComplete(event.sessionId);
       }
@@ -207,9 +224,18 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       // the per-message step (matches what the user sees in the
       // main view). turn_count itself keeps incrementing in
       // absolute terms — that's the offset's source of truth.
+      //
+      // Unread is a completed-reply signal, not an intermediate-step
+      // signal. GA emits turn_end for every loop step; only the final
+      // one carries exitReason and is followed by run_complete.
       useSessionsStore
         .getState()
-        .bumpSessionAfterTurn(event.sessionId, event.summary, event.turnIndex);
+        .bumpSessionAfterTurn(
+          event.sessionId,
+          event.summary,
+          event.turnIndex,
+          event.exitReason != null,
+        );
       // SQLite: persist under the ABSOLUTE turn index. rowsToTurns
       // reconstructs the per-message step at restore by tracking
       // the latest user row's turn_index as a per-message base.

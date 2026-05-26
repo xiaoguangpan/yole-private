@@ -173,9 +173,10 @@ pub trait GalleyApi: Send + Sync {
         origin: Origin,
     ) -> Result<SessionBrief>;
 
-    /// Persist a session's per-bridge LLM choice. Pass `index = None`
-    /// to clear (covers the rare case of a user removing their picked
-    /// LLM from mykey.py while a stored choice still points at it).
+    /// Persist a session's per-bridge LLM choice. `key` is the stable
+    /// identity: managed runtime stores `managed_models.id`, external
+    /// runtime stores GA's raw LLM name. `index` is retained for
+    /// backwards compatibility and the bridge's current index command.
     ///
     /// No `origin` parameter — `replaceLLMs` fires this every time the
     /// bridge emits a `ready` event or the user picks a new LLM, both
@@ -187,6 +188,7 @@ pub trait GalleyApi: Send + Sync {
         &self,
         id: SessionId,
         index: Option<u32>,
+        key: Option<String>,
         display_name: Option<String>,
     ) -> Result<SessionBrief>;
 
