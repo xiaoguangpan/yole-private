@@ -184,6 +184,11 @@ const zhCopy = {
       healthDescription:
         "不知道哪儿出问题了？跑一次完整体检 —— 重新探测 Python 解释器、检查 GA 路径和必要文件。",
       runHealthCheck: "跑一次 Health Check",
+      setupAssistant: "设置向导",
+      setupAssistantDescription:
+        "重新走一遍首次设置流程，检查 Runtime、模型和 Health Check。现有对话会保留。",
+      openSetupAssistant: "打开设置向导...",
+      setupAssistantRunningBlock: "有任务运行时暂时不能打开设置向导。",
       bundledPythonDetail: "Galley 内置 · 已附带 GA 依赖，零配置可用",
       useExternalPython: "使用外部 Python…",
       externalPythonHint: "外部 Python · 改变后用下方 Re-run 重新探测",
@@ -248,6 +253,17 @@ const zhCopy = {
       showApiKey: "显示 API Key",
       hideApiKey: "隐藏 API Key",
       testConnection: "测试连接",
+      connectionLatency: (message: string, latencyMs: number) =>
+        `${message} · ${latencyMs} ms`,
+      errorUnauthorized: "401 未授权：模型密钥不正确，或没有访问这个模型的权限。",
+      errorForbidden: "403 权限不足：当前 Key 不能访问这个服务或模型。",
+      errorRateLimited: "429 请求过多：稍后重试，或检查额度和限流设置。",
+      errorNotFound: "404 未找到：API 地址或模型名可能不匹配。",
+      errorServer: (status: number) =>
+        `${status} 服务异常：模型服务暂时不可用，稍后再试。`,
+      errorTimeout: "连接超时：模型服务没有及时响应，请检查网络或代理。",
+      errorNetwork: "网络不可达：请检查 API 地址、网络连接或代理。",
+      errorUnknownWithDetail: (detail: string) => `连接失败：${detail}`,
       modelName: "模型名",
       modelNamePlaceholder: "例如 anthropic/claude-sonnet-4.5",
       displayName: "显示名称",
@@ -256,6 +272,8 @@ const zhCopy = {
       closeProviderEditor: "关闭模型提供商编辑",
       editProviderAria: "编辑模型提供商",
       deleteProviderAria: "删除模型提供商",
+      editProviderAction: "编辑",
+      deleteProviderAction: "删除",
       editModel: "编辑模型",
       removeModel: "移除模型",
       setupComplete: "配置完成",
@@ -266,6 +284,7 @@ const zhCopy = {
       enabledModelsCount: (count: number) => `${count} 个模型`,
       noEnabledModels: "还没有启用模型",
       defaultModel: "默认",
+      defaultModelStatus: "默认模型",
       moveUp: (name: string) => `上移 ${name}`,
       moveDown: (name: string) => `下移 ${name}`,
       saveService: "保存服务",
@@ -420,8 +439,10 @@ const zhCopy = {
     modelSubtitle: "填入你的模型 API Key 和 API 地址。",
     connectExistingButton: "接入已有的 GenericAgent",
     testAndStart: "测试并开始使用 Galley",
+    startUsingGalley: "开始使用 Galley",
     attachTitle: "接入已经安装的 GenericAgent",
     attachSubtitle: "指向你本地的 GA 安装目录 · Galley 会用它启动 GA。",
+    gaPathLabel: "GA 路径",
     foundGA: "找到 GA 安装",
     agentmainVisible: "agentmain.py 可见",
     pathMissingAgentmain:
@@ -430,7 +451,6 @@ const zhCopy = {
     checking: "检查中…",
     downloadGuide: "查看教程：下载 GA",
     folderGuide: "查看教程：选对 GA 目录",
-    needGA: "还没装 GenericAgent？前往安装",
     healthTitle: "检查 GA 运行环境",
     healthSubtitle: "全部通过后才能进入主界面 · Galley 不会修改你的 GA。",
     skipLLMTest:
@@ -438,6 +458,7 @@ const zhCopy = {
     rerunChecks: "重新检查",
     enterGalley: "进入 Galley",
     backToSettings: "返回设置",
+    continueWithCurrentModel: "继续使用当前模型",
     tutorialDownloadGA: "查看教程：下载 GA",
     tutorialChooseFolder: "查看教程：选对目录",
     tutorialMyKey: "查看教程：配置 API 密钥",
@@ -870,6 +891,12 @@ const enCopy: AppCopy = {
       healthDescription:
         "Not sure what is wrong? Run a full Health Check to re-detect Python, verify the GA folder, and check required files.",
       runHealthCheck: "Run Health Check",
+      setupAssistant: "Setup Assistant",
+      setupAssistantDescription:
+        "Run through first-time setup again to review Runtime, models, and Health Check. Your conversations stay in place.",
+      openSetupAssistant: "Open Setup Assistant...",
+      setupAssistantRunningBlock:
+        "Setup Assistant is unavailable while a task is running.",
       bundledPythonDetail: "Bundled with Galley · GA dependencies included",
       useExternalPython: "Use external Python...",
       externalPythonHint:
@@ -936,6 +963,22 @@ const enCopy: AppCopy = {
       showApiKey: "Show API Key",
       hideApiKey: "Hide API Key",
       testConnection: "Test connection",
+      connectionLatency: (message, latencyMs) => `${message} · ${latencyMs} ms`,
+      errorUnauthorized:
+        "401 Unauthorized: the API Key is invalid or cannot access this model.",
+      errorForbidden:
+        "403 Forbidden: this key cannot access the service or model.",
+      errorRateLimited:
+        "429 Rate limited: try again later, or check quota and rate limits.",
+      errorNotFound:
+        "404 Not found: the API URL or model name may not match.",
+      errorServer: (status) =>
+        `${status} service error: the model service is temporarily unavailable.`,
+      errorTimeout:
+        "Connection timed out: the model service did not respond in time.",
+      errorNetwork:
+        "Network error: check the API URL, network connection, or proxy.",
+      errorUnknownWithDetail: (detail) => `Connection failed: ${detail}`,
       modelName: "Model name",
       modelNamePlaceholder: "e.g. anthropic/claude-sonnet-4.5",
       displayName: "Display name",
@@ -944,6 +987,8 @@ const enCopy: AppCopy = {
       closeProviderEditor: "Close model provider editor",
       editProviderAria: "Edit model provider",
       deleteProviderAria: "Delete model provider",
+      editProviderAction: "Edit",
+      deleteProviderAction: "Delete",
       editModel: "Edit model",
       removeModel: "Remove model",
       setupComplete: "Setup complete",
@@ -954,6 +999,7 @@ const enCopy: AppCopy = {
       enabledModelsCount: (count) => `${count} model${count === 1 ? "" : "s"}`,
       noEnabledModels: "No enabled models yet",
       defaultModel: "Default",
+      defaultModelStatus: "Default model",
       moveUp: (name) => `Move ${name} up`,
       moveDown: (name) => `Move ${name} down`,
       saveService: "Save service",
@@ -1114,9 +1160,11 @@ const enCopy: AppCopy = {
     modelSubtitle: "Enter your model API Key and API URL.",
     connectExistingButton: "Connect existing GenericAgent",
     testAndStart: "Test and start using Galley",
+    startUsingGalley: "Start using Galley",
     attachTitle: "Connect an existing GenericAgent",
     attachSubtitle:
       "Point Galley to your local GA folder. Galley will use it to start GA.",
+    gaPathLabel: "GA Folder",
     foundGA: "Found GA installation",
     agentmainVisible: "agentmain.py visible",
     pathMissingAgentmain:
@@ -1125,7 +1173,6 @@ const enCopy: AppCopy = {
     checking: "Checking...",
     downloadGuide: "Open guide: download GA",
     folderGuide: "Open guide: choose the GA folder",
-    needGA: "Need GenericAgent? Open install page",
     healthTitle: "Check GA runtime",
     healthSubtitle:
       "All checks must pass before entering Galley. Galley will not modify your GA.",
@@ -1134,6 +1181,7 @@ const enCopy: AppCopy = {
     rerunChecks: "Re-run checks",
     enterGalley: "Enter Galley",
     backToSettings: "Back to Settings",
+    continueWithCurrentModel: "Continue with current model",
     tutorialDownloadGA: "Open guide: download GA",
     tutorialChooseFolder: "Open guide: choose the right folder",
     tutorialMyKey: "Open guide: configure API key",

@@ -1,3 +1,4 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ArrowDown,
   ArrowUp,
@@ -5,6 +6,7 @@ import {
   CaretRight,
   CheckCircle,
   CircleNotch,
+  DotsThreeVertical,
   Eye,
   EyeSlash,
   Info,
@@ -29,7 +31,9 @@ import {
 import { Button, IconButton } from "@/components/ui/button";
 import {
   listManagedModelOptions,
-  testManagedModelConnection,
+  managedModelProbeErrorMessage,
+  testManagedModelConnectionWithLatency,
+  type TimedManagedModelConnectionResult,
 } from "@/lib/managed-models";
 import { useCopy } from "@/lib/i18n";
 import {
@@ -44,23 +48,23 @@ import {
 import { cn } from "@/lib/utils";
 import { useManagedModelsStore } from "@/stores/managed-models";
 import type {
-  ManagedModelConnectionResult,
   ManagedModelProtocol,
   ManagedModelProviderRecord,
   ManagedModelRecord,
 } from "@/types/managed-models";
 import type { RuntimeKind } from "@/types/session";
 
+type ProbeAction = "provider-test" | "model-list" | "model-test";
+
 type ProbeState =
   | { kind: "idle" }
-  | { kind: "loading"; action: "provider-test" | "model-list" | "model-test" }
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string };
+  | { kind: "loading"; action: ProbeAction }
+  | { kind: "success"; action: ProbeAction; message: string }
+  | { kind: "error"; action: ProbeAction; message: string };
 
-type ScopedProbeState = {
-  id: string;
-  state: ProbeState;
-};
+type ProbeStateMap = Record<string, ProbeState>;
+
+const idleProbeState: ProbeState = { kind: "idle" };
 
 type ProviderFormState = {
   id?: string;
@@ -105,6 +109,25 @@ function providerFormFromPreset(
   };
 }
 
+function probeStateFor(states: ProbeStateMap, id: string): ProbeState {
+  return states[id] ?? idleProbeState;
+}
+
+function withProbeState(
+  states: ProbeStateMap,
+  id: string,
+  state: ProbeState,
+): ProbeStateMap {
+  return { ...states, [id]: state };
+}
+
+function withoutProbeState(states: ProbeStateMap, id: string): ProbeStateMap {
+  if (!(id in states)) return states;
+  const next = { ...states };
+  delete next[id];
+  return next;
+}
+
 export function SettingsModels({
   activeRuntimeKind = "managed",
 }: {
@@ -130,15 +153,11 @@ export function SettingsModels({
   const [providerFormProbeState, setProviderFormProbeState] =
     useState<ProbeState>({ kind: "idle" });
   const [expandedProviderIds, setExpandedProviderIds] = useState<string[]>([]);
-  const [collapsedProviderIds, setCollapsedProviderIds] = useState<string[]>(
-    [],
-  );
-  const [providerProbeState, setProviderProbeState] =
-    useState<ScopedProbeState | null>(null);
-  const [modelProbeState, setModelProbeState] =
-    useState<ScopedProbeState | null>(null);
-  const [savedModelProbeState, setSavedModelProbeState] =
-    useState<ScopedProbeState | null>(null);
+  const [providerProbeStates, setProviderProbeStates] =
+    useState<ProbeStateMap>({});
+  const [modelProbeStates, setModelProbeStates] = useState<ProbeStateMap>({});
+  const [savedModelProbeStates, setSavedModelProbeStates] =
+    useState<ProbeStateMap>({});
   const [modelOptionsByProvider, setModelOptionsByProvider] = useState<
     Record<string, string[]>
   >({});
@@ -164,7 +183,6 @@ export function SettingsModels({
     [models, optimisticModelIds],
   );
 
-  const defaultModel = orderedModels[0];
   const modelsByProvider = useMemo(() => {
     const grouped: Record<string, ManagedModelRecord[]> = {};
     for (const model of orderedModels) {
@@ -173,8 +191,6 @@ export function SettingsModels({
     }
     return grouped;
   }, [orderedModels]);
-  const defaultExpandedProviderId =
-    defaultModel?.providerId ?? providers[0]?.id;
   const visibleProviderForm =
     providerForm ??
     (!loading && providers.length === 0 ? newProviderForm() : null);
@@ -206,22 +222,14 @@ export function SettingsModels({
     setExpandedProviderIds((current) =>
       current.includes(id) ? current : [...current, id],
     );
-    setCollapsedProviderIds((current) => current.filter((item) => item !== id));
   };
 
-  const isProviderExpanded = (id: string) =>
-    expandedProviderIds.includes(id) ||
-    (expandedProviderIds.length === 0 &&
-      collapsedProviderIds.length === 0 &&
-      id === defaultExpandedProviderId);
+  const isProviderExpanded = (id: string) => expandedProviderIds.includes(id);
 
   const toggleProvider = (id: string) => {
     if (isProviderExpanded(id)) {
       setExpandedProviderIds((current) =>
         current.filter((item) => item !== id),
-      );
-      setCollapsedProviderIds((current) =>
-        current.includes(id) ? current : [...current, id],
       );
       return;
     }
@@ -265,33 +273,45 @@ export function SettingsModels({
   };
 
   const resetModelDraft = () => {
+    const providerId = modelDraft?.providerId;
     setModelDraft(null);
-    setModelProbeState(null);
+    if (providerId) {
+      setModelProbeStates((current) =>
+        withoutProbeState(current, providerId),
+      );
+    }
   };
 
   const handleProviderFormTest = async () => {
     if (!visibleProviderForm || !canTestProvider) return;
+    const testModel = visibleProviderForm.model.trim();
     setProviderFormProbeState({
       kind: "loading",
       action: "provider-test",
     });
     try {
-      const result = await testManagedModelConnection({
+      const result = await testManagedModelConnectionWithLatency({
         id: visibleProviderForm.id,
         providerId: visibleProviderForm.id,
         protocol: visibleProviderForm.protocol,
         apiKey: visibleProviderForm.apiKey || undefined,
         apiBase: visibleProviderForm.apiBase,
-        model: visibleProviderForm.model.trim() || undefined,
+        model: testModel || undefined,
       });
       setProviderFormProbeState({
         kind: "success",
-        message: connectionSuccessMessage(result, "setup-model", modelCopy),
+        action: "provider-test",
+        message: connectionSuccessMessage(
+          result,
+          testModel ? "setup-model" : "provider",
+          modelCopy,
+        ),
       });
     } catch (e) {
       setProviderFormProbeState({
         kind: "error",
-        message: errorMessage(e, modelCopy),
+        action: "provider-test",
+        message: managedModelProbeErrorMessage(e, modelCopy),
       });
     }
   };
@@ -319,6 +339,7 @@ export function SettingsModels({
       }
       setProviderFormProbeState({
         kind: "success",
+        action: "model-list",
         message:
           result.models.length > 0
             ? modelCopy.foundModels(result.models.length)
@@ -327,7 +348,8 @@ export function SettingsModels({
     } catch (e) {
       setProviderFormProbeState({
         kind: "error",
-        message: errorMessage(e, modelCopy),
+        action: "model-list",
+        message: managedModelProbeErrorMessage(e, modelCopy),
       });
     }
   };
@@ -352,6 +374,10 @@ export function SettingsModels({
           makeDefault: models.length === 0,
         });
       }
+      setProviderProbeStates((current) =>
+        withoutProbeState(current, saved.id),
+      );
+      setModelProbeStates((current) => withoutProbeState(current, saved.id));
       expandProvider(saved.id);
       resetProviderForm();
     } catch {
@@ -362,40 +388,47 @@ export function SettingsModels({
   const handleProviderTest = async (provider: ManagedModelProviderRecord) => {
     if (provider.credentialStatus === "missing") return;
     const providerTestModel = (modelsByProvider[provider.id] ?? [])[0]?.model;
-    setProviderProbeState({
-      id: provider.id,
-      state: { kind: "loading", action: "provider-test" },
-    });
+    setProviderProbeStates((current) =>
+      withProbeState(current, provider.id, {
+        kind: "loading",
+        action: "provider-test",
+      }),
+    );
     try {
-      const result = await testManagedModelConnection({
+      const result = await testManagedModelConnectionWithLatency({
         id: provider.id,
         providerId: provider.id,
         protocol: provider.protocol,
         apiBase: provider.apiBase,
         model: providerTestModel,
       });
-      setProviderProbeState({
-        id: provider.id,
-        state: {
+      setProviderProbeStates((current) =>
+        withProbeState(current, provider.id, {
           kind: "success",
+          action: "provider-test",
           message: connectionSuccessMessage(result, "provider", modelCopy),
-        },
-      });
+        }),
+      );
     } catch (e) {
-      setProviderProbeState({
-        id: provider.id,
-        state: { kind: "error", message: errorMessage(e, modelCopy) },
-      });
+      setProviderProbeStates((current) =>
+        withProbeState(current, provider.id, {
+          kind: "error",
+          action: "provider-test",
+          message: managedModelProbeErrorMessage(e, modelCopy),
+        }),
+      );
     }
   };
 
   const handleFetchModels = async (provider: ManagedModelProviderRecord) => {
     if (provider.credentialStatus === "missing") return;
     expandProvider(provider.id);
-    setModelProbeState({
-      id: provider.id,
-      state: { kind: "loading", action: "model-list" },
-    });
+    setModelProbeStates((current) =>
+      withProbeState(current, provider.id, {
+        kind: "loading",
+        action: "model-list",
+      }),
+    );
     try {
       const result = await listManagedModelOptions({
         providerId: provider.id,
@@ -413,21 +446,24 @@ export function SettingsModels({
           displayName: "",
         });
       }
-      setModelProbeState({
-        id: provider.id,
-        state: {
+      setModelProbeStates((current) =>
+        withProbeState(current, provider.id, {
           kind: "success",
+          action: "model-list",
           message:
             result.models.length > 0
               ? modelCopy.foundModels(result.models.length)
               : modelCopy.connectedNoModels,
-        },
-      });
+        }),
+      );
     } catch (e) {
-      setModelProbeState({
-        id: provider.id,
-        state: { kind: "error", message: errorMessage(e, modelCopy) },
-      });
+      setModelProbeStates((current) =>
+        withProbeState(current, provider.id, {
+          kind: "error",
+          action: "model-list",
+          message: managedModelProbeErrorMessage(e, modelCopy),
+        }),
+      );
     }
   };
 
@@ -438,33 +474,39 @@ export function SettingsModels({
     if (provider.credentialStatus === "missing" || draft.model.trim() === "") {
       return;
     }
-    setModelProbeState({
-      id: provider.id,
-      state: { kind: "loading", action: "model-test" },
-    });
+    setModelProbeStates((current) =>
+      withProbeState(current, provider.id, {
+        kind: "loading",
+        action: "model-test",
+      }),
+    );
     try {
-      const result = await testManagedModelConnection({
+      const result = await testManagedModelConnectionWithLatency({
         providerId: provider.id,
         protocol: provider.protocol,
         apiBase: provider.apiBase,
         model: draft.model,
       });
-      setModelProbeState({
-        id: provider.id,
-        state: {
+      setModelProbeStates((current) =>
+        withProbeState(current, provider.id, {
           kind: "success",
+          action: "model-test",
           message: connectionSuccessMessage(result, "setup-model", modelCopy),
-        },
-      });
+        }),
+      );
     } catch (e) {
-      setModelProbeState({
-        id: provider.id,
-        state: { kind: "error", message: errorMessage(e, modelCopy) },
-      });
+      setModelProbeStates((current) =>
+        withProbeState(current, provider.id, {
+          kind: "error",
+          action: "model-test",
+          message: managedModelProbeErrorMessage(e, modelCopy),
+        }),
+      );
     }
   };
 
   const handleSaveDraftModel = async (draft: ModelDraftState) => {
+    const draftId = draft.id;
     const existingModel = draft.id
       ? models.find((item) => item.id === draft.id)
       : undefined;
@@ -486,6 +528,11 @@ export function SettingsModels({
           ? (existingModel?.isDefault ?? false)
           : models.length === 0,
       });
+      if (draftId) {
+        setSavedModelProbeStates((current) =>
+          withoutProbeState(current, draftId),
+        );
+      }
       resetModelDraft();
     } catch {
       // Store-level error is shown inline.
@@ -556,29 +603,34 @@ export function SettingsModels({
   const handleTestSavedModel = async (model: ManagedModelRecord) => {
     const provider = providers.find((item) => item.id === model.providerId);
     if (!provider || provider.credentialStatus === "missing") return;
-    setSavedModelProbeState({
-      id: model.id,
-      state: { kind: "loading", action: "model-test" },
-    });
+    setSavedModelProbeStates((current) =>
+      withProbeState(current, model.id, {
+        kind: "loading",
+        action: "model-test",
+      }),
+    );
     try {
-      const result = await testManagedModelConnection({
+      const result = await testManagedModelConnectionWithLatency({
         providerId: provider.id,
         protocol: provider.protocol,
         apiBase: provider.apiBase,
         model: model.model,
       });
-      setSavedModelProbeState({
-        id: model.id,
-        state: {
+      setSavedModelProbeStates((current) =>
+        withProbeState(current, model.id, {
           kind: "success",
+          action: "model-test",
           message: connectionSuccessMessage(result, "saved-model", modelCopy),
-        },
-      });
+        }),
+      );
     } catch (e) {
-      setSavedModelProbeState({
-        id: model.id,
-        state: { kind: "error", message: errorMessage(e, modelCopy) },
-      });
+      setSavedModelProbeStates((current) =>
+        withProbeState(current, model.id, {
+          kind: "error",
+          action: "model-test",
+          message: managedModelProbeErrorMessage(e, modelCopy),
+        }),
+      );
     }
   };
 
@@ -710,16 +762,14 @@ export function SettingsModels({
                 allModelCount={orderedModels.length}
                 saving={saving}
                 expanded={isProviderExpanded(provider.id)}
-                providerProbeState={
-                  providerProbeState?.id === provider.id
-                    ? providerProbeState.state
-                    : { kind: "idle" }
-                }
-                modelProbeState={
-                  modelProbeState?.id === provider.id
-                    ? modelProbeState.state
-                    : { kind: "idle" }
-                }
+                providerProbeState={probeStateFor(
+                  providerProbeStates,
+                  provider.id,
+                )}
+                modelProbeState={probeStateFor(
+                  modelProbeStates,
+                  provider.id,
+                )}
                 modelOptions={modelOptionsByProvider[provider.id] ?? []}
                 modelFilter={modelFilterByProvider[provider.id] ?? ""}
                 modelDraft={
@@ -769,7 +819,9 @@ export function SettingsModels({
                           displayName: "",
                         },
                   );
-                  setModelProbeState(null);
+                  setModelProbeStates((current) =>
+                    withoutProbeState(current, provider.id),
+                  );
                 }}
                 onChangeModelDraft={(patch) => {
                   setModelDraft((current) =>
@@ -777,7 +829,9 @@ export function SettingsModels({
                       ? { ...current, ...patch }
                       : current,
                   );
-                  setModelProbeState(null);
+                  setModelProbeStates((current) =>
+                    withoutProbeState(current, provider.id),
+                  );
                 }}
                 onCancelModelDraft={resetModelDraft}
                 onTestModelDraft={(draft) =>
@@ -790,9 +844,7 @@ export function SettingsModels({
                 onSetDefaultModel={(model) => void handleSetDefaultModel(model)}
                 onTestModel={(model) => void handleTestSavedModel(model)}
                 modelProbeStateFor={(modelId) =>
-                  savedModelProbeState?.id === modelId
-                    ? savedModelProbeState.state
-                    : { kind: "idle" }
+                  probeStateFor(savedModelProbeStates, modelId)
                 }
                 onDeleteModel={handleDeleteModel}
               />
@@ -885,7 +937,8 @@ function ConfiguredModelRow({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors duration-100",
+        "group flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors duration-150",
+        "hover:bg-elevated/55 focus-within:bg-elevated/55",
         swapClass,
       )}
     >
@@ -896,7 +949,7 @@ function ConfiguredModelRow({
           size="xs"
           disabled={!canMoveUp}
           onClick={onMoveUp}
-          className="text-ink-muted/75 hover:text-ink"
+          className="text-ink-muted/45 transition-colors group-hover:text-ink-muted group-focus-within:text-ink-muted hover:text-ink"
         >
           <ArrowUp size={11} weight="bold" />
         </IconButton>
@@ -905,7 +958,7 @@ function ConfiguredModelRow({
           size="xs"
           disabled={!canMoveDown}
           onClick={onMoveDown}
-          className="text-ink-muted/75 hover:text-ink"
+          className="text-ink-muted/45 transition-colors group-hover:text-ink-muted group-focus-within:text-ink-muted hover:text-ink"
         >
           <ArrowDown size={11} weight="bold" />
         </IconButton>
@@ -1108,7 +1161,9 @@ function ProviderEditor({
               >
                 {copy.fetchList}
               </Button>
+              <InlineProbeStatus state={probeState} action="model-list" />
             </div>
+            <ProbeErrorLine state={probeState} action="model-list" />
             {modelOptions.length > 0 && (
               <select
                 value={modelOptions.includes(form.model) ? form.model : ""}
@@ -1169,6 +1224,7 @@ function ProviderEditor({
           >
             {copy.testConnection}
           </Button>
+          <InlineProbeStatus state={probeState} action="provider-test" />
           <Button
             variant="primary"
             size="sm"
@@ -1187,7 +1243,7 @@ function ProviderEditor({
             {form.id ? copy.saveService : copy.saveAndEnableModel}
           </Button>
         </div>
-        <StatusLine state={probeState} />
+        <ProbeErrorLine state={probeState} action="provider-test" />
       </div>
     </div>
   );
@@ -1268,11 +1324,11 @@ function ProviderCard({
 
   return (
     <div>
-      <div className="flex min-w-0 flex-wrap items-center gap-3 px-2 py-2">
+      <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">
         <button
           type="button"
           aria-expanded={expanded}
-          className="group flex min-w-[220px] flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
+          className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
           onClick={onToggle}
         >
           <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors group-hover:bg-surface group-hover:text-ink">
@@ -1283,22 +1339,21 @@ function ProviderCard({
             )}
           </span>
           <Key size={16} weight="thin" className="shrink-0 text-ink-soft" />
-          <span className="min-w-0 flex-1">
-            <span className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="min-w-0 truncate text-[13px] font-medium text-ink transition-colors group-hover:text-brand-strong">
-                {provider.displayName}
-              </span>
-              <CredentialBadge status={provider.credentialStatus} />
-              <span className="inline-flex shrink-0 rounded-sm border border-line bg-elevated px-1.5 py-px text-[10.5px] text-ink-muted">
-                {copy.enabledModelsCount(models.length)}
-              </span>
-            </span>
+          <span className="flex min-w-0 flex-1 items-center gap-2">
             <span
-              className="mt-0.5 block truncate font-mono text-[11.5px] text-ink-muted"
-              title={provider.apiBase}
+              className="min-w-0 truncate text-[13px] font-medium text-ink transition-colors group-hover:text-brand-strong"
+              title={provider.displayName}
             >
-              {protocolLabel(provider.protocol)}
+              {provider.displayName}
             </span>
+            <CredentialBadge status={provider.credentialStatus} />
+            <span className="inline-flex shrink-0 rounded-sm border border-line bg-elevated px-1.5 py-px text-[10.5px] text-ink-muted">
+              {copy.enabledModelsCount(models.length)}
+            </span>
+            <ProtocolBadge
+              protocol={provider.protocol}
+              apiBase={provider.apiBase}
+            />
           </span>
         </button>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -1320,30 +1375,27 @@ function ProviderCard({
           >
             {copy.check}
           </Button>
-          <IconButton
-            ariaLabel={copy.editProviderAria}
-            size="sm"
-            onClick={onEditProvider}
-          >
-            <PencilSimple size={13} weight="thin" />
-          </IconButton>
-          <IconButton
-            ariaLabel={copy.deleteProviderAria}
-            variant="danger"
-            size="sm"
+          <InlineProbeStatus
+            state={providerProbeState}
+            action="provider-test"
+          />
+          <ProviderActionsMenu
             disabled={saving}
-            onClick={onDeleteProvider}
-          >
-            <Trash size={13} weight="thin" />
-          </IconButton>
+            onEdit={onEditProvider}
+            onDelete={onDeleteProvider}
+          />
         </div>
       </div>
+      <ProbeErrorLine
+        state={providerProbeState}
+        action="provider-test"
+        className="px-4 pb-3"
+      />
 
       {expanded && (
         <div className="border-t border-line bg-elevated/40 px-3 py-3">
           <div className="space-y-3">
             {keyMissing && <ErrorLine message={copy.keyNeedsResave} />}
-            <StatusLine state={providerProbeState} />
 
             {models.length > 0 ? (
               <div className="divide-y divide-line border-y border-line">
@@ -1387,6 +1439,7 @@ function ProviderCard({
               >
                 {copy.fetchModelList}
               </Button>
+              <InlineProbeStatus state={modelProbeState} action="model-list" />
               <Button
                 variant="secondary"
                 size="sm"
@@ -1397,8 +1450,7 @@ function ProviderCard({
                 {copy.addManually}
               </Button>
             </div>
-
-            <StatusLine state={modelProbeState} />
+            <ProbeErrorLine state={modelProbeState} action="model-list" />
 
             {modelOptions.length > 0 && (
               <div className="space-y-2 border-t border-line pt-3">
@@ -1497,12 +1549,6 @@ function EnabledModelRow({
             <div className="truncate text-[13px] font-medium text-ink">
               {display.title}
             </div>
-            {isDefault && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-brand-soft px-1.5 py-px text-[10.5px] text-brand-strong">
-                <Star size={10} weight="fill" />
-                {copy.defaultModel}
-              </span>
-            )}
           </div>
           {display.subtitle && (
             <div className="mt-0.5 truncate font-mono text-[11.5px] text-ink-muted">
@@ -1528,17 +1574,23 @@ function EnabledModelRow({
           >
             {copy.test}
           </Button>
-          <Button
-            variant={isDefault ? "ghost" : "secondary"}
-            size="sm"
-            disabled={isDefault || saving}
-            onClick={onSetDefault}
-            leadingIcon={
-              <Star size={12} weight={isDefault ? "fill" : "thin"} />
-            }
-          >
-            {copy.setDefault}
-          </Button>
+          <InlineProbeStatus state={probeState} action="model-test" />
+          {isDefault ? (
+            <span className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-sm bg-brand-soft px-2 py-1 text-[11.5px] leading-none text-brand-strong">
+              <Star size={11} weight="fill" />
+              {copy.defaultModelStatus}
+            </span>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={saving}
+              onClick={onSetDefault}
+              leadingIcon={<Star size={12} weight="thin" />}
+            >
+              {copy.setDefault}
+            </Button>
+          )}
           <IconButton ariaLabel={copy.editModel} size="sm" onClick={onEdit}>
             <PencilSimple size={13} weight="thin" />
           </IconButton>
@@ -1553,12 +1605,59 @@ function EnabledModelRow({
           </IconButton>
         </div>
       </div>
-      {(probeState.kind === "success" || probeState.kind === "error") && (
-        <div className="mt-2">
-          <StatusLine state={probeState} />
-        </div>
-      )}
+      <ProbeErrorLine state={probeState} action="model-test" />
     </div>
+  );
+}
+
+function ProviderActionsMenu({
+  disabled,
+  onEdit,
+  onDelete,
+}: {
+  disabled: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const appCopy = useCopy();
+  const copy = appCopy.settings.models;
+  const itemClass =
+    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 outline-none data-[highlighted]:bg-hover";
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <IconButton ariaLabel={appCopy.common.more} size="sm">
+          <DotsThreeVertical size={13} weight="bold" />
+        </IconButton>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          className={cn(
+            "z-[70] min-w-[112px] rounded-md border border-line bg-elevated p-1",
+            "text-[13px] text-ink shadow-elevated",
+          )}
+        >
+          <DropdownMenu.Item onSelect={onEdit} className={itemClass}>
+            <PencilSimple size={13} weight="thin" />
+            {copy.editProviderAction}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            disabled={disabled}
+            onSelect={onDelete}
+            className={cn(
+              itemClass,
+              "text-error data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
+            )}
+          >
+            <Trash size={13} weight="thin" />
+            {copy.deleteProviderAction}
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
@@ -1676,6 +1775,7 @@ function ModelDraftEditor({
         >
           {copy.testModel}
         </Button>
+        <InlineProbeStatus state={modelProbeState} action="model-test" />
         <Button
           variant="primary"
           size="sm"
@@ -1694,6 +1794,7 @@ function ModelDraftEditor({
           {draft.id ? copy.saveModel : copy.enableModel}
         </Button>
       </div>
+      <ProbeErrorLine state={modelProbeState} action="model-test" />
     </div>
   );
 }
@@ -1738,6 +1839,42 @@ function SettingsInput({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function InlineProbeStatus({
+  state,
+  action,
+}: {
+  state: ProbeState;
+  action: ProbeAction;
+}) {
+  if (state.kind !== "success" || state.action !== action) return null;
+  return (
+    <span
+      className="inline-flex min-h-7 max-w-[220px] shrink items-center gap-1 px-1 text-[11.5px] leading-none text-success"
+      title={state.message}
+    >
+      <CheckCircle size={11} weight="fill" className="shrink-0" />
+      <span className="truncate">{state.message}</span>
+    </span>
+  );
+}
+
+function ProbeErrorLine({
+  state,
+  action,
+  className,
+}: {
+  state: ProbeState;
+  action: ProbeAction;
+  className?: string;
+}) {
+  if (state.kind !== "error" || state.action !== action) return null;
+  return (
+    <div className={cn("mt-2", className)}>
+      <StatusLine state={state} />
     </div>
   );
 }
@@ -1817,6 +1954,24 @@ function CredentialBadge({
   );
 }
 
+function ProtocolBadge({
+  protocol,
+  apiBase,
+}: {
+  protocol: ManagedModelProtocol;
+  apiBase: string;
+}) {
+  const label = protocolLabel(protocol);
+  return (
+    <span
+      className="inline-flex shrink-0 rounded-sm border border-line bg-surface/70 px-1.5 py-px font-mono text-[10.5px] text-ink-muted"
+      title={`${label} · ${apiBase}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function modelDisplayParts(model: ManagedModelRecord): {
   title: string;
   subtitle?: string;
@@ -1875,33 +2030,17 @@ function protocolLabel(protocol: ManagedModelProtocol): string {
 }
 
 function connectionSuccessMessage(
-  result: ManagedModelConnectionResult,
+  result: TimedManagedModelConnectionResult,
   context: "provider" | "setup-model" | "saved-model",
   copy: ReturnType<typeof useCopy>["settings"]["models"],
 ): string {
-  if (context === "provider") {
-    return copy.connectionUsable;
-  }
-  if (context === "saved-model") {
-    return copy.modelUsable;
-  }
-  return result.modelFound === false
-    ? copy.connectionUsableCanSave
-    : copy.modelUsable;
-}
-
-function errorMessage(
-  e: unknown,
-  copy: ReturnType<typeof useCopy>["settings"]["models"],
-): string {
-  if (typeof e === "string") {
-    try {
-      const parsed = JSON.parse(e) as { message?: string };
-      return parsed.message ?? e;
-    } catch {
-      return e;
-    }
-  }
-  if (e instanceof Error) return e.message;
-  return copy.actionFailed;
+  const message =
+    context === "provider"
+      ? copy.connectionUsable
+      : context === "saved-model"
+        ? copy.modelUsable
+        : result.modelFound === true
+          ? copy.modelUsable
+          : copy.connectionUsableCanSave;
+  return copy.connectionLatency(message, result.latencyMs);
 }

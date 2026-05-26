@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  ArrowSquareOut,
   BookOpen,
   Check,
   CircleNotch,
@@ -84,7 +83,7 @@ export function StepAttach({
       </p>
 
       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-        GA Path
+        {onboardingCopy.gaPathLabel}
       </label>
       <div className="flex gap-2">
         <input
@@ -118,18 +117,6 @@ export function StepAttach({
           <BookOpen size={11} weight="thin" />
           {tutorialLabel}
         </button>
-      )}
-
-      {!tutorialForFailure && (
-        <a
-          href="https://github.com/lsdefine/GenericAgent"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-1 inline-flex items-center gap-1 text-[12px] text-ink-muted transition-colors hover:text-brand-strong"
-        >
-          {onboardingCopy.needGA}
-          <ArrowSquareOut size={11} weight="thin" />
-        </a>
       )}
 
       <div className="mt-9 flex items-center gap-2">

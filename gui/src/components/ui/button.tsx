@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils";
  *
  *   primary — Main CTA. Charcoal foreground (`bg-ink`), elevated text.
  *             Used for "确认 / 保存 / 创建 / 继续". One per dialog
- *             or screen; the eye should know where to land.
+ *             or screen; the eye should know where to land. It has
+ *             a subtle physical press response; secondary actions stay flat.
  *
  *   secondary — Border-only, neutral bg. Used for "取消 / Back / 次要
  *               操作". Pairs with a primary on the same row.
@@ -120,7 +121,10 @@ export interface DialogActionRowProps
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary: cn(
     "border border-ink bg-ink font-medium text-elevated",
-    "hover:bg-ink/90",
+    "shadow-[0_1px_0_rgba(31,27,23,0.22),0_2px_6px_rgba(31,27,23,0.10)]",
+    "hover:-translate-y-px hover:bg-ink/95 hover:shadow-[0_2px_0_rgba(31,27,23,0.22),0_8px_18px_rgba(31,27,23,0.16)]",
+    "active:translate-y-0 active:bg-ink active:shadow-[0_1px_0_rgba(31,27,23,0.18),0_2px_5px_rgba(31,27,23,0.12)]",
+    "disabled:translate-y-0 disabled:shadow-none",
   ),
   secondary: cn(
     "border border-line bg-elevated text-ink",
@@ -224,7 +228,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         type={type}
         className={cn(
-          "inline-flex select-none items-center justify-center rounded-sm transition-colors",
+          "inline-flex select-none items-center justify-center rounded-sm transition-[background-color,border-color,color,box-shadow,transform]",
           "disabled:cursor-not-allowed disabled:opacity-40",
           VARIANT_CLASSES[variant],
           SIZE_CLASSES[size],

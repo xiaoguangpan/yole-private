@@ -79,6 +79,7 @@ export interface SettingsProps {
   onChangeGAPath?: () => void;
   onChangeBridgePython?: () => void;
   onReRunHealthCheck?: () => void;
+  onOpenSetupAssistant?: () => void;
   onToggleExternalPython?: (useExternal: boolean) => void;
   onCommitGAPath?: (path: string) => Promise<void>;
   onChangeRuntimeKind?: (kind: RuntimeKind) => void;
@@ -126,6 +127,7 @@ export function Settings({
   onChangeGAPath,
   onChangeBridgePython,
   onReRunHealthCheck,
+  onOpenSetupAssistant,
   onToggleExternalPython,
   onCommitGAPath,
   onChangeRuntimeKind,
@@ -186,6 +188,7 @@ export function Settings({
                   onChangeGAPath={onChangeGAPath}
                   onChangeBridgePython={onChangeBridgePython}
                   onReRunHealthCheck={onReRunHealthCheck}
+                  onOpenSetupAssistant={onOpenSetupAssistant}
                   onToggleExternalPython={onToggleExternalPython}
                   onCommitGAPath={onCommitGAPath}
                   onOpenModels={() => setTab("models")}

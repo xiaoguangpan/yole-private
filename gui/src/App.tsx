@@ -721,6 +721,14 @@ function App() {
   );
   // ConfirmDeleteProject dialog — opens from inside EditProject when
   // the user clicks "删除 Project". Same null-or-project pattern.
+  // Settings-driven Onboarding flows:
+  // - Health Check revisit jumps directly to StepHealth and returns to
+  //   Settings on completion.
+  // - Setup Assistant starts from the same first screen as initial
+  //   install, but keeps a Back to Settings escape hatch. Opening it
+  //   has no side effect; settings only change when the user edits a
+  //   step and completes it.
+  //
   // Health Check revisit flow (Settings → Re-run Health Check):
   //   - true → Onboarding renders in "revisit" mode (skips Welcome /
   //     Attach, jumps to Health step, swaps button labels)
@@ -730,6 +738,8 @@ function App() {
   //     the Settings dialog, so "where I was" implicitly includes
   //     "with Settings open").
   const [healthCheckRevisit, setHealthCheckRevisit] = useState(false);
+  const [setupAssistantFromSettings, setSetupAssistantFromSettings] =
+    useState(false);
   const [revisitReturnScreen, setRevisitReturnScreen] =
     useState<import("@/stores/ui").Screen>("empty");
 
@@ -744,41 +754,82 @@ function App() {
   // Onboarding takeover: no AppShell, no overlays besides the dev
   // toggle.
   if (screen === "onboarding") {
+    const onboardingMode = healthCheckRevisit
+      ? "revisit"
+      : setupAssistantFromSettings
+        ? "setup"
+        : "fresh";
+    const returnToSettings = () => {
+      setHealthCheckRevisit(false);
+      setSetupAssistantFromSettings(false);
+      setScreen(revisitReturnScreen);
+      setSettingsOpen(true);
+    };
+    const returnToMainAfterSetup = () => {
+      setHealthCheckRevisit(false);
+      setSetupAssistantFromSettings(false);
+      setScreen("empty");
+      setEmptyComposerFocusTick((tick) => tick + 1);
+    };
+    const saveExternalGAConfigIfChanged = async (
+      gaPath: string,
+      pythonAlias: string | null,
+    ) => {
+      const partial: { gaPath?: string; python?: string } = {};
+      if (gaPath !== gaConfig.gaPath) partial.gaPath = gaPath;
+      if (pythonAlias && pythonAlias !== gaConfig.python) {
+        partial.python = pythonAlias;
+      }
+      if (Object.keys(partial).length > 0) {
+        await setGAConfig(partial);
+      }
+    };
+
     return (
       <CopyProvider language={resolvedLanguage}>
         <Onboarding
-          mode={healthCheckRevisit ? "revisit" : "fresh"}
-          initialPath={healthCheckRevisit ? gaConfig.gaPath : undefined}
+          mode={onboardingMode}
+          initialPath={
+            healthCheckRevisit || setupAssistantFromSettings
+              ? gaConfig.gaPath
+              : undefined
+          }
+          canContinueWithCurrentModel={
+            activeRuntimeKind === "managed" && hasConfiguredManagedModel
+          }
           onComplete={(gaPath, pythonAlias) => {
             // Persist the validated path + the probed Python alias so
             // subsequent bridge spawns use the right interpreter, not
             // the demo fallback (system python3 in a packaged build
             // has no GA deps — silent crash).
-            const partial: { gaPath: string; python?: string } = { gaPath };
-            if (pythonAlias) partial.python = pythonAlias;
-            void setGAConfig(partial);
-            if (healthCheckRevisit) {
-              // Settings → "跑一次 Health Check" round-trip: return the
-              // user to the screen they came from + re-open the
-              // Settings dialog where they clicked.
-              setHealthCheckRevisit(false);
-              setScreen(revisitReturnScreen);
-              setSettingsOpen(true);
-            } else {
-              setScreen("empty");
-            }
+            void (async () => {
+              await saveExternalGAConfigIfChanged(gaPath, pythonAlias);
+              if (!healthCheckRevisit && activeRuntimeKind !== "external") {
+                await setActiveRuntimeKind("external");
+              }
+              if (healthCheckRevisit) {
+                // Settings → "跑一次 Health Check" round-trip: return
+                // the user to the screen they came from + re-open the
+                // Settings dialog where they clicked.
+                returnToSettings();
+              } else {
+                returnToMainAfterSetup();
+              }
+            })();
           }}
           onManagedComplete={() => {
-            setScreen("empty");
-            setEmptyComposerFocusTick((tick) => tick + 1);
+            void (async () => {
+              if (activeRuntimeKind !== "managed") {
+                await setActiveRuntimeKind("managed");
+              }
+              returnToMainAfterSetup();
+            })();
           }}
           onCancel={() => {
             // Revisit-only escape hatch. setGAConfig is intentionally
             // skipped — the user bailed without committing to a new
             // probe result, so we keep whatever was saved before.
-            setHealthCheckRevisit(false);
-            setScreen(revisitReturnScreen);
-            setSettingsOpen(true);
+            returnToSettings();
           }}
         />
       </CopyProvider>
@@ -1250,6 +1301,14 @@ function App() {
           setRevisitReturnScreen(screen);
           setSettingsOpen(false);
           setHealthCheckRevisit(true);
+          setSetupAssistantFromSettings(false);
+          setScreen("onboarding");
+        }}
+        onOpenSetupAssistant={() => {
+          setRevisitReturnScreen(screen);
+          setSettingsOpen(false);
+          setHealthCheckRevisit(false);
+          setSetupAssistantFromSettings(true);
           setScreen("onboarding");
         }}
         languagePreference={languagePreference}

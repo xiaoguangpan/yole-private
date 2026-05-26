@@ -37,14 +37,16 @@ export interface OnboardingProps {
   /** Called when managed model setup succeeds. */
   onManagedComplete?: () => void;
   /**
-   * Flow mode. Default `"fresh"` is the first-launch path: Welcome →
-   * Attach → Health → Main view. `"revisit"` is the Settings → "Re-run
-   * Health Check" path: jumps straight to Health step (uses the
-   * already-saved GA path), relabels Back → "取消" and "进入 Galley"
-   * → "返回设置", and requires an `onCancel` callback for the
-   * Back button (since there's no Attach step to step back to).
+   * Flow mode. Default `"fresh"` is the first-launch path: Model /
+   * Attach / Health → Main view. `"setup"` is the Settings → "Open
+   * Setup Assistant" path: starts from the same first screen but keeps
+   * a Back to Settings escape hatch. `"revisit"` is the Settings →
+   * "Re-run Health Check" path: jumps straight to Health step (uses
+   * the already-saved GA path), relabels Back → "取消" and
+   * "进入 Galley" → "返回设置", and requires an `onCancel` callback
+   * for the Back button (since there's no Attach step to step back to).
    */
-  mode?: "fresh" | "revisit";
+  mode?: "fresh" | "setup" | "revisit";
   /**
    * Required when `mode="revisit"`. Called when the user clicks the
    * (renamed) Back button to abort without re-saving. The host should
@@ -58,6 +60,12 @@ export interface OnboardingProps {
    * runs against the right directory without going through Attach.
    */
   initialPath?: string;
+  /**
+   * Setup Assistant can be opened after bundled GA is already ready.
+   * In that case the first step should allow the user to continue
+   * without re-entering an API key or changing model configuration.
+   */
+  canContinueWithCurrentModel?: boolean;
 }
 
 /**
@@ -79,6 +87,7 @@ export function Onboarding({
   mode = "fresh",
   onCancel,
   initialPath,
+  canContinueWithCurrentModel = false,
 }: OnboardingProps) {
   const copy = useCopy();
   const languagePreference = usePrefsStore((s) => s.languagePreference);
@@ -87,10 +96,10 @@ export function Onboarding({
     [languagePreference],
   );
   const isRevisit = mode === "revisit";
+  const isSetup = mode === "setup";
   // Revisit jumps straight to Health (Settings already has a saved GA
-  // path; user just wants to re-validate). Welcome/Attach are unreachable
-  // in this mode — the StepProgress dots still render the full chain for
-  // visual continuity, but step state can't backtrack past health.
+  // path; user just wants to re-validate). Setup starts at the same
+  // model screen as first launch but adds a Settings escape hatch.
   const [step, setStep] = useState<OnboardingStep>(
     isRevisit ? "health" : "model",
   );
@@ -259,6 +268,10 @@ export function Onboarding({
             <StepModelConfig
               onComplete={handleManagedComplete}
               onAttachExisting={() => setStep("attach")}
+              onCancel={isSetup ? onCancel : undefined}
+              canContinueWithExisting={
+                isSetup && canContinueWithCurrentModel
+              }
             />
           )}
           {step === "attach" && (
@@ -325,7 +338,7 @@ function StepProgress({ step }: { step: OnboardingStep }) {
     { key: "done", label: copy.common.done },
   ];
   const attachStepLabels: { key: OnboardingStep | "done"; label: string }[] = [
-    { key: "attach", label: "GA" },
+    { key: "attach", label: copy.onboarding.gaPathLabel },
     { key: "health", label: copy.health.title },
     { key: "done", label: copy.common.done },
   ];

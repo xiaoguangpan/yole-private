@@ -49,6 +49,7 @@ interface SettingsRuntimeProps {
   onChangeGAPath?: () => void;
   onChangeBridgePython?: () => void;
   onReRunHealthCheck?: () => void;
+  onOpenSetupAssistant?: () => void;
   /**
    * Toggle the bundled-vs-external Python mode. Persisted via
    * `setGAConfig({ useExternalPython })`. Takes effect on the next
@@ -77,6 +78,8 @@ interface SettingsRuntimeProps {
  *
  * Re-run health check routes back through Onboarding's StepHealth in
  * revisit mode — one canonical health-check UX.
+ * Open Setup Assistant routes back through the full Onboarding flow
+ * without clearing existing conversations or saved settings.
  *
  * baseline + version are read-only mono labels at the bottom.
  */
@@ -90,6 +93,7 @@ export function SettingsRuntime({
   onChangeGAPath,
   onChangeBridgePython,
   onReRunHealthCheck,
+  onOpenSetupAssistant,
   onToggleExternalPython,
   onChangeRuntimeKind,
   onOpenModels,
@@ -177,6 +181,7 @@ export function SettingsRuntime({
         highlighted={highlightedRuntimeKind === "external"}
         showManagedDiagnostics={activeRuntimeKind === "managed"}
         managedDiagnostics={info.managedRuntime}
+        onOpenSetupAssistant={onOpenSetupAssistant}
         onToggleExpanded={() => setExternalExpanded((current) => !current)}
         onActivate={() => activateRuntimeKind("external")}
       >
@@ -297,6 +302,7 @@ function AdvancedRuntimeSettings({
   highlighted,
   showManagedDiagnostics,
   managedDiagnostics,
+  onOpenSetupAssistant,
   onToggleExpanded,
   onActivate,
   children,
@@ -308,15 +314,26 @@ function AdvancedRuntimeSettings({
   highlighted: boolean;
   showManagedDiagnostics: boolean;
   managedDiagnostics?: ManagedRuntimeDiagnostics;
+  onOpenSetupAssistant?: () => void;
   onToggleExpanded: () => void;
   onActivate?: () => void;
   children: ReactNode;
 }) {
   const copy = useCopy().settings.runtime;
+  const [setupAssistantExpanded, setSetupAssistantExpanded] = useState(false);
   return (
     <div>
       <SettingsSectionLabel>{copy.more}</SettingsSectionLabel>
-      <div className="mt-2 space-y-2">
+      <div className="mt-2 space-y-3">
+        <SetupAssistantAccess
+          expanded={setupAssistantExpanded}
+          hasRunningSessions={hasRunningSessions}
+          onOpenSetupAssistant={onOpenSetupAssistant}
+          onToggleExpanded={() =>
+            setSetupAssistantExpanded((current) => !current)
+          }
+        />
+
         <ExternalRuntimeAccess
           expanded={expanded}
           value={value}
@@ -333,6 +350,60 @@ function AdvancedRuntimeSettings({
           <ManagedRuntimeCard diagnostics={managedDiagnostics} />
         )}
       </div>
+    </div>
+  );
+}
+
+function SetupAssistantAccess({
+  expanded,
+  hasRunningSessions,
+  onOpenSetupAssistant,
+  onToggleExpanded,
+}: {
+  expanded: boolean;
+  hasRunningSessions: boolean;
+  onOpenSetupAssistant?: () => void;
+  onToggleExpanded: () => void;
+}) {
+  const copy = useCopy().settings.runtime;
+  const disabled = hasRunningSessions || !onOpenSetupAssistant;
+  return (
+    <div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onToggleExpanded}
+        className="px-0 text-[11.5px] hover:bg-transparent hover:underline"
+        leadingIcon={
+          expanded ? (
+            <CaretDown size={12} weight="bold" />
+          ) : (
+            <CaretRight size={12} weight="bold" />
+          )
+        }
+      >
+        {copy.setupAssistant}
+      </Button>
+      {expanded && (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line bg-surface px-3 py-2.5">
+          <div className="min-w-[260px] flex-1 text-[11.5px] leading-[1.5] text-ink-muted">
+            {copy.setupAssistantDescription}
+            {hasRunningSessions && (
+              <div className="mt-1 text-ink-muted">
+                {copy.setupAssistantRunningBlock}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            onClick={onOpenSetupAssistant}
+          >
+            {copy.openSetupAssistant}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,17 +2,20 @@ import {
   ArrowSquareOut,
   CheckCircle,
   CircleNotch,
+  Eye,
+  EyeSlash,
   ListMagnifyingGlass,
   PlugsConnected,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
 import { Button } from "@/components/ui/button";
 import {
   listManagedModelOptions,
-  testManagedModelConnection,
+  managedModelProbeErrorMessage,
+  testManagedModelConnectionWithLatency,
 } from "@/lib/managed-models";
 import { useCopy } from "@/lib/i18n";
 import {
@@ -25,20 +28,26 @@ import { cn } from "@/lib/utils";
 import { useManagedModelsStore } from "@/stores/managed-models";
 import type { ManagedModelProtocol } from "@/types/managed-models";
 
+type SetupAction = "list" | "test" | "start";
+
 type SetupState =
   | { kind: "idle" }
-  | { kind: "loading"; action: "list" | "start" }
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string };
+  | { kind: "loading"; action: SetupAction }
+  | { kind: "success"; action: SetupAction; message: string }
+  | { kind: "error"; action: SetupAction; message: string };
 
 interface StepModelConfigProps {
   onComplete: () => void;
   onAttachExisting: () => void;
+  onCancel?: () => void;
+  canContinueWithExisting?: boolean;
 }
 
 export function StepModelConfig({
   onComplete,
   onAttachExisting,
+  onCancel,
+  canContinueWithExisting = false,
 }: StepModelConfigProps) {
   const copy = useCopy();
   const modelCopy = copy.settings.models;
@@ -64,11 +73,28 @@ export function StepModelConfig({
   >(initialPresetDraft.advancedOptions);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [state, setState] = useState<SetupState>({ kind: "idle" });
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [verifiedFingerprint, setVerifiedFingerprint] = useState<
+    string | null
+  >(null);
   const selectedPreset = getManagedModelProviderPreset(providerPresetId);
+  const apiKeyRevealLabel = apiKeyVisible
+    ? modelCopy.hideApiKey
+    : modelCopy.showApiKey;
+  const connectionFingerprint = useMemo(
+    () =>
+      JSON.stringify({
+        protocol,
+        apiKey: apiKey.trim(),
+        apiBase: apiBase.trim(),
+        model: model.trim(),
+      }),
+    [apiBase, apiKey, model, protocol],
+  );
 
   const canFetchModels =
     apiKey.trim() !== "" && apiBase.trim() !== "" && state.kind !== "loading";
-  const canStart = useMemo(
+  const canTestConnection = useMemo(
     () =>
       apiKey.trim() !== "" &&
       apiBase.trim() !== "" &&
@@ -76,13 +102,20 @@ export function StepModelConfig({
       state.kind !== "loading",
     [apiBase, apiKey, model, state.kind],
   );
+  const canStart =
+    canTestConnection && verifiedFingerprint === connectionFingerprint;
 
   const probeInput = () => ({
     protocol,
-    apiKey,
-    apiBase,
-    model,
+    apiKey: apiKey.trim(),
+    apiBase: apiBase.trim(),
+    model: model.trim(),
   });
+
+  const resetConnectionTest = () => {
+    setVerifiedFingerprint(null);
+    setState({ kind: "idle" });
+  };
 
   const handleSelectProviderPreset = (
     nextProviderPresetId: ManagedModelProviderPresetId,
@@ -95,7 +128,7 @@ export function StepModelConfig({
     setProviderDisplayNameValue(draft.displayName);
     setAdvancedOptions(draft.advancedOptions);
     setModelOptions([]);
-    setState({ kind: "idle" });
+    resetConnectionTest();
   };
 
   const handleFetchModels = async () => {
@@ -106,13 +139,40 @@ export function StepModelConfig({
       setModelOptions(result.models);
       setState({
         kind: "success",
+        action: "list",
         message:
           result.models.length > 0
             ? modelCopy.foundModels(result.models.length)
             : modelCopy.connectedNoModels,
       });
     } catch (e) {
-      setState({ kind: "error", message: errorMessage(e, modelCopy) });
+      setState({
+        kind: "error",
+        action: "list",
+        message: managedModelProbeErrorMessage(e, modelCopy),
+      });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!canTestConnection) return;
+    const fingerprint = connectionFingerprint;
+    setVerifiedFingerprint(null);
+    setState({ kind: "loading", action: "test" });
+    try {
+      const result = await testManagedModelConnectionWithLatency(probeInput());
+      setVerifiedFingerprint(fingerprint);
+      setState({
+        kind: "success",
+        action: "test",
+        message: connectionSuccessMessage(result, modelCopy),
+      });
+    } catch (e) {
+      setState({
+        kind: "error",
+        action: "test",
+        message: managedModelProbeErrorMessage(e, modelCopy),
+      });
     }
   };
 
@@ -120,23 +180,31 @@ export function StepModelConfig({
     if (!canStart) return;
     setState({ kind: "loading", action: "start" });
     try {
-      await testManagedModelConnection(probeInput());
       const provider = await saveProvider({
         protocol,
-        apiKey,
-        apiBase,
-        displayName: providerDisplayNameValue || providerDisplayName(apiBase),
+        apiKey: apiKey.trim(),
+        apiBase: apiBase.trim(),
+        displayName:
+          providerDisplayNameValue || providerDisplayName(apiBase.trim()),
       });
       await saveModel({
         providerId: provider.id,
-        model,
+        model: model.trim(),
         advancedOptions,
         makeDefault: true,
       });
-      setState({ kind: "success", message: modelCopy.setupComplete });
+      setState({
+        kind: "success",
+        action: "start",
+        message: modelCopy.setupComplete,
+      });
       onComplete();
     } catch (e) {
-      setState({ kind: "error", message: errorMessage(e, modelCopy) });
+      setState({
+        kind: "error",
+        action: "start",
+        message: managedModelProbeErrorMessage(e, modelCopy),
+      });
     }
   };
 
@@ -164,15 +232,39 @@ export function StepModelConfig({
 
         <SetupInput
           label={modelCopy.apiKey}
-          type="password"
+          type={apiKeyVisible ? "text" : "password"}
           value={apiKey}
-          onChange={setApiKey}
+          onChange={(value) => {
+            setApiKey(value);
+            resetConnectionTest();
+          }}
           placeholder="sk-..."
+          reserveTrailing
+          trailing={
+            apiKey.length > 0 ? (
+              <button
+                type="button"
+                aria-label={apiKeyRevealLabel}
+                title={apiKeyRevealLabel}
+                onClick={() => setApiKeyVisible((visible) => !visible)}
+                className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink-soft"
+              >
+                {apiKeyVisible ? (
+                  <EyeSlash size={13} weight="thin" />
+                ) : (
+                  <Eye size={13} weight="thin" />
+                )}
+              </button>
+            ) : null
+          }
         />
         <SetupInput
           label={modelCopy.apiUrl}
           value={apiBase}
-          onChange={setApiBase}
+          onChange={(value) => {
+            setApiBase(value);
+            resetConnectionTest();
+          }}
           placeholder={
             selectedPreset.apiBase ||
             (protocol === "openai"
@@ -183,7 +275,10 @@ export function StepModelConfig({
         <SetupInput
           label={modelCopy.model}
           value={model}
-          onChange={setModel}
+          onChange={(value) => {
+            setModel(value);
+            resetConnectionTest();
+          }}
           placeholder={selectedPreset.modelPlaceholder}
         />
 
@@ -205,12 +300,17 @@ export function StepModelConfig({
           >
             {modelCopy.fetchModelList}
           </Button>
+          <InlineSetupStatus state={state} action="list" />
         </div>
+        <SetupErrorLine state={state} action="list" />
 
         {modelOptions.length > 0 && (
           <select
             value={modelOptions.includes(model) ? model : ""}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => {
+              setModel(e.target.value);
+              resetConnectionTest();
+            }}
             className="w-full rounded-sm border border-line bg-elevated px-3 py-2 font-mono text-[13px] text-ink outline-none transition-colors focus:border-brand focus:ring-[3px] focus:ring-brand/20"
           >
             <option value="">{modelCopy.chooseDetectedModel}</option>
@@ -221,42 +321,81 @@ export function StepModelConfig({
             ))}
           </select>
         )}
-
-        {state.kind === "success" && (
-          <StatusLine tone="success" message={state.message} />
-        )}
-        {state.kind === "error" && (
-          <StatusLine tone="error" message={state.message} />
-        )}
       </div>
 
-      <div className="mt-9 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onAttachExisting}
-          className="inline-flex items-center gap-1 text-[12px] text-ink-muted transition-colors hover:text-brand-strong"
-        >
-          {onboardingCopy.connectExistingButton}
-          <ArrowSquareOut size={11} weight="thin" />
-        </button>
-        <Button
-          variant="primary"
-          size="lg"
-          disabled={!canStart}
-          onClick={() => void handleStart()}
-          className="ml-auto"
-          leadingIcon={
-            state.kind === "loading" && state.action === "start" ? (
-              <span className="spin">
-                <CircleNotch size={14} weight="thin" />
-              </span>
-            ) : (
-              <PlugsConnected size={14} weight="bold" />
-            )
-          }
-        >
-          {onboardingCopy.testAndStart}
-        </Button>
+      <div className="mt-9 flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-[12px] text-ink-muted transition-colors hover:text-brand-strong"
+            >
+              {onboardingCopy.backToSettings}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onAttachExisting}
+            className="inline-flex items-center gap-1 text-[12px] text-ink-muted transition-colors hover:text-brand-strong"
+          >
+            {onboardingCopy.connectExistingButton}
+            <ArrowSquareOut size={11} weight="thin" />
+          </button>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {canContinueWithExisting && (
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={onComplete}
+              leadingIcon={<CheckCircle size={14} weight="thin" />}
+            >
+              {onboardingCopy.continueWithCurrentModel}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={!canTestConnection}
+            onClick={() => void handleTestConnection()}
+            leadingIcon={
+              state.kind === "loading" && state.action === "test" ? (
+                <span className="spin">
+                  <CircleNotch size={14} weight="thin" />
+                </span>
+              ) : (
+                <PlugsConnected size={14} weight="thin" />
+              )
+            }
+          >
+            {modelCopy.testConnection}
+          </Button>
+          <InlineSetupStatus state={state} action="test" />
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={!canStart}
+            onClick={() => void handleStart()}
+            leadingIcon={
+              state.kind === "loading" && state.action === "start" ? (
+                <span className="spin">
+                  <CircleNotch size={14} weight="thin" />
+                </span>
+              ) : (
+                <CheckCircle size={14} weight="bold" />
+              )
+            }
+          >
+            {onboardingCopy.startUsingGalley}
+          </Button>
+        </div>
+      </div>
+      <div className="mt-2 flex justify-end">
+        <div className="w-full max-w-[420px] space-y-2">
+          <SetupErrorLine state={state} action="test" />
+          <SetupErrorLine state={state} action="start" />
+        </div>
       </div>
     </div>
   );
@@ -268,28 +407,72 @@ function SetupInput({
   onChange,
   placeholder,
   type = "text",
+  trailing,
+  reserveTrailing = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: "text" | "password";
+  trailing?: ReactNode;
+  reserveTrailing?: boolean;
 }) {
   return (
     <div>
       <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
         {label}
       </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        spellCheck={false}
-        className="w-full rounded-sm border border-line bg-elevated px-3 py-2 font-mono text-[13px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
-      />
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+          className={cn(
+            "w-full rounded-sm border border-line bg-elevated px-3 py-2 font-mono text-[13px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20",
+            (trailing || reserveTrailing) && "pr-10",
+          )}
+        />
+        {trailing && (
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            {trailing}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function InlineSetupStatus({
+  state,
+  action,
+}: {
+  state: SetupState;
+  action: SetupAction;
+}) {
+  if (state.kind !== "success" || state.action !== action) return null;
+  return (
+    <span
+      className="inline-flex min-h-7 max-w-[220px] shrink items-center gap-1 rounded-sm bg-success/10 px-2 py-1 text-[11.5px] leading-none text-success"
+      title={state.message}
+    >
+      <CheckCircle size={11} weight="fill" className="shrink-0" />
+      <span className="truncate">{state.message}</span>
+    </span>
+  );
+}
+
+function SetupErrorLine({
+  state,
+  action,
+}: {
+  state: SetupState;
+  action: SetupAction;
+}) {
+  if (state.kind !== "error" || state.action !== action) return null;
+  return <StatusLine tone="error" message={state.message} />;
 }
 
 function StatusLine({
@@ -319,20 +502,13 @@ function StatusLine({
   );
 }
 
-function errorMessage(
-  e: unknown,
+function connectionSuccessMessage(
+  result: { latencyMs: number; modelFound?: boolean | null },
   copy: ReturnType<typeof useCopy>["settings"]["models"],
 ): string {
-  if (typeof e === "string") {
-    try {
-      const parsed = JSON.parse(e) as { message?: string };
-      return parsed.message ?? e;
-    } catch {
-      return e;
-    }
-  }
-  if (e instanceof Error) return e.message;
-  return copy.actionFailed;
+  const message =
+    result.modelFound === true ? copy.modelUsable : copy.connectionUsableCanSave;
+  return copy.connectionLatency(message, result.latencyMs);
 }
 
 function providerDisplayName(apiBase: string): string {
