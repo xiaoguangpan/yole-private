@@ -74,7 +74,7 @@ function ModeCard({ title, body, onClick, disabled }: ModeCardProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex w-full items-start gap-3 rounded-[10px] border px-5 py-4 text-left",
+        "flex w-full items-start gap-3 rounded-callout border px-5 py-4 text-left",
         "transition-[background-color,border-color,box-shadow,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:duration-[45ms]",
         disabled
           ? "cursor-not-allowed border-line bg-app opacity-60"

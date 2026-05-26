@@ -64,8 +64,9 @@
     BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* --- radii (overrides Tailwind defaults; we only use these three) --- */
+  /* --- radii (overrides Tailwind defaults; semantic, limited set) --- */
   --radius-sm: 6px;
+  --radius-callout: 8px;
   --radius-md: 12px;
   --radius-lg: 14px;
 

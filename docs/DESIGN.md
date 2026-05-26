@@ -116,6 +116,7 @@ Galley 的视觉与交互气质 = **Notion + Claude**。
 | Token | 值 | 用途 |
 |---|---|---|
 | `radius-sm` | 6px | inline element |
+| `radius-callout` | 8px | inline callout / compact content block |
 | `radius-md` | 12px | card |
 | `radius-lg` | 14px | overlay (Command Palette) |
 | `shadow-card` | `0 1px 2px rgba(31,27,23,0.04)` | 普通卡片 |

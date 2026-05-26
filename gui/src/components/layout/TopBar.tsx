@@ -301,7 +301,7 @@ function YoloIndicator({
           align="end"
           sideOffset={8}
           className={cn(
-            "z-50 w-[280px] rounded-[10px] border border-line bg-elevated p-4 shadow-elevated",
+            "z-50 w-[280px] rounded-md border border-line bg-elevated p-4 shadow-elevated",
           )}
         >
           <div className="flex items-center gap-2">

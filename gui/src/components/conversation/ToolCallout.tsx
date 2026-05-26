@@ -324,7 +324,7 @@ const STATUS_PILL_CLASS: Record<ToolEventStatus, string> = {
 
 function ArgsBlock({ args }: { args: Record<string, unknown> }) {
   return (
-    <pre className="overflow-x-auto whitespace-pre-wrap rounded-[8px] border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
+    <pre className="overflow-x-auto whitespace-pre-wrap rounded-callout border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
       {Object.entries(args).map(([k, v]) => (
         <Line key={k} k={k} v={v} />
       ))}
@@ -353,7 +353,7 @@ function ResultBlock({ content }: { content: string }) {
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
         {copy.conversation.result}
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap rounded-[8px] border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
+      <pre className="overflow-x-auto whitespace-pre-wrap rounded-callout border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
         {content}
       </pre>
     </div>

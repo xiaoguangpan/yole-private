@@ -219,6 +219,8 @@ function App() {
   const hasConfiguredManagedModel = managedModels.some(
     (model) => model.credentialStatus !== "missing",
   );
+  const requiresManagedModelConfig =
+    activeRuntimeKind === "managed" && !hasConfiguredManagedModel;
   const sidebarRuntimeIndicator =
     activeRuntimeKind === "managed"
       ? hasConfiguredManagedModel
@@ -231,6 +233,7 @@ function App() {
     setSettingsTab(tab);
     setSettingsOpen(true);
   };
+  const openModelsForMissingConfig = () => openSettings("models");
   const openModelConfigFromSwitcher =
     activeRuntimeKind === "managed" ? () => openSettings("models") : undefined;
   const openLLMSwitcherFallback = () => {
@@ -970,6 +973,7 @@ function App() {
               llms={llms}
               llmConfigHint={llmConfigHint}
               onConfigureModels={openModelConfigFromSwitcher}
+              requiresModelConfig={requiresManagedModelConfig}
               onSelectLLM={(idx) => {
                 // EmptyState always configures the *next* new
                 // session: stash pendingLLMIndex + flip the
@@ -981,6 +985,10 @@ function App() {
               }}
               onOpenLLMSwitcher={openLLMSwitcherFallback}
               onSubmit={(t) => {
+                if (requiresManagedModelConfig) {
+                  openModelsForMissingConfig();
+                  return;
+                }
                 void submitOnEmpty(
                   t,
                   activeSessionId,
@@ -995,6 +1003,10 @@ function App() {
                 });
               }}
               onQuickPrompt={(p) => {
+                if (requiresManagedModelConfig) {
+                  openModelsForMissingConfig();
+                  return;
+                }
                 void submitOnEmpty(
                   p,
                   activeSessionId,
@@ -1021,6 +1033,7 @@ function App() {
               llms={llms}
               llmConfigHint={llmConfigHint}
               onConfigureModels={openModelConfigFromSwitcher}
+              requiresModelConfig={requiresManagedModelConfig}
               onSelectLLM={(idx) => {
                 if (!activeSessionId) return;
                 // Flip local + persisted state immediately so the
@@ -1043,6 +1056,10 @@ function App() {
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}
               onSubmit={(t) => {
+                if (requiresManagedModelConfig) {
+                  openModelsForMissingConfig();
+                  return;
+                }
                 // Main screen always has an active session — Sidebar
                 // / EmptyState set it before transitioning here.
                 if (!activeSessionId) return;
@@ -1385,11 +1402,7 @@ function App() {
       <ToastHost
         toasts={toasts}
         onDismiss={dismissToast}
-        onSwitchLLM={() => console.info("[toast] switch llm action")}
-        onOpenMyKey={() => console.info("[toast] open mykey.py")}
-        onOpenGADocs={() => console.info("[toast] open GA docs")}
         onViewProject={openProjectInSidebar}
-        onRetry={() => console.info("[toast] retry")}
       />
 
       <YoloIntroDialog

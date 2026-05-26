@@ -96,6 +96,14 @@ const COMPOSER_STOP_BUTTON = cn(
   "active:shadow-[inset_0_2px_5px_rgba(31,27,23,0.18)]",
 );
 
+const COMPOSER_CONFIG_BUTTON = cn(
+  COMPOSER_ACTION_BUTTON,
+  "border-line bg-surface text-ink-soft",
+  "shadow-[0_1px_0_rgba(31,27,23,0.04),0_2px_7px_rgba(31,27,23,0.07),inset_0_1px_0_rgba(255,255,255,0.22)]",
+  "hover:border-brand/35 hover:bg-brand-soft hover:text-ink hover:shadow-[0_2px_0_rgba(31,27,23,0.05),0_8px_16px_rgba(31,27,23,0.10),inset_0_1px_0_rgba(255,255,255,0.18)]",
+  "active:shadow-[inset_0_2px_5px_rgba(31,27,23,0.12)]",
+);
+
 export interface ComposerProps {
   /** Display name of the currently active LLM (e.g., "Claude Sonnet 4.5"). */
   llmDisplayName: string;
@@ -141,6 +149,8 @@ export interface ComposerProps {
   llmConfigHint?: string;
   /** Opens the model configuration surface from the LLM dropdown. */
   onConfigureModels?: () => void;
+  /** When true, a submit attempt opens Models instead of sending. */
+  requiresModelConfig?: boolean;
   /** Fallback click handler for the LLM pill when `llms` is not
    * provided. Today the only caller using this path is the dev-toggle
    * harness; production wires `llms` + `onSelectLLM`. */
@@ -172,6 +182,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       onSelectLLM,
       llmConfigHint,
       onConfigureModels,
+      requiresModelConfig = false,
       onOpenLLMSwitcher,
     },
     ref,
@@ -329,6 +340,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       const expanded = expandPastePlaceholders(text);
       const trimmed = expanded.trim();
       if (!trimmed || disabled) return;
+      if (requiresModelConfig) {
+        onConfigureModels?.();
+        return;
+      }
       // Allow /btw through stopMode; everything else stays gated.
       if (stopMode && !isSideQuestion) return;
       onSubmit?.(trimmed);
@@ -407,16 +422,36 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={disabled || !text?.trim()}
-                title={copy.composer.sendWithEnter}
-                aria-label={copy.composer.send}
+                disabled={
+                  disabled ||
+                  !text?.trim() ||
+                  (requiresModelConfig && !onConfigureModels)
+                }
+                title={
+                  requiresModelConfig
+                    ? copy.composer.configureModelBeforeSending
+                    : copy.composer.sendWithEnter
+                }
+                aria-label={
+                  requiresModelConfig
+                    ? copy.composer.configureModelBeforeSending
+                    : copy.composer.send
+                }
                 className={cn(
-                  COMPOSER_SEND_BUTTON,
-                  (disabled || !text?.trim()) &&
-                    "cursor-not-allowed opacity-50 hover:translate-y-0 hover:bg-brand hover:text-ink hover:shadow-none",
+                  requiresModelConfig
+                    ? COMPOSER_CONFIG_BUTTON
+                    : COMPOSER_SEND_BUTTON,
+                  (disabled ||
+                    !text?.trim() ||
+                    (requiresModelConfig && !onConfigureModels)) &&
+                    "cursor-not-allowed opacity-50 hover:translate-y-0 hover:shadow-none",
                 )}
               >
-                <ArrowUp size={16} weight="bold" />
+                {requiresModelConfig ? (
+                  <Gear size={15} weight="thin" />
+                ) : (
+                  <ArrowUp size={16} weight="bold" />
+                )}
               </button>
             )}
           </span>

@@ -46,6 +46,8 @@ export interface EmptyStateProps {
   llmConfigHint?: string;
   /** Opens Settings -> Models from the Composer model dropdown. */
   onConfigureModels?: () => void;
+  /** When true, submitting opens Models instead of creating a session. */
+  requiresModelConfig?: boolean;
   /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
   /**
@@ -96,6 +98,7 @@ export function EmptyState({
   onSelectLLM,
   llmConfigHint,
   onConfigureModels,
+  requiresModelConfig = false,
   onOpenLLMSwitcher,
   conversationWidth = "compact",
   projectName,
@@ -138,6 +141,7 @@ export function EmptyState({
           onSelectLLM={onSelectLLM}
           llmConfigHint={llmConfigHint}
           onConfigureModels={onConfigureModels}
+          requiresModelConfig={requiresModelConfig}
           onOpenLLMSwitcher={onOpenLLMSwitcher}
         />
 

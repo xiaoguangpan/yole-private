@@ -85,7 +85,7 @@ export function StepHealth({
         itemActions={itemActions}
       />
 
-      <div className="mt-7 flex items-start gap-2.5 rounded-[8px] border border-line bg-surface p-3.5 text-[12.5px] leading-[1.55] text-ink-soft">
+      <div className="mt-7 flex items-start gap-2.5 rounded-callout border border-line bg-surface p-3.5 text-[12.5px] leading-[1.55] text-ink-soft">
         <Info
           size={14}
           weight="thin"

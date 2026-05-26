@@ -66,7 +66,7 @@ function FileWriteRenderer({ tool }: { tool: ConversationToolEvent }) {
   const mode = stringArg(tool, "mode") || "overwrite";
 
   return (
-    <div className="mb-3 rounded-[8px] border border-line bg-surface px-3.5 py-3">
+    <div className="mb-3 rounded-callout border border-line bg-surface px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <FloppyDiskBack
           size={14}
@@ -109,7 +109,7 @@ function CodeRunRenderer({ tool }: { tool: ConversationToolEvent }) {
     "";
 
   return (
-    <div className="mb-3 overflow-hidden rounded-[8px] border border-line bg-surface">
+    <div className="mb-3 overflow-hidden rounded-callout border border-line bg-surface">
       <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-[11px]">
         <span className="font-mono uppercase tracking-[0.08em] text-ink-muted">
           {language}
@@ -142,7 +142,7 @@ function StartLongTermUpdateRenderer({
     "";
 
   return (
-    <div className="mb-3 rounded-[8px] border border-line bg-surface">
+    <div className="mb-3 rounded-callout border border-line bg-surface">
       <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-[12px]">
         <Brain size={14} weight="thin" className="text-ink-soft" />
         <span className="text-ink-soft">memory key</span>
@@ -161,7 +161,7 @@ function GenericArgsRenderer({ tool }: { tool: ConversationToolEvent }) {
   const args = tool.args ?? {};
   if (Object.keys(args).length === 0) return null;
   return (
-    <pre className="mb-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-[8px] border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
+    <pre className="mb-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-callout border border-line bg-app px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-ink-soft">
       {Object.entries(args).map(([k, v]) => (
         <div key={k}>
           <span className="text-ink-muted">{k}: </span>

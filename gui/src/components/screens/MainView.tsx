@@ -77,6 +77,8 @@ export interface MainViewProps {
   llmConfigHint?: string;
   /** Opens Settings -> Models from the Composer model dropdown. */
   onConfigureModels?: () => void;
+  /** When true, submitting opens Models instead of sending to the bridge. */
+  requiresModelConfig?: boolean;
   /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
   /**
@@ -140,6 +142,7 @@ export function MainView({
   onSelectLLM,
   llmConfigHint,
   onConfigureModels,
+  requiresModelConfig = false,
   onOpenLLMSwitcher,
   pendingAskUser,
   conversationWidth = "compact",
@@ -689,6 +692,7 @@ export function MainView({
             onSelectLLM={onSelectLLM}
             llmConfigHint={llmConfigHint}
             onConfigureModels={onConfigureModels}
+            requiresModelConfig={requiresModelConfig}
             onOpenLLMSwitcher={onOpenLLMSwitcher}
           />
 

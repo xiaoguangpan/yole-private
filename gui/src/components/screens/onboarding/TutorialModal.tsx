@@ -41,7 +41,7 @@ export function TutorialModal({ tutorial, onClose }: TutorialModalProps) {
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-1/2 z-50 w-[640px] -translate-x-1/2 -translate-y-1/2",
-            "max-h-[80vh] overflow-y-auto rounded-[14px] border border-line bg-elevated shadow-elevated",
+            "max-h-[80vh] overflow-y-auto rounded-lg border border-line bg-elevated shadow-elevated",
             "max-w-[calc(100vw-32px)]",
           )}
         >

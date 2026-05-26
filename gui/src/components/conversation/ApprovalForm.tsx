@@ -246,7 +246,7 @@ function DecisionPill({ decision }: { decision: ApprovalDecision }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-[8px] px-3.5 py-2 text-[13px] font-medium",
+        "inline-flex items-center gap-2 rounded-callout px-3.5 py-2 text-[13px] font-medium",
         isDeny
           ? "bg-error/[0.06] text-error"
           : "bg-brand-soft text-brand-strong",

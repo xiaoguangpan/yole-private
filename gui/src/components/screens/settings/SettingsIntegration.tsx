@@ -311,15 +311,7 @@ export function SettingsIntegration() {
           onInstall={() => void installPath()}
           onUninstall={() => void uninstallPath()}
         />
-        {pathError && (
-          <p
-            className="mt-2 break-all text-[11px] text-error"
-            title={pathError}
-          >
-            {pathError.slice(0, 140)}
-            {pathError.length > 140 && "…"}
-          </p>
-        )}
+        {pathError && <InlineErrorWithCopy message={pathError} />}
       </section>
 
       {/* Developer-facing docs link. Kept low ceremony: this is for
@@ -346,13 +338,10 @@ export function SettingsIntegration() {
             <ArrowSquareOut size={11} weight="thin" />
           </Button>
           {docOpenError && (
-            <p
-              className="mt-2 break-all text-[11px] text-error"
-              title={docOpenError}
-            >
-              {agentCopy.openFailed(docOpenError.slice(0, 100))}
-              {docOpenError.length > 100 && "…"}
-            </p>
+            <InlineErrorWithCopy
+              message={agentCopy.openFailed(docOpenError)}
+              details={docOpenError}
+            />
           )}
         </div>
       </section>
@@ -501,6 +490,39 @@ function SopStatus({ state }: { state: SopCopyState }) {
         </span>
       );
   }
+}
+
+function InlineErrorWithCopy({
+  message,
+  details,
+}: {
+  message: string;
+  details?: string;
+}) {
+  const copy = useCopy();
+  const [copied, setCopied] = useState(false);
+  const visible =
+    message.length > 140 ? `${message.slice(0, 140)}…` : message;
+  return (
+    <div className="mt-2 flex items-start gap-2 text-[11px] text-error">
+      <p className="m-0 min-w-0 flex-1 break-all" title={message}>
+        {visible}
+      </p>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-5 shrink-0 px-1.5 text-[10.5px] text-error/75 hover:text-error"
+        onClick={() => {
+          void copyTextToClipboard(details ?? message).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1400);
+          });
+        }}
+      >
+        {copied ? copy.errors.copiedDetails : copy.errors.copyDetails}
+      </Button>
+    </div>
+  );
 }
 
 async function copyTextToClipboard(text: string): Promise<void> {

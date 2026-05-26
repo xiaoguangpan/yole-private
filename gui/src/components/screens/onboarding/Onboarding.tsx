@@ -257,7 +257,7 @@ export function Onboarding({
     // normally — Tauri's drag region inherits down the DOM tree.
     <div
       data-tauri-drag-region
-      className="flex h-screen min-h-[720px] w-screen min-w-[1120px] flex-col overflow-y-auto bg-app pl-[80px] pr-16 pt-16"
+      className="flex h-screen min-h-[720px] w-screen min-w-[1120px] flex-col overflow-y-auto bg-app pl-20 pr-16 pt-16"
     >
       <div
         data-tauri-drag-region="false"

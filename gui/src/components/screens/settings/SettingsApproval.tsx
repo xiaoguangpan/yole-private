@@ -200,7 +200,7 @@ function YoloSection({
   return (
     <div
       className={cn(
-        "rounded-[10px] border bg-surface px-4 py-3.5",
+        "rounded-callout border bg-surface px-4 py-3.5",
         enabled ? "border-warning/30 bg-warning/5" : "border-line",
       )}
     >
@@ -270,7 +270,7 @@ function YoloActivationModal({
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-1/2 z-[60] w-[480px] max-w-[calc(100vw-32px)]",
-            "-translate-x-1/2 -translate-y-1/2 rounded-[14px] border border-line bg-elevated p-7 shadow-elevated",
+            "-translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-elevated p-7 shadow-elevated",
           )}
         >
           <div className="flex items-center gap-2">
@@ -342,7 +342,7 @@ function RuleList({
 }) {
   if (rules.length === 0) {
     return (
-      <div className="mt-2 rounded-[8px] border border-dashed border-line px-3 py-3 text-[12.5px] italic text-ink-muted">
+      <div className="mt-2 rounded-callout border border-dashed border-line px-3 py-3 text-[12.5px] italic text-ink-muted">
         {empty}
       </div>
     );

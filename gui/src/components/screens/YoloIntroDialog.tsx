@@ -51,7 +51,7 @@ export function YoloIntroDialog({ open, onAcknowledge }: YoloIntroDialogProps) {
           onInteractOutside={(e) => e.preventDefault()}
           className={cn(
             "fixed left-1/2 top-1/2 z-50 w-[440px] -translate-x-1/2 -translate-y-1/2",
-            "rounded-[14px] border border-line bg-elevated p-6 shadow-elevated",
+            "rounded-lg border border-line bg-elevated p-6 shadow-elevated",
             "max-w-[calc(100vw-32px)]",
           )}
         >

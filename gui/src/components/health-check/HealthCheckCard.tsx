@@ -6,6 +6,7 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useCopy } from "@/lib/i18n";
@@ -149,12 +150,16 @@ function HealthRow({
   actions: ItemAction[];
   onAction: (action: string) => void;
 }) {
+  const copy = useCopy();
+  const [copied, setCopied] = useState(false);
   // Warnings (e.g. mykey.py missing — user-supplied + .gitignored)
   // also surface a tutorial action: "this is fixable, here's how".
   // Failures and warnings share the same action treatment; success /
   // running / pending rows have nothing to fix so we skip.
   const showActions =
     (item.state === "failed" || item.state === "warning") && actions.length > 0;
+  const canCopyDetails =
+    Boolean(item.detail) && (item.state === "failed" || item.state === "warning");
 
   return (
     <div className="border-b border-line py-2.5 last:border-b-0">
@@ -177,7 +182,7 @@ function HealthRow({
         )}
       </div>
 
-      {showActions && (
+      {(showActions || canCopyDetails) && (
         <div className="ml-[26px] mt-2 flex flex-wrap gap-2">
           {actions.map((a) => (
             <Button
@@ -189,10 +194,54 @@ function HealthRow({
               {a.label}
             </Button>
           ))}
+          {canCopyDetails && (
+            <Button
+              onClick={() => {
+                void copyTextToClipboard(formatHealthDetails(item)).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1400);
+                });
+              }}
+              variant="secondary"
+              size="sm"
+            >
+              {copied ? copy.errors.copiedDetails : copy.errors.copyDetails}
+            </Button>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+function formatHealthDetails(item: HealthCheckItem): string {
+  return [`check: ${item.name}`, `state: ${item.state}`, item.detail ?? ""]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to the textarea fallback.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }
 
 function RowIcon({ state }: { state: HealthCheckState }) {

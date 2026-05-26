@@ -78,7 +78,16 @@ export function ErrorCard({
   //   3. defaultTitle(error) — category-flavored fallback.
   const title = error.title ?? hintCfg?.title ?? defaultTitle(error, copy);
   const brief = hintCfg?.brief ?? error.message;
-  const actions = hintCfg?.actions ?? defaultActions(error, copy);
+  const actions = (hintCfg?.actions ?? defaultActions(error, copy)).filter(
+    (action) =>
+      isActionAvailable(action, error, {
+        onRetry,
+        onSwitchLLM,
+        onOpenMyKey,
+        onOpenGADocs,
+        onViewProject,
+      }),
+  );
 
   return (
     <div
@@ -126,7 +135,7 @@ export function ErrorCard({
       )}
 
       {open && (error.traceback || error.context) && (
-        <div className="mt-3 rounded-[6px] border border-line bg-app p-2.5">
+        <div className="mt-3 rounded-sm border border-line bg-app p-2.5">
           {error.context && (
             <div className="font-mono text-[11px] text-ink-muted">
               context: {error.context}
@@ -156,6 +165,7 @@ interface ActionDef {
     | "onOpenMyKey"
     | "onOpenGADocs"
     | "onViewProject"
+    | "copyDetails"
     | "toggleDetails";
 }
 
@@ -214,10 +224,10 @@ function hintConfig(copy: AppCopy): Record<AppErrorHint, HintConfig> {
         handler: "onOpenGADocs",
       },
       {
-        id: "details",
-        label: copy.errors.details,
+        id: "copy-details",
+        label: copy.errors.copyDetails,
         kind: "ghost",
-        handler: "toggleDetails",
+        handler: "copyDetails",
       },
     ],
   },
@@ -227,10 +237,10 @@ function hintConfig(copy: AppCopy): Record<AppErrorHint, HintConfig> {
     actions: [
       { id: "retry", label: copy.common.retry, kind: "primary", handler: "onRetry" },
       {
-        id: "details",
-        label: copy.errors.details,
+        id: "copy-details",
+        label: copy.errors.copyDetails,
         kind: "ghost",
-        handler: "toggleDetails",
+        handler: "copyDetails",
       },
     ],
   },
@@ -245,10 +255,10 @@ function hintConfig(copy: AppCopy): Record<AppErrorHint, HintConfig> {
         handler: "onSwitchLLM",
       },
       {
-        id: "details",
-        label: copy.errors.details,
+        id: "copy-details",
+        label: copy.errors.copyDetails,
         kind: "ghost",
-        handler: "toggleDetails",
+        handler: "copyDetails",
       },
     ],
   },
@@ -286,13 +296,39 @@ function defaultActions(error: AppError, copy: AppCopy): ActionDef[] {
   }
   if (error.traceback || error.context) {
     actions.push({
-      id: "details",
-      label: copy.errors.details,
+      id: "copy-details",
+      label: copy.errors.copyDetails,
       kind: "ghost",
-      handler: "toggleDetails",
+      handler: "copyDetails",
     });
   }
   return actions;
+}
+
+function isActionAvailable(
+  action: ActionDef,
+  error: AppError,
+  handlers: Pick<
+    ErrorCardActions,
+    "onRetry" | "onSwitchLLM" | "onOpenMyKey" | "onOpenGADocs" | "onViewProject"
+  >,
+): boolean {
+  switch (action.handler) {
+    case "onRetry":
+      return Boolean(handlers.onRetry);
+    case "onSwitchLLM":
+      return Boolean(handlers.onSwitchLLM);
+    case "onOpenMyKey":
+      return Boolean(handlers.onOpenMyKey);
+    case "onOpenGADocs":
+      return Boolean(handlers.onOpenGADocs);
+    case "onViewProject":
+      return error.action?.kind === "view_project" && Boolean(handlers.onViewProject);
+    case "copyDetails":
+      return Boolean(error.context || error.traceback);
+    case "toggleDetails":
+      return Boolean(error.context || error.traceback);
+  }
 }
 
 function ActionButton({
@@ -316,6 +352,8 @@ function ActionButton({
   onToggleDetails: () => void;
   detailsOpen: boolean;
 }) {
+  const copy = useCopy();
+  const [copied, setCopied] = useState(false);
   const handler = (() => {
     switch (action.handler) {
       case "onRetry":
@@ -334,6 +372,13 @@ function ActionButton({
           const { projectId } = error.action;
           return () => onViewProject(projectId);
         }
+      case "copyDetails":
+        return () => {
+          void copyTextToClipboard(formatErrorDetails(error)).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1400);
+          });
+        };
       case "toggleDetails":
         return onToggleDetails;
     }
@@ -361,7 +406,9 @@ function ActionButton({
         ) : undefined
       }
     >
-      {action.label}
+      {copied && action.handler === "copyDetails"
+        ? copy.errors.copiedDetails
+        : action.label}
     </Button>
   );
 }
@@ -371,5 +418,42 @@ const ACTION_ICONS: Partial<Record<ActionDef["handler"], typeof Cube>> = {
   onOpenMyKey: FileCode,
   onOpenGADocs: ArrowSquareOut,
   onViewProject: FolderOpen,
+  copyDetails: FileCode,
   toggleDetails: CaretDown,
 };
+
+function formatErrorDetails(error: AppError): string {
+  const rows = [
+    `category: ${error.category}`,
+    `severity: ${error.severity}`,
+    `message: ${error.message}`,
+    error.context ? `context: ${error.context}` : null,
+    `timestamp: ${error.timestamp}`,
+    error.traceback ? `traceback:\n${error.traceback}` : null,
+  ];
+  return rows.filter(Boolean).join("\n");
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to the textarea fallback.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}

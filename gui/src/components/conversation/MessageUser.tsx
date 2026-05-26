@@ -21,7 +21,7 @@ import type { Origin } from "@/types/conversation";
  *     the user's own turns sit in the same family. Still a
  *     document callout (full-width, left-anchored), not an IM
  *     bubble.
- *   - rounded-r-[6px] — softens the trailing edge into a callout
+ *   - rounded-r-sm — softens the trailing edge into a callout
  *     shape (a touch less round than ThinkingSummary's 8px so the
  *     hierarchy reads user > thinking).
  *   - `whitespace-pre-wrap break-words` — preserves the `\n`s in
@@ -211,7 +211,7 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
       <div
         data-role="user-msg"
         className={cn(
-          "relative rounded-r-[6px] border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 pr-12 text-[15px] font-medium leading-[1.65] text-ink",
+          "relative rounded-r-sm border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 pr-12 text-[15px] font-medium leading-[1.65] text-ink",
           "select-text whitespace-pre-wrap break-words",
           isLong && collapsed && "overflow-hidden",
         )}

@@ -87,6 +87,9 @@ export function ArchivedDialog({
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deletingOne, setDeletingOne] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [emptying, setEmptying] = useState(false);
 
   // Reset select mode + selection every time the dialog opens.
   // Stale selection across opens would be surprising.
@@ -139,7 +142,7 @@ export function ArchivedDialog({
             aria-describedby={undefined}
             className={cn(
               "fixed left-1/2 top-1/2 z-50 flex h-[520px] w-[640px] -translate-x-1/2 -translate-y-1/2 flex-col",
-              "overflow-hidden rounded-[14px] border border-line bg-elevated shadow-elevated",
+              "overflow-hidden rounded-lg border border-line bg-elevated shadow-elevated",
               "max-h-[calc(100vh-32px)] max-w-[calc(100vw-32px)]",
             )}
           >
@@ -200,9 +203,17 @@ export function ArchivedDialog({
         onCancel={() => setPendingDelete(null)}
         onConfirm={async () => {
           if (!pendingDelete) return;
-          await onDeletePermanently(pendingDelete.id);
-          setPendingDelete(null);
+          setDeletingOne(true);
+          try {
+            await onDeletePermanently(pendingDelete.id);
+            setPendingDelete(null);
+          } catch {
+            // Store surfaces the failure toast and keeps the row in place.
+          } finally {
+            setDeletingOne(false);
+          }
         }}
+        busy={deletingOne}
       />
 
       {/* Bulk delete confirm — single-layer (count, no checkbox). */}
@@ -211,10 +222,18 @@ export function ArchivedDialog({
         count={selectedIds.length}
         onCancel={() => setBulkDeleteConfirmOpen(false)}
         onConfirm={async () => {
-          await onDeletePermanentlyBulk(selectedIds);
-          setBulkDeleteConfirmOpen(false);
-          exitSelectMode();
+          setBulkDeleting(true);
+          try {
+            await onDeletePermanentlyBulk(selectedIds);
+            setBulkDeleteConfirmOpen(false);
+            exitSelectMode();
+          } catch {
+            // Store surfaces the failure toast and keeps the selection.
+          } finally {
+            setBulkDeleting(false);
+          }
         }}
+        busy={bulkDeleting}
       />
 
       {/* Empty-all double-confirm dialog. */}
@@ -223,9 +242,17 @@ export function ArchivedDialog({
         count={archived.length}
         onCancel={() => setEmptyConfirmOpen(false)}
         onConfirm={async () => {
-          await onEmptyAll();
-          setEmptyConfirmOpen(false);
+          setEmptying(true);
+          try {
+            await onEmptyAll();
+            setEmptyConfirmOpen(false);
+          } catch {
+            // Store surfaces the failure toast and keeps the archive intact.
+          } finally {
+            setEmptying(false);
+          }
         }}
+        busy={emptying}
       />
     </>
   );
@@ -492,10 +519,12 @@ function ConfirmDeleteOneDialog({
   session,
   onCancel,
   onConfirm,
+  busy,
 }: {
   session: Session | null;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
+  busy: boolean;
 }) {
   const copy = useCopy();
   return (
@@ -515,7 +544,7 @@ function ConfirmDeleteOneDialog({
           aria-describedby="confirm-delete-one-desc"
           className={cn(
             "fixed left-1/2 top-1/2 z-[60] w-[420px] -translate-x-1/2 -translate-y-1/2",
-            "rounded-[14px] border border-line bg-elevated p-5 shadow-elevated",
+            "rounded-lg border border-line bg-elevated p-5 shadow-elevated",
             "max-w-[calc(100vw-32px)]",
           )}
         >
@@ -533,11 +562,12 @@ function ConfirmDeleteOneDialog({
           </p>
 
           <DialogActionRow>
-            <Button variant="secondary" onClick={onCancel} autoFocus>
+            <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
               {copy.common.cancel}
             </Button>
             <Button
               variant="destructive"
+              disabled={busy}
               onClick={() => {
                 void onConfirm();
               }}
@@ -561,11 +591,13 @@ function ConfirmDeleteManyDialog({
   count,
   onCancel,
   onConfirm,
+  busy,
 }: {
   open: boolean;
   count: number;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
+  busy: boolean;
 }) {
   const copy = useCopy();
   return (
@@ -582,7 +614,7 @@ function ConfirmDeleteManyDialog({
           aria-describedby="confirm-delete-many-desc"
           className={cn(
             "fixed left-1/2 top-1/2 z-[60] w-[440px] -translate-x-1/2 -translate-y-1/2",
-            "rounded-[14px] border border-line bg-elevated p-5 shadow-elevated",
+            "rounded-lg border border-line bg-elevated p-5 shadow-elevated",
             "max-w-[calc(100vw-32px)]",
           )}
         >
@@ -598,11 +630,12 @@ function ConfirmDeleteManyDialog({
           </p>
 
           <DialogActionRow>
-            <Button variant="secondary" onClick={onCancel} autoFocus>
+            <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
               {copy.common.cancel}
             </Button>
             <Button
               variant="destructive"
+              disabled={busy}
               onClick={() => {
                 void onConfirm();
               }}
@@ -630,11 +663,13 @@ function ConfirmEmptyAllDialog({
   count,
   onCancel,
   onConfirm,
+  busy,
 }: {
   open: boolean;
   count: number;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
+  busy: boolean;
 }) {
   const copy = useCopy();
   const [acknowledged, setAcknowledged] = useState(false);
@@ -656,7 +691,7 @@ function ConfirmEmptyAllDialog({
           aria-describedby="confirm-empty-all-desc"
           className={cn(
             "fixed left-1/2 top-1/2 z-[60] w-[460px] -translate-x-1/2 -translate-y-1/2",
-            "rounded-[14px] border border-line bg-elevated p-5 shadow-elevated",
+            "rounded-lg border border-line bg-elevated p-5 shadow-elevated",
             "max-w-[calc(100vw-32px)]",
           )}
         >
@@ -685,6 +720,7 @@ function ConfirmEmptyAllDialog({
           <DialogActionRow>
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => {
                 setAcknowledged(false);
                 onCancel();
@@ -695,7 +731,7 @@ function ConfirmEmptyAllDialog({
             </Button>
             <Button
               variant="destructive"
-              disabled={!acknowledged}
+              disabled={!acknowledged || busy}
               onClick={() => {
                 void onConfirm().then(() => setAcknowledged(false));
               }}

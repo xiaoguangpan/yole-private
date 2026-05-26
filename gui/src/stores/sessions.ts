@@ -31,10 +31,10 @@ import type {
  * Writes go through the Rust `GalleyApi` trait via Tauri invoke (see
  * `core/src/api.rs`); the front-end keeps an in-memory mirror so the
  * sidebar / TopBar / Composer can render synchronously. The slice
- * intentionally optimistic-updates: mutate in memory immediately, fire
- * invoke fire-and-forget, log on failure. SQLite errors are rare on a
- * trusted local DB; the alternative (round-trip awaits before
- * rendering) introduced visible lag during dogfood for archive/delete.
+ * intentionally optimistic-updates low-risk organization changes:
+ * mutate in memory immediately, fire invoke fire-and-forget, log on
+ * failure. Permanent delete is the exception because a failed DB delete
+ * must not look successful to the user.
  *
  * This file does NOT own:
  *   - Per-session conversation state (turns / pending approvals /
@@ -105,6 +105,32 @@ function currentCopy() {
   return copyForLanguage(
     resolveLanguagePreference(usePrefsStore.getState().languagePreference),
   );
+}
+
+function pushDeleteFailedToast(context: string, error: unknown) {
+  const copy = currentCopy();
+  useUiStore.getState().pushToast(
+    makeAppError({
+      category: "business",
+      severity: "error",
+      title: copy.toasts.deleteFailed,
+      message: copy.toasts.deleteFailedMessage,
+      hint: null,
+      retryable: false,
+      context,
+      traceback: errorMessage(error),
+    }),
+  );
+}
+
+function errorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
 }
 
 // Mirror of Rust `CreateSessionInput`.
@@ -688,6 +714,13 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         e,
       );
     }
+    try {
+      await invoke("delete_session", { id: sessionId, origin: GUI_ORIGIN });
+    } catch (e) {
+      console.warn("[sessions] delete_session invoke failed.", e);
+      pushDeleteFailedToast("deleteSessionPermanently", e);
+      throw e;
+    }
     set((state) => {
       const sessions = state.sessions.filter((s) => s.id !== sessionId);
       const out: Partial<SessionsState> = { sessions };
@@ -697,11 +730,6 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       return out;
     });
     clearSessionMessages(sessionId);
-    try {
-      await invoke("delete_session", { id: sessionId, origin: GUI_ORIGIN });
-    } catch (e) {
-      console.warn("[sessions] delete_session invoke failed.", e);
-    }
   },
 
   archiveSessionsBulk: (sessionIds) => {
@@ -779,6 +807,16 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
         );
       }
     }
+    try {
+      await invoke("bulk_delete_sessions", {
+        ids: sessionIds,
+        origin: GUI_ORIGIN,
+      });
+    } catch (e) {
+      console.warn("[sessions] bulk_delete_sessions invoke failed.", e);
+      pushDeleteFailedToast("deleteSessionsPermanentlyBulk", e);
+      throw e;
+    }
     const idSet = new Set(sessionIds);
     set((state) => {
       const sessions = state.sessions.filter((s) => !idSet.has(s.id));
@@ -789,14 +827,6 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
       return out;
     });
     sessionIds.forEach((id) => clearSessionMessages(id));
-    try {
-      await invoke("bulk_delete_sessions", {
-        ids: sessionIds,
-        origin: GUI_ORIGIN,
-      });
-    } catch (e) {
-      console.warn("[sessions] bulk_delete_sessions invoke failed.", e);
-    }
   },
 
   emptyArchive: async () => {

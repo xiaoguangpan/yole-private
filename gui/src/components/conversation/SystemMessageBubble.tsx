@@ -38,7 +38,7 @@ export function SystemMessageBubble({
     return (
       <div
         data-role="system-bubble"
-        className="my-5 rounded-r-[6px] border-l-[3px] border-warning bg-warning/[0.04] px-4 py-2.5"
+        className="my-5 rounded-r-sm border-l-[3px] border-warning bg-warning/[0.04] px-4 py-2.5"
       >
         <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-warning">
           <ChatCircleDots size={12} weight="bold" />
@@ -51,7 +51,7 @@ export function SystemMessageBubble({
   return (
     <div
       data-role="system-bubble"
-      className="my-5 rounded-r-[6px] border-l-[3px] border-ink-soft bg-surface px-4 py-2.5"
+      className="my-5 rounded-r-sm border-l-[3px] border-ink-soft bg-surface px-4 py-2.5"
     >
       <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted">
         <Info size={12} weight="bold" />

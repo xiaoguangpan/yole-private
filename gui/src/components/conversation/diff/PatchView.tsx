@@ -37,7 +37,7 @@ export function PatchView({ path, oldContent, newContent }: PatchViewProps) {
   const isNewFile = oldContent === "" && added > 0;
 
   return (
-    <div className="overflow-hidden rounded-[8px] border border-line bg-surface font-mono text-[12px] leading-[1.55]">
+    <div className="overflow-hidden rounded-callout border border-line bg-surface font-mono text-[12px] leading-[1.55]">
       <div className="flex items-center justify-between gap-3 border-b border-line bg-app px-3 py-2">
         <span className="font-mono text-[12px] text-ink">{path}</span>
         <span className="flex items-center gap-2 text-ink-muted">

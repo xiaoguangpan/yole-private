@@ -125,6 +125,7 @@ const zhCopy = {
     cannotSwitchRunning: "运行中无法切换 LLM",
     switchCurrent: (name: string) => `切换 LLM · 当前 ${name}`,
     configureModels: "配置模型",
+    configureModelBeforeSending: "先配置模型",
     willCreateIn: (projectName: string) => `将创建到 ${projectName}`,
   },
   empty: {
@@ -597,6 +598,8 @@ const zhCopy = {
       brief: "可切换其他 LLM 继续。",
     },
     details: "查看技术详情",
+    copyDetails: "Copy details",
+    copiedDetails: "Copied",
     switchLLM: "切换 LLM",
     managedModelUnavailable:
       "内置 GA 模型不可用。请在 Models 添加模型，或重新输入 API Key。",
@@ -624,6 +627,8 @@ const zhCopy = {
     petClosed: "桌面宠物已关闭",
     archived: "已 Archive",
     archivedCount: (count: number) => `已归档 ${count} 个对话`,
+    deleteFailed: "删除失败",
+    deleteFailedMessage: "Galley 没能从本地数据库删除这个对话。请稍后再试。",
   },
   projects: {
     fallbackProject: "项目",
@@ -837,6 +842,7 @@ const enCopy: AppCopy = {
     cannotSwitchRunning: "Cannot switch LLMs while a run is active",
     switchCurrent: (name) => `Switch LLM · Current: ${name}`,
     configureModels: "Configure models",
+    configureModelBeforeSending: "Set up a model first",
     willCreateIn: (projectName) => `Will be created in ${projectName}`,
   },
   empty: {
@@ -1324,6 +1330,8 @@ const enCopy: AppCopy = {
       brief: "Switch to another LLM to continue.",
     },
     details: "Show technical details",
+    copyDetails: "Copy details",
+    copiedDetails: "Copied",
     switchLLM: "Switch LLM",
     managedModelUnavailable:
       "Bundled GA has no usable model. Add a model in Models or re-enter the API Key.",
@@ -1355,6 +1363,9 @@ const enCopy: AppCopy = {
     petClosed: "Desktop Pet closed",
     archived: "Archived",
     archivedCount: (count) => `Archived ${count} conversations`,
+    deleteFailed: "Delete failed",
+    deleteFailedMessage:
+      "Galley could not delete the conversation from the local database. Try again in a moment.",
   },
   projects: {
     fallbackProject: "Project",
