@@ -1,8 +1,7 @@
 """Unit tests for module-level helpers in runner.workbench_bridge.
 
 Heavy integration is in test_e2e.py. This file covers pure-function helpers
-that don't need a GA subprocess: error classification and LLM name
-prettification.
+that don't need a GA subprocess: error classification and LLM display names.
 """
 from __future__ import annotations
 
@@ -10,9 +9,9 @@ import pytest
 
 from runner.workbench_bridge import (
     Bridge,
-    _FenceFilter,
     _classify_error,
-    _simplify_llm_name,
+    _FenceFilter,
+    _llm_display_name,
 )
 
 # ---------------- _classify_error ----------------
@@ -86,53 +85,31 @@ def test_classify_case_insensitive() -> None:
     assert hint == "check_llm_config"
 
 
-# ---------------- _simplify_llm_name ----------------
+# ---------------- _llm_display_name ----------------
 
 
-@pytest.mark.parametrize(
-    "raw,expected",
-    [
-        # Standard ClassName/model-name forms
-        ("NativeClaudeSession/glm-5.1", "GLM 5.1"),
-        ("NativeOAISession/gpt-4o", "GPT 4o"),
-        ("ClaudeSession/claude-3-5-sonnet", "Claude 3-5-sonnet"),
-        ("LLMSession/qwen-max", "Qwen max"),
-        ("MixinSession/deepseek-v3", "DeepSeek v3"),
-        ("Session/kimi-k2", "Kimi k2"),
-        # No slash: treat the whole thing as the model id
-        ("BADCONFIG_MIXIN", "BADCONFIG_MIXIN"),
-        # Single-token model with unknown brand keeps the original token
-        ("FooSession/CustomModel", "CustomModel"),
-    ],
-)
-def test_simplify_llm_name(raw: str, expected: str) -> None:
-    assert _simplify_llm_name(raw) == expected
-
-
-@pytest.mark.parametrize(
-    "raw,model,expected",
-    [
-        # name == model (no explicit user name): prettify the model
-        ("NativeOAISession/gpt-5.5", "gpt-5.5", "GPT 5.5"),
-        ("NativeClaudeSession/claude-opus-4-6", "claude-opus-4-6",
-         "Claude opus-4-6"),
-        # name != model (user set explicit name in mykey.py): verbatim
-        ("NativeClaudeSession/claude-main", "claude-opus-4-6", "claude-main"),
-        ("NativeOAISession/gpt-backup", "gpt-5.5", "gpt-backup"),
-        # Custom name with brand-like prefix still respected verbatim
-        ("LLMSession/my-fast-claude", "claude-haiku-4-5", "my-fast-claude"),
-        # Lowercased / underscored user names preserved (no auto-capitalize)
-        ("NativeOAISession/team_shared", "gpt-5.5", "team_shared"),
-        # model=None falls through to prettify (legacy single-arg behavior)
-        ("NativeOAISession/gpt-4o", None, "GPT 4o"),
-        # Empty model treated as missing (defensive)
-        ("NativeOAISession/gpt-4o", "", "GPT 4o"),
-    ],
-)
-def test_simplify_llm_name_respects_explicit_name(
-    raw: str, model: str | None, expected: str
+def test_llm_display_name_external_runtime_uses_raw_name(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert _simplify_llm_name(raw, model) == expected
+    monkeypatch.delenv("GALLEY_RUNTIME_KIND", raising=False)
+
+    assert _llm_display_name("NativeClaudeSession/glm-5.1") == (
+        "NativeClaudeSession/glm-5.1"
+    )
+    assert _llm_display_name("NativeClaudeSession/claude-main") == (
+        "NativeClaudeSession/claude-main"
+    )
+
+
+def test_llm_display_name_managed_runtime_uses_galley_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GALLEY_RUNTIME_KIND", "managed")
+
+    assert (
+        _llm_display_name("NativeClaudeSession/glm-5.1") == "glm-5.1"
+    )
+    assert _llm_display_name("NativeClaudeSession/My GLM") == "My GLM"
 
 
 # ---------------- _extract_ask_user ----------------

@@ -17,7 +17,7 @@ export interface LLMInfo {
   index: number;
   /** Raw "ClassName/model" from GA */
   name: string;
-  /** Bridge-prettified name for UI display */
+  /** Runtime-mode display label for UI */
   displayName: string;
   isCurrent: boolean;
 }

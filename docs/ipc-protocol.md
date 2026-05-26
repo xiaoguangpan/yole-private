@@ -145,9 +145,9 @@ bridge 启动并完成 GA 初始化后**立刻**发的第一条事件。desktop 
   "cwd": "/Users/inkstone/Documents/GenericAgent/temp",
   "pid": 12345,
   "availableLLMs": [
-    { "index": 0, "name": "NativeClaudeSession/glm-5.1", "displayName": "GLM 5.1", "isCurrent": true },
-    { "index": 1, "name": "ClaudeSession/claude-sonnet-4-6", "displayName": "Claude sonnet-4-6", "isCurrent": false },
-    { "index": 2, "name": "NativeOAISession/gpt-4o", "displayName": "GPT 4o", "isCurrent": false }
+    { "index": 0, "name": "NativeClaudeSession/glm-5.1", "displayName": "NativeClaudeSession/glm-5.1", "isCurrent": true },
+    { "index": 1, "name": "ClaudeSession/claude-sonnet-4-6", "displayName": "ClaudeSession/claude-sonnet-4-6", "isCurrent": false },
+    { "index": 2, "name": "NativeOAISession/gpt-4o", "displayName": "NativeOAISession/gpt-4o", "isCurrent": false }
   ],
   "timestamp": "2026-05-07T13:51:00+08:00"
 }
@@ -157,7 +157,7 @@ bridge 启动并完成 GA 初始化后**立刻**发的第一条事件。desktop 
 - `gaCommit`：用户本地 GA repo 的 HEAD commit hash（来自 `git rev-parse HEAD`）。`"unknown"` 表示 GA 路径不是 git 仓库（例如 zip 下载安装），desktop 应优雅退化为"无版本信息"
 - `gaCommitDate`：HEAD commit 的提交时间（ISO 8601，来自 `git log -1 --format=%cI`）。同样 `"unknown"` 退化处理
 - `llmName`：当前激活的 LLM raw name（GA 内部 `f"{ClassName}/{model}"` 格式）
-- `availableLLMs`：所有可用 LLM 的列表。`displayName` 是 bridge 简化后的人话名（用于 Composer 内 LLM 选择器）；`name` 是 raw 名字（debug 用）
+- `availableLLMs`：所有可用 LLM 的列表。`name` 是 raw 名字。`displayName` 是 UI 标签：external GA 保留完整 raw name；managed GA 使用 Galley 模型配置里的显示名，未设置时使用原始 model id。
 
 desktop 必须验证 `protocolVersion` 与自身一致；不一致应主动 `shutdown`。
 
@@ -408,7 +408,7 @@ agent 主动调用 `ask_user` 工具时发出。bridge 此时 agent_runner_loop 
   "sessionId": "sess_abc123",
   "index": 1,
   "name": "ClaudeSession/claude-sonnet-4-6",
-  "displayName": "Claude sonnet-4-6",
+  "displayName": "ClaudeSession/claude-sonnet-4-6",
   "timestamp": "..."
 }
 ```

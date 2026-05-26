@@ -26,10 +26,13 @@ Health Check.
 - Users can continue without changing Runtime or models. In bundled-GA mode,
   a configured model exposes `Continue with current model`; in external-GA
   mode, the saved GA path pre-fills the attach step.
-- Bundled model setup separates `Test connection` from `Start using Galley`.
-  The test sends a minimal real model request, shows latency, and maps common
-  HTTP / network failures to human-readable guidance. Settings -> Models uses
-  the same probe feedback.
+- Bundled model setup keeps connection validation separate from
+  `Start using Galley`. The test sends a minimal real model request, shows
+  latency, and maps common HTTP / network failures to human-readable guidance.
+  Settings -> Models uses the same probe feedback.
+- In Onboarding, the model connection test runs automatically after complete
+  input settles, because first setup should minimize decision points. Settings
+  keeps explicit manual checks for maintenance workflows.
 - Settings -> Models keeps probe feedback per provider / model instead of
   treating the last probe as global state. This supports a "check everything"
   pass without earlier results disappearing when the next provider is tested.
@@ -47,7 +50,9 @@ Health Check.
   does not read as part of the Provider name. In expanded provider details,
   default models show a lightweight `Default model` status pill; only
   non-default models expose `Set as default`.
-- From Settings, the first screen has a `Back to Settings` escape hatch.
+- From Settings, the setup flow has a top-level `Back to Settings` escape hatch
+  beside the progress indicator. Step footers stay reserved for step-local
+  actions.
 - Disable the entry while an Agent task is running, because setup can change
   Runtime / model semantics.
 

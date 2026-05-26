@@ -36,7 +36,7 @@ export interface RuntimeInfo {
   /** ~/Documents/GenericAgent or wherever the user attached. */
   gaPath: string;
   pythonVersion: string;
-  /** Active LLM (display name from bridge prettifier). */
+  /** Active LLM UI label from the bridge runtime-mode display rule. */
   llmDisplayName: string;
   /** Bridge subprocess PID for the active session, if any. */
   bridgePid?: number;

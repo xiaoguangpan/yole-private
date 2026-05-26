@@ -5,10 +5,16 @@ import {
   Eye,
   EyeSlash,
   ListMagnifyingGlass,
-  PlugsConnected,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
 import { Button } from "@/components/ui/button";
@@ -36,17 +42,17 @@ type SetupState =
   | { kind: "success"; action: SetupAction; message: string }
   | { kind: "error"; action: SetupAction; message: string };
 
+const AUTO_CONNECTION_TEST_DELAY_MS = 800;
+
 interface StepModelConfigProps {
   onComplete: () => void;
   onAttachExisting: () => void;
-  onCancel?: () => void;
   canContinueWithExisting?: boolean;
 }
 
 export function StepModelConfig({
   onComplete,
   onAttachExisting,
-  onCancel,
   canContinueWithExisting = false,
 }: StepModelConfigProps) {
   const copy = useCopy();
@@ -74,9 +80,14 @@ export function StepModelConfig({
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [state, setState] = useState<SetupState>({ kind: "idle" });
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
-  const [verifiedFingerprint, setVerifiedFingerprint] = useState<
-    string | null
-  >(null);
+  const [verifiedFingerprint, setVerifiedFingerprint] = useState<string | null>(
+    null,
+  );
+  const [testedFingerprint, setTestedFingerprint] = useState<string | null>(
+    null,
+  );
+  const connectionTestRequestRef = useRef(0);
+  const connectionFingerprintRef = useRef("");
   const selectedPreset = getManagedModelProviderPreset(providerPresetId);
   const apiKeyRevealLabel = apiKeyVisible
     ? modelCopy.hideApiKey
@@ -92,28 +103,34 @@ export function StepModelConfig({
     [apiBase, apiKey, model, protocol],
   );
 
-  const canFetchModels =
-    apiKey.trim() !== "" && apiBase.trim() !== "" && state.kind !== "loading";
-  const canTestConnection = useMemo(
-    () =>
-      apiKey.trim() !== "" &&
-      apiBase.trim() !== "" &&
-      model.trim() !== "" &&
-      state.kind !== "loading",
-    [apiBase, apiKey, model, state.kind],
-  );
-  const canStart =
-    canTestConnection && verifiedFingerprint === connectionFingerprint;
+  useEffect(() => {
+    connectionFingerprintRef.current = connectionFingerprint;
+  }, [connectionFingerprint]);
 
-  const probeInput = () => ({
-    protocol,
-    apiKey: apiKey.trim(),
-    apiBase: apiBase.trim(),
-    model: model.trim(),
-  });
+  const connectionInputComplete =
+    apiKey.trim() !== "" && apiBase.trim() !== "" && model.trim() !== "";
+  const isBusy = state.kind === "loading";
+  const canFetchModels =
+    apiKey.trim() !== "" && apiBase.trim() !== "" && !isBusy;
+  const canStart =
+    connectionInputComplete &&
+    verifiedFingerprint === connectionFingerprint &&
+    !isBusy;
+
+  const probeInput = useCallback(
+    () => ({
+      protocol,
+      apiKey: apiKey.trim(),
+      apiBase: apiBase.trim(),
+      model: model.trim(),
+    }),
+    [apiBase, apiKey, model, protocol],
+  );
 
   const resetConnectionTest = () => {
+    connectionTestRequestRef.current += 1;
     setVerifiedFingerprint(null);
+    setTestedFingerprint(null);
     setState({ kind: "idle" });
   };
 
@@ -154,27 +171,77 @@ export function StepModelConfig({
     }
   };
 
-  const handleTestConnection = async () => {
-    if (!canTestConnection) return;
-    const fingerprint = connectionFingerprint;
-    setVerifiedFingerprint(null);
-    setState({ kind: "loading", action: "test" });
-    try {
-      const result = await testManagedModelConnectionWithLatency(probeInput());
-      setVerifiedFingerprint(fingerprint);
-      setState({
-        kind: "success",
-        action: "test",
-        message: connectionSuccessMessage(result, modelCopy),
-      });
-    } catch (e) {
-      setState({
-        kind: "error",
-        action: "test",
-        message: managedModelProbeErrorMessage(e, modelCopy),
-      });
+  const runConnectionTest = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (!connectionInputComplete) return;
+
+      const fingerprint = connectionFingerprint;
+      if (!force && testedFingerprint === fingerprint) return;
+
+      const requestId = connectionTestRequestRef.current + 1;
+      connectionTestRequestRef.current = requestId;
+      setVerifiedFingerprint(null);
+      setTestedFingerprint(fingerprint);
+      setState({ kind: "loading", action: "test" });
+      try {
+        const result =
+          await testManagedModelConnectionWithLatency(probeInput());
+        if (
+          requestId !== connectionTestRequestRef.current ||
+          fingerprint !== connectionFingerprintRef.current
+        ) {
+          return;
+        }
+        setVerifiedFingerprint(fingerprint);
+        setState({
+          kind: "success",
+          action: "test",
+          message: connectionSuccessMessage(result, modelCopy),
+        });
+      } catch (e) {
+        if (
+          requestId !== connectionTestRequestRef.current ||
+          fingerprint !== connectionFingerprintRef.current
+        ) {
+          return;
+        }
+        setState({
+          kind: "error",
+          action: "test",
+          message: managedModelProbeErrorMessage(e, modelCopy),
+        });
+      }
+    },
+    [
+      connectionFingerprint,
+      connectionInputComplete,
+      modelCopy,
+      probeInput,
+      testedFingerprint,
+    ],
+  );
+
+  useEffect(() => {
+    if (
+      !connectionInputComplete ||
+      isBusy ||
+      testedFingerprint === connectionFingerprint
+    ) {
+      return;
     }
-  };
+
+    const timer = setTimeout(() => {
+      void runConnectionTest();
+    }, AUTO_CONNECTION_TEST_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [
+    connectionFingerprint,
+    connectionInputComplete,
+    isBusy,
+    runConnectionTest,
+    testedFingerprint,
+  ]);
 
   const handleStart = async () => {
     if (!canStart) return;
@@ -325,15 +392,6 @@ export function StepModelConfig({
 
       <div className="mt-9 flex flex-wrap items-start gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="text-[12px] text-ink-muted transition-colors hover:text-brand-strong"
-            >
-              {onboardingCopy.backToSettings}
-            </button>
-          )}
           <button
             type="button"
             onClick={onAttachExisting}
@@ -354,24 +412,11 @@ export function StepModelConfig({
               {onboardingCopy.continueWithCurrentModel}
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="lg"
-            disabled={!canTestConnection}
-            onClick={() => void handleTestConnection()}
-            leadingIcon={
-              state.kind === "loading" && state.action === "test" ? (
-                <span className="spin">
-                  <CircleNotch size={14} weight="thin" />
-                </span>
-              ) : (
-                <PlugsConnected size={14} weight="thin" />
-              )
-            }
-          >
-            {modelCopy.testConnection}
-          </Button>
-          <InlineSetupStatus state={state} action="test" />
+          <InlineSetupStatus
+            state={state}
+            action="test"
+            loadingMessage={modelCopy.autoTestingConnection}
+          />
           <Button
             variant="primary"
             size="lg"
@@ -393,7 +438,20 @@ export function StepModelConfig({
       </div>
       <div className="mt-2 flex justify-end">
         <div className="w-full max-w-[420px] space-y-2">
-          <SetupErrorLine state={state} action="test" />
+          <SetupErrorLine
+            state={state}
+            action="test"
+            actionSlot={
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!connectionInputComplete || isBusy}
+                onClick={() => void runConnectionTest({ force: true })}
+              >
+                {modelCopy.retryConnectionTest}
+              </Button>
+            }
+          />
           <SetupErrorLine state={state} action="start" />
         </div>
       </div>
@@ -448,10 +506,22 @@ function SetupInput({
 function InlineSetupStatus({
   state,
   action,
+  loadingMessage,
 }: {
   state: SetupState;
   action: SetupAction;
+  loadingMessage?: string;
 }) {
+  if (state.kind === "loading" && state.action === action && loadingMessage) {
+    return (
+      <span className="inline-flex min-h-7 max-w-[220px] shrink items-center gap-1 px-1 text-[11.5px] leading-none text-ink-muted">
+        <span className="spin">
+          <CircleNotch size={11} weight="thin" />
+        </span>
+        <span className="truncate">{loadingMessage}</span>
+      </span>
+    );
+  }
   if (state.kind !== "success" || state.action !== action) return null;
   return (
     <span
@@ -467,12 +537,21 @@ function InlineSetupStatus({
 function SetupErrorLine({
   state,
   action,
+  actionSlot,
 }: {
   state: SetupState;
   action: SetupAction;
+  actionSlot?: ReactNode;
 }) {
   if (state.kind !== "error" || state.action !== action) return null;
-  return <StatusLine tone="error" message={state.message} />;
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <StatusLine tone="error" message={state.message} />
+      </div>
+      {actionSlot}
+    </div>
+  );
 }
 
 function StatusLine({
@@ -507,7 +586,9 @@ function connectionSuccessMessage(
   copy: ReturnType<typeof useCopy>["settings"]["models"],
 ): string {
   const message =
-    result.modelFound === true ? copy.modelUsable : copy.connectionUsableCanSave;
+    result.modelFound === true
+      ? copy.modelUsable
+      : copy.connectionUsableCanSave;
   return copy.connectionLatency(message, result.latencyMs);
 }
 

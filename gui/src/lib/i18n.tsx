@@ -253,9 +253,12 @@ const zhCopy = {
       showApiKey: "显示 API Key",
       hideApiKey: "隐藏 API Key",
       testConnection: "测试连接",
+      autoTestingConnection: "正在测试连接...",
+      retryConnectionTest: "重新测试",
       connectionLatency: (message: string, latencyMs: number) =>
         `${message} · ${latencyMs} ms`,
-      errorUnauthorized: "401 未授权：模型密钥不正确，或没有访问这个模型的权限。",
+      errorUnauthorized:
+        "401 未授权：模型密钥不正确，或没有访问这个模型的权限。",
       errorForbidden: "403 权限不足：当前 Key 不能访问这个服务或模型。",
       errorRateLimited: "429 请求过多：稍后重试，或检查额度和限流设置。",
       errorNotFound: "404 未找到：API 地址或模型名可能不匹配。",
@@ -381,13 +384,13 @@ const zhCopy = {
       links: "Links",
       feedback: "反馈建议",
       origin:
-        "Galley started as a workbench for GenericAgent. The first two letters of our name are a quiet bow to where we came from.",
+        "Galley 最初是 GenericAgent 的 workbench；名字前两个字母 GA，是对它的致意。",
       galleyVersion: "Galley 版本",
       bundledGAVersion: "内置 GA 版本",
-      alsoBy: "wangjc683 的其他作品",
+      alsoBy: "More by wangjc683",
       subsageDetail: "AI Agent 原生订阅管家 · subsage.top",
       filmDetail: "IMAX 胶片电影资料库 · 15perf70mm.com",
-      madeBy: "由 wangjc683 制作 · MIT 开源许可",
+      madeBy: "Built by wangjc683 · MIT License",
     },
     agent: {
       subtitle: "让 Agent 接管和操作 Galley",
@@ -963,6 +966,8 @@ const enCopy: AppCopy = {
       showApiKey: "Show API Key",
       hideApiKey: "Hide API Key",
       testConnection: "Test connection",
+      autoTestingConnection: "Testing connection...",
+      retryConnectionTest: "Retry test",
       connectionLatency: (message, latencyMs) => `${message} · ${latencyMs} ms`,
       errorUnauthorized:
         "401 Unauthorized: the API Key is invalid or cannot access this model.",
@@ -970,8 +975,7 @@ const enCopy: AppCopy = {
         "403 Forbidden: this key cannot access the service or model.",
       errorRateLimited:
         "429 Rate limited: try again later, or check quota and rate limits.",
-      errorNotFound:
-        "404 Not found: the API URL or model name may not match.",
+      errorNotFound: "404 Not found: the API URL or model name may not match.",
       errorServer: (status) =>
         `${status} service error: the model service is temporarily unavailable.`,
       errorTimeout:
@@ -1104,10 +1108,10 @@ const enCopy: AppCopy = {
         "Galley started as a workbench for GenericAgent. The first two letters of our name are a quiet bow to where we came from.",
       galleyVersion: "Galley version",
       bundledGAVersion: "Bundled GA version",
-      alsoBy: "Also by wangjc683",
+      alsoBy: "More by wangjc683",
       subsageDetail: "Your AI Agent's Subscription Memory · subsage.top",
       filmDetail: "IMAX Film Datebase · 15perf70mm.com",
-      madeBy: "Made by wangjc683 · MIT licensed",
+      madeBy: "Built by wangjc683 · MIT License",
     },
     agent: {
       subtitle: "Let Agents inspect and operate Galley",

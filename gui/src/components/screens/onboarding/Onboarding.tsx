@@ -8,6 +8,7 @@ import {
 import { StepHealth } from "@/components/screens/onboarding/StepHealth";
 import { StepModelConfig } from "@/components/screens/onboarding/StepModelConfig";
 import { TutorialModal } from "@/components/screens/onboarding/TutorialModal";
+import { Button } from "@/components/ui/button";
 import { runHealthChecks, validateGAPath } from "@/lib/onboarding-validation";
 import {
   tutorialsForLanguage,
@@ -40,7 +41,7 @@ export interface OnboardingProps {
    * Flow mode. Default `"fresh"` is the first-launch path: Model /
    * Attach / Health → Main view. `"setup"` is the Settings → "Open
    * Setup Assistant" path: starts from the same first screen but keeps
-   * a Back to Settings escape hatch. `"revisit"` is the Settings →
+   * a top-level Back to Settings escape hatch. `"revisit"` is the Settings →
    * "Re-run Health Check" path: jumps straight to Health step (uses
    * the already-saved GA path), relabels Back → "取消" and
    * "进入 Galley" → "返回设置", and requires an `onCancel` callback
@@ -246,6 +247,7 @@ export function Onboarding({
   const handleManagedComplete = () => {
     onManagedComplete?.();
   };
+  const showSettingsEscape = isSetup && Boolean(onCancel);
 
   return (
     // Outer container is a Tauri drag region so the user can move the
@@ -261,14 +263,20 @@ export function Onboarding({
         data-tauri-drag-region="false"
         className="mx-auto flex w-full max-w-[700px] flex-col"
       >
-        <StepProgress step={step} />
+        <div className="flex items-center justify-between gap-4">
+          <StepProgress step={step} />
+          {showSettingsEscape && (
+            <Button variant="ghost" size="sm" onClick={() => onCancel?.()}>
+              {copy.onboarding.backToSettings}
+            </Button>
+          )}
+        </div>
 
         <div className="mt-10">
           {step === "model" && (
             <StepModelConfig
               onComplete={handleManagedComplete}
               onAttachExisting={() => setStep("attach")}
-              onCancel={isSetup ? onCancel : undefined}
               canContinueWithExisting={
                 isSetup && canContinueWithCurrentModel
               }
