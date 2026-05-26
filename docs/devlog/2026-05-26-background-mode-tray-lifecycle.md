@@ -24,11 +24,20 @@ agent orchestrator.
 - True quit is explicit through `Quit Galley`.
 - macOS keeps the Dock icon for now and also shows a right-side menu bar status
   item.
+- Because the Dock icon remains visible, clicking it after the main window was
+  hidden must restore and focus the window. Users should not have to notice the
+  menu bar status item, especially on notched MacBook displays.
 - Windows uses the system tray for the same open / hide / quit path.
 - The tray / status item first action is dynamic: `Open Galley` when hidden,
   `Hide Galley` when visible.
+- Tray click behavior is platform-specific: macOS keeps left click as the menu
+  action and treats right click as an auxiliary restore/focus action; Windows
+  uses left click to open/hide the main window and right click for the tray
+  menu.
 - The tray / status item also exposes `New Chat`, `Settings`, and
   `Check for Updates...` because those are the common background-entry actions.
+- Tray menu grouping uses separators to keep the mental model clear: return to
+  work, manage the app, then explicit quit.
 - True quit confirms only when an Agent task is currently running.
 - The first tray icon is a simplified version of the existing app icon:
   template monochrome on macOS, slightly branded but quiet on Windows.

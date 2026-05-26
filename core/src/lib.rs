@@ -43,12 +43,43 @@ const TRAY_HIDE_GALLEY_LABEL: &str = "Hide Galley";
 static QUIT_REQUEST_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static ALLOW_APP_EXIT: AtomicBool = AtomicBool::new(false);
 
-fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+struct TrayMenuState {
+    toggle_window_item: tauri::menu::MenuItem<tauri::Wry>,
+}
+
+fn set_tray_window_visible(app: &tauri::AppHandle<tauri::Wry>, visible: bool) {
+    use tauri::Manager;
+    let Some(tray_menu) = app.try_state::<TrayMenuState>() else {
+        return;
+    };
+    let label = if visible {
+        TRAY_HIDE_GALLEY_LABEL
+    } else {
+        TRAY_SHOW_GALLEY_LABEL
+    };
+    let _ = tray_menu.toggle_window_item.set_text(label);
+}
+
+fn show_main_window(app: &tauri::AppHandle<tauri::Wry>) {
     use tauri::Manager;
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        set_tray_window_visible(app, true);
+    }
+}
+
+fn toggle_main_window(app: &tauri::AppHandle<tauri::Wry>) {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let visible = window.is_visible().unwrap_or(false);
+        if visible {
+            let _ = window.hide();
+            set_tray_window_visible(app, false);
+        } else {
+            show_main_window(app);
+        }
     }
 }
 
@@ -1126,7 +1157,7 @@ pub fn run() {
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
                 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-                use tauri::tray::TrayIconBuilder;
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
                 use tauri::{Emitter, Manager, WindowEvent};
 
                 let tray_toggle = MenuItem::with_id(
@@ -1136,6 +1167,9 @@ pub fn run() {
                     true,
                     None::<&str>,
                 )?;
+                _app.manage(TrayMenuState {
+                    toggle_window_item: tray_toggle.clone(),
+                });
                 let tray_new_chat =
                     MenuItem::with_id(_app, "tray_new_chat", "New Chat", true, None::<&str>)?;
                 let tray_settings =
@@ -1149,15 +1183,17 @@ pub fn run() {
                 )?;
                 let tray_quit =
                     MenuItem::with_id(_app, "tray_quit", "Quit Galley", true, None::<&str>)?;
-                let tray_separator = PredefinedMenuItem::separator(_app)?;
+                let tray_primary_separator = PredefinedMenuItem::separator(_app)?;
+                let tray_quit_separator = PredefinedMenuItem::separator(_app)?;
                 let tray_menu = Menu::with_items(
                     _app,
                     &[
                         &tray_toggle,
                         &tray_new_chat,
+                        &tray_primary_separator,
                         &tray_settings,
                         &tray_check_updates,
-                        &tray_separator,
+                        &tray_quit_separator,
                         &tray_quit,
                     ],
                 )?;
@@ -1175,10 +1211,37 @@ pub fn run() {
                     .icon(tray_icon)
                     .menu(&tray_menu)
                     .tooltip("Galley")
-                    .show_menu_on_left_click(true);
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button,
+                            button_state,
+                            ..
+                        } = event
+                        {
+                            #[cfg(target_os = "macos")]
+                            if button == MouseButton::Right
+                                && button_state == MouseButtonState::Down
+                            {
+                                show_main_window(tray.app_handle());
+                            }
+
+                            #[cfg(target_os = "windows")]
+                            if button == MouseButton::Left
+                                && button_state == MouseButtonState::Up
+                            {
+                                toggle_main_window(tray.app_handle());
+                            }
+                        }
+                    });
                 #[cfg(target_os = "macos")]
                 {
-                    tray_builder = tray_builder.icon_as_template(true);
+                    tray_builder = tray_builder
+                        .show_menu_on_left_click(true)
+                        .icon_as_template(true);
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    tray_builder = tray_builder.show_menu_on_left_click(false);
                 }
                 let _tray = tray_builder.build(_app)?;
 
@@ -1224,18 +1287,7 @@ pub fn run() {
                             let _ = app.emit("menu:width_wide", ());
                         }
                         "tray_toggle_window" => {
-                            if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-                                let visible = window.is_visible().unwrap_or(false);
-                                if visible {
-                                    let _ = window.hide();
-                                    let _ =
-                                        tray_toggle_for_menu.set_text(TRAY_SHOW_GALLEY_LABEL);
-                                } else {
-                                    show_main_window(app);
-                                    let _ =
-                                        tray_toggle_for_menu.set_text(TRAY_HIDE_GALLEY_LABEL);
-                                }
-                            }
+                            toggle_main_window(app);
                         }
                         "quit_galley" | "tray_quit" => {
                             request_true_quit(app.clone(), true);
@@ -1418,14 +1470,26 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
-                if ALLOW_APP_EXIT.load(Ordering::SeqCst)
-                    || code == Some(tauri::RESTART_EXIT_CODE)
-                {
-                    return;
+            match event {
+                tauri::RunEvent::ExitRequested { api, code, .. } => {
+                    if ALLOW_APP_EXIT.load(Ordering::SeqCst)
+                        || code == Some(tauri::RESTART_EXIT_CODE)
+                    {
+                        return;
+                    }
+                    api.prevent_exit();
+                    request_true_quit(app.clone(), true);
                 }
-                api.prevent_exit();
-                request_true_quit(app.clone(), true);
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen {
+                    has_visible_windows,
+                    ..
+                } => {
+                    if !has_visible_windows {
+                        show_main_window(app);
+                    }
+                }
+                _ => {}
             }
         });
 }
