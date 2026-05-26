@@ -1,5 +1,12 @@
 import * as Popover from "@radix-ui/react-popover";
-import { ArrowUp, CaretUp, Check, Cube, Stop } from "@phosphor-icons/react";
+import {
+  ArrowUp,
+  CaretUp,
+  Check,
+  Cube,
+  Gear,
+  Stop,
+} from "@phosphor-icons/react";
 import {
   forwardRef,
   useEffect,
@@ -110,6 +117,8 @@ export interface ComposerProps {
   /** Quiet footer hint in the LLM dropdown. Runtime-specific because
    * managed mode should not teach users about external GA internals. */
   llmConfigHint?: string;
+  /** Opens the model configuration surface from the LLM dropdown. */
+  onConfigureModels?: () => void;
   /** Fallback click handler for the LLM pill when `llms` is not
    * provided. Today the only caller using this path is the dev-toggle
    * harness; production wires `llms` + `onSelectLLM`. */
@@ -140,6 +149,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       llms,
       onSelectLLM,
       llmConfigHint,
+      onConfigureModels,
       onOpenLLMSwitcher,
     },
     ref,
@@ -348,6 +358,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
             llms={llms}
             onSelectLLM={onSelectLLM}
             llmConfigHint={llmConfigHint}
+            onConfigureModels={onConfigureModels}
             onOpenLLMSwitcher={onOpenLLMSwitcher}
             disabled={disabled || stopMode}
             stopMode={stopMode}
@@ -413,6 +424,7 @@ function LLMPill({
   llms,
   onSelectLLM,
   llmConfigHint,
+  onConfigureModels,
   onOpenLLMSwitcher,
   disabled,
   stopMode,
@@ -421,6 +433,7 @@ function LLMPill({
   llms?: ComposerLLMOption[];
   onSelectLLM?: (index: number) => void;
   llmConfigHint?: string;
+  onConfigureModels?: () => void;
   onOpenLLMSwitcher?: () => void;
   disabled: boolean;
   stopMode: boolean;
@@ -503,9 +516,27 @@ function LLMPill({
           {/* Footer hint: addresses the "为什么这里没有 X 模型"
               question right where it surfaces. Visually quiet on
               purpose — supplementary metadata, not a CTA. */}
-          <div className="mt-1 border-t border-line/60 px-2.5 pb-1 pt-1.5 text-[10.5px] leading-[1.45] text-ink-muted/70">
-            {footerHint}
-          </div>
+          {onConfigureModels ? (
+            <div className="mt-1 border-t border-line/60 px-1.5 pb-1 pt-1">
+              <Popover.Close asChild>
+                <button
+                  type="button"
+                  onClick={onConfigureModels}
+                  className={cn(
+                    "flex w-full items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-[11px] leading-[1.35] text-ink-muted/70",
+                    "transition-colors hover:bg-hover hover:text-ink-soft",
+                  )}
+                >
+                  <Gear size={11} weight="thin" className="shrink-0" />
+                  <span>{copy.composer.configureModels}</span>
+                </button>
+              </Popover.Close>
+            </div>
+          ) : (
+            <div className="mt-1 border-t border-line/60 px-2.5 pb-1 pt-1.5 text-[10.5px] leading-[1.45] text-ink-muted/70">
+              {footerHint}
+            </div>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

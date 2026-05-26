@@ -5,6 +5,8 @@ import {
   CaretRight,
   CheckCircle,
   CircleNotch,
+  Eye,
+  EyeSlash,
   Info,
   Key,
   ListMagnifyingGlass,
@@ -17,7 +19,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
 import {
@@ -1002,6 +1004,8 @@ function ProviderEditor({
   const isCreatingProvider = !form.id;
   const selectedPreset = getManagedModelProviderPreset(form.providerPresetId);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const apiKeyRevealLabel = apiKeyVisible ? copy.hideApiKey : copy.showApiKey;
 
   return (
     <div className="rounded-sm border border-line bg-surface px-3 py-3">
@@ -1043,8 +1047,26 @@ function ProviderEditor({
           label={copy.apiKey}
           value={form.apiKey}
           onChange={(apiKey) => onChange({ apiKey })}
-          type="password"
+          type={apiKeyVisible ? "text" : "password"}
           placeholder={form.id ? copy.leaveExistingKey : "sk-..."}
+          reserveTrailing
+          trailing={
+            form.apiKey.length > 0 ? (
+              <button
+                type="button"
+                aria-label={apiKeyRevealLabel}
+                title={apiKeyRevealLabel}
+                onClick={() => setApiKeyVisible((visible) => !visible)}
+                className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink-soft"
+              >
+                {apiKeyVisible ? (
+                  <EyeSlash size={13} weight="thin" />
+                ) : (
+                  <Eye size={13} weight="thin" />
+                )}
+              </button>
+            ) : null
+          }
         />
         <SettingsInput
           label={copy.apiUrl}
@@ -1682,26 +1704,40 @@ function SettingsInput({
   onChange,
   placeholder,
   type = "text",
+  trailing,
+  reserveTrailing = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: "text" | "password";
+  trailing?: ReactNode;
+  reserveTrailing?: boolean;
 }) {
   return (
     <div>
       <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
         {label}
       </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        spellCheck={false}
-        className="w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
-      />
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+          className={cn(
+            "w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20",
+            (trailing || reserveTrailing) && "pr-10",
+          )}
+        />
+        {trailing && (
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            {trailing}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

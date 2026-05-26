@@ -213,9 +213,7 @@ function App() {
   const llmDisplayName =
     activeRuntimeDisplayName ?? fallbackLLMDisplayName ?? "";
   const llmConfigHint =
-    activeRuntimeKind === "managed"
-      ? copy.app.managedModelHint
-      : copy.app.externalModelHint;
+    activeRuntimeKind === "managed" ? undefined : copy.app.externalModelHint;
   const hasConfiguredManagedModel = managedModels.some(
     (model) => model.credentialStatus !== "missing",
   );
@@ -230,6 +228,15 @@ function App() {
   const openSettings = (tab: SettingsTab = "runtime") => {
     setSettingsTab(tab);
     setSettingsOpen(true);
+  };
+  const openModelConfigFromSwitcher =
+    activeRuntimeKind === "managed" ? () => openSettings("models") : undefined;
+  const openLLMSwitcherFallback = () => {
+    if (activeRuntimeKind === "managed") {
+      openSettings("models");
+      return;
+    }
+    setPaletteOpen(true);
   };
 
   const storeTurns = useMessagesStore((s) =>
@@ -899,6 +906,7 @@ function App() {
               focusTick={emptyComposerFocusTick}
               llms={llms}
               llmConfigHint={llmConfigHint}
+              onConfigureModels={openModelConfigFromSwitcher}
               onSelectLLM={(idx) => {
                 // EmptyState always configures the *next* new
                 // session: stash pendingLLMIndex + flip the
@@ -908,7 +916,7 @@ function App() {
                 // spawns the fresh session.
                 selectLLMForNewSession(idx);
               }}
-              onOpenLLMSwitcher={() => setPaletteOpen(true)}
+              onOpenLLMSwitcher={openLLMSwitcherFallback}
               onSubmit={(t) => {
                 void submitOnEmpty(
                   t,
@@ -949,6 +957,7 @@ function App() {
               }
               llms={llms}
               llmConfigHint={llmConfigHint}
+              onConfigureModels={openModelConfigFromSwitcher}
               onSelectLLM={(idx) => {
                 if (!activeSessionId) return;
                 // Flip local + persisted state immediately so the
@@ -967,7 +976,7 @@ function App() {
                   });
                 }
               }}
-              onOpenLLMSwitcher={() => setPaletteOpen(true)}
+              onOpenLLMSwitcher={openLLMSwitcherFallback}
               pendingApprovals={pendingApprovals}
               approvalDecisions={approvalDecisions}
               onSubmit={(t) => {

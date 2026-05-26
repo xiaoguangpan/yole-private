@@ -44,6 +44,8 @@ export interface EmptyStateProps {
   onSelectLLM?: (index: number) => void;
   /** Runtime-specific footer hint in the Composer model dropdown. */
   llmConfigHint?: string;
+  /** Opens Settings -> Models from the Composer model dropdown. */
+  onConfigureModels?: () => void;
   /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
   /**
@@ -93,6 +95,7 @@ export function EmptyState({
   llms,
   onSelectLLM,
   llmConfigHint,
+  onConfigureModels,
   onOpenLLMSwitcher,
   conversationWidth = "compact",
   projectName,
@@ -134,6 +137,7 @@ export function EmptyState({
           llms={llms}
           onSelectLLM={onSelectLLM}
           llmConfigHint={llmConfigHint}
+          onConfigureModels={onConfigureModels}
           onOpenLLMSwitcher={onOpenLLMSwitcher}
         />
 

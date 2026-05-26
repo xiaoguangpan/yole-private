@@ -28,7 +28,7 @@ const zhCopy = {
   },
   app: {
     unconfiguredModel: "未配置模型",
-    managedModelHint: "在 Models 调整内置 GA 模型",
+    managedModelHint: "配置模型",
     externalModelHint: "修改 mykey.py 后重启 Galley 生效",
     chooseGAFolderTitle: "选择 GenericAgent 仓库目录",
     restoreTimeout: "历史会话恢复超时",
@@ -124,6 +124,7 @@ const zhCopy = {
       "Large Language Model · GPT / Claude / DeepSeek 等大语言模型的统称",
     cannotSwitchRunning: "运行中无法切换 LLM",
     switchCurrent: (name: string) => `切换 LLM · 当前 ${name}`,
+    configureModels: "配置模型",
     willCreateIn: (projectName: string) => `将创建到 ${projectName}`,
   },
   empty: {
@@ -244,6 +245,8 @@ const zhCopy = {
       providerNamePlaceholder: "可选；默认使用模型提供商或 API 地址",
       leaveKeyBlank: "密钥留空会继续使用已保存的 Key",
       leaveExistingKey: "留空表示不修改现有 Key",
+      showApiKey: "显示 API Key",
+      hideApiKey: "隐藏 API Key",
       testConnection: "测试连接",
       modelName: "模型名",
       modelNamePlaceholder: "例如 anthropic/claude-sonnet-4.5",
@@ -711,7 +714,7 @@ const enCopy: AppCopy = {
   },
   app: {
     unconfiguredModel: "No model configured",
-    managedModelHint: "Manage bundled GA models in Models",
+    managedModelHint: "Configure models",
     externalModelHint: "Restart Galley after editing mykey.py",
     chooseGAFolderTitle: "Choose GenericAgent repository folder",
     restoreTimeout: "Restoring the conversation timed out",
@@ -808,6 +811,7 @@ const enCopy: AppCopy = {
       "Large Language Model · shorthand for models like GPT, Claude, and DeepSeek",
     cannotSwitchRunning: "Cannot switch LLMs while a run is active",
     switchCurrent: (name) => `Switch LLM · Current: ${name}`,
+    configureModels: "Configure models",
     willCreateIn: (projectName) => `Will be created in ${projectName}`,
   },
   empty: {
@@ -929,6 +933,8 @@ const enCopy: AppCopy = {
       providerNamePlaceholder: "Optional; defaults to the provider or API URL",
       leaveKeyBlank: "Leave the key blank to keep the saved one",
       leaveExistingKey: "Leave blank to keep the existing key",
+      showApiKey: "Show API Key",
+      hideApiKey: "Hide API Key",
       testConnection: "Test connection",
       modelName: "Model name",
       modelNamePlaceholder: "e.g. anthropic/claude-sonnet-4.5",
