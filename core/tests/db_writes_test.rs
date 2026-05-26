@@ -12,6 +12,7 @@ use galley_core_lib::api::{
     ManagedModelProtocol, Origin, ProjectId, ProjectPatch, RuntimeKind, SessionFilter, SessionId,
     SessionStatus,
 };
+use galley_core_lib::credential_store;
 use galley_core_lib::db::{
     SqliteGalley, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
 };
@@ -31,6 +32,7 @@ const MIG_008: &str = include_str!("../migrations/008_runtime_identity.sql");
 const MIG_009: &str = include_str!("../migrations/009_managed_models.sql");
 const MIG_010: &str = include_str!("../migrations/010_managed_model_providers.sql");
 const MIG_011: &str = include_str!("../migrations/011_managed_model_sort_order.sql");
+const MIG_012: &str = include_str!("../migrations/012_managed_model_local_secrets.sql");
 
 async fn fresh_pool() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:")
@@ -45,7 +47,7 @@ async fn fresh_pool() -> SqlitePool {
         .expect("enable foreign keys");
     for sql in [
         MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008, MIG_009, MIG_010,
-        MIG_011,
+        MIG_011, MIG_012,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -114,7 +116,7 @@ async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
     assert_eq!(provider.api_key_ref, "managed-provider:mp_test");
     assert!(matches!(
         provider.credential_status,
-        ManagedModelCredentialStatus::Unknown
+        ManagedModelCredentialStatus::Missing
     ));
 
     let row = galley
@@ -136,7 +138,7 @@ async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
     assert_eq!(row.api_key_ref, "managed-provider:mp_test");
     assert!(matches!(
         row.credential_status,
-        ManagedModelCredentialStatus::Unknown
+        ManagedModelCredentialStatus::Missing
     ));
     assert!(row.is_default);
     assert_eq!(row.sort_order, 0);
@@ -148,6 +150,52 @@ async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
             .await
             .expect("read raw provider row");
     assert_eq!(raw_rows, vec![("managed-provider:mp_test".to_string(),)]);
+}
+
+#[tokio::test]
+async fn managed_model_secret_roundtrip_uses_encrypted_sqlite_rows() {
+    let pool = fresh_pool().await;
+    let galley = SqliteGalley::from_pool(pool.clone());
+    let api_key_ref = "managed-provider:mp_secret";
+
+    credential_store::set_secret(&galley, api_key_ref, "sk-test-secret")
+        .await
+        .expect("store secret");
+    let provider = galley
+        .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
+            id: "mp_secret".into(),
+            display_name: "Secret Provider".into(),
+            protocol: ManagedModelProtocol::Openai,
+            api_base: "https://example.test/v1".into(),
+            api_key_ref: api_key_ref.into(),
+        })
+        .await
+        .expect("upsert provider with stored secret");
+    assert!(matches!(
+        provider.credential_status,
+        ManagedModelCredentialStatus::Present
+    ));
+
+    let restored = credential_store::get_secret(&galley, api_key_ref)
+        .await
+        .expect("get secret");
+    assert_eq!(restored, "sk-test-secret");
+
+    let raw: (Vec<u8>,) =
+        sqlx::query_as("SELECT ciphertext FROM managed_model_secrets WHERE api_key_ref = ?")
+            .bind(api_key_ref)
+            .fetch_one(&pool)
+            .await
+            .expect("read ciphertext");
+    assert_ne!(raw.0, b"sk-test-secret".to_vec());
+
+    credential_store::delete_secret(&galley, api_key_ref)
+        .await
+        .expect("delete secret");
+    let missing = credential_store::get_secret(&galley, api_key_ref)
+        .await
+        .expect_err("secret should be gone");
+    assert!(matches!(missing, GalleyError::InvalidArgs { .. }));
 }
 
 #[tokio::test]

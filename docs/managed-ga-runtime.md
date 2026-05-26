@@ -437,9 +437,16 @@ and timeout/retry overrides belong in Settings -> Models -> Advanced. Leave
 `reasoning_effort` unset by default unless a provider preset later has a clear
 product reason to set it.
 
-API keys live in the system credential store, such as macOS Keychain or Windows
-Credential Manager. The database stores only `apiKeyRef` and non-secret model
-metadata.
+Unsigned beta builds store API keys as encrypted payloads in Galley's SQLite
+database. The database also stores the local encryption key so app-data backups
+and machine moves preserve model credentials with the rest of the managed model
+configuration.
+
+This is a UX-first beta tradeoff, not a system credential-store boundary. It
+protects generated config, diagnostics, logs, and casual DB browsing from
+plaintext keys, but someone with the full Galley database can decrypt managed
+model API keys. Signed builds can later migrate these rows to macOS Keychain /
+Windows Credential Manager.
 
 Official GenericAgent expects a user-owned `mykey.py` or `mykey.json` with
 plain-text `apikey` values. That is acceptable for attach mode because the user
@@ -449,14 +456,14 @@ product contract.
 Managed mode must not persist real API keys in generated GA-compatible config.
 If Galley needs to generate a managed-only `mykey.py` or equivalent config, it
 should contain only non-secret metadata and a key reference. At session start,
-Galley resolves the key reference from the system credential store and injects
-the secret into the managed runtime in memory.
+Galley resolves the key reference from the local encrypted credential store and
+injects the secret into the managed runtime in memory.
 
-Galley must not read the system credential store during cold start, sidebar
-rendering, Settings list rendering, or passive diagnostics. Those paths show
-saved model metadata only. Secret reads are lazy and user-initiated: connection
-tests, model-list fetches, saving a new key, deleting a Provider secret, and
-starting a managed session.
+Cold start, sidebar rendering, Settings list rendering, and passive diagnostics
+may check whether an encrypted credential row exists, but must not decrypt or
+display real API key values. Secret decrypts are lazy and user-initiated:
+connection tests, model-list fetches, and starting a managed session. Saving and
+deleting a Provider secret write or remove the encrypted row.
 
 Recommended managed records:
 
@@ -482,7 +489,7 @@ Recommended secret flow:
 ```text
 Onboarding / Settings
 -> save non-secret Provider record to Galley DB
--> save real API key to system credential store under Provider apiKeyRef
+-> save encrypted API key payload to Galley DB under Provider apiKeyRef
 -> save Model record that references the Provider
 -> test model connection
 -> start managed session with runtime-resolved secret
@@ -490,7 +497,7 @@ Onboarding / Settings
 
 Editing an existing Provider may leave the API key field blank, meaning "keep
 the saved key." Deleting a Provider deletes its Models and then removes the
-Provider secret reference from secure storage. Deleting a Model never deletes a
+Provider secret row from local encrypted storage. Deleting a Model never deletes a
 Provider key.
 
 The generated config path is an implementation detail. Users should not edit or
@@ -800,7 +807,7 @@ protecting API keys better than official GA's plain-file default.
 Scope:
 
 - Add managed model records in Galley DB with non-secret metadata only.
-- Store API keys in the system credential store.
+- Store API keys in encrypted SQLite rows for the unsigned beta.
 - Use `apiKeyRef` in Galley DB and generated runtime config.
 - Add model connection test before first conversation.
 - Add Settings -> Runtime / Models management for adding, testing, renaming,
@@ -810,14 +817,13 @@ Scope:
 
 Current implementation slice:
 
-- `managed_models` stores model metadata only.
-- API keys are saved through `keyring` into the OS credential store.
-- The `keyring` dependency must enable native platform backends; otherwise it
-  falls back to an in-memory mock store and session start will ask the user to
-  re-enter the key.
-- Passive model/provider list APIs return credential status `unknown` rather
-  than probing secure storage. This avoids macOS Keychain prompts on ordinary
-  app startup.
+- `managed_model_providers` and `managed_models` store Provider / Model
+  metadata only.
+- `managed_model_secrets` stores encrypted API key payloads keyed by
+  `apiKeyRef`; `managed_model_secret_keys` stores the local beta encryption key
+  so backups can restore credentials with the DB.
+- Passive model/provider list APIs return credential status from encrypted row
+  presence (`present` / `missing`) without decrypting API key values.
 - `managed-model-config/managed-models.json` is generated with `apiKeyRef`
   values, never real API keys.
 - Settings -> Models supports adding, listing, deleting, model-list fetch, and
@@ -830,11 +836,11 @@ Current implementation slice:
 Acceptance:
 
 - The database and generated config do not contain real API key values.
-- Deleting a key from the system credential store makes the corresponding model
-  fail with an actionable `managed_model_not_configured` / credential error.
-- Galley backup does not include API keys.
-- Restoring Galley data on a new machine asks the user to re-enter model
-  credentials.
+- Deleting an encrypted secret row makes the corresponding model fail with an
+  actionable `managed_model_not_configured` / credential error.
+- Galley backup includes encrypted managed model credentials and the local beta
+  key; restored backups can use configured managed models without re-entering
+  API keys.
 - A user can complete first-run model setup without seeing `mykey.py`, Python,
   venv, GA checkout paths, or generated config.
 
@@ -1031,7 +1037,8 @@ Scope:
 Acceptance:
 
 - Galley backup restores managed sessions and managed state.
-- A restored backup on a new machine asks for model credentials again.
+- A restored backup on a new machine preserves encrypted managed model
+  credentials for the unsigned beta.
 - Managed GA code can be replaced without overwriting memory, SOP, skills,
   temp state, or model responses.
 - Existing attach users do not see changed GA behavior after upgrade.
@@ -1046,10 +1053,11 @@ Do not build:
 Current implementation slice:
 
 - Existing Galley pre-migration backup copies the whole app data directory, so
-  managed sessions, `managed-ga-state/`, and non-secret
-  `managed-model-config/` are included.
-- API keys live in the system credential store and are not present in ordinary
-  app-data backup.
+  managed sessions, `managed-ga-state/`, non-secret `managed-model-config/`,
+  and encrypted managed model credentials in `workbench.db` are included.
+- Plaintext API keys are never written to generated config, diagnostics, or
+  backup sidecar files. The unsigned beta DB contains both encrypted payloads
+  and the local beta key by design.
 - Settings -> Runtime -> Advanced Diagnostics now shows active runtime mode,
   managed GA baseline, patch stack, code/prompt readiness, state path,
   configured managed model metadata, and generated non-secret config presence.
@@ -1177,6 +1185,6 @@ Before shipping managed runtime, verify:
 - Session restore uses the session's original runtime kind.
 - Managed runtime upgrade replaces code without overwriting memory, SOP, skills,
   or other state.
-- Galley backup restores managed sessions and state; API keys require re-entry
-  on a new machine.
+- Galley backup restores managed sessions, state, and encrypted managed model
+  credentials on a new machine for the unsigned beta.
 - `node scripts/check-managed-ga-payload.mjs` passes locally and in CI.

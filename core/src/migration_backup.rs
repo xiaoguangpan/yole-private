@@ -446,9 +446,9 @@ mod tests {
                     .unwrap(),
                     b"managed memory"
                 );
-                // Non-secret generated model config is app data. API keys live
-                // in the system credential store, so plaintext keys are not
-                // part of this directory-level backup.
+                // Non-secret generated model config is app data. Managed model
+                // API keys live in encrypted SQLite rows, so plaintext keys are
+                // not part of this directory-level backup.
                 assert!(backup_path
                     .join("managed-model-config")
                     .join("managed-models.json")

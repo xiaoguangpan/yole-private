@@ -2,7 +2,7 @@
 //!
 //! The generated file is a Galley-owned runtime artifact. It deliberately
 //! contains `apiKeyRef` only; session start resolves the real key from the
-//! system credential store and injects it in memory.
+//! local encrypted credential store and injects it in memory.
 
 use std::fs;
 use std::path::Path;

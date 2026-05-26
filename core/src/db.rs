@@ -471,9 +471,12 @@ impl SqliteGalley {
 
     pub async fn list_managed_model_providers(&self) -> Result<Vec<ManagedModelProviderRecord>> {
         let rows = sqlx::query_as::<_, ManagedModelProviderRow>(
-            "SELECT id, display_name, protocol, api_base, api_key_ref, created_at, updated_at \
-             FROM managed_model_providers \
-             ORDER BY updated_at DESC",
+            "SELECT p.id, p.display_name, p.protocol, p.api_base, p.api_key_ref, \
+                    CASE WHEN s.api_key_ref IS NULL THEN 0 ELSE 1 END AS has_secret, \
+                    p.created_at, p.updated_at \
+             FROM managed_model_providers p \
+             LEFT JOIN managed_model_secrets s ON s.api_key_ref = p.api_key_ref \
+             ORDER BY p.updated_at DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -494,6 +497,93 @@ impl SqliteGalley {
             .map_err(map_sqlx_err)?;
 
         rows.into_iter().map(ManagedModelRow::into_record).collect()
+    }
+
+    pub async fn managed_model_secret_key(&self, key_id: &str) -> Result<Option<Vec<u8>>> {
+        sqlx::query_scalar("SELECT key_material FROM managed_model_secret_keys WHERE key_id = ?")
+            .bind(key_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_sqlx_err)
+    }
+
+    pub async fn insert_managed_model_secret_key(
+        &self,
+        key_id: &str,
+        key_material: &[u8],
+    ) -> Result<()> {
+        let now = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO managed_model_secret_keys (key_id, key_material, created_at) \
+             VALUES (?, ?, ?) \
+             ON CONFLICT(key_id) DO NOTHING",
+        )
+        .bind(key_id)
+        .bind(key_material)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        Ok(())
+    }
+
+    pub async fn upsert_managed_model_secret(
+        &self,
+        api_key_ref: &str,
+        key_id: &str,
+        algorithm: &str,
+        nonce: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<()> {
+        let now = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO managed_model_secrets (
+               api_key_ref, key_id, encryption_version, algorithm, nonce,
+               ciphertext, created_at, updated_at
+             ) VALUES (?, ?, 1, ?, ?, ?, ?, ?)
+             ON CONFLICT(api_key_ref) DO UPDATE SET
+               key_id = excluded.key_id,
+               encryption_version = excluded.encryption_version,
+               algorithm = excluded.algorithm,
+               nonce = excluded.nonce,
+               ciphertext = excluded.ciphertext,
+               updated_at = excluded.updated_at",
+        )
+        .bind(api_key_ref)
+        .bind(key_id)
+        .bind(algorithm)
+        .bind(nonce)
+        .bind(ciphertext)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+        Ok(())
+    }
+
+    pub async fn managed_model_secret(
+        &self,
+        api_key_ref: &str,
+    ) -> Result<Option<ManagedModelSecretRow>> {
+        sqlx::query_as::<_, ManagedModelSecretRow>(
+            "SELECT key_id, encryption_version, algorithm, nonce, ciphertext \
+             FROM managed_model_secrets \
+             WHERE api_key_ref = ?",
+        )
+        .bind(api_key_ref)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_sqlx_err)
+    }
+
+    pub async fn delete_managed_model_secret(&self, api_key_ref: &str) -> Result<()> {
+        sqlx::query("DELETE FROM managed_model_secrets WHERE api_key_ref = ?")
+            .bind(api_key_ref)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_err)?;
+        Ok(())
     }
 
     pub async fn active_runtime_kind(&self) -> Result<RuntimeKind> {
@@ -820,9 +910,12 @@ impl SqliteGalley {
 
     async fn managed_model_provider_by_id(&self, id: &str) -> Result<ManagedModelProviderRecord> {
         let row = sqlx::query_as::<_, ManagedModelProviderRow>(
-            "SELECT id, display_name, protocol, api_base, api_key_ref, created_at, updated_at \
-             FROM managed_model_providers \
-             WHERE id = ? \
+            "SELECT p.id, p.display_name, p.protocol, p.api_base, p.api_key_ref, \
+                    CASE WHEN s.api_key_ref IS NULL THEN 0 ELSE 1 END AS has_secret, \
+                    p.created_at, p.updated_at \
+             FROM managed_model_providers p \
+             LEFT JOIN managed_model_secrets s ON s.api_key_ref = p.api_key_ref \
+             WHERE p.id = ? \
              LIMIT 1",
         )
         .bind(id)
@@ -1017,12 +1110,22 @@ pub struct UpsertManagedModelMetadata {
 }
 
 #[derive(Debug, FromRow)]
+pub struct ManagedModelSecretRow {
+    pub key_id: String,
+    pub encryption_version: i64,
+    pub algorithm: String,
+    pub nonce: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+}
+
+#[derive(Debug, FromRow)]
 struct ManagedModelProviderRow {
     id: String,
     display_name: String,
     protocol: String,
     api_base: String,
     api_key_ref: String,
+    has_secret: i64,
     created_at: String,
     updated_at: String,
 }
@@ -1035,7 +1138,11 @@ impl ManagedModelProviderRow {
             protocol: parse_managed_model_protocol(&self.protocol)?,
             api_base: self.api_base,
             api_key_ref: self.api_key_ref,
-            credential_status: ManagedModelCredentialStatus::Unknown,
+            credential_status: if self.has_secret != 0 {
+                ManagedModelCredentialStatus::Present
+            } else {
+                ManagedModelCredentialStatus::Missing
+            },
             created_at: self.created_at,
             updated_at: self.updated_at,
         })
@@ -1055,6 +1162,7 @@ struct ManagedModelRow {
     advanced_options: String,
     is_default: i64,
     sort_order: i64,
+    has_secret: i64,
     last_validated_at: Option<String>,
     created_at: String,
     updated_at: String,
@@ -1078,7 +1186,11 @@ impl ManagedModelRow {
             advanced_options,
             is_default: self.is_default != 0,
             sort_order: self.sort_order,
-            credential_status: ManagedModelCredentialStatus::Unknown,
+            credential_status: if self.has_secret != 0 {
+                ManagedModelCredentialStatus::Present
+            } else {
+                ManagedModelCredentialStatus::Missing
+            },
             last_validated_at: self.last_validated_at,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -1178,11 +1290,13 @@ fn managed_model_select_sql(suffix: &str) -> String {
            m.advanced_options, \
            m.is_default, \
            m.sort_order, \
+           CASE WHEN s.api_key_ref IS NULL THEN 0 ELSE 1 END AS has_secret, \
            m.last_validated_at, \
            m.created_at, \
            m.updated_at \
          FROM managed_models m \
          JOIN managed_model_providers p ON p.id = m.provider_id \
+         LEFT JOIN managed_model_secrets s ON s.api_key_ref = p.api_key_ref \
          {suffix}"
     )
 }

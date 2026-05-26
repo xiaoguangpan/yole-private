@@ -77,9 +77,8 @@ export async function hydrateApp(): Promise<void> {
     console.warn("[hydrate] managed runtime layout init failed.", e);
   }
 
-  // 4. Managed models. Startup deliberately does not read Keychain:
-  // a managed install is configured when it has model metadata. Secret
-  // reads happen only on user-initiated test / send paths.
+  // 4. Managed models. Startup reads only metadata and local credential
+  // presence, never the real API key values.
   const managedConfig = await useManagedModelsStore.getState().load();
   const hasConfiguredManagedModel = managedConfig.models.length > 0;
 

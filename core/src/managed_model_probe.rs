@@ -146,7 +146,7 @@ async fn resolve_secret(input: &ManagedModelProbeInput) -> Result<String> {
         .ok_or_else(|| GalleyError::InvalidArgs {
             message: format!("managed provider {id} not found"),
         })?;
-    credential_store::get_secret(&api_key_ref)
+    credential_store::get_secret(&galley, &api_key_ref).await
 }
 
 fn apply_auth_headers(

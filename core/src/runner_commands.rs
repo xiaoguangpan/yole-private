@@ -193,7 +193,7 @@ pub(crate) async fn prepare_managed_spawn_args(
     })?;
     let mut runtime_models = Vec::new();
     for model in models {
-        let api_key = match credential_store::get_secret(&model.api_key_ref) {
+        let api_key = match credential_store::get_secret(&galley, &model.api_key_ref).await {
             Ok(secret) if !secret.trim().is_empty() => secret,
             _ => continue,
         };

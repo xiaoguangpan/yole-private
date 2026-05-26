@@ -261,7 +261,9 @@ async fn save_managed_model_provider(
         .map(str::trim)
         .filter(|s| !s.is_empty());
     if let Some(api_key) = api_key {
-        credential_store::set_secret(&api_key_ref, api_key).map_err(stringify_error)?;
+        credential_store::set_secret(&galley, &api_key_ref, api_key)
+            .await
+            .map_err(stringify_error)?;
     } else if !is_existing_provider {
         return Err(stringify_error(error::GalleyError::InvalidArgs {
             message: "managed provider API key is required".into(),
@@ -306,7 +308,9 @@ async fn delete_managed_model_provider(
         .await
         .map_err(stringify_error)?
     {
-        credential_store::delete_secret(&api_key_ref).map_err(stringify_error)?;
+        credential_store::delete_secret(&galley, &api_key_ref)
+            .await
+            .map_err(stringify_error)?;
     }
     sync_managed_model_config(&app, &galley).await?;
     Ok(())
@@ -922,6 +926,12 @@ pub fn run() {
             version: 11,
             description: "add managed model display order",
             sql: include_str!("../migrations/011_managed_model_sort_order.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 12,
+            description: "add managed model local encrypted secrets",
+            sql: include_str!("../migrations/012_managed_model_local_secrets.sql"),
             kind: MigrationKind::Up,
         },
     ];

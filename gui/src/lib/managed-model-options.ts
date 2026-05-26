@@ -4,9 +4,9 @@ import type { ManagedModelRecord } from "@/types/managed-models";
 /**
  * Build the Composer/Palette model list for Galley-managed runtime.
  *
- * Startup and ordinary list paths must not read Keychain. A model is therefore
- * shown unless a user-initiated secret read has explicitly marked it missing.
- * Rust still filters by real credential availability at spawn time.
+ * Startup and ordinary list paths expose local credential presence without
+ * decrypting real API key values. Rust still filters by real credential
+ * availability at spawn time.
  */
 export function managedModelsToLLMs(
   models: ManagedModelRecord[],

@@ -94,12 +94,13 @@ anyhow = { version = "1", optional = true }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
-# Managed model API keys live in the platform credential store
-# (macOS Keychain, Windows Credential Manager, Linux Secret Service).
-keyring = { version = "3", features = ["apple-native", "windows-native"] }
+# Unsigned beta managed model API keys live in Galley's SQLite DB as
+# encrypted local payloads. Signed builds can add a system credential-store
+# backend later without changing the public Provider/Model API.
+ring = "0.17"
 
-# Managed model setup probes provider endpoints from Rust so saved Keychain
-# secrets do not need to round-trip through GUI state.
+# Managed model setup probes provider endpoints from Rust so saved secrets do
+# not need to round-trip through GUI state.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [features]
