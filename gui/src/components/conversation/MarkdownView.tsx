@@ -43,10 +43,13 @@ interface MarkdownViewProps {
   source: string;
   /**
    * Visual register. "agent" = serif body (final answer floating in
-   * the document). "narration" = lower-weight intermediate assistant
-   * prose. "thinking" = serif italic muted (thinking summary callout).
-   * Layout chrome (padding / background / brand bar) is the caller's
-   * job — this component renders inline content only.
+   * the document). "narration" = the same body register for
+   * intermediate assistant prose; callers distinguish it by layout
+   * and actions, not typography, so streaming text does not jump when
+   * it settles into an intermediate turn. "thinking" = serif italic
+   * muted (thinking summary callout). Layout chrome (padding /
+   * background / brand bar) is the caller's job — this component
+   * renders inline content only.
    */
   variant: "agent" | "narration" | "thinking";
   className?: string;
@@ -129,10 +132,10 @@ const PROSE_AGENT = cn(
 
 const PROSE_NARRATION = cn(
   PROSE_BASE,
-  // Intermediate LLM narrator prose: useful in the main flow, but
-  // not the final answer. Keep it smaller and softer so the eye can
-  // skim process notes without mistaking them for the deliverable.
-  "font-serif text-[14.5px] leading-[1.62] tracking-[0.003em] text-ink-soft",
+  // Intermediate LLM narrator prose must match the in-flight body
+  // register. Otherwise a pre-tool sentence streams as `agent`, then
+  // snaps smaller/softer once turn_end classifies it as narration.
+  "font-serif text-[16.5px] leading-[1.7] tracking-[0.005em] text-ink",
 );
 
 const PROSE_THINKING = cn(

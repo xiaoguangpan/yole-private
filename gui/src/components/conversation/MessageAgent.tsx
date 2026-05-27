@@ -17,7 +17,7 @@ import { MessageActions } from "@/components/conversation/MessageActions";
  * run carries them — the conclusion is what users want to grab.
  * Intermediate-step narrator text ("好的，我先看一下 X" before a
  * tool_use) renders through MessageAgentNarration below so it remains
- * visible in the main flow without adopting final-answer weight.
+ * visible in the main flow without adopting final-answer actions.
  *
  * ReactNode demo children always skip actions — there's no canonical
  * markdown source to copy back out, and demos rarely need actions.
@@ -52,9 +52,9 @@ export function MessageAgent({
 
 /**
  * Intermediate assistant narration — process prose that belongs in
- * the main flow, but should read lighter than the final answer. No
- * Copy/Save actions: this text is useful status context, not the
- * user-facing deliverable.
+ * the main flow. It shares the answer body register so streaming
+ * text does not restyle when it settles, but skips Copy/Save actions:
+ * this text is useful status context, not the user-facing deliverable.
  */
 export function MessageAgentNarration({ children }: { children: string }) {
   return (
