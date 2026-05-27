@@ -20,6 +20,10 @@
       "allow": [{ "path": "$HOME/**" }, { "path": "$DOCUMENT/**" }, { "path": "$DESKTOP/**" }, { "path": "$DOWNLOAD/**" }]
     },
     {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$APPDATA/browser-control/**" }]
+    },
+    {
       "identifier": "shell:allow-spawn",
       "allow": [
         { "name": "python-bundled", "cmd": "$RESOURCE/python/bin/python3", "args": true, "sidecar": false },

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/overlay/CommandPalette";
+import { BrowserControlSetupDialog } from "@/components/screens/BrowserControlSetupDialog";
 import { EmptyState } from "@/components/screens/EmptyState";
 import { MainView } from "@/components/screens/MainView";
 import { Onboarding } from "@/components/screens/onboarding/Onboarding";
@@ -30,6 +31,7 @@ import {
 } from "@/lib/managed-model-options";
 import { bucketSession } from "@/lib/sessions";
 import { useAppUpdateStore } from "@/stores/app-update";
+import { useBrowserControlStore } from "@/stores/browser-control";
 import {
   EMPTY_APPROVALS,
   EMPTY_DECISIONS,
@@ -64,6 +66,17 @@ function App() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("runtime");
+  const browserControlStatus = useBrowserControlStore((s) => s.status);
+  const browserControlSetupOpen = useBrowserControlStore((s) => s.setupOpen);
+  const ensureBrowserControlLayout = useBrowserControlStore(
+    (s) => s.ensureLayout,
+  );
+  const probeBrowserControl = useBrowserControlStore((s) => s.probe);
+  const openBrowserControlSetup = useBrowserControlStore((s) => s.openSetup);
+  const closeBrowserControlSetup = useBrowserControlStore((s) => s.closeSetup);
+  const maybeOpenBrowserStartupSetup = useBrowserControlStore(
+    (s) => s.maybeOpenStartupSetup,
+  );
 
   // Sidebar live-status comes from `sessions` directly: messagesStore's
   // `fireSessionMirror` writes sidebar-visible fields (status,
@@ -280,6 +293,44 @@ function App() {
     (s) => s.removePendingApproval,
   );
 
+  const runBrowserControlDemo = async () => {
+    if (requiresManagedModelConfig) {
+      openModelsForMissingConfig();
+      return;
+    }
+    try {
+      const probe = await probeBrowserControl();
+      if (!probe || probe.status !== "connected") {
+        throw new Error(
+          probe?.message ?? copy.browserControl.demoConnectionFailed,
+        );
+      }
+      const sid = createSession();
+      await activateSession(sid);
+      setScreen("main");
+      appendUserTurn(sid, copy.browserControl.demoPrompt);
+      await sendIPCCommand(sid, {
+        kind: "user_message",
+        text: copy.browserControl.demoPrompt,
+        images: [],
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      useUiStore.getState().pushToast(
+        makeAppError({
+          category: "bridge",
+          severity: "error",
+          title: copy.errors.sendFailed,
+          message,
+          hint: null,
+          retryable: true,
+          context: "browser_control_demo",
+          traceback: null,
+        }),
+      );
+    }
+  };
+
   // Drives the slice-store hydrate sequence in order: app version →
   // prefs hydrate → managed runtime layout → sessions hydrate →
   // SQLite housekeeping / FTS backfill → cached LLM seed →
@@ -287,6 +338,55 @@ function App() {
   useEffect(() => {
     void hydrateApp();
   }, []);
+
+  // Browser Control is part of the intended managed-GA experience. On each
+  // launch in managed mode we sync the stable extension folder and run a real
+  // bridge probe. The setup modal is gated below so it does not interrupt the
+  // first-run model configuration screen.
+  useEffect(() => {
+    if (activeRuntimeKind !== "managed") return;
+    let cancelled = false;
+    void (async () => {
+      const layout = await ensureBrowserControlLayout();
+      if (cancelled) return;
+      if (!layout) return;
+      await probeBrowserControl();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeRuntimeKind,
+    ensureBrowserControlLayout,
+    probeBrowserControl,
+  ]);
+
+  useEffect(() => {
+    if (activeRuntimeKind === "managed") return;
+    if (!browserControlSetupOpen) return;
+    closeBrowserControlSetup();
+  }, [
+    activeRuntimeKind,
+    browserControlSetupOpen,
+    closeBrowserControlSetup,
+  ]);
+
+  useEffect(() => {
+    if (activeRuntimeKind !== "managed") return;
+    if (requiresManagedModelConfig) return;
+    if (
+      browserControlStatus === "unknown" ||
+      browserControlStatus === "connected"
+    ) {
+      return;
+    }
+    maybeOpenBrowserStartupSetup();
+  }, [
+    activeRuntimeKind,
+    requiresManagedModelConfig,
+    browserControlStatus,
+    maybeOpenBrowserStartupSetup,
+  ]);
 
   // Session creation is **lazy** — we no longer auto-create on
   // landing in the empty screen. Earlier versions did, which
@@ -849,6 +949,10 @@ function App() {
             onDisableYolo={() => {
               void setYoloMode(false);
             }}
+            browserControlStatus={
+              activeRuntimeKind === "managed" ? browserControlStatus : null
+            }
+            onOpenBrowserControl={openBrowserControlSetup}
             conversationWidth={conversationWidth}
             onToggleConversationWidth={() => {
               void setConversationWidth(
@@ -1396,6 +1500,20 @@ function App() {
           await deleteProject(deletingProject.id);
           setDeletingProjectId(null);
           setEditingProjectId(null);
+        }}
+      />
+
+      <BrowserControlSetupDialog
+        open={activeRuntimeKind === "managed" && browserControlSetupOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            if (activeRuntimeKind === "managed") openBrowserControlSetup();
+          } else {
+            closeBrowserControlSetup();
+          }
+        }}
+        onRunDemo={() => {
+          void runBrowserControlDemo();
         }}
       />
 

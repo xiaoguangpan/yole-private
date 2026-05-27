@@ -7,9 +7,12 @@ import {
   ArrowsOutLineHorizontal,
   CaretDown,
   Cat,
+  CircleNotch,
   Gear,
   Lightning,
   PencilSimple,
+  PuzzlePiece,
+  Warning,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,6 +23,7 @@ import { useCopy } from "@/lib/i18n";
 import { isMac, isWindowActionTarget } from "@/lib/platform";
 import { formatShortcutReadable } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import type { BrowserControlStatus } from "@/lib/browser-control";
 
 import { WindowControls } from "./WindowControls";
 
@@ -42,6 +46,8 @@ export interface TopBarProps {
   onOpenSettings?: () => void;
   /** YOLO popover link: opens Settings directly on the Approval tab. */
   onOpenApprovalSettings?: () => void;
+  browserControlStatus?: BrowserControlStatus | null;
+  onOpenBrowserControl?: () => void;
   /**
    * Conversation column width mode. "compact" = 760px (default), "wide"
    * = 1400px. Renders an icon button next to Settings that flips
@@ -138,6 +144,8 @@ export function TopBar({
   onDisableYolo,
   onOpenSettings,
   onOpenApprovalSettings,
+  browserControlStatus = null,
+  onOpenBrowserControl,
   conversationWidth = "compact",
   onToggleConversationWidth,
   onReinjectTools,
@@ -240,6 +248,12 @@ export function TopBar({
             mode={conversationWidth}
             onToggle={onToggleConversationWidth}
           />
+          {browserControlStatus && (
+            <BrowserControlIndicator
+              status={browserControlStatus}
+              onOpen={onOpenBrowserControl}
+            />
+          )}
           <IconButton
             title={copy.topbar.settingsShortcut(
               formatShortcutReadable("Mod+,"),
@@ -257,6 +271,73 @@ export function TopBar({
         {!isMac && <WindowControls />}
       </div>
     </div>
+  );
+}
+
+function BrowserControlIndicator({
+  status,
+  onOpen,
+}: {
+  status: BrowserControlStatus;
+  onOpen?: () => void;
+}) {
+  const copy = useCopy().topbar;
+  const connected = status === "connected";
+  const checking = status === "unknown";
+  const missing = status === "not_connected";
+  const error = status === "error";
+  const label = checking
+    ? copy.browserControlChecking
+    : copy.browserControlPending;
+  const title = connected
+    ? copy.browserControlConnectedTitle
+    : error
+      ? copy.browserControlErrorTitle
+      : copy.browserControlPendingTitle;
+  if (connected) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        title={title}
+        className={cn(
+          "relative flex size-7 items-center justify-center rounded-sm border border-transparent text-ink-muted",
+          "transition-[background-color,border-color,color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+          "hover:border-line hover:bg-hover hover:text-ink active:translate-y-[0.5px]",
+        )}
+        aria-label={title}
+      >
+        <PuzzlePiece size={16} weight="thin" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={title}
+      className={cn(
+        "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow,transform]",
+        "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:translate-y-[0.5px]",
+        error
+          ? "border-error/30 bg-error/[0.06] text-error hover:bg-error/[0.1]"
+          : checking
+            ? "border-line bg-elevated text-ink-muted hover:bg-hover hover:text-ink"
+            : "border-warning/30 bg-warning/10 font-medium text-warning hover:bg-warning/20",
+        missing && "browser-control-attention",
+      )}
+      aria-label={title}
+    >
+      {checking ? (
+        <CircleNotch size={14} weight="thin" className="spin" />
+      ) : error ? (
+        <Warning size={14} weight="thin" />
+      ) : (
+        <PuzzlePiece size={14} weight="thin" />
+      )}
+      <span>{label}</span>
+    </button>
   );
 }
 

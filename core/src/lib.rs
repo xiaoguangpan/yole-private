@@ -1,5 +1,6 @@
 pub mod api;
 pub mod app_update;
+pub mod browser_control;
 pub mod credential_store;
 pub mod db;
 pub mod discovery;
@@ -214,6 +215,31 @@ fn ensure_managed_runtime_layout(
     app: tauri::AppHandle,
 ) -> std::result::Result<managed_runtime::ManagedRuntimeDiagnostics, String> {
     managed_runtime::ensure_for_app(&app).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn ensure_browser_control_layout(
+    app: tauri::AppHandle,
+) -> std::result::Result<browser_control::BrowserControlLayout, String> {
+    browser_control::ensure_for_app(&app).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn probe_browser_control(
+    app: tauri::AppHandle,
+) -> std::result::Result<browser_control::BrowserControlProbe, String> {
+    browser_control::probe_for_app(app)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn open_browser_control_extensions_page(
+    browser: browser_control::BrowserControlBrowser,
+) -> std::result::Result<(), String> {
+    browser_control::open_extensions_page(browser)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -974,6 +1000,9 @@ pub fn run() {
             install_galley_to_path,
             uninstall_galley_from_path,
             ensure_managed_runtime_layout,
+            ensure_browser_control_layout,
+            probe_browser_control,
+            open_browser_control_extensions_page,
             list_managed_model_providers,
             save_managed_model_provider,
             delete_managed_model_provider,

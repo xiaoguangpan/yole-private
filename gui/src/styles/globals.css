@@ -243,6 +243,25 @@ code {
   animation: approval-attention-breath 2.4s ease-in-out infinite;
 }
 
+/* Browser Control is a core managed-runtime setup item. While it is
+   missing, the TopBar badge keeps a low-frequency pulse: persistent enough
+   to feel unfinished, quieter than a flashing alert. */
+@keyframes browser-control-attention {
+  0%,
+  78%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(191, 122, 31, 0);
+    filter: none;
+  }
+  88% {
+    box-shadow: 0 0 0 3px rgba(191, 122, 31, 0.12);
+    filter: drop-shadow(0 0 4px rgba(191, 122, 31, 0.16));
+  }
+}
+.browser-control-attention {
+  animation: browser-control-attention 4.8s ease-in-out infinite;
+}
+
 /* Sidebar session rows show liveness, not completion percentage. The
    rail breathes while a session is running; each completed GA step
    remounts the tick layer for one soft flash. */
@@ -438,6 +457,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .tool-running-bar-breath,
   .approval-attention-breath,
+  .browser-control-attention,
   .sidebar-liveness-rail,
   .sidebar-liveness-tick,
   .sidebar-step-tick,

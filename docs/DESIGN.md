@@ -198,7 +198,7 @@ Galley 是桌面客户端，不应暴露不必要的网页线索：
   - 长 title truncate 居中
 - **Session title menu**：有 active session 时 title + `CaretDown` 是一个按钮，打开 session-scoped 菜单（Rename / Reinject Tools / Desktop Pet）。空状态渲染 italic muted "新对话"，不可点。
 - Rename 从 title menu 进入 inline edit；Enter 提交，Esc 取消。
-- 右：YOLO indicator（条件渲染）+ conversation width toggle（compact / wide）+ Settings 入口（Phosphor `Gear` thin，中文 UI tooltip "设置 · ⌘ + ,"）+ Windows window controls。
+- 右：YOLO indicator（条件渲染）+ conversation width toggle（compact / wide）+ Browser Control indicator + Settings 入口（Phosphor `Gear` thin，中文 UI tooltip "设置 · ⌘ + ,"）+ Windows window controls。
 - **不在 TopBar 放 Command Palette 按钮**：Sidebar 已有 Search quick action，`⌘K` 全局可用；重复 click affordance 只增加 chrome 噪音。
 - **不放 Sidebar toggle**：Sidebar 当前不可折叠，只可拖拽调整宽度。
 - 整个 TopBar 加 `data-tauri-drag-region`，作为窗口拖动 handle（Tauri v2 需要 `core:window:allow-start-dragging` 权限，buttons 由 Tauri 自动豁免）
@@ -225,6 +225,23 @@ YOLO mode 开启时在右侧 actions 最前渲染 persistent badge：
 - **未开启时不渲染**——这个位置完全空（不留占位），TopBar 视觉跟现在一致
 
 设计判断：indicator 视觉上比"普通的右侧按钮"重，不是因为追求漂亮，而是要让用户**每次扫 TopBar 都注意到**这个状态。深琥珀 (`--color-warning`) 在 light theme 主背景上反差足够，不至于过度恐吓用 error 红色（用户开了 YOLO 不是出了问题，只是在做"我知道风险"的事）。
+
+#### Browser Control Indicator
+
+Browser Control 是 managed GA 的核心能力完成项。未连接时，TopBar 必须常驻：
+
+```text
+[ PuzzlePiece icon · 浏览器控制 · 待连接 ]
+```
+
+- 视觉：与 YOLO indicator 同一语法家族，`bg-warning/10`、`text-warning`、`border-warning/30`，但文案是"待连接"，不是 error。
+- 位置：靠近 Settings，放在 conversation width toggle 与 Settings gear 之间；它是扩展能力入口，不挤在 YOLO 风险状态旁边。
+- 未连接时不允许隐藏、不允许 dismiss；连接成功后收敛为安静的 icon-only button：`PuzzlePiece` thin icon，tooltip 为 `浏览器控制已可用`，无状态点、无文字、无动效、无 warning 底色。
+- 未连接状态允许低频 breathing 动效，表达"核心设置未完成"。检测中和已可用都不使用该动效。禁止闪烁、抖动、红色警报或反复弹窗抢焦点。
+- 每次启动如果未连接，可以自动打开一次 Browser Control setup dialog；用户关闭后本次启动不再自动弹，但 TopBar 继续强提醒。
+- 点击 indicator 打开 Browser Control setup dialog，不跳 Settings。
+- setup dialog 使用 Radix Dialog，信息量保持短：未连接时先展示准备 `tmwd_cdp_bridge` 文件夹和配置；只有准备成功后，才展示打开 Chrome / Edge 扩展页、把 `tmwd_cdp_bridge` 文件夹拖到扩展页（拖拽无效时再点"加载已解压的扩展程序"选择该文件夹）、测试连接。若准备失败，停留在第一步并提供重试；第 3 步可放一个轻量 `图文指南` ghost link 指向官方教程的 Chrome 安装步骤锚点，作为带图救急入口，不进入底部 action row，避免先看到原生 GA 的前置条件和 `GenericAgent\assets` 路径；已连接时，连接证据降权为安静信息行（`已连接浏览器` + `检测到 N 个可操作标签页`），维护动作收敛到底部左侧（`重新测试`、`重新加载插件`），右侧保留 demo。
+- 成功后提供轻量 demo 按钮 `试用浏览器控制`，作为新手理解真实浏览器控制的入口；连接测试本身不走模型，demo 由 managed GA 通过现有 `web_execute_js` / `tabs.create` 协议主动打开搜索页，不依赖 `window.open`，也不写回 Browser Control 连接状态。
 
 ### 4.2 Sidebar
 
