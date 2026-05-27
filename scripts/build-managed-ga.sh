@@ -28,6 +28,13 @@ if [[ "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]]; then
   exit 2
 fi
 
+if [[ -n "$(git -C "$SOURCE" status --porcelain)" ]]; then
+  echo "GenericAgent source checkout must be clean before building managed GA." >&2
+  echo "Use a clean temporary clone at the audited upstream commit." >&2
+  git -C "$SOURCE" status --short >&2
+  exit 2
+fi
+
 mkdir -p "$DEST"
 find "$DEST" -mindepth 1 -maxdepth 1 \
   ! -name '.gitignore' \

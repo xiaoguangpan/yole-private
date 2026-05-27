@@ -5,6 +5,8 @@ that don't need a GA subprocess: error classification and LLM display names.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from runner.workbench_bridge import (
@@ -12,6 +14,7 @@ from runner.workbench_bridge import (
     _classify_error,
     _FenceFilter,
     _llm_display_name,
+    _managed_model_config_from_env,
 )
 
 # ---------------- _classify_error ----------------
@@ -110,6 +113,38 @@ def test_llm_display_name_managed_runtime_uses_galley_name(
         _llm_display_name("NativeClaudeSession/glm-5.1") == "glm-5.1"
     )
     assert _llm_display_name("NativeClaudeSession/My GLM") == "My GLM"
+
+
+def test_managed_model_config_maps_connect_timeout_to_ga_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Newer GA reads `timeout`; Galley keeps `connect_timeout` in Settings."""
+    monkeypatch.setenv(
+        "GALLEY_MANAGED_MODEL_CONFIG_JSON",
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "protocol": "openai",
+                        "displayName": "Test Model",
+                        "apiKey": "sk-test",
+                        "apiBase": "https://example.test/v1/",
+                        "model": "test-model",
+                        "advancedOptions": {
+                            "connect_timeout": 12,
+                            "read_timeout": 180,
+                        },
+                    }
+                ]
+            }
+        ),
+    )
+
+    cfg = _managed_model_config_from_env()["native_oai_config_0"]
+
+    assert cfg["connect_timeout"] == 12
+    assert cfg["timeout"] == 12
+    assert cfg["read_timeout"] == 180
 
 
 # ---------------- _extract_ask_user ----------------

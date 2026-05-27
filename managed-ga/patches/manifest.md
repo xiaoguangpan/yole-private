@@ -2,6 +2,9 @@
 
 Patch stack id: `galley-managed-ga-patches-v1`
 
+Last replay verified: `2026-05-27` against upstream
+`1c9f141ecd52d1e6900ca1405ebbd75a382bee5f`.
+
 Current patches:
 
 | Patch | Upstream files | Reason | Rebase risk | Removal condition |

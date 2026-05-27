@@ -3,37 +3,43 @@
 > Maintainer-facing document. Contributors touching GenericAgent integration
 > should read this; most users do not need it.
 
-Galley integrates with GenericAgent without modifying it. The baseline records
-the upstream GenericAgent commit that Galley has audited and tested against.
+Galley integrates with GenericAgent in two different ways:
+
+- **External / attach GA**: user-owned GenericAgent. Galley audits
+  compatibility but never upgrades or modifies that checkout.
+- **Managed / bundled GA**: Galley-owned GenericAgent runtime. Galley vendors
+  the audited upstream commit and reapplies its managed-runtime patch stack.
+
+The baseline records the upstream GenericAgent commit that both paths have been
+audited against.
 
 ## Current Baseline
 
-Locked commit: `1a8abc4fda00d4324c41e148b64e2f3475114ade`
+Locked commit: `1c9f141ecd52d1e6900ca1405ebbd75a382bee5f`
 
 - Source: `lsdefine/GenericAgent` upstream `main`
-- Date audited: 2026-05-22
-- Previous baseline: `b063518`
-- Delta: 36 commits
-- Result: one compatibility adapter for dispatch callback removal; no schema
-  or dependency changes
-- Devlog: [GA baseline upgrade b063518 -> 1a8abc4](./devlog/2026-05-22-ga-baseline-upgrade-b063518-to-1a8abc4.md)
+- Date audited: 2026-05-27
+- Previous baseline: `1a8abc4`
+- Delta: 18 commits
+- Result: no external bridge protocol break; managed runtime needed a
+  `connect_timeout` -> `timeout` adapter because upstream GA now reads
+  `timeout` for connection timeout; managed patch stack replayed cleanly
+- Devlog: [GA upstream upgrade 1a8abc4 -> 1c9f141](./devlog/2026-05-27-ga-upstream-upgrade-1a8abc4-to-1c9f141.md)
 
 Relevant compatibility notes:
 
-- `agent_loop.py`: `BaseHandler.dispatch` replaced
-  `tool_before_callback` / `tool_after_callback` calls with
-  `plugins.hooks` triggers. Galley now feature-detects this and emits its
-  own `turn_start` signal around dispatch when the loaded GA no longer calls
-  the callback.
-- `agent_loop.py`: `BaseHandler.dispatch` still has the
+- `agent_loop.py`: no relevant diff in this range. `BaseHandler.dispatch`
+  still uses `plugins.hooks` and still has the
   `(tool_name, args, response, index=0, tool_num=1)` generator protocol.
-- `agentmain.py`: `plugins.hooks.discover_and_load()` now runs at import time;
-  Galley still patches `agentmain.GenericAgentHandler` after import.
-- `ga.py`: `_turn_end_hooks` stayed compatible.
-- `llmcore.py`: mykey import error reporting changed and langfuse plugin
-  loading moved to the hook loader. Galley reads `client.backend.model` and
-  `llmclient.backend.history`; both stayed compatible.
-- `pyproject.toml`: no dependency changes.
+- `ga.py`: `_turn_end_hooks` iteration now wraps `.values()` with `list()`;
+  compatible with Galley's hook registration. Windows `code_run` now prefers
+  `pwsh` and forces UTF-8 output.
+- `llmcore.py`: `reload_mykeys()` now fails closed to existing config on load
+  errors. `BaseSession.connect_timeout` now reads GA config key `timeout`
+  instead of `connect_timeout`; Galley's managed config adapter emits both.
+- `pyproject.toml`: core dependencies were unchanged in this delta. Optional UI
+  dependencies added `prompt_toolkit`, `rich`, and `pillow`; Galley does not
+  bundle optional GA frontends by default.
 
 ## Contract Surface
 
@@ -63,46 +69,92 @@ Upgrade is event-driven, not calendar-driven.
 
 ## Upgrade Procedure
 
-1. Fetch upstream and inspect the commit range:
+1. Lock the official upstream target SHA. Do not use floating `upstream/main`
+   after this point:
 
 ```bash
-cd ~/Documents/GenericAgent
-git fetch upstream
-git log <current_baseline>..upstream/main --oneline
+git ls-remote https://github.com/lsdefine/GenericAgent.git refs/heads/main
 ```
 
-2. Review the integration files:
+2. Prepare a clean source checkout at the target SHA. Do not build managed GA
+   from a dirty user checkout. A local temporary clone is fine:
 
 ```bash
-git diff <current_baseline>..upstream/main -- agent_loop.py ga.py agentmain.py llmcore.py pyproject.toml
+git clone ~/Documents/GenericAgent /tmp/galley-ga-upgrade
+git -C /tmp/galley-ga-upgrade checkout <target_sha>
+git -C /tmp/galley-ga-upgrade status --short
 ```
 
-3. If an interface changed, prefer runtime feature detection over hard-binding
+3. Review the external / attach integration surface:
+
+```bash
+git -C /tmp/galley-ga-upgrade log <current_baseline>..<target_sha> --oneline
+git -C /tmp/galley-ga-upgrade diff <current_baseline>..<target_sha> -- \
+  agent_loop.py ga.py agentmain.py llmcore.py pyproject.toml
+```
+
+4. If an interface changed, prefer runtime feature detection over hard-binding
    to a single GenericAgent version. `inspect.signature` is the preferred
    pattern for Python callback signature drift.
 
-4. Run the compatibility matrix against both new and old GenericAgent states:
+5. Rebase the managed runtime only after the external audit is understood:
 
 ```bash
-cd ~/Documents/GenericAgent && git checkout upstream/main
-cd ~/Documents/genericagent-webui && .venv/bin/python -m pytest runner/tests/
-
-cd ~/Documents/GenericAgent && git checkout main
-cd ~/Documents/genericagent-webui && .venv/bin/python -m pytest runner/tests/
+cd ~/Documents/genericagent-webui
+# update managed-ga/manifest.json upstream.commit / upstream.auditedAt first
+./scripts/build-managed-ga.sh /tmp/galley-ga-upgrade
+node scripts/check-managed-ga-payload.mjs
 ```
 
-5. Start Galley dev mode and run a real multi-step task. Verify streaming,
-   thinking state, approvals, tool dispatch, and LLM display.
+Then inspect the managed patch stack semantically, not just mechanically:
 
-6. Update this document with the new hash, date, delta summary, and devlog link.
+- Did every patch apply?
+- Did upstream add new writes to `memory/`, `sop/`, `skills/`, `temp/`, or
+  `model_responses/` that bypass `GALLEY_GA_STATE_ROOT`?
+- Did upstream add an official state-root/profile option that should replace a
+  Galley patch?
+- Did upstream rename a key that Galley's managed model config emits?
 
-7. Write a devlog entry:
+6. Run the compatibility matrix:
+
+```bash
+GA_PATH=/tmp/galley-ga-upgrade \
+  .venv/bin/python -m pytest runner/tests/ -m 'not e2e'
+
+# Optional when spending model quota is acceptable:
+GA_PATH=/tmp/galley-ga-upgrade \
+  BRIDGE_PYTHON=<python-with-ga-deps> \
+  .venv/bin/python -m pytest runner/tests/ -m e2e
+```
+
+7. Audit bundled Python dependencies and run a bundle import smoke:
+
+```bash
+./scripts/bundle-python.sh mac-x64
+```
+
+If `[project.dependencies]` changed, update `scripts/bundle-python.sh` before
+running the bundle script. The bundle script must verify `managed-ga/code`, not
+`~/Documents/GenericAgent`.
+
+8. Start Galley dev mode and run a real multi-step task in both runtime modes
+   when possible:
+
+- External GA: streaming, thinking state, approvals, tool dispatch, LLM display.
+- Managed GA: model config injection, streaming, tools, state under app data,
+  restart / restore behavior.
+
+9. Update this document with the new hash, date, delta summary, and devlog link.
+
+10. Write a devlog entry:
 
 ```text
-docs/devlog/YYYY-MM-DD-ga-baseline-upgrade-<old>-to-<new>.md
+docs/devlog/YYYY-MM-DD-ga-upstream-upgrade-<old>-to-<new>.md
 ```
 
-8. Keep the baseline upgrade as an independent commit when possible.
+11. Keep the upstream upgrade as an independent commit when possible. If the
+    upgrade forces a Galley adapter or packaging guard, include that adapter in
+    the same branch and document the product impact.
 
 ## Bundled Python Dependency Audit
 
@@ -120,6 +172,7 @@ Current bundled GenericAgent core deps:
 - `beautifulsoup4`
 - `bottle`
 - `simple-websocket-server`
+- `aiohttp`
 
 Runtime packaging details live in [desktop runtime](./desktop-runtime.md).
 

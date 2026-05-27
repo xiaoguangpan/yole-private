@@ -14,6 +14,9 @@ Environment:
                     (anthropic / openai / lark_oapi etc). Defaults to
                     sys.executable; override if pytest runs in a venv that
                     doesn't have GA deps installed.
+    E2E_LLM_NAME    optional substring match for the LLM to use during e2e
+                    runs, e.g. "glm-5.1". Lets maintainers spend quota on a
+                    known test model without editing mykey.py.
 """
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GA_PATH = os.environ.get("GA_PATH") or str(Path.home() / "Documents" / "GenericAgent")
 BRIDGE_PYTHON = os.environ.get("BRIDGE_PYTHON") or sys.executable
+E2E_LLM_NAME = os.environ.get("E2E_LLM_NAME", "").strip().lower()
 
 # A minimal user message designed to keep the round-trip short and cheap.
 PING_PROMPT = "Reply with exactly the single word: pong"
@@ -42,6 +46,41 @@ E2E_RUN_TIMEOUT = 180.0        # full LLM round-trip, generous for slow networks
 E2E_LINE_TIMEOUT = 30.0        # max wait between consecutive events
 
 pytestmark = pytest.mark.e2e
+
+
+def _llm_matches(llm: dict[str, Any], needle: str) -> bool:
+    haystack = f"{llm.get('name', '')} {llm.get('displayName', '')}".lower()
+    return needle in haystack
+
+
+def _ready(bridge_proc: "_BridgeProc") -> dict[str, Any]:
+    """Read ready and optionally switch to E2E_LLM_NAME before a test run.
+
+    Real e2e runs depend on whichever model is current in the user's GA config.
+    `E2E_LLM_NAME=glm-5.1` lets maintainers spend quota on a known generous
+    plan without editing `mykey.py` or relying on the default model.
+    """
+    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
+    assert ready["kind"] == "ready", f"unexpected first event: {ready}"
+
+    if not E2E_LLM_NAME:
+        return ready
+
+    llms = ready.get("availableLLMs") or []
+    target = next((llm for llm in llms if _llm_matches(llm, E2E_LLM_NAME)), None)
+    if not target:
+        pytest.fail(f"E2E_LLM_NAME={E2E_LLM_NAME!r} not found in availableLLMs")
+
+    if not target.get("isCurrent"):
+        bridge_proc.send({"kind": "set_llm", "llmIndex": target["index"]})
+        changed = bridge_proc.next_event(timeout=10)
+        assert changed["kind"] == "llm_changed", changed
+        assert changed["index"] == target["index"], changed
+
+        for llm in llms:
+            llm["isCurrent"] = llm.get("index") == target["index"]
+
+    return ready
 
 
 # ---------------- Subprocess + reader thread ----------------
@@ -143,8 +182,7 @@ def bridge_proc() -> Iterator[_BridgeProc]:
 
 
 def test_bridge_starts_and_emits_ready(bridge_proc: _BridgeProc) -> None:
-    ev = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ev["kind"] == "ready", f"unexpected first event: {ev}"
+    ev = _ready(bridge_proc)
     assert ev["sessionId"] == "test_e2e_sess"
     assert ev["protocolVersion"] == "0.1"
     assert ev["pid"] > 0
@@ -160,8 +198,7 @@ def test_bridge_starts_and_emits_ready(bridge_proc: _BridgeProc) -> None:
 def test_set_llm_switches_active_model(bridge_proc: _BridgeProc) -> None:
     """If the user's mykey.py exposes 2+ LLMs, switching should work and
     emit llm_changed. With only 1 LLM configured, this test skips."""
-    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ready["kind"] == "ready"
+    ready = _ready(bridge_proc)
     llms = ready["availableLLMs"]
     if len(llms) < 2:
         pytest.skip(f"need >=2 LLMs to test switching; user has {len(llms)}")
@@ -181,8 +218,7 @@ def test_set_llm_switches_active_model(bridge_proc: _BridgeProc) -> None:
 def test_bridge_full_message_round_trip(bridge_proc: _BridgeProc) -> None:
     """Send one tiny user message and verify the bridge produces turn_end +
     run_complete with non-empty final content."""
-    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ready["kind"] == "ready"
+    _ready(bridge_proc)
 
     bridge_proc.send(
         {
@@ -217,8 +253,7 @@ def test_bridge_full_message_round_trip(bridge_proc: _BridgeProc) -> None:
 def test_approval_deny_short_circuits(bridge_proc: _BridgeProc) -> None:
     """Send a prompt designed to trigger code_run, deny the approval, and
     verify the run still completes (agent receives denied status and proceeds)."""
-    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ready["kind"] == "ready"
+    _ready(bridge_proc)
 
     bridge_proc.send(
         {
@@ -275,8 +310,7 @@ def test_approval_deny_short_circuits(bridge_proc: _BridgeProc) -> None:
 def test_load_history_restores_context(bridge_proc: _BridgeProc) -> None:
     """Inject a fake prior conversation, then ask a follow-up that depends
     on it. If the LLM answers correctly, history injection works."""
-    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ready["kind"] == "ready"
+    _ready(bridge_proc)
 
     bridge_proc.send(
         {
@@ -320,8 +354,7 @@ def test_load_history_restores_context(bridge_proc: _BridgeProc) -> None:
 
 def test_abort_synthesizes_run_complete(bridge_proc: _BridgeProc) -> None:
     """Start a long-form generation, abort mid-stream, expect ABORTED."""
-    ready = bridge_proc.next_event(timeout=E2E_READY_TIMEOUT)
-    assert ready["kind"] == "ready"
+    _ready(bridge_proc)
 
     bridge_proc.send(
         {

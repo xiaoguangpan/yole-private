@@ -28,6 +28,7 @@ GA_DEPS=(
   "beautifulsoup4==4.14.3"
   "bottle==0.13.4"
   "simple-websocket-server==0.4.4"
+  "aiohttp==3.13.5"
 )
 
 ARCH="${1:-}"
@@ -119,20 +120,24 @@ echo "[bundle-python] installing GA deps to bundle's site-packages..."
   --quiet \
   "${GA_DEPS[@]}"
 
-# Verify the bridge's exact import chain works against the bundle.
-# Uses GA at ~/Documents/GenericAgent if present (dev-machine
-# convenience); falls back to a deps-only smoke test otherwise.
+# Verify the managed GA import chain works against the bundle. This must
+# use Galley's vendored managed-ga/code payload, not the maintainer's
+# external ~/Documents/GenericAgent checkout, or a local setup can hide
+# missing packaged dependencies.
 echo "[bundle-python] verifying bundle..."
-if [[ -d "$HOME/Documents/GenericAgent" && "$ARCH" == "mac-x64" ]]; then
-  "$PYTHON_BIN" -c "
+MANAGED_GA_PATH="${REPO_ROOT}/managed-ga/code"
+VERIFY_STATE_DIR="${OUT_DIR}/managed-import-state"
+if [[ -d "$MANAGED_GA_PATH" ]]; then
+  mkdir -p "$VERIFY_STATE_DIR"
+  PYTHONDONTWRITEBYTECODE=1 GALLEY_GA_STATE_ROOT="$VERIFY_STATE_DIR" "$PYTHON_BIN" -c "
 import sys
-sys.path.insert(0, '$HOME/Documents/GenericAgent')
+sys.path.insert(0, '$MANAGED_GA_PATH')
 import agentmain
-print('  GA import OK (bundle is bridge-ready)')
+print('  managed GA import OK (bundle is bridge-ready)')
 "
 else
   "$PYTHON_BIN" -c "
-import requests, bs4, bottle
+import aiohttp, requests, bs4, bottle
 import simple_websocket_server  # ensure underscore-renamed import works
 print('  deps OK')
 "

@@ -1,14 +1,5 @@
-import os, sys, threading, queue, time, json, re, random, locale, subprocess
-def _detect_lang():
-    loc = (locale.getlocale()[0] or '').lower()
-    if any(k in loc for k in ('zh', 'chinese')): return 'zh'
-    if sys.platform == 'darwin':
-        try:
-            out = subprocess.check_output(['defaults', 'read', '-g', 'AppleLanguages'], stderr=subprocess.DEVNULL).decode()
-            if 'zh' in out.lower(): return 'zh'
-        except: pass
-    return 'en'
-os.environ.setdefault('GA_LANG', _detect_lang())
+import os, sys, threading, queue, time, json, re, random, locale
+os.environ.setdefault('GA_LANG', 'zh' if any(k in (locale.getlocale()[0] or '').lower() for k in ('zh', 'chinese')) else 'en')
 if sys.stdout is None: sys.stdout = open(os.devnull, "w")
 elif hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(errors='replace')
 if sys.stderr is None: sys.stderr = open(os.devnull, "w")

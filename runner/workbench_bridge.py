@@ -170,6 +170,8 @@ def _managed_model_config_from_env() -> dict[str, Any]:
         advanced = model.get("advancedOptions") or {}
         if isinstance(advanced, dict):
             cfg.update(advanced)
+            if "connect_timeout" in advanced and "timeout" not in advanced:
+                cfg["timeout"] = advanced["connect_timeout"]
         if not cfg["apikey"] or not cfg["apibase"] or not cfg["model"]:
             continue
         out[key] = cfg
