@@ -295,6 +295,43 @@ async fn session_watch_without_core_running_exits_4() {
     assert_eq!(code, Some(4), "exit code: stdout = {stdout}");
 }
 
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn session_watch_socket_error_emits_single_cli_error() {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::UnixListener;
+
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    drop(pool);
+
+    let socket_path = td.path().join(format!("galley-{}.sock", current_uid()));
+    let listener = UnixListener::bind(&socket_path).expect("bind fake socket");
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.expect("accept");
+        let (read_half, mut write_half) = stream.into_split();
+        let mut lines = BufReader::new(read_half).lines();
+        let _request = lines.next_line().await.expect("read request");
+        write_half
+            .write_all(
+                br#"{"ok":false,"requestId":null,"error":"not_found","message":"no live runner"}"#,
+            )
+            .await
+            .expect("write response");
+        write_half.write_all(b"\n").await.expect("write newline");
+    });
+
+    let (stdout, code) = run_galley_with_tmpdir(&db, td.path(), &["session", "watch", "s1"]);
+    server.await.expect("fake socket task");
+    assert_eq!(code, Some(3), "stdout = {stdout}");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 1, "stdout should contain one error envelope");
+    let parsed: serde_json::Value = serde_json::from_str(lines[0]).expect("json");
+    assert_eq!(parsed["error"], "not_found");
+    assert_eq!(parsed.get("ok"), None);
+}
+
 /// Variant of run_galley that also sets TMPDIR so the CLI's
 /// `socket_path()` helper resolves to a tempdir-relative socket — keeps
 /// these tests from accidentally picking up a real Galley Core socket
@@ -325,4 +362,12 @@ fn tempdir() -> TempDir {
         .prefix("galley-cli-test-")
         .tempdir()
         .expect("create tempdir")
+}
+
+#[cfg(unix)]
+fn current_uid() -> u32 {
+    extern "C" {
+        fn getuid() -> u32;
+    }
+    unsafe { getuid() }
 }

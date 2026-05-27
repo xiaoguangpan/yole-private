@@ -27,9 +27,9 @@ use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 use crate::api::{
     CreateProjectInput, CreateSessionInput, GalleyApi, HealthCheck, HealthReport, HealthStatus,
     ManagedModelCredentialStatus, ManagedModelProtocol, ManagedModelProviderRecord,
-    ManagedModelRecord, MessageBrief, MessageId, MessageRole, Origin, ProjectBrief, ProjectId,
-    ProjectPatch, RuntimeKind, SearchHit, SearchScope, SessionBrief, SessionFilter, SessionId,
-    SessionStatus, StatusSummary,
+    ManagedModelRecord, MessageBrief, MessageId, MessageRole, Origin, OriginVia, ProjectBrief,
+    ProjectId, ProjectPatch, RuntimeKind, SearchHit, SearchScope, SessionBrief, SessionFilter,
+    SessionId, SessionStatus, StatusSummary,
 };
 use crate::error::{GalleyError, Result};
 use crate::managed_runtime;
@@ -1027,6 +1027,9 @@ struct MessageRow {
     role: String,
     content: String,
     summary: Option<String>,
+    created_via: Option<String>,
+    supervisor: Option<String>,
+    origin_note: Option<String>,
     created_at: String,
 }
 
@@ -1040,13 +1043,16 @@ impl MessageRow {
             created_at: self.created_at,
             summary: self.summary,
             turn_index: Some(self.turn_index.max(0) as u32),
-            // Read APIs don't currently project origin onto MessageBrief
-            // — the column exists from migration 006 but the read path
-            // here was written before B2 M5 added the field. Returning
-            // None keeps the JSON shape backward-compatible. A follow-up
-            // can extend MessageRow + this projection if a consumer
-            // needs it (e.g. v0.2 supervisor activity log in the GUI).
-            origin: None,
+            origin: self
+                .created_via
+                .map(|via| {
+                    Ok(Origin {
+                        via: parse_origin_via(&via)?,
+                        supervisor: self.supervisor,
+                        reason: self.origin_note,
+                    })
+                })
+                .transpose()?,
         })
     }
 }
@@ -1405,6 +1411,20 @@ fn parse_message_role(s: &str) -> Result<MessageRole> {
     })
 }
 
+fn parse_origin_via(s: &str) -> Result<OriginVia> {
+    Ok(match s {
+        "gui" => OriginVia::Gui,
+        "cli" => OriginVia::Cli,
+        "supervisor" => OriginVia::Supervisor,
+        "system" => OriginVia::System,
+        other => {
+            return Err(GalleyError::Internal {
+                message: format!("unknown origin via: {other}"),
+            })
+        }
+    })
+}
+
 fn map_sqlx_err(e: sqlx::Error) -> GalleyError {
     GalleyError::Internal {
         message: format!("sqlx: {e}"),
@@ -1614,6 +1634,28 @@ async fn insert_user_message_inner(
     .execute(&mut *conn)
     .await
     .map_err(map_sqlx_err)?;
+    let fts_res = async {
+        sqlx::query("DELETE FROM messages_fts WHERE message_id = ?")
+            .bind(&msg_id)
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "INSERT INTO messages_fts (message_id, session_id, role, turn_index, body) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&msg_id)
+        .bind(&session_id.0)
+        .bind("user")
+        .bind(next_turn)
+        .bind(&content)
+        .execute(&mut *conn)
+        .await?;
+        std::result::Result::<(), sqlx::Error>::Ok(())
+    }
+    .await;
+    if let Err(e) = fts_res {
+        eprintln!("[galley-core] index user message fts failed: {e}");
+    }
     sqlx::query("UPDATE sessions SET last_activity_at = ?, updated_at = ? WHERE id = ?")
         .bind(&now)
         .bind(&now)
@@ -1749,7 +1791,8 @@ impl GalleyApi for SqliteGalley {
         let rows = if let Some(n) = tail {
             let limit = i64::try_from(n).unwrap_or(i64::MAX);
             let mut rows: Vec<MessageRow> = sqlx::query_as::<_, MessageRow>(
-                "SELECT id, session_id, turn_index, role, content, summary, created_at \
+                "SELECT id, session_id, turn_index, role, content, summary, \
+                        created_via, supervisor, origin_note, created_at \
                  FROM messages \
                  WHERE session_id = ? \
                  ORDER BY turn_index DESC, sequence DESC \
@@ -1764,7 +1807,8 @@ impl GalleyApi for SqliteGalley {
             rows
         } else {
             sqlx::query_as::<_, MessageRow>(
-                "SELECT id, session_id, turn_index, role, content, summary, created_at \
+                "SELECT id, session_id, turn_index, role, content, summary, \
+                        created_via, supervisor, origin_note, created_at \
                  FROM messages \
                  WHERE session_id = ? \
                  ORDER BY turn_index ASC, sequence ASC",

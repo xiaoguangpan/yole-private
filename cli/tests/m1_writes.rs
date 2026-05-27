@@ -18,9 +18,10 @@
 //!    surface reaches the socket and reports the right exit code; the
 //!    handler logic doesn't need re-testing through the binary.
 //!
-//! 2. Direct-SQLite read commands (`project list`, `llm list`) get
-//!    full happy / empty / shape-error coverage because they don't
-//!    need a server.
+//! 2. Direct-SQLite read commands (`project list/brief/show`, `llm list`)
+//!    and hybrid follow snapshot fallbacks get full happy / empty /
+//!    shape-error coverage because they don't need a server for the
+//!    persisted state.
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -73,6 +74,56 @@ async fn seed_project(pool: &SqlitePool, id: &str, name: &str, ts: &str) {
     .execute(pool)
     .await
     .expect("seed project");
+}
+
+async fn seed_project_session(
+    pool: &SqlitePool,
+    id: &str,
+    project_id: &str,
+    title: &str,
+    status: &str,
+    ts: &str,
+) {
+    sqlx::query(
+        "INSERT INTO sessions (id, project_id, title, status, turn_count, \
+            pending_approval_count, error_count, pinned, last_activity_at, \
+            created_at, updated_at, ga_runtime_kind) \
+         VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, 'managed')",
+    )
+    .bind(id)
+    .bind(project_id)
+    .bind(title)
+    .bind(status)
+    .bind(ts)
+    .bind(ts)
+    .bind(ts)
+    .execute(pool)
+    .await
+    .expect("seed project session");
+}
+
+async fn seed_message(
+    pool: &SqlitePool,
+    id: &str,
+    session_id: &str,
+    turn_index: i64,
+    sequence: i64,
+    role: &str,
+    content: &str,
+) {
+    sqlx::query(
+        "INSERT INTO messages (id, session_id, turn_index, sequence, role, content, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, '2026-05-20T00:00:00Z')",
+    )
+    .bind(id)
+    .bind(session_id)
+    .bind(turn_index)
+    .bind(sequence)
+    .bind(role)
+    .bind(content)
+    .execute(pool)
+    .await
+    .expect("seed message");
 }
 
 async fn seed_pref(pool: &SqlitePool, key: &str, value_json: &str) {
@@ -303,6 +354,188 @@ async fn project_list_db_unavailable_exits_4() {
     assert_eq!(code, Some(4), "stdout: {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "db_unavailable");
+}
+
+#[tokio::test]
+async fn project_brief_counts_active_sessions_and_running_subset() {
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    seed_project(&pool, "proj_batch", "Release check", "2026-05-20T00:00:00Z").await;
+    seed_project_session(
+        &pool,
+        "s_running",
+        "proj_batch",
+        "Packaging",
+        "running",
+        "2026-05-20T00:00:02Z",
+    )
+    .await;
+    seed_project_session(
+        &pool,
+        "s_done",
+        "proj_batch",
+        "Data",
+        "completed",
+        "2026-05-20T00:00:01Z",
+    )
+    .await;
+    seed_project_session(
+        &pool,
+        "s_archived",
+        "proj_batch",
+        "Old",
+        "archived",
+        "2026-05-20T00:00:03Z",
+    )
+    .await;
+    drop(pool);
+
+    let (stdout, code) =
+        run_galley_isolated(&db, td.path(), &["project", "brief", "proj_batch"]);
+    assert_eq!(code, Some(0), "stdout: {stdout}");
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(payload["schemaVersion"], 1);
+    assert_eq!(payload["project"]["id"], "proj_batch");
+    assert_eq!(payload["sessionCount"], 2);
+    assert_eq!(payload["statusCounts"]["running"], 1);
+    assert_eq!(payload["statusCounts"]["completed"], 1);
+    assert_eq!(payload["statusCounts"].get("archived"), None);
+    assert_eq!(payload["runningSessions"].as_array().unwrap().len(), 1);
+    assert_eq!(payload["runningSessions"][0]["id"], "s_running");
+}
+
+#[tokio::test]
+async fn project_show_includes_tail_messages_per_session() {
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    seed_project(&pool, "proj_batch", "Release check", "2026-05-20T00:00:00Z").await;
+    seed_project_session(
+        &pool,
+        "s_review",
+        "proj_batch",
+        "Review",
+        "completed",
+        "2026-05-20T00:00:02Z",
+    )
+    .await;
+    seed_message(&pool, "m1", "s_review", 0, 0, "user", "first").await;
+    seed_message(&pool, "m2", "s_review", 1, 0, "assistant", "second").await;
+    drop(pool);
+
+    let (stdout, code) = run_galley_isolated(
+        &db,
+        td.path(),
+        &["project", "show", "proj_batch", "--tail", "1"],
+    );
+    assert_eq!(code, Some(0), "stdout: {stdout}");
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(payload["schemaVersion"], 1);
+    assert_eq!(payload["sessionCount"], 1);
+    assert_eq!(payload["sessions"].as_array().unwrap().len(), 1);
+    assert_eq!(payload["sessions"][0]["session"]["id"], "s_review");
+    let messages = payload["sessions"][0]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["content"], "second");
+}
+
+#[tokio::test]
+async fn session_follow_without_core_emits_snapshot_and_clean_end() {
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    seed_project(&pool, "proj_batch", "Release check", "2026-05-20T00:00:00Z").await;
+    seed_project_session(
+        &pool,
+        "s_review",
+        "proj_batch",
+        "Review",
+        "completed",
+        "2026-05-20T00:00:02Z",
+    )
+    .await;
+    seed_message(&pool, "m1", "s_review", 0, 0, "user", "inspect").await;
+    drop(pool);
+
+    let (stdout, code) =
+        run_galley_isolated(&db, td.path(), &["session", "follow", "s_review", "--tail", "1"]);
+    assert_eq!(code, Some(0), "stdout: {stdout}");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "stdout: {stdout}");
+    let snapshot: serde_json::Value = serde_json::from_str(lines[0]).expect("snapshot json");
+    assert_eq!(snapshot["stream"], "snapshot");
+    assert_eq!(snapshot["phase"], "initial");
+    assert_eq!(snapshot["session"]["id"], "s_review");
+    assert_eq!(snapshot["messages"].as_array().unwrap().len(), 1);
+    let end: serde_json::Value = serde_json::from_str(lines[1]).expect("end json");
+    assert_eq!(end["stream"], "end");
+    assert_eq!(end["reason"], "core_unavailable");
+}
+
+#[tokio::test]
+async fn project_follow_without_live_sessions_ends_after_snapshot() {
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    seed_project(&pool, "proj_batch", "Release check", "2026-05-20T00:00:00Z").await;
+    seed_project_session(
+        &pool,
+        "s_idle",
+        "proj_batch",
+        "Idle",
+        "idle",
+        "2026-05-20T00:00:02Z",
+    )
+    .await;
+    drop(pool);
+
+    let (stdout, code) =
+        run_galley_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
+    assert_eq!(code, Some(0), "stdout: {stdout}");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "stdout: {stdout}");
+    let snapshot: serde_json::Value = serde_json::from_str(lines[0]).expect("snapshot json");
+    assert_eq!(snapshot["stream"], "snapshot");
+    assert_eq!(snapshot["phase"], "initial");
+    assert_eq!(snapshot["sessionCount"], 1);
+    let end: serde_json::Value = serde_json::from_str(lines[1]).expect("end json");
+    assert_eq!(end["stream"], "end");
+    assert_eq!(end["reason"], "no_live_sessions");
+}
+
+#[tokio::test]
+async fn project_follow_running_session_without_core_marks_session_end() {
+    let td = tempdir();
+    let db = td.path().join("test.db");
+    let pool = seeded_db_at(&db).await;
+    seed_project(&pool, "proj_batch", "Release check", "2026-05-20T00:00:00Z").await;
+    seed_project_session(
+        &pool,
+        "s_running",
+        "proj_batch",
+        "Running",
+        "running",
+        "2026-05-20T00:00:02Z",
+    )
+    .await;
+    drop(pool);
+
+    let (stdout, code) =
+        run_galley_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
+    assert_eq!(code, Some(0), "stdout: {stdout}");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 4, "stdout: {stdout}");
+    let session_end: serde_json::Value = serde_json::from_str(lines[1]).expect("session end json");
+    assert_eq!(session_end["stream"], "sessionEnd");
+    assert_eq!(session_end["sessionId"], "s_running");
+    assert_eq!(session_end["reason"], "core_unavailable");
+    let final_snapshot: serde_json::Value =
+        serde_json::from_str(lines[2]).expect("final snapshot json");
+    assert_eq!(final_snapshot["stream"], "snapshot");
+    assert_eq!(final_snapshot["phase"], "final");
+    let end: serde_json::Value = serde_json::from_str(lines[3]).expect("end json");
+    assert_eq!(end["reason"], "all_live_sessions_ended");
 }
 
 // ---------------- llm.* (mixed: SQLite reads + socket writes) ----------------

@@ -1343,6 +1343,13 @@ async fn tx_commit_persists_both_session_and_message() {
         .await
         .unwrap();
     assert_eq!(msg_count, 1, "first message should be persisted");
+    let fts_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM messages_fts WHERE message_id = ?")
+            .bind("msg_sess_tx_1_0_user")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(fts_count, 1, "first message should be indexed for search");
 }
 
 #[tokio::test]
@@ -1350,7 +1357,7 @@ async fn socket_user_message_ids_are_session_scoped() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "sess_msg_a").await;
     seed_session_idle(&pool, "sess_msg_b").await;
-    let galley = SqliteGalley::from_pool(pool);
+    let galley = SqliteGalley::from_pool(pool.clone());
 
     let msg_a = galley
         .send_message(sid("sess_msg_a"), "task A".into(), Origin::cli(None, None))
@@ -1363,6 +1370,14 @@ async fn socket_user_message_ids_are_session_scoped() {
 
     assert_eq!(msg_a.id.0, "msg_sess_msg_a_0_user");
     assert_eq!(msg_b.id.0, "msg_sess_msg_b_0_user");
+    let fts_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM messages_fts WHERE message_id IN (?, ?)")
+            .bind("msg_sess_msg_a_0_user")
+            .bind("msg_sess_msg_b_0_user")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(fts_count, 2, "socket user messages should be searchable");
 }
 
 #[tokio::test]

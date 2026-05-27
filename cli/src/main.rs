@@ -16,15 +16,18 @@
 //!   - Exit code maps `GalleyError` variants to fixed categories
 //!     (see [`run`]) so SOPs can branch without parsing.
 
+use std::collections::BTreeMap;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use galley_core_lib::api::{
-    GalleyApi, RuntimeKind, SearchScope, SessionFilter, SessionId, SessionStatus,
+    GalleyApi, MessageBrief, ProjectBrief, RuntimeKind, SearchScope, SessionBrief, SessionFilter,
+    SessionId, SessionStatus,
 };
 use galley_core_lib::db::SqliteGalley;
 use galley_core_lib::error::GalleyError;
 use galley_core_lib::socket_listener::socket_path;
+use serde::Serialize;
 use serde_json::Value;
 
 const SCHEMA_VERSION: u32 = 1;
@@ -53,7 +56,7 @@ enum Command {
     #[command(subcommand)]
     Sessions(SessionsCmd),
 
-    /// Operations on a single session (brief / show).
+    /// Operations on a single session (brief / show / follow / write).
     #[command(subcommand)]
     Session(SessionCmd),
 
@@ -67,7 +70,7 @@ enum Command {
     /// Print the CLI + schema version.
     Version,
 
-    /// Project operations (create / list / delete). v0.2 has no
+    /// Project operations (create / list / brief / show / follow / delete). v0.2 has no
     /// reversible "archive" surface — `delete` is destructive (FK SET
     /// NULL detaches child sessions to ungrouped). A future v0.6+ ships
     /// `archive` separately with reversible semantics (sub-plan O2).
@@ -108,6 +111,42 @@ enum ProjectCmd {
     /// Read-only — opens SQLite directly without requiring Galley Core
     /// to be running.
     List,
+    /// One-project rollup for supervisor batch orchestration.
+    /// Read-only — opens SQLite directly and includes session status
+    /// counts plus currently-running sessions.
+    Brief {
+        /// Project id.
+        project_id: String,
+        /// Include archived sessions in counts and rollup.
+        #[arg(long)]
+        all: bool,
+    },
+    /// Project rollup plus each session's recent transcript tail.
+    /// Read-only — useful when a supervisor is preparing a final
+    /// batch summary.
+    Show {
+        /// Project id.
+        project_id: String,
+        /// Return only the last N messages per session.
+        #[arg(long, default_value_t = 20)]
+        tail: usize,
+        /// Include archived sessions.
+        #[arg(long)]
+        all: bool,
+    },
+    /// Follow live sessions inside a project. Emits an initial project
+    /// snapshot, then merged live runner events tagged with sessionId,
+    /// then a final snapshot when all live subscriptions end.
+    Follow {
+        /// Project id.
+        project_id: String,
+        /// Return only the last N messages per session in snapshots.
+        #[arg(long, default_value_t = 10)]
+        tail: usize,
+        /// Include archived sessions in snapshots and subscription attempts.
+        #[arg(long)]
+        all: bool,
+    },
     /// Permanently delete a project. Child sessions auto-detach to
     /// ungrouped (FK SET NULL); the sessions themselves survive.
     /// Response includes `detachedSessions` count + the list of
@@ -221,6 +260,16 @@ enum SessionCmd {
     Watch {
         /// Session id.
         id: String,
+    },
+    /// Read the recent transcript, then follow live runner events if a
+    /// runner is available. Unlike `watch`, this command gracefully
+    /// ends when there is no live runner.
+    Follow {
+        /// Session id.
+        id: String,
+        /// Return only the last N messages in the initial/final snapshots.
+        #[arg(long, default_value_t = 20)]
+        tail: usize,
     },
     /// Create a new session with a first user message (B4 M1). Atomic:
     /// session row + first message commit together or roll back together.
@@ -438,6 +487,7 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             reason,
         }) => session_send(id, content, supervisor, reason).await,
         Command::Session(SessionCmd::Watch { id }) => session_watch(id).await,
+        Command::Session(SessionCmd::Follow { id, tail }) => session_follow(id, tail).await,
         Command::Session(SessionCmd::New {
             task,
             project,
@@ -507,6 +557,19 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             reason,
         }) => project_create(name, root_path, icon, color, supervisor, reason).await,
         Command::Project(ProjectCmd::List) => project_list().await,
+        Command::Project(ProjectCmd::Brief { project_id, all }) => {
+            project_brief(project_id, all).await
+        }
+        Command::Project(ProjectCmd::Show {
+            project_id,
+            tail,
+            all,
+        }) => project_show(project_id, tail, all).await,
+        Command::Project(ProjectCmd::Follow {
+            project_id,
+            tail,
+            all,
+        }) => project_follow(project_id, tail, all).await,
         Command::Project(ProjectCmd::Delete {
             project_id,
             supervisor,
@@ -570,6 +633,242 @@ fn emit_json<T: serde::Serialize>(value: &T) -> Result<(), GalleyError> {
     })?;
     println!("{s}");
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionSnapshotPayload {
+    schema_version: u32,
+    stream: &'static str,
+    phase: &'static str,
+    session: SessionBrief,
+    messages: Vec<MessageBrief>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionEventPayload {
+    schema_version: u32,
+    stream: &'static str,
+    session_id: String,
+    data: Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamEndPayload<'a> {
+    schema_version: u32,
+    stream: &'static str,
+    reason: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectRollupPayload {
+    schema_version: u32,
+    project: ProjectBrief,
+    session_count: usize,
+    status_counts: BTreeMap<String, usize>,
+    running_sessions: Vec<SessionBrief>,
+    last_activity_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectSessionDetail {
+    session: SessionBrief,
+    messages: Vec<MessageBrief>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectShowPayload {
+    schema_version: u32,
+    project: ProjectBrief,
+    session_count: usize,
+    status_counts: BTreeMap<String, usize>,
+    sessions: Vec<ProjectSessionDetail>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectSnapshotPayload {
+    schema_version: u32,
+    stream: &'static str,
+    phase: &'static str,
+    project: ProjectBrief,
+    session_count: usize,
+    status_counts: BTreeMap<String, usize>,
+    sessions: Vec<ProjectSessionDetail>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectEventPayload {
+    schema_version: u32,
+    stream: &'static str,
+    session_id: String,
+    data: Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectSessionEndPayload {
+    schema_version: u32,
+    stream: &'static str,
+    session_id: String,
+    reason: String,
+}
+
+async fn session_snapshot_payload(
+    galley: &SqliteGalley,
+    id: &str,
+    phase: &'static str,
+    tail: usize,
+) -> Result<SessionSnapshotPayload, GalleyError> {
+    let session_id = SessionId(id.to_string());
+    let session = galley.session_brief(session_id.clone()).await?;
+    let messages = galley.session_messages(session_id, Some(tail)).await?;
+    Ok(SessionSnapshotPayload {
+        schema_version: SCHEMA_VERSION,
+        stream: "snapshot",
+        phase,
+        session,
+        messages,
+    })
+}
+
+async fn find_project(galley: &SqliteGalley, project_id: &str) -> Result<ProjectBrief, GalleyError> {
+    galley
+        .list_projects()
+        .await?
+        .into_iter()
+        .find(|p| p.id.as_str() == project_id)
+        .ok_or_else(|| GalleyError::NotFound {
+            message: format!("project {project_id} not found"),
+        })
+}
+
+async fn project_sessions(
+    galley: &SqliteGalley,
+    project_id: &str,
+    all: bool,
+) -> Result<Vec<SessionBrief>, GalleyError> {
+    galley
+        .list_sessions(SessionFilter {
+            project_id: Some(project_id.to_string()),
+            status: None,
+            archived: if all { None } else { Some(false) },
+            runtime_kind: None,
+        })
+        .await
+}
+
+fn status_key(status: SessionStatus) -> &'static str {
+    match status {
+        SessionStatus::Idle => "idle",
+        SessionStatus::Connecting => "connecting",
+        SessionStatus::Running => "running",
+        SessionStatus::WaitingApproval => "waiting_approval",
+        SessionStatus::Error => "error",
+        SessionStatus::Completed => "completed",
+        SessionStatus::Cancelled => "cancelled",
+        SessionStatus::Archived => "archived",
+    }
+}
+
+fn status_counts(sessions: &[SessionBrief]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for s in sessions {
+        *counts.entry(status_key(s.status).to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn is_live_candidate(status: SessionStatus) -> bool {
+    matches!(
+        status,
+        SessionStatus::Connecting | SessionStatus::Running | SessionStatus::WaitingApproval
+    )
+}
+
+async fn project_rollup_payload(
+    galley: &SqliteGalley,
+    project_id: &str,
+    all: bool,
+) -> Result<ProjectRollupPayload, GalleyError> {
+    let project = find_project(galley, project_id).await?;
+    let sessions = project_sessions(galley, project_id, all).await?;
+    let running_sessions = sessions
+        .iter()
+        .filter(|s| s.status == SessionStatus::Running)
+        .cloned()
+        .collect::<Vec<_>>();
+    Ok(ProjectRollupPayload {
+        schema_version: SCHEMA_VERSION,
+        last_activity_at: project.last_activity_at.clone(),
+        project,
+        session_count: sessions.len(),
+        status_counts: status_counts(&sessions),
+        running_sessions,
+    })
+}
+
+async fn project_session_details(
+    galley: &SqliteGalley,
+    sessions: &[SessionBrief],
+    tail: usize,
+) -> Result<Vec<ProjectSessionDetail>, GalleyError> {
+    let mut details = Vec::with_capacity(sessions.len());
+    for session in sessions {
+        let messages = galley
+            .session_messages(session.id.clone(), Some(tail))
+            .await?;
+        details.push(ProjectSessionDetail {
+            session: session.clone(),
+            messages,
+        });
+    }
+    Ok(details)
+}
+
+async fn project_show_payload(
+    galley: &SqliteGalley,
+    project_id: &str,
+    tail: usize,
+    all: bool,
+) -> Result<ProjectShowPayload, GalleyError> {
+    let project = find_project(galley, project_id).await?;
+    let sessions = project_sessions(galley, project_id, all).await?;
+    let status_counts = status_counts(&sessions);
+    let session_count = sessions.len();
+    let details = project_session_details(galley, &sessions, tail).await?;
+    Ok(ProjectShowPayload {
+        schema_version: SCHEMA_VERSION,
+        project,
+        session_count,
+        status_counts,
+        sessions: details,
+    })
+}
+
+async fn project_snapshot_payload(
+    galley: &SqliteGalley,
+    project_id: &str,
+    phase: &'static str,
+    tail: usize,
+    all: bool,
+) -> Result<ProjectSnapshotPayload, GalleyError> {
+    let show = project_show_payload(galley, project_id, tail, all).await?;
+    Ok(ProjectSnapshotPayload {
+        schema_version: SCHEMA_VERSION,
+        stream: "snapshot",
+        phase,
+        project: show.project,
+        session_count: show.session_count,
+        status_counts: show.status_counts,
+        sessions: show.sessions,
+    })
 }
 
 // ---- socket transport helpers (B2 M4) ----
@@ -666,6 +965,112 @@ async fn socket_send_recv(req: serde_json::Value) -> Result<String, GalleyError>
     Ok(resp)
 }
 
+type WatchLines =
+    tokio::io::Lines<tokio::io::BufReader<Box<dyn tokio::io::AsyncRead + Unpin + Send>>>;
+
+#[derive(Debug)]
+enum WatchFrame {
+    Event(Value),
+    End(String),
+}
+
+async fn open_watch_lines(id: &str) -> Result<WatchLines, GalleyError> {
+    use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+    let req = serde_json::json!({
+        "command": "session.watch",
+        "args": { "sessionId": id },
+        "schemaVersion": SCHEMA_VERSION,
+    });
+
+    #[cfg(unix)]
+    let (read_half, mut write_half): (
+        Box<dyn AsyncRead + Unpin + Send>,
+        Box<dyn AsyncWrite + Unpin + Send>,
+    ) = {
+        use tokio::net::UnixStream;
+        let path = socket_path();
+        let stream = UnixStream::connect(&path)
+            .await
+            .map_err(|e| GalleyError::DbUnavailable {
+                message: format!("Galley Core not running (socket {}: {})", path.display(), e),
+            })?;
+        let (read_half, write_half) = stream.into_split();
+        (Box::new(read_half), Box::new(write_half))
+    };
+    #[cfg(windows)]
+    let (read_half, mut write_half): (
+        Box<dyn AsyncRead + Unpin + Send>,
+        Box<dyn AsyncWrite + Unpin + Send>,
+    ) = {
+        use tokio::net::windows::named_pipe::ClientOptions;
+        let path = socket_path();
+        let path_str = path.to_str().ok_or_else(|| GalleyError::Internal {
+            message: "named pipe path not UTF-8".into(),
+        })?;
+        let stream =
+            ClientOptions::new()
+                .open(path_str)
+                .map_err(|e| GalleyError::DbUnavailable {
+                    message: format!("Galley Core not running (pipe {}: {})", path_str, e),
+                })?;
+        let (read_half, write_half) = tokio::io::split(stream);
+        (Box::new(read_half), Box::new(write_half))
+    };
+
+    let line = serde_json::to_string(&req).unwrap();
+    write_half
+        .write_all(line.as_bytes())
+        .await
+        .map_err(|e| GalleyError::DbUnavailable {
+            message: format!("watch write: {e}"),
+        })?;
+    write_half
+        .write_all(b"\n")
+        .await
+        .map_err(|e| GalleyError::DbUnavailable {
+            message: format!("watch write: {e}"),
+        })?;
+    write_half
+        .flush()
+        .await
+        .map_err(|e| GalleyError::DbUnavailable {
+            message: format!("watch flush: {e}"),
+        })?;
+
+    Ok(BufReader::new(read_half).lines())
+}
+
+async fn read_watch_frame(lines: &mut WatchLines) -> Result<Option<WatchFrame>, GalleyError> {
+    let Some(line) = lines.next_line().await.map_err(|e| GalleyError::DbUnavailable {
+        message: format!("watch read: {e}"),
+    })?
+    else {
+        return Ok(None);
+    };
+
+    let parsed: Value = serde_json::from_str(&line).map_err(|e| GalleyError::Internal {
+        message: format!("malformed watch frame: {e}"),
+    })?;
+    if parsed["ok"] == Value::Bool(false) {
+        let tag = parsed["error"].as_str().unwrap_or("internal");
+        let msg = parsed["message"].as_str().unwrap_or("").to_string();
+        return Err(map_error_tag(tag, msg));
+    }
+    if parsed["stream"] == "end" {
+        let reason = parsed["reason"]
+            .as_str()
+            .unwrap_or("subprocess_exited")
+            .to_string();
+        return Ok(Some(WatchFrame::End(reason)));
+    }
+    if parsed["stream"] == "event" {
+        return Ok(Some(WatchFrame::Event(
+            parsed.get("data").cloned().unwrap_or(Value::Null),
+        )));
+    }
+    Ok(Some(WatchFrame::Event(parsed)))
+}
+
 async fn session_send(
     id: String,
     content: String,
@@ -702,63 +1107,7 @@ async fn session_send(
 }
 
 async fn session_watch(id: String) -> Result<(), GalleyError> {
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-    // Streaming subscription: we hand-roll the loop here rather than
-    // reusing socket_send_recv because we keep the connection open.
-    let req = serde_json::json!({
-        "command": "session.watch",
-        "args": { "sessionId": id },
-        "schemaVersion": SCHEMA_VERSION,
-    });
-
-    #[cfg(unix)]
-    let (read_half, mut write_half) = {
-        use tokio::net::UnixStream;
-        let path = socket_path();
-        let stream = UnixStream::connect(&path)
-            .await
-            .map_err(|e| GalleyError::DbUnavailable {
-                message: format!("Galley Core not running (socket {}: {})", path.display(), e),
-            })?;
-        stream.into_split()
-    };
-    #[cfg(windows)]
-    let (read_half, mut write_half) = {
-        use tokio::net::windows::named_pipe::ClientOptions;
-        let path = socket_path();
-        let path_str = path.to_str().ok_or_else(|| GalleyError::Internal {
-            message: "named pipe path not UTF-8".into(),
-        })?;
-        let stream =
-            ClientOptions::new()
-                .open(path_str)
-                .map_err(|e| GalleyError::DbUnavailable {
-                    message: format!("Galley Core not running (pipe {}: {})", path_str, e),
-                })?;
-        tokio::io::split(stream)
-    };
-
-    let line = serde_json::to_string(&req).unwrap();
-    write_half
-        .write_all(line.as_bytes())
-        .await
-        .map_err(|e| GalleyError::DbUnavailable {
-            message: format!("watch write: {e}"),
-        })?;
-    write_half
-        .write_all(b"\n")
-        .await
-        .map_err(|e| GalleyError::DbUnavailable {
-            message: format!("watch write: {e}"),
-        })?;
-    write_half
-        .flush()
-        .await
-        .map_err(|e| GalleyError::DbUnavailable {
-            message: format!("watch flush: {e}"),
-        })?;
-
-    let mut lines = BufReader::new(read_half).lines();
+    let mut lines = open_watch_lines(&id).await?;
     while let Some(line) = lines
         .next_line()
         .await
@@ -766,23 +1115,79 @@ async fn session_watch(id: String) -> Result<(), GalleyError> {
             message: format!("watch read: {e}"),
         })?
     {
-        // Print every line as-is; agents stream-parse the NDJSON. End
-        // sentinel ({"stream":"end",...}) flows through unchanged and
-        // the loop exits because the server closes the connection.
-        println!("{line}");
         let parsed: serde_json::Value =
             serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
-        // Stream-end + initial-error responses both close the loop.
-        if parsed["stream"] == "end" {
-            break;
-        }
         if parsed["ok"] == serde_json::Value::Bool(false) {
             let tag = parsed["error"].as_str().unwrap_or("internal");
             let msg = parsed["message"].as_str().unwrap_or("").to_string();
             return Err(map_error_tag(tag, msg));
         }
+        // Print stream frames as-is; agents stream-parse the NDJSON. Initial
+        // error envelopes are mapped above so CLI errors keep one shape.
+        println!("{line}");
+        if parsed["stream"] == "end" {
+            break;
+        }
     }
     Ok(())
+}
+
+async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
+    let galley = SqliteGalley::open().await?;
+    emit_json(&session_snapshot_payload(&galley, &id, "initial", tail).await?)?;
+
+    let mut lines = match open_watch_lines(&id).await {
+        Ok(lines) => lines,
+        Err(GalleyError::DbUnavailable { .. }) => {
+            emit_json(&StreamEndPayload {
+                schema_version: SCHEMA_VERSION,
+                stream: "end",
+                reason: "core_unavailable",
+            })?;
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    };
+
+    loop {
+        match read_watch_frame(&mut lines).await {
+            Ok(Some(WatchFrame::Event(data))) => emit_json(&SessionEventPayload {
+                schema_version: SCHEMA_VERSION,
+                stream: "event",
+                session_id: id.clone(),
+                data,
+            })?,
+            Ok(Some(WatchFrame::End(reason))) => {
+                let galley = SqliteGalley::open().await?;
+                emit_json(&session_snapshot_payload(&galley, &id, "final", tail).await?)?;
+                emit_json(&StreamEndPayload {
+                    schema_version: SCHEMA_VERSION,
+                    stream: "end",
+                    reason: &reason,
+                })?;
+                return Ok(());
+            }
+            Ok(None) => {
+                let galley = SqliteGalley::open().await?;
+                emit_json(&session_snapshot_payload(&galley, &id, "final", tail).await?)?;
+                emit_json(&StreamEndPayload {
+                    schema_version: SCHEMA_VERSION,
+                    stream: "end",
+                    reason: "socket_closed",
+                })?;
+                return Ok(());
+            }
+            Err(GalleyError::NotFound { .. }) => {
+                emit_json(&StreamEndPayload {
+                    schema_version: SCHEMA_VERSION,
+                    stream: "end",
+                    reason: "not_live",
+                })?;
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 /// Shared socket round-trip for the unary write commands (`session.new`,
@@ -952,6 +1357,161 @@ async fn project_list() -> Result<(), GalleyError> {
     for p in projects {
         emit_json(&p)?;
     }
+    Ok(())
+}
+
+async fn project_brief(project_id: String, all: bool) -> Result<(), GalleyError> {
+    let galley = SqliteGalley::open().await?;
+    emit_json(&project_rollup_payload(&galley, &project_id, all).await?)?;
+    Ok(())
+}
+
+async fn project_show(project_id: String, tail: usize, all: bool) -> Result<(), GalleyError> {
+    let galley = SqliteGalley::open().await?;
+    emit_json(&project_show_payload(&galley, &project_id, tail, all).await?)?;
+    Ok(())
+}
+
+enum ProjectWatchItem {
+    Event { session_id: String, data: Value },
+    End { session_id: String, reason: String },
+    Error(GalleyError),
+}
+
+async fn forward_project_watch(
+    session_id: String,
+    report_initial_failure: bool,
+    tx: tokio::sync::mpsc::UnboundedSender<ProjectWatchItem>,
+) {
+    let mut lines = match open_watch_lines(&session_id).await {
+        Ok(lines) => lines,
+        Err(GalleyError::DbUnavailable { .. }) => {
+            if report_initial_failure {
+                let _ = tx.send(ProjectWatchItem::End {
+                    session_id,
+                    reason: "core_unavailable".into(),
+                });
+            }
+            return;
+        }
+        Err(e) => {
+            let _ = tx.send(ProjectWatchItem::Error(e));
+            return;
+        }
+    };
+
+    loop {
+        match read_watch_frame(&mut lines).await {
+            Ok(Some(WatchFrame::Event(data))) => {
+                if tx
+                    .send(ProjectWatchItem::Event {
+                        session_id: session_id.clone(),
+                        data,
+                    })
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            Ok(Some(WatchFrame::End(reason))) => {
+                let _ = tx.send(ProjectWatchItem::End { session_id, reason });
+                return;
+            }
+            Ok(None) => {
+                let _ = tx.send(ProjectWatchItem::End {
+                    session_id,
+                    reason: "socket_closed".into(),
+                });
+                return;
+            }
+            Err(GalleyError::NotFound { .. }) => {
+                if report_initial_failure {
+                    let _ = tx.send(ProjectWatchItem::End {
+                        session_id,
+                        reason: "not_live".into(),
+                    });
+                }
+                return;
+            }
+            Err(e) => {
+                let _ = tx.send(ProjectWatchItem::Error(e));
+                return;
+            }
+        }
+    }
+}
+
+async fn project_follow(project_id: String, tail: usize, all: bool) -> Result<(), GalleyError> {
+    let galley = SqliteGalley::open().await?;
+    let initial = project_snapshot_payload(&galley, &project_id, "initial", tail, all).await?;
+    let watch_targets = initial
+        .sessions
+        .iter()
+        .map(|detail| {
+            (
+                detail.session.id.0.clone(),
+                is_live_candidate(detail.session.status),
+            )
+        })
+        .collect::<Vec<_>>();
+    emit_json(&initial)?;
+
+    if watch_targets.is_empty() {
+        emit_json(&StreamEndPayload {
+            schema_version: SCHEMA_VERSION,
+            stream: "end",
+            reason: "no_live_sessions",
+        })?;
+        return Ok(());
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    for (session_id, report_initial_failure) in watch_targets {
+        let tx = tx.clone();
+        tokio::spawn(forward_project_watch(session_id, report_initial_failure, tx));
+    }
+    drop(tx);
+
+    let mut saw_stream_item = false;
+    while let Some(item) = rx.recv().await {
+        saw_stream_item = true;
+        match item {
+            ProjectWatchItem::Event { session_id, data } => {
+                emit_json(&ProjectEventPayload {
+                    schema_version: SCHEMA_VERSION,
+                    stream: "event",
+                    session_id,
+                    data,
+                })?;
+            }
+            ProjectWatchItem::End { session_id, reason } => {
+                emit_json(&ProjectSessionEndPayload {
+                    schema_version: SCHEMA_VERSION,
+                    stream: "sessionEnd",
+                    session_id,
+                    reason,
+                })?;
+            }
+            ProjectWatchItem::Error(e) => return Err(e),
+        }
+    }
+
+    if !saw_stream_item {
+        emit_json(&StreamEndPayload {
+            schema_version: SCHEMA_VERSION,
+            stream: "end",
+            reason: "no_live_sessions",
+        })?;
+        return Ok(());
+    }
+
+    let galley = SqliteGalley::open().await?;
+    emit_json(&project_snapshot_payload(&galley, &project_id, "final", tail, all).await?)?;
+    emit_json(&StreamEndPayload {
+        schema_version: SCHEMA_VERSION,
+        stream: "end",
+        reason: "all_live_sessions_ended",
+    })?;
     Ok(())
 }
 

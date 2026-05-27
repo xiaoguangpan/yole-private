@@ -3,7 +3,7 @@
 The contract between **Galley** and any agent that drives it via the
 `galley` CLI binary or the Unix-socket / named-pipe local transport.
 
-> **Status: B4 M6 — `schemaVersion: 1` FROZEN for `v0.2.0-beta.1`.** All 19
+> **Status: B4 M6 — `schemaVersion: 1` FROZEN for `v0.2.0-beta.1`.** The
 > commands documented in §5 are wired, tested, and locked. Inside
 > `schemaVersion: 1` the rules in §1 hold: additions are non-breaking;
 > renames / removals require a `schemaVersion: 2` bump. Pre-freeze
@@ -95,13 +95,19 @@ mislead. SOPs branch per command:
 
 #### `stream.reason` values (subscription commands)
 
-For NDJSON stream-end frames on `session watch` (§5.5b):
+For NDJSON stream-end frames on `session watch` (§5.5b),
+`session follow` (§5.5c), and `project follow` (§5.15c):
 
 | `reason`             | Meaning                                          |
 | -------------------- | ------------------------------------------------ |
 | `subprocess_exited`  | Runner subprocess exited cleanly                 |
 | `subprocess_error`   | Runner subprocess died unexpectedly              |
 | `cancelled`          | Client disconnected (SIGINT / closed socket)     |
+| `core_unavailable`   | Snapshot read worked, but no Galley Core socket was reachable |
+| `not_live`           | Session exists but no live runner is subscribed  |
+| `socket_closed`      | Watch socket closed without a stream-end frame   |
+| `no_live_sessions`   | Project follow found no live stream output       |
+| `all_live_sessions_ended` | Project follow consumed all live subscriptions |
 
 ### 1.2 Schema pinning
 
@@ -147,9 +153,10 @@ depending on whether the command is read-only or writes state.
 
 ### Read-only commands → direct SQLite
 
-`sessions list / search`, `session brief / show`, `status`, `health`,
-`version` open the SQLite file directly via `GALLEY_DB_PATH` (or the
-platform default path in §2). **No daemon required.** Useful when:
+`sessions list / search`, `session brief / show`, `project list`,
+`project brief`, `project show`, `status`, `health`, `version` open
+the SQLite file directly via `GALLEY_DB_PATH` (or the platform default
+path in §2). **No daemon required.** Useful when:
 
 - Galley GUI isn't running but the agent wants to inspect history
 - A CI / cron job wants to scrape session state from a snapshot DB
@@ -159,9 +166,11 @@ running — they don't talk to it.
 
 ### Write commands → local socket
 
-`session send`, `session watch`, and all future B-phase write commands
-connect to a per-user local socket served by a running Galley Core
-process:
+`session send`, `session watch`, and write commands connect to a
+per-user local socket served by a running Galley Core process.
+`session follow` and `project follow` are hybrid commands: they read
+SQLite snapshots first, then attempt live socket subscriptions when a
+runner is available.
 
 - **macOS / Linux**: Unix domain socket at `$TMPDIR/galley-$UID.sock`
   (typically `/tmp/galley-501.sock`). Permission `0600` — only the
@@ -482,6 +491,41 @@ flag is planned (see [B2 playbook running note N35]).
 Exit codes: `0` clean stream end / `3 not_found` (no live runner for
 that session id) / `4 db_unavailable` (Galley Core not running).
 
+### 5.5c · `galley session follow <id> [--tail=N]`
+
+**Hybrid subscription command** — emits a persisted snapshot first,
+then follows live runner events if a runner exists, then emits a final
+snapshot when the live stream ends.
+
+This is the supervisor-friendly wrapper around `session show` +
+`session watch`. Unlike `session watch`, no live runner is not an
+error: the command returns the snapshot and ends cleanly.
+
+```bash
+$ galley session follow sess_abc --tail=20
+{"schemaVersion":1,"stream":"snapshot","phase":"initial","session":{…},"messages":[…]}
+{"schemaVersion":1,"stream":"event","sessionId":"sess_abc","data":{"kind":"turn_start",…}}
+{"schemaVersion":1,"stream":"snapshot","phase":"final","session":{…},"messages":[…]}
+{"schemaVersion":1,"stream":"end","reason":"subprocess_exited"}
+```
+
+If Galley Core is not reachable after the initial snapshot:
+
+```json
+{"schemaVersion":1,"stream":"end","reason":"core_unavailable"}
+```
+
+If the session exists but has no live runner:
+
+```json
+{"schemaVersion":1,"stream":"end","reason":"not_live"}
+```
+
+Exit codes: `0` when the session exists and the snapshot can be read /
+`3 not_found` (session missing) / `4 db_unavailable` (DB missing or
+unopenable). Live-runner absence is reported in the end frame, not as
+exit 3.
+
 ### 5.6 · `galley status`
 
 Aggregate counts.
@@ -733,6 +777,89 @@ $ galley project list
 | `updatedAt`      | string (ISO8601) |                                                                      |
 
 Exit codes: `0` success / `4 db_unavailable`.
+
+### 5.15a · `galley project brief <project-id> [--all]`
+
+**Read-only** — direct SQLite, no socket. Returns one JSON object that
+rolls up a project for supervisor batch orchestration.
+
+By default archived sessions are excluded. Pass `--all` to include
+archived sessions in `sessionCount` and `statusCounts`.
+
+```bash
+$ galley project brief proj_demo
+{"schemaVersion":1,"project":{…},"sessionCount":4,
+ "statusCounts":{"running":2,"completed":2},
+ "runningSessions":[{…},{…}],"lastActivityAt":"…"}
+```
+
+| Field             | Type              | Notes                                      |
+| ----------------- | ----------------- | ------------------------------------------ |
+| `schemaVersion`   | int               | Current CLI schema version.                |
+| `project`         | `ProjectBrief`    | Project row.                               |
+| `sessionCount`    | int               | Sessions in the project after filters.     |
+| `statusCounts`    | object            | Keys are `SessionBrief.status` values.     |
+| `runningSessions` | `SessionBrief[]`  | Sessions whose persisted status is `running`. |
+| `lastActivityAt`  | string (ISO8601)  | Echo of `project.lastActivityAt`.          |
+
+Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
+
+### 5.15b · `galley project show <project-id> [--tail=N] [--all]`
+
+**Read-only** — direct SQLite, no socket. Returns the same project
+rollup plus each session's recent transcript tail. Default
+`--tail=20`.
+
+```bash
+$ galley project show proj_demo --tail=10
+{"schemaVersion":1,"project":{…},"sessionCount":2,
+ "statusCounts":{"completed":1,"running":1},
+ "sessions":[{"session":{…},"messages":[…]},{"session":{…},"messages":[…]}]}
+```
+
+Use this before final synthesis: it gives the supervisor one stable
+payload to summarize instead of a hand-written loop over `session
+show`.
+
+Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
+
+### 5.15c · `galley project follow <project-id> [--tail=N] [--all]`
+
+**Hybrid subscription command** — emits a project snapshot, attempts to
+follow sessions inside the project, then emits a final snapshot if any
+live stream produced output. Default `--tail=10`.
+
+The command attempts subscription for project sessions because runner
+liveness lives in Galley Core, not only in the persisted SQLite status.
+For sessions persisted as `connecting`, `running`, or `waiting_approval`,
+an initial `not_live` / `core_unavailable` is reported as a
+`sessionEnd` frame. For ordinary idle/completed sessions, that quiet
+not-live result is suppressed so large Projects do not spam the stream.
+
+```bash
+$ galley project follow proj_demo --tail=10
+{"schemaVersion":1,"stream":"snapshot","phase":"initial","project":{…},"sessions":[…]}
+{"schemaVersion":1,"stream":"event","sessionId":"s-a","data":{"kind":"turn_start",…}}
+{"schemaVersion":1,"stream":"sessionEnd","sessionId":"s-a","reason":"subprocess_exited"}
+{"schemaVersion":1,"stream":"snapshot","phase":"final","project":{…},"sessions":[…]}
+{"schemaVersion":1,"stream":"end","reason":"all_live_sessions_ended"}
+```
+
+If no live sessions produce stream output, the command emits the initial
+snapshot and:
+
+```json
+{"schemaVersion":1,"stream":"end","reason":"no_live_sessions"}
+```
+
+If a live-status session has no live runner or Galley Core is not
+reachable, that session gets a `sessionEnd` frame with
+`reason: "not_live"` or `reason: "core_unavailable"`; the command still
+emits a final snapshot and exits 0.
+
+Exit codes: `0` when the project snapshot can be read / `3 not_found`
+/ `4 db_unavailable`. Per-session live-runner absence is represented
+as stream frames, not process failure.
 
 ### 5.16 · `galley project delete <project-id> [--supervisor=<x>] [--reason=<y>]`
 

@@ -4,7 +4,9 @@
 //! the GUI runs in production. Each test sets up its own DB to keep
 //! cases isolated.
 
-use galley_core_lib::api::{GalleyApi, SearchScope, SessionFilter, SessionId, SessionStatus};
+use galley_core_lib::api::{
+    GalleyApi, OriginVia, SearchScope, SessionFilter, SessionId, SessionStatus,
+};
 use galley_core_lib::db::SqliteGalley;
 use sqlx::SqlitePool;
 
@@ -331,6 +333,42 @@ async fn session_messages_returns_chronological_order() {
         .expect("session_messages");
     let ids: Vec<&str> = msgs.iter().map(|m| m.id.0.as_str()).collect();
     assert_eq!(ids, vec!["m1", "m2", "m3"]);
+}
+
+#[tokio::test]
+async fn session_messages_projects_origin_metadata() {
+    let pool = fresh_pool().await;
+    seed_session(&pool, "sess_x", "Conv", "idle", "2026-05-18T00:00:00Z").await;
+    seed_message(
+        &pool,
+        "m1",
+        "sess_x",
+        1,
+        0,
+        "user",
+        "hi",
+        "2026-05-18T00:00:00Z",
+    )
+    .await;
+    sqlx::query(
+        "UPDATE messages \
+         SET created_via = 'supervisor', supervisor = 'ga-test/v1', origin_note = 'dogfood' \
+         WHERE id = 'm1'",
+    )
+    .execute(&pool)
+    .await
+    .expect("update origin");
+
+    let galley = SqliteGalley::from_pool(pool);
+    let msgs = galley
+        .session_messages(SessionId("sess_x".into()), None)
+        .await
+        .expect("session_messages");
+
+    let origin = msgs[0].origin.as_ref().expect("origin");
+    assert_eq!(origin.via, OriginVia::Supervisor);
+    assert_eq!(origin.supervisor.as_deref(), Some("ga-test/v1"));
+    assert_eq!(origin.reason.as_deref(), Some("dogfood"));
 }
 
 #[tokio::test]
