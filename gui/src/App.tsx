@@ -10,10 +10,8 @@ import { BrowserControlSetupDialog } from "@/components/screens/BrowserControlSe
 import { EmptyState } from "@/components/screens/EmptyState";
 import { MainView } from "@/components/screens/MainView";
 import { Onboarding } from "@/components/screens/onboarding/Onboarding";
-import {
-  Settings,
-  type SettingsTab,
-} from "@/components/screens/settings/Settings";
+import { Settings } from "@/components/screens/settings/Settings";
+import type { SettingsTab } from "@/components/screens/settings/settings-types";
 import { YoloIntroDialog } from "@/components/screens/YoloIntroDialog";
 import { ArchivedDialog } from "@/components/screens/archived/ArchivedDialog";
 import { EarlierDialog } from "@/components/screens/earlier/EarlierDialog";

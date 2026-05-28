@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { ApprovalConfig } from "@/components/screens/settings/Settings";
+import type { ApprovalConfig } from "@/components/screens/settings/settings-types";
 import { getPref, setPref } from "@/lib/db";
 import { copyForLanguage } from "@/lib/i18n";
 import {

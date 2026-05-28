@@ -19,7 +19,7 @@
  *     a louder signal than silently displaying a stale literal.
  */
 
-import type { ApprovalConfig } from "@/components/screens/settings/Settings";
+import type { ApprovalConfig } from "@/components/screens/settings/settings-types";
 import { isWindows } from "@/lib/platform";
 import type { RuntimeInfo } from "@/types/inspector";
 

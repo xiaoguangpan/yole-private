@@ -1,0 +1,385 @@
+import { CaretDown, CaretRight } from "@phosphor-icons/react";
+
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { useCopy } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import type { ManagedModelProtocol } from "@/types/managed-models";
+
+import { InfoTooltip } from "./ModelPrimitives";
+
+type AdvancedChoiceOption<TValue extends string> = {
+  value: TValue;
+  label: string;
+};
+
+export function AdvancedModelOptions({
+  open,
+  onOpenChange,
+  protocol,
+  options,
+  recommendedOptions,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  protocol: ManagedModelProtocol;
+  options: Record<string, unknown>;
+  recommendedOptions: Record<string, unknown>;
+  onChange: (options: Record<string, unknown>) => void;
+}) {
+  const copy = useCopy().settings.models;
+  const effectiveOptions = { ...recommendedOptions, ...options };
+  const customCount = advancedCustomCount(
+    effectiveOptions,
+    recommendedOptions,
+    protocol,
+  );
+
+  const setOption = (key: string, value: string | number | boolean | null) => {
+    const next = { ...effectiveOptions };
+    if (value === null || value === "") {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+    onChange(next);
+  };
+
+  const maxRetries = numberAdvancedOption(
+    effectiveOptions.max_retries,
+    recommendedOptions.max_retries,
+    3,
+  );
+  const readTimeout = numberAdvancedOption(
+    effectiveOptions.read_timeout,
+    recommendedOptions.read_timeout,
+    180,
+  );
+  const stream = booleanAdvancedOption(
+    effectiveOptions.stream,
+    recommendedOptions.stream,
+    true,
+  );
+  const rawApiMode = stringAdvancedOption(
+    effectiveOptions.api_mode,
+    recommendedOptions.api_mode,
+    "chat_completions",
+  );
+  const apiMode: "chat_completions" | "responses" =
+    rawApiMode === "responses" ? "responses" : "chat_completions";
+  const openaiReasoning = stringAdvancedOption(
+    effectiveOptions.reasoning_effort,
+    null,
+    "",
+  ) as "" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  const claudeReasoning = stringAdvancedOption(
+    effectiveOptions.reasoning_effort,
+    null,
+    "",
+  ) as "" | "low" | "medium" | "high" | "xhigh";
+  const rawThinkingType = stringAdvancedOption(
+    effectiveOptions.thinking_type,
+    recommendedOptions.thinking_type,
+    "adaptive",
+  );
+  const thinkingType: "adaptive" | "disabled" =
+    rawThinkingType === "disabled" ? "disabled" : "adaptive";
+  const claudeCodePassthrough = booleanAdvancedOption(
+    effectiveOptions.fake_cc_system_prompt,
+    recommendedOptions.fake_cc_system_prompt,
+    false,
+  );
+
+  return (
+    <div className="rounded-sm border border-line/70 bg-elevated/35">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {open ? (
+            <CaretDown size={12} weight="bold" className="text-ink-muted" />
+          ) : (
+            <CaretRight size={12} weight="bold" className="text-ink-muted" />
+          )}
+          <span className="text-[12.5px] font-medium text-ink">
+            {copy.advancedConfig}
+          </span>
+        </span>
+        <span className="shrink-0 text-[11.5px] text-ink-muted">
+          {customCount > 0
+            ? copy.advancedConfigSetCount(customCount)
+            : copy.advancedConfigUsingRecommended}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-line px-3 py-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdvancedNumberField
+              label={copy.maxRetries}
+              value={maxRetries}
+              min={0}
+              onChange={(value) => setOption("max_retries", value)}
+            />
+            <AdvancedNumberField
+              label={copy.readTimeout}
+              value={readTimeout}
+              min={5}
+              suffix={copy.secondsSuffix}
+              onChange={(value) => setOption("read_timeout", value)}
+            />
+          </div>
+
+          <AdvancedSwitchRow
+            label={copy.streamResponse}
+            checked={stream}
+            onCheckedChange={(checked) => setOption("stream", checked)}
+          />
+
+          {protocol === "openai" ? (
+            <>
+              <AdvancedChoiceField
+                label={copy.apiMode}
+                value={apiMode}
+                options={[
+                  { value: "chat_completions", label: copy.apiModeChat },
+                  { value: "responses", label: copy.apiModeResponses },
+                ]}
+                onChange={(value) => setOption("api_mode", value)}
+              />
+              <AdvancedChoiceField
+                label={copy.reasoningEffort}
+                value={openaiReasoning}
+                options={[
+                  { value: "", label: copy.reasoningDefault },
+                  { value: "none", label: copy.reasoningNone },
+                  { value: "minimal", label: copy.reasoningMinimal },
+                  { value: "low", label: copy.reasoningLow },
+                  { value: "medium", label: copy.reasoningMedium },
+                  { value: "high", label: copy.reasoningHigh },
+                  { value: "xhigh", label: copy.reasoningXHigh },
+                ]}
+                onChange={(value) =>
+                  setOption("reasoning_effort", value || null)
+                }
+              />
+            </>
+          ) : (
+            <>
+              <AdvancedChoiceField
+                label={copy.thinkingType}
+                value={thinkingType}
+                options={[
+                  { value: "adaptive", label: copy.thinkingAdaptive },
+                  { value: "disabled", label: copy.thinkingDisabled },
+                ]}
+                onChange={(value) => setOption("thinking_type", value)}
+              />
+              <AdvancedChoiceField
+                label={copy.reasoningEffort}
+                value={claudeReasoning}
+                options={[
+                  { value: "", label: copy.reasoningDefault },
+                  { value: "low", label: copy.reasoningLow },
+                  { value: "medium", label: copy.reasoningMedium },
+                  { value: "high", label: copy.reasoningHigh },
+                  { value: "xhigh", label: copy.reasoningXHigh },
+                ]}
+                onChange={(value) =>
+                  setOption("reasoning_effort", value || null)
+                }
+              />
+              <AdvancedSwitchRow
+                label={copy.claudeCodePassthrough}
+                checked={claudeCodePassthrough}
+                onCheckedChange={(checked) =>
+                  setOption("fake_cc_system_prompt", checked)
+                }
+                info={copy.claudeCodePassthroughInfo}
+              />
+            </>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0 text-ink-muted"
+            onClick={() => onChange(recommendedOptions)}
+          >
+            {copy.restoreRecommended}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdvancedNumberField({
+  label,
+  value,
+  min,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </span>
+      <span className="relative block">
+        <input
+          type="number"
+          min={min}
+          value={value}
+          onChange={(event) => {
+            const next = Number.parseInt(event.currentTarget.value, 10);
+            if (Number.isFinite(next)) onChange(Math.max(min, next));
+          }}
+          className={cn(
+            "w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors",
+            "placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20",
+            suffix && "pr-12",
+          )}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11.5px] text-ink-muted">
+            {suffix}
+          </span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+function AdvancedChoiceField<TValue extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: TValue;
+  options: AdvancedChoiceOption<TValue>[];
+  onChange: (value: TValue) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {options.map((option) => {
+          const active = option.value === value;
+          return (
+            <button
+              key={option.value || "default"}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "inline-flex min-h-7 items-center rounded-sm border px-2 text-[12px] transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+                active
+                  ? "border-line bg-elevated text-ink shadow-card"
+                  : "border-transparent text-ink-muted hover:bg-hover hover:text-ink",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedSwitchRow({
+  label,
+  checked,
+  onCheckedChange,
+  info,
+}: {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  info?: string;
+}) {
+  return (
+    <div className="flex min-h-8 items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink">
+        <span>{label}</span>
+        {info && <InfoTooltip label={label} text={info} />}
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        ariaLabel={label}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+function advancedCustomCount(
+  options: Record<string, unknown>,
+  recommended: Record<string, unknown>,
+  protocol: ManagedModelProtocol,
+): number {
+  const keys =
+    protocol === "openai"
+      ? ["max_retries", "read_timeout", "stream", "api_mode", "reasoning_effort"]
+      : [
+          "max_retries",
+          "read_timeout",
+          "stream",
+          "thinking_type",
+          "reasoning_effort",
+          "fake_cc_system_prompt",
+        ];
+  return keys.filter((key) => {
+    const current = options[key] ?? null;
+    const baseline = recommended[key] ?? null;
+    return current !== baseline;
+  }).length;
+}
+
+function numberAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: number,
+): number {
+  const raw = value ?? recommended;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function booleanAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: boolean,
+): boolean {
+  const raw = value ?? recommended;
+  return typeof raw === "boolean" ? raw : fallback;
+}
+
+function stringAdvancedOption(
+  value: unknown,
+  recommended: unknown,
+  fallback: string,
+): string {
+  const raw = value ?? recommended;
+  return typeof raw === "string" ? raw : fallback;
+}

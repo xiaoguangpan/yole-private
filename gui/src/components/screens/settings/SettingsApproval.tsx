@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { IconTooltip } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { ApprovalConfig } from "@/components/screens/settings/Settings";
+import type { ApprovalConfig } from "@/components/screens/settings/settings-types";
 
 interface SettingsApprovalProps {
   config: ApprovalConfig;

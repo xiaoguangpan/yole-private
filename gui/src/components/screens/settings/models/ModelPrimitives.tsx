@@ -1,0 +1,309 @@
+import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  CheckCircle,
+  CircleNotch,
+  Info,
+  MagnifyingGlass,
+  WarningCircle,
+} from "@phosphor-icons/react";
+import type { ReactNode } from "react";
+
+import { useCopy } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import type { ManagedModelProtocol } from "@/types/managed-models";
+
+import { protocolLabel } from "./model-settings-utils";
+import type { ProbeAction, ProbeState } from "./types";
+
+export function ModelSelectionList({
+  title,
+  value,
+  options,
+  filter,
+  onFilterChange,
+  onChange,
+}: {
+  title: string;
+  value: string;
+  options: string[];
+  filter: string;
+  onFilterChange: (value: string) => void;
+  onChange: (value: string) => void;
+}) {
+  const copy = useCopy().settings.models;
+  const normalizedFilter = filter.trim().toLowerCase();
+  const selectedValue = value.trim();
+  const filteredOptions = options.filter((option) =>
+    option.toLowerCase().includes(normalizedFilter),
+  );
+  const visibleOptions = filteredOptions.slice(0, 80);
+
+  return (
+    <div className="space-y-2 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[12.5px] font-medium text-ink">{title}</div>
+        <div className="relative w-full max-w-[260px]">
+          <MagnifyingGlass
+            size={12}
+            weight="thin"
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
+          <input
+            value={filter}
+            onChange={(e) => onFilterChange(e.target.value)}
+            placeholder={copy.filterModels}
+            spellCheck={false}
+            className="w-full rounded-sm border border-line bg-surface py-1.5 pl-7 pr-2.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
+          />
+        </div>
+      </div>
+      <div className="max-h-[220px] divide-y divide-line overflow-auto rounded-sm border border-line bg-surface">
+        {visibleOptions.length === 0 && (
+          <EmptyRow text={copy.noMatchingModels} />
+        )}
+        {visibleOptions.map((option) => {
+          const selected = option === selectedValue;
+          return (
+            <button
+              key={option}
+              type="button"
+              title={option}
+              aria-pressed={selected}
+              onClick={() => onChange(option)}
+              className={cn(
+                "flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors",
+                "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20",
+                selected ? "bg-brand-soft text-ink" : "text-ink hover:bg-hover",
+              )}
+            >
+              <span className="flex w-4 shrink-0 items-center justify-center">
+                {selected && (
+                  <CheckCircle
+                    size={12}
+                    weight="fill"
+                    className="text-brand-strong"
+                  />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                {option}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {filteredOptions.length > visibleOptions.length && (
+        <div className="text-[11.5px] text-ink-muted">
+          {copy.visibleOptionsHint(visibleOptions.length)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SettingsInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  trailing,
+  reserveTrailing = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: "text" | "password";
+  trailing?: ReactNode;
+  reserveTrailing?: boolean;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+          className={cn(
+            "w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20",
+            (trailing || reserveTrailing) && "pr-10",
+          )}
+        />
+        {trailing && (
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            {trailing}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function InlineProbeStatus({
+  state,
+  action,
+}: {
+  state: ProbeState;
+  action: ProbeAction;
+}) {
+  if (state.kind !== "success" || state.action !== action) return null;
+  return (
+    <span
+      className="inline-flex min-h-7 max-w-[220px] shrink items-center gap-1 px-1 text-[11.5px] leading-none text-success"
+      title={state.message}
+    >
+      <CheckCircle size={11} weight="fill" className="shrink-0" />
+      <span className="truncate">{state.message}</span>
+    </span>
+  );
+}
+
+export function ProbeErrorLine({
+  state,
+  action,
+  className,
+}: {
+  state: ProbeState;
+  action: ProbeAction;
+  className?: string;
+}) {
+  if (state.kind !== "error" || state.action !== action) return null;
+  return (
+    <div className={cn("mt-2", className)}>
+      <StatusLine state={state} />
+    </div>
+  );
+}
+
+function StatusLine({ state }: { state: ProbeState }) {
+  if (state.kind !== "success" && state.kind !== "error") return null;
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-sm border px-3 py-2 text-[12.5px]",
+        "select-text",
+        state.kind === "success"
+          ? "border-success/20 bg-success/[0.06] text-success"
+          : "border-error/20 bg-error/[0.06] text-error",
+      )}
+    >
+      {state.kind === "success" ? (
+        <CheckCircle size={12} weight="fill" />
+      ) : (
+        <WarningCircle size={12} weight="fill" />
+      )}
+      {state.message}
+    </div>
+  );
+}
+
+export function ErrorLine({ message }: { message: string }) {
+  return (
+    <div className="select-text rounded-sm border border-error/20 bg-error/[0.06] px-3 py-2 text-[12.5px] text-error">
+      {message}
+    </div>
+  );
+}
+
+export function InfoLine({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-sm border border-line bg-elevated/55 px-3 py-2 text-[12.5px] leading-[1.45] text-ink-soft">
+      <Info
+        size={12}
+        weight="bold"
+        className="mt-0.5 shrink-0 text-ink-muted"
+      />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+export function LoadingRow() {
+  const copy = useCopy().settings.models;
+  return (
+    <div className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-ink-muted">
+      <span className="spin">
+        <CircleNotch size={13} weight="thin" />
+      </span>
+      {copy.loading}
+    </div>
+  );
+}
+
+export function EmptyRow({ text }: { text: string }) {
+  return <div className="px-3 py-3 text-[12.5px] text-ink-muted">{text}</div>;
+}
+
+export function CredentialBadge({
+  status,
+}: {
+  status: "present" | "missing" | "unknown";
+}) {
+  const copy = useCopy().settings.models;
+  if (status === "present") return null;
+  if (status === "unknown") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-warning/10 px-1.5 py-px text-[10.5px] text-warning">
+        <WarningCircle size={10} weight="fill" />
+        {copy.keyStatusUnknownShort}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-warning/10 px-1.5 py-px text-[10.5px] text-warning">
+      <WarningCircle size={10} weight="fill" />
+      {copy.keyNeedsResaveShort}
+    </span>
+  );
+}
+
+export function ProtocolBadge({
+  protocol,
+  apiBase,
+}: {
+  protocol: ManagedModelProtocol;
+  apiBase: string;
+}) {
+  const label = protocolLabel(protocol);
+  return (
+    <span
+      className="inline-flex max-w-[180px] shrink-0 truncate rounded-sm bg-ink-muted/10 px-1.5 py-px text-[10.5px] leading-4 text-ink-muted/80"
+      title={`${label} · ${apiBase}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+export function InfoTooltip({ label, text }: { label: string; text: string }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="inline-flex size-5 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink"
+        >
+          <Info size={11} weight="bold" />
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="z-[80] max-w-[260px] rounded-sm border border-line bg-elevated p-2 text-[11.5px] leading-4 text-ink-soft shadow-elevated"
+        >
+          {text}
+          <Tooltip.Arrow className="fill-elevated" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
