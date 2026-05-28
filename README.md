@@ -27,6 +27,8 @@
   <img src="docs/screenshots/screenshot_05.png" alt="Galley 主对话界面" width="800" />
 </p>
 
+---
+
 ## Galley 是什么
 
 Galley 在你的电脑上并行运行多个 AI agent session。Human 用 GUI 看进度、发指令、做审批；Supervisor Agent 用 CLI 编排同一支 session team。
@@ -37,6 +39,8 @@ Galley 在你的电脑上并行运行多个 AI agent session。Human 用 GUI 看
 
 已有 [GenericAgent](https://github.com/lsdefine/GenericAgent) 用户也可以在 **Settings → Runtime** 接入外部 GA；Galley 不修改外部 GA 代码、memory、SOP 或 `mykey.py`。
 
+---
+
 ## Highlights
 
 | | |
@@ -45,6 +49,8 @@ Galley 在你的电脑上并行运行多个 AI agent session。Human 用 GUI 看
 | ⚙️ **GUI + CLI 双原生**<br/>人在 GUI 里操作，Supervisor Agent 通过稳定的 `galley` CLI 操作；两边共享同一份 session 和历史。 | 💬 **IM 接入能力**<br/>微信、飞书、QQ、Telegram、Discord 等 GA IM 前端能力已随内置 GA 带入。 |
 | 🔒 **Localhost-only**<br/>Core 只监听 Unix socket / Windows named pipe；远程传输交给 Supervisor Agent。 | 🔧 **工具时间线 + 审批**<br/>工具调用、参数、结果、时延内联展示；高风险动作可审批、白名单或 YOLO。 |
 | 🌐 **浏览器控制**<br/>连接 Chrome/Chromium 后，agent 可以操作你已登录的浏览器。发挥你的想象空间。 | 💾 **持久化 + 搜索 + 后台常驻**<br/>关窗不退出，远程通过 Supervisor Agent 调度，回来继续聊、搜索历史会话。 |
+
+---
 
 ## Quick Start
 
@@ -74,6 +80,8 @@ Windows SmartScreen 提示发布者未知时，点「更多信息」→「仍要
 已有 GenericAgent 环境时，在 **Settings → Runtime → 接入外部 GA** 选择 GA 目录。
 
 </details>
+
+---
 
 ## Supervisor / IM
 
@@ -115,40 +123,42 @@ galley session archive <id> --supervisor=ga-claude-1 --reason="done"
 
 </details>
 
+---
+
 ## Architecture
 
 GUI 和 CLI 都接到同一个 Rust Core；Core 管 session 生命周期、SQLite 写入和 runner 事件广播。
 
 ```text
-┌──────────────┐                          ┌──────────────┐
-│  Galley GUI  │ ───┐                ┌─── │  Galley CLI  │
-│ (Tauri/React)│    │                │    │    (Rust)    │
-└──────────────┘    │                │    └──────────────┘
-                    ▼                ▼
-              ┌──────────────────────────┐
-              │      Galley Core         │      localhost only
-              │         (Rust)           │ ◀──  unix socket / named pipe
-              │  · session 生命周期      │      0600 · 无 token · 无 TLS
-              │  · SQLite 写权威         │
-              │  · runner 管理 + 事件广播│
-              └────────────┬─────────────┘
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-          ┌─────────────┐     ┌─────────────┐
-          │  Runner #1  │ ··· │  Runner #N  │   每 session 一个
-          │  (Python)   │     │  (Python)   │
-          └──────┬──────┘     └──────┬──────┘
-                 │                   │
-                 └─────────┬─────────┘
-                           ▼
-              ┌──────────────────────────┐
-              │  Galley-managed GA       │
-              │  · GenericAgent kernel   │
-              │  · Galley prompt profile │
-              │  · bundled CPython 3.11  │
-              │  · bundled dependencies  │
-              └──────────────────────────┘
++----------------+                  +----------------+
+|   Galley GUI   |---+          +---|   Galley CLI   |
+|  Tauri/React   |   |          |   |      Rust      |
++----------------+   |          |   +----------------+
+                     v          v
+              +------------------------+        localhost only
+              |      Galley Core       | <----  unix socket / named pipe
+              |          Rust          |        0600 / no token / no TLS
+              |  - session lifecycle   |
+              |  - SQLite authority    |
+              |  - runner + events     |
+              +-----------+------------+
+                          |
+             +------------+------------+
+             v                         v
+       +------------+             +------------+
+       | Runner #1  |     ...     | Runner #N  |        one per session
+       |  Python    |             |  Python    |
+       +-----+------+             +------+-----+
+             |                           |
+             +------------+--------------+
+                          v
+              +------------------------+
+              |   Galley-managed GA    |
+              | - GenericAgent kernel  |
+              | - Galley prompt profile|
+              | - bundled CPython 3.11 |
+              | - bundled dependencies |
+              +------------------------+
 ```
 
 (1) GUI 跟 CLI 是**对等前端**，不是 GUI 包 CLI；
@@ -163,6 +173,8 @@ GUI 和 CLI 都接到同一个 Rust Core；Core 管 session 生命周期、SQLit
 [架构说明](./docs/architecture.md) ·
 [贡献指南](./CONTRIBUTING.md) ·
 [文档索引](./docs/README.md)
+
+---
 
 ## Why "Galley"?
 
