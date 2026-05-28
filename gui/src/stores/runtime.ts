@@ -158,8 +158,9 @@ interface RuntimeActions {
   attachExternalBridge: (sessionId: string, pid: number) => Promise<void>;
   /** Graceful shutdown. No-op if no bridge alive for `sid`. */
   shutdownBridge: (sid: string) => Promise<void>;
-  /** Send an IPC command to `sid`'s bridge over stdin. Warns + no-op
-   * if no live bridge. */
+  /** Send an IPC command to `sid`'s bridge over stdin. User-turn commands
+   * fail loudly when no live bridge is available; quiet background sync
+   * commands remain best-effort. */
   sendIPCCommand: (sid: string, cmd: IPCCommand) => Promise<void>;
   /** True only when this JS runtime has a live client/listener handle. */
   hasBridgeClient: (sid: string) => boolean;
@@ -282,6 +283,27 @@ async function _waitForBridgeClient(
   return _bridgeClients.get(sessionId);
 }
 
+function missingBridgeMessage(
+  status: BridgeStatus,
+  bridgeError: string | null,
+): string {
+  if (bridgeError) return bridgeError;
+  switch (status) {
+    case "spawning":
+      return "Galley 运行时还没有启动完成，请稍后重试。";
+    case "error":
+      return "Galley 运行时启动失败。";
+    case "closed":
+      return "Galley 运行时已关闭，请重新发送这条消息。";
+    default:
+      return "Galley 运行时未启动，请重新发送这条消息。";
+  }
+}
+
+function shouldFailWhenBridgeMissing(cmd: IPCCommand): boolean {
+  return cmd.kind === "user_message" || cmd.kind === "ask_user_response";
+}
+
 async function _enforceLRUCap(): Promise<void> {
   while (_lruOrder.length > LRU_CAP) {
     // `agentRunning` lives in messagesStore (B3 M5). Active-running
@@ -353,11 +375,11 @@ function buildSeedRuntime(seed: RuntimeSeedHints): PerSessionRuntime {
         isCurrent: llmStableKey(l) === seed.persistedKey,
       }))
     : hasPersistedIndex
-    ? cached.map((l) => ({
-        ...l,
-        isCurrent: l.index === seed.persistedIndex,
-      }))
-    : cached;
+      ? cached.map((l) => ({
+          ...l,
+          isCurrent: l.index === seed.persistedIndex,
+        }))
+      : cached;
   const llmDisplayName =
     seed.persistedDisplayName ??
     llms.find((l) => l.isCurrent)?.displayName ??
@@ -398,11 +420,14 @@ function makeBridgeHandlers(sessionId: string): BridgeHandlers {
     },
     onClose: (code, signal) => {
       console.info(`[bridge ${sessionId}] closed`, { code, signal });
-      if (code !== 0 && code !== null) {
-        const tail = _stderrTails.get(sessionId) ?? [];
-        const message = tail.length
-          ? tail.slice(-3).join("\n")
+      const abnormalClose = code !== 0;
+      const tail = abnormalClose ? (_stderrTails.get(sessionId) ?? []) : [];
+      const message = tail.length
+        ? tail.slice(-3).join("\n")
+        : code === null
+          ? "Galley 运行时意外退出，未返回退出码。"
           : `Bridge exited with code ${code}`;
+      if (abnormalClose) {
         useUiStore.getState().pushToast(
           makeAppError({
             category: "bridge",
@@ -423,7 +448,8 @@ function makeBridgeHandlers(sessionId: string): BridgeHandlers {
         byId: {
           ...state.byId,
           [sessionId]: _bridgeFieldsUpdate(state.byId[sessionId], {
-            bridgeStatus: "closed",
+            bridgeStatus: abnormalClose ? "error" : "closed",
+            bridgeError: abnormalClose ? message : null,
             bridgePid: null,
           }),
         },
@@ -792,10 +818,16 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
       }
     }
     if (!client) {
+      const slot = get().byId[sessionId];
+      const status = slot?.bridgeStatus ?? "idle";
+      const message = missingBridgeMessage(status, slot?.bridgeError ?? null);
       console.warn(
         `[runtime] sendIPCCommand(${sessionId}) called but no bridge is alive:`,
         cmd,
       );
+      if (shouldFailWhenBridgeMissing(cmd)) {
+        throw new Error(message);
+      }
       return;
     }
     await client.send(cmd);
@@ -854,7 +886,12 @@ async function mirrorSelectedLLMOnSession(sid: string, current: LLMOption) {
   // separate persistSession call.
   await useSessionsStore
     .getState()
-    .setSessionLlm(sid, current.index, llmStableKey(current), current.displayName);
+    .setSessionLlm(
+      sid,
+      current.index,
+      llmStableKey(current),
+      current.displayName,
+    );
 }
 
 function maybeToastMissingSelectedLLM(
@@ -862,10 +899,14 @@ function maybeToastMissingSelectedLLM(
   llms: LLMOption[],
   current: LLMOption,
 ) {
-  const session = useSessionsStore.getState().sessions.find((s) => s.id === sid);
+  const session = useSessionsStore
+    .getState()
+    .sessions.find((s) => s.id === sid);
   const expectedKey = session?.selectedLlmKey;
   if (!expectedKey) return;
-  const expectedStillExists = llms.some((llm) => llmStableKey(llm) === expectedKey);
+  const expectedStillExists = llms.some(
+    (llm) => llmStableKey(llm) === expectedKey,
+  );
   if (expectedStillExists || llmStableKey(current) === expectedKey) return;
   const copy = currentCopy();
   useUiStore.getState().pushToast(

@@ -18,7 +18,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time;
 
-use crate::managed_runtime;
+use crate::{managed_runtime, process_command};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -107,7 +107,9 @@ pub async fn probe_for_app(app: AppHandle) -> std::io::Result<BrowserControlProb
     let state_root = diagnostics.paths.state_root;
     let script = python_probe_script();
 
-    let mut child = Command::new(python)
+    let mut cmd = Command::new(python);
+    process_command::configure_python(&mut cmd);
+    let mut child = cmd
         .arg("-c")
         .arg(script)
         .current_dir(&code_root)
@@ -263,7 +265,9 @@ async fn open_extensions_page_for_platform(browser: BrowserControlBrowser) -> io
 }
 
 async fn run_command(program: &str, args: &[&str]) -> io::Result<()> {
-    let output = Command::new(program)
+    let mut cmd = Command::new(program);
+    process_command::configure_background(&mut cmd);
+    let output = cmd
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -283,8 +287,9 @@ async fn run_command(program: &str, args: &[&str]) -> io::Result<()> {
 
 #[cfg(not(target_os = "macos"))]
 fn spawn_command(program: &str, args: &[&str]) -> io::Result<()> {
-    Command::new(program)
-        .args(args)
+    let mut cmd = Command::new(program);
+    process_command::configure_background(&mut cmd);
+    cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -379,7 +384,7 @@ try:
             "status": "not_connected",
             "tab_count": 0,
             "message": "未检测到浏览器扩展连接。请确认扩展已加载并启用。"
-        }, ensure_ascii=False))
+        }, ensure_ascii=True))
     else:
         session_id = str(sessions[0].get("id"))
         title = None
@@ -394,20 +399,20 @@ try:
                 "status": "error",
                 "tab_count": len(sessions),
                 "message": "扩展已连接，但网页脚本测试失败：" + str(exec_error)
-            }, ensure_ascii=False))
+            }, ensure_ascii=True))
             raise SystemExit(0)
         print(json.dumps({
             "status": "connected",
             "tab_count": len(sessions),
             "sample_title": title,
             "message": "浏览器控制已连接。"
-        }, ensure_ascii=False))
+        }, ensure_ascii=True))
 except Exception as e:
     print(json.dumps({
         "status": "error",
         "tab_count": 0,
         "message": str(e)
-    }, ensure_ascii=False))
+    }, ensure_ascii=True))
     traceback.print_exc()
 "#
 }

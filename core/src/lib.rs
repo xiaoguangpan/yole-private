@@ -12,6 +12,7 @@ pub mod managed_model_probe;
 pub mod managed_runtime;
 pub mod migration_backup;
 pub mod path_install;
+mod process_command;
 pub mod runner_commands;
 pub mod runner_manager;
 pub mod socket_listener;

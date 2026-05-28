@@ -291,11 +291,33 @@ function App() {
     (s) => s.removePendingApproval,
   );
 
+  const reportUserSendFailure = (sid: string, context: string, e: unknown) => {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn("[main] send failed", { sid, message });
+    const m = useMessagesStore.getState();
+    m.setAgentRunning(sid, false);
+    m.setCurrentTurnIndex(sid, null);
+    m.clearInFlightContent(sid);
+    useUiStore.getState().pushToast(
+      makeAppError({
+        category: "bridge",
+        severity: "error",
+        title: copy.errors.sendFailed,
+        message,
+        hint: null,
+        retryable: true,
+        context,
+        traceback: null,
+      }),
+    );
+  };
+
   const runBrowserControlDemo = async () => {
     if (requiresManagedModelConfig) {
       openModelsForMissingConfig();
       return;
     }
+    let demoSid: string | null = null;
     try {
       const probe = await probeBrowserControl();
       if (!probe || probe.status !== "connected") {
@@ -304,6 +326,7 @@ function App() {
         );
       }
       const sid = createSession();
+      demoSid = sid;
       await activateSession(sid);
       setScreen("main");
       appendUserTurn(sid, copy.browserControl.demoPrompt);
@@ -313,19 +336,23 @@ function App() {
         images: [],
       });
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      useUiStore.getState().pushToast(
-        makeAppError({
-          category: "bridge",
-          severity: "error",
-          title: copy.errors.sendFailed,
-          message,
-          hint: null,
-          retryable: true,
-          context: "browser_control_demo",
-          traceback: null,
-        }),
-      );
+      if (demoSid) {
+        reportUserSendFailure(demoSid, "browser_control_demo", e);
+      } else {
+        const message = e instanceof Error ? e.message : String(e);
+        useUiStore.getState().pushToast(
+          makeAppError({
+            category: "bridge",
+            severity: "error",
+            title: copy.errors.sendFailed,
+            message,
+            hint: null,
+            retryable: true,
+            context: "browser_control_demo",
+            traceback: null,
+          }),
+        );
+      }
     }
   };
 
@@ -353,21 +380,13 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [
-    activeRuntimeKind,
-    ensureBrowserControlLayout,
-    probeBrowserControl,
-  ]);
+  }, [activeRuntimeKind, ensureBrowserControlLayout, probeBrowserControl]);
 
   useEffect(() => {
     if (activeRuntimeKind === "managed") return;
     if (!browserControlSetupOpen) return;
     closeBrowserControlSetup();
-  }, [
-    activeRuntimeKind,
-    browserControlSetupOpen,
-    closeBrowserControlSetup,
-  ]);
+  }, [activeRuntimeKind, browserControlSetupOpen, closeBrowserControlSetup]);
 
   useEffect(() => {
     if (activeRuntimeKind !== "managed") return;
@@ -1104,6 +1123,7 @@ function App() {
                   appendUserTurn,
                   sendIPCCommand,
                   setScreen,
+                  reportUserSendFailure,
                   activeProjectFilter,
                 ).then(() => {
                   if (activeProjectFilter) setActiveProjectFilter(undefined);
@@ -1122,6 +1142,7 @@ function App() {
                   appendUserTurn,
                   sendIPCCommand,
                   setScreen,
+                  reportUserSendFailure,
                   activeProjectFilter,
                 ).then(() => {
                   if (activeProjectFilter) setActiveProjectFilter(undefined);
@@ -1203,26 +1224,8 @@ function App() {
                   }
                   await sendIPCCommand(sid, cmd);
                 };
-                const reportSendFailure = (e: unknown) => {
-                  const message = e instanceof Error ? e.message : String(e);
-                  console.warn("[main] send failed", { sid, message });
-                  const m = useMessagesStore.getState();
-                  m.setAgentRunning(sid, false);
-                  m.setCurrentTurnIndex(sid, null);
-                  m.clearInFlightContent(sid);
-                  useUiStore.getState().pushToast(
-                    makeAppError({
-                      category: "bridge",
-                      severity: "error",
-                      title: copy.errors.sendFailed,
-                      message,
-                      hint: null,
-                      retryable: true,
-                      context: "send_user_message",
-                      traceback: null,
-                    }),
-                  );
-                };
+                const reportSendFailure = (e: unknown) =>
+                  reportUserSendFailure(sid, "send_user_message", e);
                 // `/btw` is a side question (interruption-free,
                 // not a main-agent turn). Route to the transient
                 // user-turn path so it doesn't disturb the main
@@ -1322,7 +1325,7 @@ function App() {
           selectLLMForSession(activeSessionId, idx);
           // Same relaxed gate as MainView's onSelectLLM — allow during
           // spawning so users don't get silent drops in the cold-start
-          // window. sendIPCCommand internally no-ops if no live bridge.
+          // window. set_llm remains best-effort if no live bridge appears.
           if (bridgeStatus === "connected" || bridgeStatus === "spawning") {
             void sendIPCCommand(activeSessionId, {
               kind: "set_llm",
@@ -1571,6 +1574,11 @@ async function submitOnEmpty(
     cmd: { kind: "user_message"; text: string; images?: string[] },
   ) => Promise<void>,
   setScreen: (s: import("@/stores/ui").Screen) => void,
+  reportSendFailure: (
+    sessionId: string,
+    context: string,
+    error: unknown,
+  ) => void,
   inheritProjectId?: string,
 ): Promise<void> {
   let id = existingId;
@@ -1584,11 +1592,15 @@ async function submitOnEmpty(
   }
   setScreen("main");
   appendUserTurn(id, text);
-  await sendIPCCommand(id, {
-    kind: "user_message",
-    text,
-    images: [],
-  });
+  try {
+    await sendIPCCommand(id, {
+      kind: "user_message",
+      text,
+      images: [],
+    });
+  } catch (e) {
+    reportSendFailure(id, "send_user_message", e);
+  }
 }
 
 // ---------------- Settings path pickers ----------------

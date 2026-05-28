@@ -4,6 +4,7 @@
 //! See [parent module docs](super) for history and lifetime contract.
 
 use crate::ipc::{IpcCommand, IpcEvent};
+use crate::process_command;
 use crate::runner_manager::error::{RunnerSpawnError, SendCommandError};
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -146,6 +147,7 @@ impl RunnerProcess {
         for (k, v) in &args.env {
             cmd.env(k, v);
         }
+        process_command::configure_python(&mut cmd);
 
         let mut child = cmd
             .current_dir(&args.bridge_cwd)
