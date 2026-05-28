@@ -137,8 +137,8 @@ they read keep their names + semantics inside `schemaVersion: 1`.
 - **Database location.** The CLI reads the same SQLite file the Galley
   GUI writes to. Default paths:
   - macOS: `~/Library/Application Support/app.galley/workbench.db`
-  - Linux: `$XDG_DATA_HOME/app.galley/workbench.db` or
-    `~/.local/share/app.galley/workbench.db`
+  - Linux: `$XDG_CONFIG_HOME/app.galley/workbench.db` or
+    `~/.config/app.galley/workbench.db`
   - Windows: `%APPDATA%/app.galley/workbench.db`
 - **Override.** Set `GALLEY_DB_PATH=<absolute-path>` to point at a
   specific file (snapshots, isolated test fixtures, etc.).

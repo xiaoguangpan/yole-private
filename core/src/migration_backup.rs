@@ -29,19 +29,10 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use directories::ProjectDirs;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Row};
 
-/// Tauri identifier — must match `tauri.conf.json:identifier` and
-/// `APP_IDENTIFIER` in [`crate::db`]. Centralized in `db.rs` but
-/// re-stated here to avoid a cyclic dependency on `db::db_path` (which
-/// also opens a pool we don't want).
-const APP_IDENTIFIER: &str = "app.galley";
-
-/// File name of the main SQLite database. Same constant as
-/// `crate::db::DB_FILENAME` but kept local for the same reason.
-const DB_FILENAME: &str = "workbench.db";
+use crate::app_paths::{self, DB_FILENAME};
 
 /// Sibling directory name prefix (e.g. `app.galley.backup.20260520T140530Z/`
 /// next to `app.galley/`).
@@ -71,8 +62,8 @@ pub enum BackupOutcome {
 /// Errors during the backup probe / copy.
 #[derive(Debug)]
 pub enum BackupError {
-    /// `ProjectDirs::from(...)` returned `None` — `$HOME` / `%APPDATA%`
-    /// both unset, extremely unusual. Galley can't proceed safely.
+    /// The platform app config directory could not be resolved.
+    /// Extremely unusual; Galley can't proceed safely.
     DataDirUnavailable,
     /// `sqlx` open / probe query failed against the existing DB file.
     /// Likely a corrupted DB; user should restore from a Time Machine
@@ -92,7 +83,10 @@ impl std::fmt::Display for BackupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BackupError::DataDirUnavailable => {
-                write!(f, "data_dir_unavailable: cannot resolve app data directory")
+                write!(
+                    f,
+                    "data_dir_unavailable: cannot resolve app config directory"
+                )
             }
             BackupError::DbProbe { message } => write!(f, "db_probe: {message}"),
             BackupError::CopyFailed { src, dst, message } => write!(
@@ -107,15 +101,18 @@ impl std::fmt::Display for BackupError {
 
 impl std::error::Error for BackupError {}
 
-/// Resolve the data directory (`~/Library/Application Support/app.galley/`
-/// on macOS, equivalents elsewhere). `None` only when the platform's
-/// home directory is unresolvable (extremely rare; see B4-M8 sub-plan
-/// §R1).
+/// Resolve the directory where `tauri-plugin-sql` opens `workbench.db`.
+///
+/// Historical note: this function kept the "data dir" name from B4 M8,
+/// but the correct source of truth is Tauri's app-config dir because
+/// that is what `tauri-plugin-sql` uses for `sqlite:workbench.db`.
+/// `None` only when the platform's home/config directory is
+/// unresolvable (extremely rare; see B4-M8 sub-plan §R1).
 ///
 /// Public so the failure dialog can show the path to the user even when
 /// resolution succeeded but later steps failed.
 pub fn resolve_data_dir() -> Option<PathBuf> {
-    ProjectDirs::from("", "", APP_IDENTIFIER).map(|dirs| dirs.data_dir().to_path_buf())
+    app_paths::app_config_dir()
 }
 
 /// Production entry point — resolves the data dir and delegates to

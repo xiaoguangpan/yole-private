@@ -1,4 +1,5 @@
 pub mod api;
+mod app_paths;
 pub mod app_update;
 pub mod browser_control;
 pub mod credential_store;

@@ -8,18 +8,16 @@
 //! is shared (one set of SQLite symbols in the binary, FTS5 + trigram
 //! tokenizer available on the same flags the GUI's writes use).
 //!
-//! **Path resolution.** The DB file lives in the platform-specific
-//! app-data directory under the Tauri identifier `app.galley` —
-//! exactly where `tauri-plugin-sql` resolves the `sqlite:workbench.db`
-//! URL. [`db_path`] reproduces that lookup without an `AppHandle`
-//! so the future Galley CLI binary (no Tauri context) can find the
-//! same DB. **Identifier change == data move** — see
+//! **Path resolution.** The DB file lives in the same directory where
+//! `tauri-plugin-sql` resolves `sqlite:workbench.db`: Tauri's
+//! app-config directory under the identifier `app.galley`. [`db_path`]
+//! reproduces that lookup without an `AppHandle` so the Galley CLI
+//! binary can find the same DB. **Identifier change == data move** — see
 //! [desktop runtime](../../docs/desktop-runtime.md#tauri-identifier).
 
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use directories::ProjectDirs;
 use serde::Serialize;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
@@ -31,21 +29,13 @@ use crate::api::{
     ProjectId, ProjectPatch, RuntimeKind, SearchHit, SearchScope, SessionBrief, SessionFilter,
     SessionId, SessionStatus, StatusSummary,
 };
+use crate::app_paths;
 use crate::error::{GalleyError, Result};
 use crate::managed_runtime;
 
-/// Tauri bundle identifier. Must match `tauri.conf.json:identifier`
-/// otherwise the CLI binary will look in a different directory than
-/// the GUI writes to. See [desktop runtime](../../docs/desktop-runtime.md#tauri-identifier).
-const APP_IDENTIFIER: &str = "app.galley";
-
-/// File name inside `app_data_dir/`. Matches `tauri-plugin-sql`'s URL
-/// `sqlite:workbench.db`.
-const DB_FILENAME: &str = "workbench.db";
-
 /// Resolve the absolute path of Galley's SQLite database file. Works
 /// both inside a Tauri process (no `AppHandle` needed) and inside the
-/// CLI binary. Returns `None` if the platform's app-data directory
+/// CLI binary. Returns `None` if the platform's config directory
 /// can't be determined (very rare — would mean `$HOME` / `%APPDATA%`
 /// are both unset).
 ///
@@ -55,17 +45,7 @@ const DB_FILENAME: &str = "workbench.db";
 /// read from a snapshot. The Tauri GUI process inherits the user's
 /// env so setting it for an interactive session works too.
 pub fn db_path() -> Option<PathBuf> {
-    if let Ok(override_path) = std::env::var("GALLEY_DB_PATH") {
-        if !override_path.is_empty() {
-            return Some(PathBuf::from(override_path));
-        }
-    }
-    // `directories` parses the identifier as `qualifier.organization.application`
-    // but Tauri stores under the full identifier as a single segment. We pass
-    // ("", "", "app.galley") so it produces `<base>/app.galley/` rather than
-    // `<base>/app/galley/`.
-    let dirs = ProjectDirs::from("", "", APP_IDENTIFIER)?;
-    Some(dirs.data_dir().join(DB_FILENAME))
+    app_paths::db_path()
 }
 
 /// SQLite-backed Galley Core. Cheap to clone (pool internally is
@@ -84,7 +64,7 @@ impl SqliteGalley {
     /// configuration mistake).
     pub async fn open() -> Result<Self> {
         let path = db_path().ok_or_else(|| GalleyError::DbUnavailable {
-            message: "platform app-data directory unavailable".into(),
+            message: "platform app config directory unavailable".into(),
         })?;
         let opts = SqliteConnectOptions::new()
             .filename(&path)

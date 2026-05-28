@@ -64,11 +64,10 @@ async-trait = "0.1"
 # SQLite-compiled symbols. Runtime tied to tokio (Tauri's executor).
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 
-# Platform-specific app-data directory lookup for CLI processes that
-# don't have a Tauri context (i.e. `~/Library/Application Support/<id>/`
-# on macOS, `%APPDATA%/<id>/` on Windows, `~/.local/share/<id>/` on
-# Linux). The Tauri runtime resolves the same path internally, but the
-# CLI binary has no AppHandle — see `db_path()` in `db.rs`.
+# Platform-specific config directory lookup for CLI processes that
+# don't have a Tauri context. `tauri-plugin-sql` resolves
+# `sqlite:workbench.db` against Tauri's app config dir, so the CLI must
+# mirror that resolver exactly; see `app_paths.rs`.
 directories = "5"
 
 # UTC timestamps for migration backup directory names (B4 M8). Already in

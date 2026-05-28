@@ -8,14 +8,16 @@ identifier safety, unsigned releases, bundled Python, and Mac / Windows notes.
 
 ## Tauri Identifier
 
-Tauri `identifier` binds the app data directory on all supported platforms:
+Tauri `identifier` binds Galley's app directories on all supported platforms.
+The main SQLite DB follows `tauri-plugin-sql` and lives in the app config
+directory:
 
 - macOS: `~/Library/Application Support/{identifier}/`
-- Linux: `$XDG_DATA_HOME/{identifier}/` or `~/.local/share/{identifier}/`
+- Linux: `$XDG_CONFIG_HOME/{identifier}/` or `~/.config/{identifier}/`
 - Windows: `%APPDATA%/{identifier}/`
 
 Galley currently uses `app.galley`. SQLite data for sessions, projects,
-tool events, prefs, and migrations lives under that identifier-controlled data
+tool events, prefs, and migrations lives under that identifier-controlled
 directory.
 
 Changing the identifier without migration makes user data appear to vanish,
