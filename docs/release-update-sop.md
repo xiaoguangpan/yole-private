@@ -121,6 +121,47 @@ Open the draft Release in GitHub and check:
 
 Do not publish if assets are missing or release notes are misleading.
 
+#### Alpha Release Notes Template
+
+Use this compact template for invited-tester alpha builds:
+
+````markdown
+仅供内测用户使用，alpha 版本存在稳定性风险，不建议普通用户安装。
+For invited testers only. This alpha build may be unstable and is not recommended for general users.
+
+## 请重点测试
+
+- 全新安装后完成 Onboarding，配置模型并进入主界面。
+- 新建对话，确认 Galley 能正常回复。
+- 浏览器控制扩展安装、连接测试和简单浏览器任务。
+- 退出并重启 Galley，确认模型配置和历史对话仍在。
+- Settings -> About 里的检查更新状态。
+
+## macOS 安装提示
+
+如果 macOS 提示无法打开，可以在终端执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Galley.app
+```
+
+## Please Test
+
+- Complete Onboarding after a fresh install, configure a model, and enter the main screen.
+- Start a new conversation and confirm Galley replies normally.
+- Install the Browser Control extension, test the connection, and run a simple browser task.
+- Quit and relaunch Galley, then confirm model settings and conversation history are still there.
+- Check the update status in Settings -> About.
+
+## macOS Install Note
+
+If macOS says Galley cannot be opened, run this in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Galley.app
+```
+````
+
 ### 5. Smoke Test Installers
 
 Download from the draft Release and run the platform smoke path:
