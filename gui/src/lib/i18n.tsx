@@ -299,9 +299,13 @@ const zhCopy = {
       apiKey: "模型密钥",
       apiUrl: "API 地址",
       model: "模型",
-      fetchList: "获取模型列表",
-      fetchModelList: "获取模型列表",
-      chooseDetectedModel: "选择检测到的模型",
+      fetchList: "读取模型列表",
+      fetchModelList: "读取模型列表",
+      chooseDetectedModel: "选择要启用的模型",
+      modelListManualFallback:
+        "没有读到模型列表也可以继续，手动填写模型名后保存即可。",
+      selectedModelOutsideList: (model: string) =>
+        `当前会保存 ${model}。它不在刚读到的列表里，也可以作为手动模型继续使用。`,
       providerName: "提供商显示名称",
       providerNamePlaceholder: "可自定义；方便在列表中识别",
       leaveKeyBlank: "密钥留空会继续使用已保存的 Key",
@@ -352,6 +356,8 @@ const zhCopy = {
       moveDown: (name: string) => `下移 ${name}`,
       saveService: "保存服务",
       saveAndEnableModel: "保存并启用模型",
+      providerCreatedToastMessage:
+        "已接入模型提供商，并启用 1 个模型；可以继续在这个 Provider 下添加模型。",
       check: "检查",
       keyNeedsResave: "这个服务的密钥需要重新保存。",
       addManually: "手动添加",
@@ -1123,9 +1129,13 @@ const enCopy: AppCopy = {
       apiKey: "API Key",
       apiUrl: "API URL",
       model: "Model",
-      fetchList: "Fetch model list",
-      fetchModelList: "Fetch model list",
-      chooseDetectedModel: "Choose a detected model",
+      fetchList: "Read model list",
+      fetchModelList: "Read model list",
+      chooseDetectedModel: "Choose a model to enable",
+      modelListManualFallback:
+        "You can keep going without a returned model list: enter the model name manually and save.",
+      selectedModelOutsideList: (model) =>
+        `Galley will save ${model}. It was not in the returned list, but you can keep it as a manual model.`,
       providerName: "Provider display name",
       providerNamePlaceholder:
         "Optional custom name; helps identify it in the list.",
@@ -1180,6 +1190,8 @@ const enCopy: AppCopy = {
       moveDown: (name) => `Move ${name} down`,
       saveService: "Save service",
       saveAndEnableModel: "Save and enable model",
+      providerCreatedToastMessage:
+        "Provider connected and 1 model enabled; you can keep adding models under this provider.",
       check: "Check",
       keyNeedsResave: "This service needs its API Key saved again.",
       addManually: "Add manually",

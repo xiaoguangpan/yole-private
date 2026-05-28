@@ -23,6 +23,7 @@ export interface ComposerLLMOption {
   key?: string;
   name?: string;
   displayName: string;
+  providerDisplayName?: string;
   isCurrent: boolean;
 }
 
@@ -528,6 +529,15 @@ function LLMPill({
     );
   }
 
+  const displayNameCounts = new Map<string, number>();
+  for (const llm of llms) {
+    const displayNameKey = llm.displayName.trim();
+    displayNameCounts.set(
+      displayNameKey,
+      (displayNameCounts.get(displayNameKey) ?? 0) + 1,
+    );
+  }
+
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -551,29 +561,50 @@ function LLMPill({
             "z-50 min-w-[200px] max-w-[320px] rounded-md border border-line bg-elevated p-1 shadow-elevated",
           )}
         >
-          {llms.map((llm) => (
-            <Popover.Close asChild key={llm.index}>
-              <button
-                type="button"
-                onClick={() => onSelectLLM?.(llm.index)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-left text-[12.5px] transition-colors hover:bg-hover",
-                  llm.isCurrent ? "text-ink" : "text-ink-soft",
-                )}
-              >
-                <span className="flex w-3.5 shrink-0 items-center justify-center">
-                  {llm.isCurrent && (
-                    <Check
-                      size={12}
-                      weight="bold"
-                      className="text-brand-strong"
-                    />
+          {llms.map((llm) => {
+            const providerLabel = llm.providerDisplayName?.trim();
+            const isDuplicateDisplayName =
+              (displayNameCounts.get(llm.displayName.trim()) ?? 0) > 1;
+            return (
+              <Popover.Close asChild key={llm.index}>
+                <button
+                  type="button"
+                  onClick={() => onSelectLLM?.(llm.index)}
+                  className={cn(
+                    "group/llm-option flex w-full min-w-0 items-center gap-2 rounded-sm px-2.5 py-1.5 text-left text-[12.5px] transition-colors hover:bg-hover",
+                    llm.isCurrent ? "text-ink" : "text-ink-soft",
                   )}
-                </span>
-                <span className="truncate">{llm.displayName}</span>
-              </button>
-            </Popover.Close>
-          ))}
+                >
+                  <span className="flex w-3.5 shrink-0 items-center justify-center">
+                    {llm.isCurrent && (
+                      <Check
+                        size={12}
+                        weight="bold"
+                        className="text-brand-strong"
+                      />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {llm.displayName}
+                  </span>
+                  {providerLabel && (
+                    <span
+                      className={cn(
+                        "shrink-0 overflow-hidden truncate whitespace-nowrap text-[10px] leading-4 text-ink-muted/50",
+                        "transition-[max-width,opacity] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+                        isDuplicateDisplayName
+                          ? "max-w-[96px] opacity-100"
+                          : "max-w-0 opacity-0 group-hover/llm-option:max-w-[96px] group-hover/llm-option:opacity-100 group-focus-visible/llm-option:max-w-[96px] group-focus-visible/llm-option:opacity-100",
+                      )}
+                      title={providerLabel}
+                    >
+                      {providerLabel}
+                    </span>
+                  )}
+                </button>
+              </Popover.Close>
+            );
+          })}
           {/* Footer hint: addresses the "为什么这里没有 X 模型"
               question right where it surfaces. Visually quiet on
               purpose — supplementary metadata, not a CTA. */}

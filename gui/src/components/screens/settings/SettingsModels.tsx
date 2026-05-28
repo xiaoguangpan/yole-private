@@ -24,7 +24,6 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
-import { ManagedModelOptionPicker } from "@/components/managed-models/ManagedModelOptionPicker";
 import {
   SettingsPanelHeader,
   SettingsSectionLabel,
@@ -172,6 +171,7 @@ export function SettingsModels({
   const [providerFormModelOptions, setProviderFormModelOptions] = useState<
     string[]
   >([]);
+  const [providerFormModelFilter, setProviderFormModelFilter] = useState("");
   const [modelFilterByProvider, setModelFilterByProvider] = useState<
     Record<string, string>
   >({});
@@ -227,14 +227,16 @@ export function SettingsModels({
     visibleProviderForm.apiKey.trim() !== "" &&
     providerFormProbeState.kind !== "loading";
 
-  const showModelConfigSavedToast = () => {
+  const showModelConfigSavedToast = (
+    message = copy.toasts.modelConfigSavedMessage,
+  ) => {
     useUiStore.getState().pushToast(
       makeAppError({
         id: "managed-model-config-saved",
         category: "business",
         severity: "info",
         title: copy.toasts.modelConfigSaved,
-        message: copy.toasts.modelConfigSavedMessage,
+        message,
         hint: null,
         retryable: false,
         context: "save_managed_model_config",
@@ -274,6 +276,7 @@ export function SettingsModels({
       "apiBase" in patch
     ) {
       setProviderFormModelOptions([]);
+      setProviderFormModelFilter("");
     }
     setProviderFormProbeState({ kind: "idle" });
   };
@@ -289,12 +292,14 @@ export function SettingsModels({
       });
     });
     setProviderFormModelOptions([]);
+    setProviderFormModelFilter("");
     setProviderFormProbeState({ kind: "idle" });
   };
 
   const resetProviderForm = () => {
     setProviderForm(null);
     setProviderFormModelOptions([]);
+    setProviderFormModelFilter("");
     setProviderFormProbeState({ kind: "idle" });
   };
 
@@ -397,12 +402,26 @@ export function SettingsModels({
           advancedOptions: visibleProviderForm.advancedOptions,
           makeDefault: models.length === 0,
         });
+        if (providerFormModelOptions.length > 0) {
+          setModelOptionsByProvider((current) => ({
+            ...current,
+            [saved.id]: providerFormModelOptions,
+          }));
+          setModelFilterByProvider((current) => ({
+            ...current,
+            [saved.id]: providerFormModelFilter,
+          }));
+        }
       }
       setProviderProbeStates((current) => withoutProbeState(current, saved.id));
       setModelProbeStates((current) => withoutProbeState(current, saved.id));
       expandProvider(saved.id);
       resetProviderForm();
-      showModelConfigSavedToast();
+      showModelConfigSavedToast(
+        isNewProvider
+          ? modelCopy.providerCreatedToastMessage
+          : copy.toasts.modelConfigSavedMessage,
+      );
     } catch {
       // Store-level error is shown inline.
     }
@@ -484,6 +503,17 @@ export function SettingsModels({
         }),
       );
     } catch (e) {
+      const recommendedAdvancedOptions =
+        recommendedAdvancedOptionsForManagedModelProvider(provider);
+      if (modelDraft?.providerId !== provider.id) {
+        setModelDraft({
+          providerId: provider.id,
+          model: "",
+          displayName: "",
+          advancedOptions: recommendedAdvancedOptions,
+          recommendedAdvancedOptions,
+        });
+      }
       setModelProbeStates((current) =>
         withProbeState(current, provider.id, {
           kind: "error",
@@ -741,6 +771,7 @@ export function SettingsModels({
         onAddProvider={() => {
           setProviderForm(newProviderForm());
           setProviderFormModelOptions([]);
+          setProviderFormModelFilter("");
           setProviderFormProbeState({ kind: "idle" });
         }}
       />
@@ -756,7 +787,9 @@ export function SettingsModels({
           providerHasSavedKey={providerHasSavedKey}
           probeState={providerFormProbeState}
           modelOptions={providerFormModelOptions}
+          modelFilter={providerFormModelFilter}
           onChange={updateProviderForm}
+          onSetModelFilter={setProviderFormModelFilter}
           onSelectProviderPreset={selectProviderPreset}
           onTest={() => void handleProviderFormTest()}
           onFetchModels={() => void handleProviderFormFetchModels()}
@@ -810,7 +843,9 @@ export function SettingsModels({
                       providerHasSavedKey={providerHasSavedKey}
                       probeState={providerFormProbeState}
                       modelOptions={providerFormModelOptions}
+                      modelFilter={providerFormModelFilter}
                       onChange={updateProviderForm}
+                      onSetModelFilter={setProviderFormModelFilter}
                       onSelectProviderPreset={selectProviderPreset}
                       onTest={() => void handleProviderFormTest()}
                       onFetchModels={() => void handleProviderFormFetchModels()}
@@ -1140,7 +1175,9 @@ function ProviderEditor({
   providerHasSavedKey,
   probeState,
   modelOptions,
+  modelFilter,
   onChange,
+  onSetModelFilter,
   onSelectProviderPreset,
   onTest,
   onFetchModels,
@@ -1157,7 +1194,9 @@ function ProviderEditor({
   providerHasSavedKey: boolean;
   probeState: ProbeState;
   modelOptions: string[];
+  modelFilter: string;
   onChange: (patch: Partial<ProviderFormState>) => void;
+  onSetModelFilter: (value: string) => void;
   onSelectProviderPreset: (
     providerPresetId: ManagedModelProviderPresetId,
   ) => void;
@@ -1172,6 +1211,18 @@ function ProviderEditor({
   const selectedPreset = getManagedModelProviderPreset(form.providerPresetId);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const apiKeyRevealLabel = apiKeyVisible ? copy.hideApiKey : copy.showApiKey;
+  const trimmedModel = form.model.trim();
+  const selectedModelOutsideFetchedList =
+    isCreatingProvider &&
+    modelOptions.length > 0 &&
+    trimmedModel !== "" &&
+    !modelOptions.includes(trimmedModel);
+  const shouldShowManualModelHint =
+    isCreatingProvider &&
+    probeState.kind !== "idle" &&
+    probeState.action === "model-list" &&
+    (probeState.kind === "error" ||
+      (probeState.kind === "success" && modelOptions.length === 0));
 
   return (
     <div
@@ -1282,13 +1333,21 @@ function ProviderEditor({
               <InlineProbeStatus state={probeState} action="model-list" />
             </div>
             <ProbeErrorLine state={probeState} action="model-list" />
+            {shouldShowManualModelHint && (
+              <InfoLine message={copy.modelListManualFallback} />
+            )}
             {modelOptions.length > 0 && (
-              <ManagedModelOptionPicker
-                value={modelOptions.includes(form.model) ? form.model : ""}
+              <ModelSelectionList
+                title={copy.chooseDetectedModel}
+                value={form.model}
                 options={modelOptions}
-                placeholder={copy.chooseDetectedModel}
+                filter={modelFilter}
+                onFilterChange={onSetModelFilter}
                 onChange={(model) => onChange({ model })}
               />
+            )}
+            {selectedModelOutsideFetchedList && (
+              <InfoLine message={copy.selectedModelOutsideList(trimmedModel)} />
             )}
           </div>
         )}
@@ -1341,6 +1400,92 @@ function ProviderEditor({
         </div>
         <ProbeErrorLine state={probeState} action="provider-test" />
       </div>
+    </div>
+  );
+}
+
+function ModelSelectionList({
+  title,
+  value,
+  options,
+  filter,
+  onFilterChange,
+  onChange,
+}: {
+  title: string;
+  value: string;
+  options: string[];
+  filter: string;
+  onFilterChange: (value: string) => void;
+  onChange: (value: string) => void;
+}) {
+  const copy = useCopy().settings.models;
+  const normalizedFilter = filter.trim().toLowerCase();
+  const selectedValue = value.trim();
+  const filteredOptions = options.filter((option) =>
+    option.toLowerCase().includes(normalizedFilter),
+  );
+  const visibleOptions = filteredOptions.slice(0, 80);
+
+  return (
+    <div className="space-y-2 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[12.5px] font-medium text-ink">{title}</div>
+        <div className="relative w-full max-w-[260px]">
+          <MagnifyingGlass
+            size={12}
+            weight="thin"
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
+          <input
+            value={filter}
+            onChange={(e) => onFilterChange(e.target.value)}
+            placeholder={copy.filterModels}
+            spellCheck={false}
+            className="w-full rounded-sm border border-line bg-surface py-1.5 pl-7 pr-2.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 focus:border-brand focus:ring-[3px] focus:ring-brand/20"
+          />
+        </div>
+      </div>
+      <div className="max-h-[220px] divide-y divide-line overflow-auto rounded-sm border border-line bg-surface">
+        {visibleOptions.length === 0 && (
+          <EmptyRow text={copy.noMatchingModels} />
+        )}
+        {visibleOptions.map((option) => {
+          const selected = option === selectedValue;
+          return (
+            <button
+              key={option}
+              type="button"
+              title={option}
+              aria-pressed={selected}
+              onClick={() => onChange(option)}
+              className={cn(
+                "flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors",
+                "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20",
+                selected ? "bg-brand-soft text-ink" : "text-ink hover:bg-hover",
+              )}
+            >
+              <span className="flex w-4 shrink-0 items-center justify-center">
+                {selected && (
+                  <CheckCircle
+                    size={12}
+                    weight="fill"
+                    className="text-brand-strong"
+                  />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                {option}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {filteredOptions.length > visibleOptions.length && (
+        <div className="text-[11.5px] text-ink-muted">
+          {copy.visibleOptionsHint(visibleOptions.length)}
+        </div>
+      )}
     </div>
   );
 }
@@ -1420,17 +1565,38 @@ function ProviderCard({
   );
   const visibleOptions = filteredOptions.slice(0, 80);
   const open = expanded || !!providerEditor;
+  const shouldShowManualModelHint =
+    modelProbeState.kind !== "idle" &&
+    modelProbeState.action === "model-list" &&
+    (modelProbeState.kind === "error" ||
+      (modelProbeState.kind === "success" && modelOptions.length === 0));
 
   return (
-    <div>
-      <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">
+    <div className={cn("transition-colors", open && "bg-elevated/25")}>
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-3 px-2 py-1.5 transition-colors",
+          open && "bg-elevated/55",
+        )}
+      >
         <button
           type="button"
           aria-expanded={open}
-          className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20"
+          className={cn(
+            "group flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors",
+            "hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20",
+            open && "bg-surface/70 hover:bg-surface",
+          )}
           onClick={onToggle}
         >
-          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors group-hover:bg-surface group-hover:text-ink">
+          <span
+            className={cn(
+              "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors",
+              open
+                ? "bg-brand-soft text-brand-strong"
+                : "text-ink-muted group-hover:bg-surface group-hover:text-ink",
+            )}
+          >
             {open ? (
               <CaretDown size={12} weight="bold" />
             ) : (
@@ -1439,7 +1605,10 @@ function ProviderCard({
           </span>
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span
-              className="min-w-0 truncate text-[13px] font-medium text-ink transition-colors group-hover:text-brand-strong"
+              className={cn(
+                "min-w-0 truncate text-[13px] font-medium transition-colors group-hover:text-brand-strong",
+                open ? "text-brand-strong" : "text-ink",
+              )}
               title={provider.displayName}
             >
               {provider.displayName}
@@ -1496,15 +1665,15 @@ function ProviderCard({
         className="px-4 pb-3"
       />
       {open && (
-        <div className="border-t border-line bg-elevated/40 px-3 py-3">
-          <div className="space-y-3">
+        <div className="border-t border-line/60 bg-elevated/30 px-3 py-2.5">
+          <div className="space-y-2.5 pl-9 pr-1">
             {providerEditor}
             {expanded && (
               <>
                 {keyMissing && <ErrorLine message={copy.keyNeedsResave} />}
 
                 {models.length > 0 ? (
-                  <div className="divide-y divide-line border-y border-line">
+                  <div className="divide-y divide-line/35">
                     {models.map((model) => (
                       <EnabledModelRow
                         key={model.id}
@@ -1521,15 +1690,16 @@ function ProviderCard({
                     ))}
                   </div>
                 ) : (
-                  <div className="border-y border-line py-3 text-[12.5px] text-ink-muted">
+                  <div className="py-2 text-[12.5px] text-ink-muted">
                     {copy.noEnabledModels}
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                   <Button
-                    variant="accent-secondary"
+                    variant="ghost"
                     size="sm"
+                    className="px-1.5 text-ink-muted hover:text-ink [&>svg]:text-brand-strong"
                     disabled={!canFetchModels}
                     onClick={onFetchModels}
                     leadingIcon={
@@ -1550,8 +1720,9 @@ function ProviderCard({
                     action="model-list"
                   />
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
+                    className="px-1.5 text-ink-muted hover:text-ink"
                     disabled={keyMissing || saving}
                     onClick={() => onStartModelDraft()}
                     leadingIcon={<Plus size={12} weight="bold" />}
@@ -1560,9 +1731,12 @@ function ProviderCard({
                   </Button>
                 </div>
                 <ProbeErrorLine state={modelProbeState} action="model-list" />
+                {shouldShowManualModelHint && (
+                  <InfoLine message={copy.modelListManualFallback} />
+                )}
 
                 {modelOptions.length > 0 && (
-                  <div className="space-y-2 border-t border-line pt-3">
+                  <div className="space-y-2 pt-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-[12.5px] font-medium text-ink">
                         {copy.availableModels}
@@ -1654,9 +1828,9 @@ function EnabledModelRow({
     probeState.kind === "loading" && probeState.action === "model-test";
 
   return (
-    <div className="py-2.5">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <div className="min-w-[180px] flex-1">
+    <div className="group/model rounded-sm px-2 py-1.5 transition-colors hover:bg-surface/75 focus-within:bg-surface/75">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1 pr-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <div className="truncate text-[13px] font-medium text-ink">
               {display.title}
@@ -1668,48 +1842,52 @@ function EnabledModelRow({
             </div>
           )}
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <Button
-            variant="secondary"
+        <div className="ml-auto flex w-[164px] shrink-0 items-center justify-end gap-1">
+          <IconButton
+            ariaLabel={copy.testModel}
             size="sm"
+            className="opacity-70 group-hover/model:opacity-100 group-focus-within/model:opacity-100"
             disabled={keyMissing || saving || testing}
             onClick={onTest}
-            leadingIcon={
-              testing ? (
-                <span className="spin">
-                  <CircleNotch size={12} weight="thin" />
-                </span>
-              ) : (
-                <PlugsConnected size={12} weight="thin" />
-              )
-            }
           >
-            {copy.test}
-          </Button>
+            {testing ? (
+              <span className="spin">
+                <CircleNotch size={13} weight="thin" />
+              </span>
+            ) : (
+              <PlugsConnected size={13} weight="thin" />
+            )}
+          </IconButton>
           <InlineProbeStatus state={probeState} action="model-test" />
           {isDefault ? (
-            <span className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-sm bg-brand-soft px-2 py-1 text-[11.5px] leading-none text-brand-strong">
+            <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-sm bg-brand-soft px-1.5 text-[11px] leading-none text-brand-strong">
               <Star size={11} weight="fill" />
-              {copy.defaultModelStatus}
+              {copy.defaultModel}
             </span>
           ) : (
-            <Button
-              variant="secondary"
+            <IconButton
+              ariaLabel={copy.setDefault}
               size="sm"
+              className="opacity-70 group-hover/model:opacity-100 group-focus-within/model:opacity-100"
               disabled={saving}
               onClick={onSetDefault}
-              leadingIcon={<Star size={12} weight="thin" />}
             >
-              {copy.setDefault}
-            </Button>
+              <Star size={13} weight="thin" />
+            </IconButton>
           )}
-          <IconButton ariaLabel={copy.editModel} size="sm" onClick={onEdit}>
+          <IconButton
+            ariaLabel={copy.editModel}
+            size="sm"
+            className="opacity-70 group-hover/model:opacity-100 group-focus-within/model:opacity-100"
+            onClick={onEdit}
+          >
             <PencilSimple size={13} weight="thin" />
           </IconButton>
           <IconButton
             ariaLabel={copy.removeModel}
             variant="danger"
             size="sm"
+            className="opacity-70 group-hover/model:opacity-100 group-focus-within/model:opacity-100"
             disabled={saving}
             onClick={onDelete}
           >
@@ -2441,6 +2619,19 @@ function ErrorLine({ message }: { message: string }) {
   return (
     <div className="select-text rounded-sm border border-error/20 bg-error/[0.06] px-3 py-2 text-[12.5px] text-error">
       {message}
+    </div>
+  );
+}
+
+function InfoLine({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-sm border border-line bg-elevated/55 px-3 py-2 text-[12.5px] leading-[1.45] text-ink-soft">
+      <Info
+        size={12}
+        weight="bold"
+        className="mt-0.5 shrink-0 text-ink-muted"
+      />
+      <span>{message}</span>
     </div>
   );
 }

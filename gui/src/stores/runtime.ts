@@ -36,6 +36,8 @@ export interface LLMOption {
   /** Stable identity: managed model id or external GA raw LLM name. */
   key?: string;
   displayName: string;
+  /** Managed runtime only. Omitted for user-owned external GA model lists. */
+  providerDisplayName?: string;
   isCurrent: boolean;
 }
 

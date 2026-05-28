@@ -31,6 +31,7 @@ export function managedModelsToLLMs(
     index,
     key: model.id,
     displayName: model.displayName.trim() || model.model,
+    providerDisplayName: model.providerDisplayName,
     isCurrent: index === selectedIndex,
   }));
 }
