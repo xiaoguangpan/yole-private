@@ -817,7 +817,13 @@ const zhCopy = {
       `发现 v${version}；当前任务结束后再后台准备更新。`,
     noUpdateAvailable: "没有可安装的新版本。",
     invalidEndpoint: "更新通道配置有误，请检查 GALLEY_UPDATER_ENDPOINT。",
+    channelUnavailable: "更新通道暂时不可用，请稍后重试。",
+    invalidManifest: "更新通道数据异常，已停止更新检查。",
+    platformUnavailable: "当前平台暂时没有可用的更新包。",
     networkUnavailable: "暂时无法连接更新通道，请稍后重试。",
+    downloadFailed: "下载更新失败，请稍后重试。",
+    signatureInvalid: "更新包校验失败，已停止安装。",
+    installFailed: "安装更新失败，请重新检查更新。",
     checkFailed: "更新检查失败。",
   },
 };
@@ -1681,8 +1687,18 @@ const enCopy: AppCopy = {
     noUpdateAvailable: "No installable update is available.",
     invalidEndpoint:
       "The update channel is misconfigured. Check GALLEY_UPDATER_ENDPOINT.",
+    channelUnavailable:
+      "The update channel is temporarily unavailable. Try again later.",
+    invalidManifest:
+      "The update channel data is invalid. Update check stopped.",
+    platformUnavailable:
+      "No update package is currently available for this platform.",
     networkUnavailable:
       "Galley cannot reach the update channel right now. Try again later.",
+    downloadFailed: "Galley could not download the update. Try again later.",
+    signatureInvalid:
+      "Galley could not verify the update package, so installation stopped.",
+    installFailed: "Galley could not install the update. Check again first.",
     checkFailed: "Update check failed.",
   },
 };

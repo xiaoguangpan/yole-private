@@ -77,7 +77,10 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
         set({ status: { kind: "idle" } });
         return;
       }
-      set({ status: { kind: "error", message: readableUpdateError(error) } });
+      console.warn("[updates] check failed", error);
+      set({
+        status: { kind: "error", message: readableUpdateError(error, "check") },
+      });
     }
   },
 
@@ -107,7 +110,13 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
         },
       });
     } catch (error) {
-      set({ status: { kind: "error", message: readableUpdateError(error) } });
+      console.warn("[updates] download/install failed", error);
+      set({
+        status: {
+          kind: "error",
+          message: readableUpdateError(error, "install"),
+        },
+      });
     }
   },
 
@@ -175,7 +184,12 @@ function ensureAutoPrepareOnIdleWatcher(): void {
   });
 }
 
-function readableUpdateError(error: unknown): string {
+type UpdateErrorPhase = "check" | "install";
+
+function readableUpdateError(
+  error: unknown,
+  phase: UpdateErrorPhase,
+): string {
   const copy = copyForLanguage(
     resolveLanguagePreference(usePrefsStore.getState().languagePreference),
   );
@@ -186,16 +200,77 @@ function readableUpdateError(error: unknown): string {
         ? error.message
         : (JSON.stringify(error) ?? String(error ?? ""));
 
-  if (raw.includes("no_update_available"))
+  const normalized = raw.toLowerCase();
+
+  if (normalized.includes("no_update_available"))
     return copy.updates.noUpdateAvailable;
-  if (raw.includes("invalid_updater_endpoint")) {
+  if (
+    normalized.includes("invalid_updater_endpoint") ||
+    normalized.includes("insecure transport protocol") ||
+    normalized.includes("relative url without a base") ||
+    normalized.includes("builder error")
+  ) {
     return copy.updates.invalidEndpoint;
   }
-  if (raw.includes("EmptyEndpoints")) {
+  if (
+    raw.includes("EmptyEndpoints") ||
+    normalized.includes("does not have any endpoints")
+  ) {
     return copy.updates.devNoChannel;
   }
-  if (raw.includes("Network") || raw.includes("network")) {
-    return copy.updates.networkUnavailable;
+  if (normalized.includes("could not fetch a valid release json")) {
+    return copy.updates.channelUnavailable;
   }
-  return raw || copy.updates.checkFailed;
+  if (
+    normalized.includes("platform") &&
+    normalized.includes("not found in the response")
+  ) {
+    return copy.updates.platformUnavailable;
+  }
+  if (
+    normalized.includes("invalid updater binary format") ||
+    normalized.includes("binary for the current target not found") ||
+    normalized.includes("the `signature` field was not set") ||
+    normalized.includes("expected value at line") ||
+    normalized.includes("invalid type") ||
+    normalized.includes("missing field")
+  ) {
+    return copy.updates.invalidManifest;
+  }
+  if (
+    normalized.includes("signature") ||
+    normalized.includes("minisign") ||
+    normalized.includes("base64") ||
+    normalized.includes("signatureutf8") ||
+    normalized.includes("signature mismatch")
+  ) {
+    return copy.updates.signatureInvalid;
+  }
+  if (
+    normalized.includes("download request failed") ||
+    normalized.includes("network") ||
+    normalized.includes("reqwest") ||
+    normalized.includes("request failed") ||
+    normalized.includes("connection") ||
+    normalized.includes("dns") ||
+    normalized.includes("timed out") ||
+    normalized.includes("timeout")
+  ) {
+    return phase === "install"
+      ? copy.updates.downloadFailed
+      : copy.updates.networkUnavailable;
+  }
+  if (
+    normalized.includes("failed to install") ||
+    normalized.includes("packageinstallfailed") ||
+    normalized.includes("authentication failed") ||
+    normalized.includes("failed to create temporary directory") ||
+    normalized.includes("failed to determine updater package extract path")
+  ) {
+    return copy.updates.installFailed;
+  }
+  if (phase === "install") {
+    return copy.updates.installFailed;
+  }
+  return copy.updates.checkFailed;
 }
