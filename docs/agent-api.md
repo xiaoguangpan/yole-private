@@ -3,7 +3,7 @@
 The contract between **Galley** and any agent that drives it via the
 `galley` CLI binary or the Unix-socket / named-pipe local transport.
 
-> **Status: B4 M6 — `schemaVersion: 1` FROZEN for `v0.2.0-beta.1`.** The
+> **Status: B4 M6 — `schemaVersion: 1` FROZEN for `v0.2.0-alpha.1`.** The
 > commands documented in §5 are wired, tested, and locked. Inside
 > `schemaVersion: 1` the rules in §1 hold: additions are non-breaking;
 > renames / removals require a `schemaVersion: 2` bump. Pre-freeze
@@ -297,7 +297,7 @@ Returns the CLI version + the schema version of its output protocol.
 
 ```bash
 $ galley version
-{"galleyVersion":"0.2.0-beta.1","schemaVersion":1}
+{"galleyVersion":"0.2.0-alpha.1","schemaVersion":1}
 ```
 
 Response fields:
@@ -1045,7 +1045,7 @@ Wire example:
 
 ## 7 · Versioning
 
-`schemaVersion: 1` is **frozen for v0.2.0-beta.1** (B4 M6). The rules in §1
+`schemaVersion: 1` is **frozen for v0.2.0-alpha.1** (B4 M6). The rules in §1
 apply.
 
 Inside `schemaVersion: 1`:

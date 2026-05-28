@@ -4,7 +4,7 @@
 > to Galley. When the user asks you to inspect, create, split, delegate, or
 > manage Galley sessions, you are acting as a **Galley Supervisor**.
 >
-> Status: v0.2.0-beta.1 draft. Schema version: 1.
+> Status: v0.2.0-alpha.1 draft. Schema version: 1.
 
 ## 1. Role
 

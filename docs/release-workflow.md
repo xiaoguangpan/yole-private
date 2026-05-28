@@ -17,13 +17,13 @@ Galley 发版 SOP。本文档定义 v0.2 起的正式发版流程，配合 `.git
        ↓
 版本号 bump (tauri.conf.json + package.json)
        ↓
-git commit + git tag v0.2.0-beta.1 + git push origin main v0.2.0-beta.1
+git commit + git tag v0.2.0-alpha.1 + git push origin main v0.2.0-alpha.1
        ↓
 GitHub Actions release.yml 自动触发
        │
-       ├─ macos-15 (arm64 runner, native) → Galley_0.2.0-beta.1_macOS_aarch64.dmg
-       ├─ macos-15 (arm64 runner, cross)  → Galley_0.2.0-beta.1_macOS_x64.dmg   ← v0.1.2 起 CI 出，cross-compile + Rosetta 2
-       └─ windows-2022                    → Galley_0.2.0-beta.1_Windows_x64-setup.exe
+       ├─ macos-15 (arm64 runner, native) → Galley_0.2.0-alpha.1_macOS_aarch64.dmg
+       ├─ macos-15 (arm64 runner, cross)  → Galley_0.2.0-alpha.1_macOS_x64.dmg   ← v0.1.2 起 CI 出，cross-compile + Rosetta 2
+       └─ windows-2022                    → Galley_0.2.0-alpha.1_Windows_x64-setup.exe
        ↓
 ubuntu-latest 收集产物 + gh release create --draft
        ↓
@@ -31,7 +31,8 @@ ubuntu-latest 收集产物 + gh release create --draft
        ↓
 点 publish → 用户可见 + 可下载
        ↓
-手动运行 Promote Update Channel → updates/beta/latest.json 指向该版本
+alpha 邀请内测：停在这里，只供手动下载
+beta / stable：手动运行 Promote Update Channel → updates/beta/latest.json 指向该版本
 ```
 
 构建时间预估：每个 platform job 4-7 min（缓存命中后），三个并行。全流程 push tag 到 draft release ready 大约 **10-12 min**。
@@ -46,7 +47,8 @@ Semver 0.x.y，pre-1.0 阶段：
 |---|---|---|
 | `v0.2.0` | 增功能 release | 新 feature ship (e.g. Win 支持上线) |
 | `v0.2.1` | 补丁 release | 单点 bug fix (e.g. Win toggleMaximize 不灵) |
-| `v0.2.0-beta.1` | beta 预发版 | 大重构后的公开 dogfood 版 |
+| `v0.2.0-alpha.1` | alpha 预发版 | 邀请内测 / dogfood 版 |
+| `v0.2.0-beta.1` | beta 预发版 | 更接近公开发布的 dogfood 版 |
 | `v0.2.0-rc.1` | release candidate | 稳定版前最后验证版 |
 | `v1.0.0` | 第一个稳定版 | 用户量起来 + 自动更新就绪 + 关键功能稳定 |
 
@@ -77,19 +79,19 @@ Semver 0.x.y，pre-1.0 阶段：
 
 ```bash
 # gui/package.json
-"version": "0.2.0-beta.1"
+"version": "0.2.0-alpha.1"
 
 # core/tauri.conf.json
-"version": "0.2.0-beta.1"
+"version": "0.2.0-alpha.1"
 
 # core/Cargo.toml
-version = "0.2.0-beta.1"
+version = "0.2.0-alpha.1"
 
 # cli/Cargo.toml
-version = "0.2.0-beta.1"
+version = "0.2.0-alpha.1"
 ```
 
-提交一个独立 commit：`Bump version v0.2.0-beta.1`。**不要**跟功能 commit 混在一起——回滚版本号方便。
+提交一个独立 commit：`Bump version v0.2.0-alpha.1`。**不要**跟功能 commit 混在一起——回滚版本号方便。
 
 ### 4. 跑预发版
 
@@ -206,6 +208,10 @@ https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates
 
 `GALLEY_UPDATER_ENDPOINT` 应该配置成这个 URL。首次配置时这个 URL 可以还不存在；
 release publish 后跑 promote workflow 才会写入。
+
+邀请内测用的 alpha 版本默认只发布 GitHub Pre-release 供手动下载，不跑
+Promote Update Channel。只有当我们明确决定让当前更新频道用户也收到这个
+alpha 时，才把 alpha tag 填进 promote workflow。
 
 操作：
 

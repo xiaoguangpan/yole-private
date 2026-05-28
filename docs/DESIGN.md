@@ -1,6 +1,6 @@
 # Galley DESIGN.md
 
-> Status: **v0.2.0-beta.1 — current implementation baseline**
+> Status: **v0.2.0-alpha.1 — current implementation baseline**
 > Last updated: 2026-05-26
 > v0.1（dark-first / Linear 风）已被 v0.2 整体方向替换，Notion 历史稿仅作对照。
 > 本文件以当前两栏 Galley GUI 为准：旧三栏 Inspector、独立 Settings window、Project emoji tree 等历史 spec 已退役。

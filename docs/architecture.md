@@ -54,7 +54,7 @@ sessions, inspect context, create sessions, send messages, move sessions,
 switch LLMs, and archive or restore work.
 
 The CLI contract is documented in [agent-api](./agent-api.md). For
-`v0.2.0-beta.1`, `schemaVersion: 1` is frozen.
+`v0.2.0-alpha.1`, `schemaVersion: 1` is frozen.
 
 ### Galley Core
 

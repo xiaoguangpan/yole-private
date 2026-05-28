@@ -9,10 +9,10 @@ live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.2.0-beta.1`
-- Git tag / GitHub Release: `v0.2.0-beta.1`
+- Package version: `0.2.0-alpha.1`
+- Git tag / GitHub Release: `v0.2.0-alpha.1`
 - Agent API schema: `schemaVersion: 1`
-- Release tier: beta prerelease; do not mark GitHub Release as Latest
+- Release tier: alpha prerelease; do not mark GitHub Release as Latest
 - Product shape: dual-native local agent team orchestrator
 
 Galley GUI and Galley CLI are peer frontends over Rust-side Galley Core. The
@@ -21,16 +21,17 @@ Supervisor automation on the same machine.
 
 ## Current Release Gates
 
-Before publishing `v0.2.0-beta.1`:
+Before publishing `v0.2.0-alpha.1`:
 
 1. Finish local dogfood on the dual-native build.
-2. Decide whether menubar / background mode is required for this beta or can
+2. Decide whether menubar / background mode is required for this alpha or can
    stay deferred.
 3. Run Windows smoke, or explicitly ship with a documented Windows caveat.
 4. Run release/update dry-run if packaging, signing, or updater config changed.
 5. Finalize release notes and devlog.
-6. Publish only after smoke, then promote the beta update channel with
-   [release / update SOP](./release-update-sop.md).
+6. Publish only after smoke. Do not promote the beta update channel for this
+   invited-tester alpha unless we explicitly decide to make it available to
+   all update-channel users.
 7. Run the standard verification set:
    - `cargo check --workspace`
    - `cargo test --workspace`
@@ -43,11 +44,11 @@ Before publishing `v0.2.0-beta.1`:
 | Area | Status | Read More |
 |---|---|---|
 | Core architecture | Rust Galley Core is authoritative | [architecture demo](./architecture-demo.md) |
-| CLI / Agent API | Feature-complete for v0.2 beta; schema frozen | [agent-api](./agent-api.md) |
+| CLI / Agent API | Feature-complete for v0.2 alpha; schema frozen | [agent-api](./agent-api.md) |
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
 | Managed GA runtime | M9 package gate implemented; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials in dogfood | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | macOS DMG + Windows NSIS + gated beta updater channel | [release / update SOP](./release-update-sop.md) |
+| Release path | macOS DMG + Windows NSIS + gated updater channel | [release / update SOP](./release-update-sop.md) |
 | Windows | Artifact path exists; smoke remains a release gate | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 
@@ -62,7 +63,7 @@ Before publishing `v0.2.0-beta.1`:
 | B1 | Complete | Rust core skeleton + read-only CLI |
 | B2 | Complete | Bridge ownership moved to Rust + local socket / named pipe |
 | B3 | Complete | `useAppStore.ts` removed; state split into domain stores |
-| B4 | Main body complete, beta dogfood | CLI writes, schema freeze, discovery file, Settings -> Agent, SOP, Claude Skill, activity UI, backup mechanism |
+| B4 | Main body complete, alpha dogfood | CLI writes, schema freeze, discovery file, Settings -> Agent, SOP, Claude Skill, activity UI, backup mechanism |
 
 Detailed phase narratives are intentionally not duplicated here. Use:
 
@@ -72,12 +73,12 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Use `0.2.0-beta.1` inside package metadata:
+- Use `0.2.0-alpha.1` inside package metadata:
   - `core/tauri.conf.json`
   - `core/Cargo.toml`
   - `cli/Cargo.toml`
   - `gui/package.json`
-- Use `v0.2.0-beta.1` for Git tag and GitHub Release title.
+- Use `v0.2.0-alpha.1` for Git tag and GitHub Release title.
 - Keep Agent API at `schemaVersion: 1`.
 - A breaking Agent API change requires `schemaVersion: 2`, with explicit
   compatibility notes in [agent-api](./agent-api.md).

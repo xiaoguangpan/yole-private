@@ -16,13 +16,16 @@ Release and update are two separate gates:
 
 Do not point the update channel at a draft, untested, or failed build. The
 draft Release `latest.json` is a review artifact, not the live user channel.
+For invited-tester alpha releases, publish the GitHub Pre-release for manual
+downloads only and skip the beta-channel promotion unless we explicitly decide
+to offer that alpha to all current update-channel users.
 
 ## Pre-Flight
 
 Set the release tag for the rest of the checklist:
 
 ```bash
-RELEASE_TAG=v0.2.0-beta.1
+RELEASE_TAG=v0.2.0-alpha.1
 ```
 
 Replace the example value before every release.
@@ -108,7 +111,7 @@ Pass criteria:
 Open the draft Release in GitHub and check:
 
 - Version and title are correct.
-- It is marked prerelease for beta / rc tags.
+- It is marked prerelease for alpha / beta / rc tags.
 - Release notes are user-facing, not just commit messages.
 - Assets are present for supported platforms.
 - Updater artifacts are present:
@@ -145,6 +148,9 @@ After publish:
 ### 7. Promote Update Channel
 
 Promote after publish + smoke:
+
+Skip this step for invited-tester alpha releases unless we explicitly decide
+that all current beta-channel users should receive the alpha build.
 
 ```bash
 gh workflow run promote-update-channel.yml \

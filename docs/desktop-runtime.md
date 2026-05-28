@@ -200,5 +200,5 @@ Windows manual smoke lives in [windows build checklist](./windows-build-checklis
   requirements, and release titles.
 - `Mac` means the hardware family or user device.
 - Release title examples:
-  - `Galley v0.2.0-beta.1 · macOS (Beta)`
-  - `Galley v0.2.0-beta.1 · Windows (Beta)`
+  - `Galley v0.2.0-alpha.1 · macOS (Alpha)`
+  - `Galley v0.2.0-alpha.1 · Windows (Alpha)`
