@@ -316,12 +316,6 @@ function App() {
     }
     let demoSid: string | null = null;
     try {
-      const probe = await probeBrowserControl();
-      if (!probe || probe.status !== "connected") {
-        throw new Error(
-          probe?.message ?? copy.browserControl.demoConnectionFailed,
-        );
-      }
       const sid = createSession();
       demoSid = sid;
       await activateSession(sid);

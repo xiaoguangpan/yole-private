@@ -55,6 +55,31 @@ pub enum BrowserControlBrowser {
     Edge,
 }
 
+const CHROME_EXTENSION_MANAGEMENT_URL: &str = "chrome://extensions";
+const EDGE_EXTENSION_MANAGEMENT_URL: &str = "edge://extensions";
+
+#[cfg(any(target_os = "windows", test))]
+const CHROME_EXTENSION_MANAGEMENT_ARGS: &[&str] = &[CHROME_EXTENSION_MANAGEMENT_URL];
+#[cfg(any(target_os = "windows", test))]
+const EDGE_EXTENSION_MANAGEMENT_ARGS: &[&str] = &["--new-window", EDGE_EXTENSION_MANAGEMENT_URL];
+
+fn extension_management_url(browser: BrowserControlBrowser) -> &'static str {
+    match browser {
+        BrowserControlBrowser::Chrome => CHROME_EXTENSION_MANAGEMENT_URL,
+        BrowserControlBrowser::Edge => EDGE_EXTENSION_MANAGEMENT_URL,
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_extension_management_launch(
+    browser: BrowserControlBrowser,
+) -> (&'static str, &'static [&'static str]) {
+    match browser {
+        BrowserControlBrowser::Chrome => ("chrome", CHROME_EXTENSION_MANAGEMENT_ARGS),
+        BrowserControlBrowser::Edge => ("msedge", EDGE_EXTENSION_MANAGEMENT_ARGS),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct ExtensionManifest {
     version: String,
@@ -182,13 +207,15 @@ pub async fn open_extensions_page(browser: BrowserControlBrowser) -> io::Result<
 #[cfg(target_os = "macos")]
 async fn open_extensions_page_for_platform(browser: BrowserControlBrowser) -> io::Result<()> {
     let (bundle_id, app_name, url) = match browser {
-        BrowserControlBrowser::Chrome => {
-            ("com.google.Chrome", "Google Chrome", "chrome://extensions/")
-        }
+        BrowserControlBrowser::Chrome => (
+            "com.google.Chrome",
+            "Google Chrome",
+            extension_management_url(browser),
+        ),
         BrowserControlBrowser::Edge => (
             "com.microsoft.edgemac",
             "Microsoft Edge",
-            "edge://extensions/",
+            extension_management_url(browser),
         ),
     };
     match run_command("open", &["-b", bundle_id, url]).await {
@@ -199,22 +226,21 @@ async fn open_extensions_page_for_platform(browser: BrowserControlBrowser) -> io
 
 #[cfg(target_os = "windows")]
 async fn open_extensions_page_for_platform(browser: BrowserControlBrowser) -> io::Result<()> {
-    let (command, url) = match browser {
-        BrowserControlBrowser::Chrome => ("chrome", "chrome://extensions/"),
-        BrowserControlBrowser::Edge => ("msedge", "edge://extensions/"),
-    };
+    let (command, args) = windows_extension_management_launch(browser);
     let mut last_error = None;
     for candidate in windows_browser_candidates(browser) {
         if !candidate.is_file() {
             continue;
         }
         let program = candidate.to_string_lossy().into_owned();
-        match spawn_command(&program, &[url]) {
+        match spawn_command(&program, args) {
             Ok(()) => return Ok(()),
             Err(e) => last_error = Some(e),
         }
     }
-    match run_command("cmd", &["/C", "start", "", command, url]).await {
+    let mut start_args = vec!["/C", "start", "", command];
+    start_args.extend_from_slice(args);
+    match run_command("cmd", &start_args).await {
         Ok(()) => Ok(()),
         Err(e) => Err(last_error.unwrap_or(e)),
     }
@@ -246,11 +272,11 @@ async fn open_extensions_page_for_platform(browser: BrowserControlBrowser) -> io
                 "chromium",
                 "chromium-browser",
             ],
-            "chrome://extensions/",
+            extension_management_url(browser),
         ),
         BrowserControlBrowser::Edge => (
             &["microsoft-edge", "microsoft-edge-stable"],
-            "edge://extensions/",
+            extension_management_url(browser),
         ),
     };
     let mut last_error = None;
@@ -466,5 +492,25 @@ mod tests {
         prepare_extension_layout(&source_dir, &extension_dir).expect("preserve config");
         let config = fs::read_to_string(extension_dir.join("config.js")).expect("config");
         assert_eq!(config, stable_config);
+    }
+
+    #[test]
+    fn extension_management_launch_uses_stable_internal_urls() {
+        assert_eq!(
+            extension_management_url(BrowserControlBrowser::Chrome),
+            "chrome://extensions"
+        );
+        assert_eq!(
+            extension_management_url(BrowserControlBrowser::Edge),
+            "edge://extensions"
+        );
+        assert_eq!(
+            windows_extension_management_launch(BrowserControlBrowser::Chrome),
+            ("chrome", &["chrome://extensions"][..])
+        );
+        assert_eq!(
+            windows_extension_management_launch(BrowserControlBrowser::Edge),
+            ("msedge", &["--new-window", "edge://extensions"][..])
+        );
     }
 }

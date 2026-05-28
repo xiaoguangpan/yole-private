@@ -11,7 +11,7 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   type BrowserControlBrowser,
 } from "@/lib/browser-control";
 import { useCopy } from "@/lib/i18n";
+import { isWindows } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useBrowserControlStore } from "@/stores/browser-control";
 
@@ -90,7 +91,11 @@ export function BrowserControlSetupDialog({
     const currentLayout = layout ?? (await ensureLayout());
     if (!currentLayout) return;
     try {
-      await openPath(currentLayout.extensionDir);
+      if (isWindows) {
+        await revealItemInDir(currentLayout.extensionDir);
+      } else {
+        await openPath(currentLayout.extensionDir);
+      }
     } catch {
       setOpenError(copy.showFolderFallback);
     }
@@ -111,11 +116,11 @@ export function BrowserControlSetupDialog({
         <Dialog.Content
           aria-describedby={undefined}
           className={cn(
-            "fixed left-1/2 top-1/2 z-[60] w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2",
+            "fixed left-1/2 top-1/2 z-[60] max-h-[calc(100vh-32px)] w-[680px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2",
             "overflow-hidden rounded-lg border border-line bg-elevated shadow-elevated",
           )}
         >
-          <div className="relative px-6 py-5">
+          <div className="relative max-h-[calc(100vh-32px)] overflow-y-auto px-6 py-5">
             <IconButton
               ariaLabel={copy.close}
               className="absolute right-3 top-3"
@@ -196,8 +201,15 @@ export function BrowserControlSetupDialog({
                   />
 
                   {layoutReady && (
-                    <SetupStep index={4} title={copy.stepTest}>
-                      <div className="mt-2">
+                    <SetupStep index={5} title={copy.stepTest}>
+                      <StepHint>
+                        {copy.stepTestHintPrefix}
+                        <StrongTerm>{copy.sameBrowser}</StrongTerm>
+                        {copy.stepTestHintMiddle}
+                        <StrongTerm>{copy.anyWebsite}</StrongTerm>
+                        {copy.stepTestHintSuffix}
+                      </StepHint>
+                      <div className="mt-2.5">
                         <ConnectionStatusCard
                           busy={busy}
                           connected={connected}
@@ -306,6 +318,11 @@ function RepairSteps({
             <div className="mt-1 text-[12px] leading-[1.5] text-success">
               {copy.stepPrepareReady}
             </div>
+            <StepHint>
+              {copy.stepPrepareHintPrefix}
+              <StrongTerm>{copy.folderName}</StrongTerm>
+              {copy.stepPrepareHintSuffix}
+            </StepHint>
             <div className="mt-1 select-text break-all font-mono text-[11.5px] leading-[1.5] text-ink-muted">
               {extensionDir}
             </div>
@@ -387,9 +404,23 @@ function RepairSteps({
             </div>
           </SetupStep>
 
-          <SetupStep index={3} title={copy.stepInstall}>
+          <SetupStep index={3} title={copy.stepDeveloperMode}>
+            <StepHint>
+              {copy.stepDeveloperModeHintPrefix}
+              <StrongTerm>{copy.developerMode}</StrongTerm>
+              {copy.stepDeveloperModeHintSuffix}
+            </StepHint>
+          </SetupStep>
+
+          <SetupStep index={4} title={copy.stepInstall}>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-[1.5] text-ink-muted">
-              <span>{copy.stepInstallHint}</span>
+              <span>
+                {copy.stepInstallHintPrefix}
+                <StrongTerm>{copy.folderName}</StrongTerm>
+                {copy.stepInstallHintMiddle}
+                <StrongTerm>{copy.loadUnpacked}</StrongTerm>
+                {copy.stepInstallHintSuffix}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -412,6 +443,18 @@ function RepairSteps({
       )}
     </>
   );
+}
+
+function StepHint({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-1 text-[12px] leading-[1.5] text-ink-muted">
+      {children}
+    </div>
+  );
+}
+
+function StrongTerm({ children }: { children: ReactNode }) {
+  return <strong className="font-medium text-ink">{children}</strong>;
 }
 
 function ConnectionStatusCard({
