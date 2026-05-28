@@ -107,9 +107,10 @@ const zhCopy = {
     yoloDetail: "所有工具调用跳过审批直接执行",
     turnOffNow: "立即关闭",
     viewInSettings: "在设置中查看",
-    browserControlPending: "连接浏览器控制",
+    browserControlPending: "浏览器控制 · 待连接",
     browserControlChecking: "浏览器控制 · 检测中",
     browserControlConnected: "浏览器控制 · 已可用",
+    browserControlError: "浏览器控制 · 需检查",
     browserControlPendingTitle: "连接浏览器控制",
     browserControlConnectedTitle: "浏览器控制已可用",
     browserControlErrorTitle: "浏览器控制需要检查",
@@ -119,13 +120,15 @@ const zhCopy = {
     desktopPet: "桌面宠物",
     closeDesktopPet: "关闭桌面宠物",
   },
+  browserControlAttention: {
+    message: "连接浏览器控制后，Galley 才能操作你已登录的浏览器。",
+    action: "连接浏览器控制",
+  },
   browserControl: {
     title: "连接浏览器控制",
     connectedTitle: "浏览器控制已可用",
-    connectedDescription:
-      "Galley 已能读取和操作浏览器，并沿用你的登录态。",
-    description:
-      "安装后，Galley 可以读取和操作浏览器，并沿用你的登录态。",
+    connectedDescription: "Galley 已能读取和操作浏览器，并沿用你的登录态。",
+    description: "安装后，Galley 可以读取和操作浏览器，并沿用你的登录态。",
     close: "关闭浏览器控制设置",
     folderName: "tmwd_cdp_bridge",
     developerMode: "开发者模式",
@@ -148,8 +151,7 @@ const zhCopy = {
     stepInstallHintSuffix: "」。",
     openGuide: "图文指南",
     openGuideTitle: "打开官方 Chrome 图文安装步骤",
-    openGuideFallback: (url: string) =>
-      `无法自动打开图文指南，请访问 ${url}`,
+    openGuideFallback: (url: string) => `无法自动打开图文指南，请访问 ${url}`,
     stepTest: "测试连接",
     stepTestHintPrefix: "在",
     stepTestHintMiddle: "打开",
@@ -959,9 +961,10 @@ const enCopy: AppCopy = {
     yoloDetail: "Tool calls run without approval",
     turnOffNow: "Turn off now",
     viewInSettings: "View in Settings",
-    browserControlPending: "Connect Browser Control",
+    browserControlPending: "Browser Control · Connect",
     browserControlChecking: "Browser Control · Checking",
     browserControlConnected: "Browser Control · Ready",
+    browserControlError: "Browser Control · Needs setup",
     browserControlPendingTitle: "Connect Browser Control",
     browserControlConnectedTitle: "Browser Control ready",
     browserControlErrorTitle: "Browser Control needs attention",
@@ -970,6 +973,11 @@ const enCopy: AppCopy = {
     reinjectTools: "Reinject tools",
     desktopPet: "Desktop Pet",
     closeDesktopPet: "Close Desktop Pet",
+  },
+  browserControlAttention: {
+    message:
+      "Connect Browser Control so Galley can operate your signed-in browser.",
+    action: "Connect Browser Control",
   },
   browserControl: {
     title: "Connect Browser Control",
@@ -989,7 +997,8 @@ const enCopy: AppCopy = {
     stepPrepareFailed:
       "Galley could not prepare tmwd_cdp_bridge. Try again, or reinstall Galley.",
     stepPrepareHintPrefix: "Keep the ",
-    stepPrepareHintSuffix: " folder visible; you will drag it into the browser soon.",
+    stepPrepareHintSuffix:
+      " folder visible; you will drag it into the browser soon.",
     stepOpenExtensions: "Open browser extension management",
     stepDeveloperMode: "Turn on Developer mode",
     stepDeveloperModeHintPrefix: "Turn on ",
@@ -1030,7 +1039,8 @@ const enCopy: AppCopy = {
     testing: "Testing",
     later: "Later",
     runDemo: "New test chat",
-    runDemoTitle: "Create a chat that asks Galley to open the browser and search for weather",
+    runDemoTitle:
+      "Create a chat that asks Galley to open the browser and search for weather",
     demoPrompt:
       "Open Baidu, search for today's weather, and tell me the result. Do not use code or external APIs.",
   },

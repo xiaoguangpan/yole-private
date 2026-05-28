@@ -244,22 +244,33 @@ code {
 }
 
 /* Browser Control is a core managed-runtime setup item. While it is
-   missing, the TopBar badge keeps a low-frequency pulse: persistent enough
-   to feel unfinished, quieter than a flashing alert. */
+   missing, the TopBar badge jumps periodically so the incomplete state is
+   difficult to ignore without falling back to a modal interruption. */
 @keyframes browser-control-attention {
   0%,
-  78%,
+  70%,
   100% {
+    transform: translateY(0) scale(1);
     box-shadow: 0 0 0 0 rgba(191, 122, 31, 0);
     filter: none;
   }
+  76% {
+    transform: translateY(-2px) scale(1.015);
+    box-shadow: 0 0 0 4px rgba(191, 122, 31, 0.12);
+    filter: drop-shadow(0 0 4px rgba(191, 122, 31, 0.18));
+  }
+  82% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 1px rgba(191, 122, 31, 0.08);
+  }
   88% {
-    box-shadow: 0 0 0 3px rgba(191, 122, 31, 0.12);
-    filter: drop-shadow(0 0 4px rgba(191, 122, 31, 0.16));
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 0 0 3px rgba(191, 122, 31, 0.1);
+    filter: drop-shadow(0 0 3px rgba(191, 122, 31, 0.14));
   }
 }
 .browser-control-attention {
-  animation: browser-control-attention 4.8s ease-in-out infinite;
+  animation: browser-control-attention 4.4s ease-in-out infinite;
 }
 
 /* Sidebar session rows show liveness, not completion percentage. The
@@ -422,8 +433,7 @@ code {
   display: inline-block;
 }
 .thinking-wave-token {
-  animation: thinking-wave var(--thinking-wave-duration, 2.16s) linear
-    infinite;
+  animation: thinking-wave var(--thinking-wave-duration, 2.16s) linear infinite;
   animation-delay: calc(var(--thinking-wave-index) * 160ms);
   display: inline-block;
   opacity: var(--thinking-wave-floor, 0.58);

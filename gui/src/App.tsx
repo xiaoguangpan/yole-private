@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/overlay/CommandPalette";
 import { BrowserControlSetupDialog } from "@/components/screens/BrowserControlSetupDialog";
+import { BrowserControlAttentionSurface } from "@/components/screens/BrowserControlAttentionBanner";
 import { EmptyState } from "@/components/screens/EmptyState";
 import { MainView } from "@/components/screens/MainView";
 import { Onboarding } from "@/components/screens/onboarding/Onboarding";
@@ -844,6 +845,10 @@ function App() {
     () => projects.find((p) => p.id === deletingProjectId) ?? null,
     [projects, deletingProjectId],
   );
+  const showBrowserControlAttention =
+    activeRuntimeKind === "managed" &&
+    (browserControlStatus === "not_connected" ||
+      browserControlStatus === "error");
 
   // Onboarding takeover: no AppShell, no overlays besides the dev
   // toggle.
@@ -1063,210 +1068,216 @@ function App() {
           />
         }
         main={
-          screen === "empty" ? (
-            <EmptyState
-              llmDisplayName={llmDisplayName}
-              conversationWidth={conversationWidth}
-              projectName={activeProject?.name}
-              showPromptSuggestions={!activeProject}
-              focusTick={emptyComposerFocusTick}
-              llms={llms}
-              llmConfigHint={llmConfigHint}
-              onConfigureModels={openModelConfigFromSwitcher}
-              requiresModelConfig={requiresManagedModelConfig}
-              onSelectLLM={(idx) => {
-                // EmptyState always configures the *next* new
-                // session: stash pendingLLMIndex + flip the
-                // top-level llms projection so the Composer pill
-                // reflects the pick. activateSession consumes
-                // pendingLLMIndex when submitOnEmpty creates and
-                // spawns the fresh session.
-                selectLLMForNewSession(idx);
-              }}
-              onOpenLLMSwitcher={openLLMSwitcherFallback}
-              onSubmit={(t) => {
-                if (requiresManagedModelConfig) {
-                  openModelsForMissingConfig();
-                  return;
-                }
-                void submitOnEmpty(
-                  t,
-                  activeSessionId,
-                  createSession,
-                  activateSession,
-                  appendUserTurn,
-                  sendIPCCommand,
-                  setScreen,
-                  reportUserSendFailure,
-                  activeProjectFilter,
-                ).then(() => {
-                  if (activeProjectFilter) setActiveProjectFilter(undefined);
-                });
-              }}
-              onQuickPrompt={(p) => {
-                if (requiresManagedModelConfig) {
-                  openModelsForMissingConfig();
-                  return;
-                }
-                void submitOnEmpty(
-                  p,
-                  activeSessionId,
-                  createSession,
-                  activateSession,
-                  appendUserTurn,
-                  sendIPCCommand,
-                  setScreen,
-                  reportUserSendFailure,
-                  activeProjectFilter,
-                ).then(() => {
-                  if (activeProjectFilter) setActiveProjectFilter(undefined);
-                });
-              }}
-            />
-          ) : (
-            <MainView
-              turns={turns}
-              llmDisplayName={llmDisplayName}
-              projectName={
-                activeSession?.projectId
-                  ? projects.find((p) => p.id === activeSession.projectId)?.name
-                  : undefined
-              }
-              llms={llms}
-              llmConfigHint={llmConfigHint}
-              onConfigureModels={openModelConfigFromSwitcher}
-              requiresModelConfig={requiresManagedModelConfig}
-              onSelectLLM={(idx) => {
-                if (!activeSessionId) return;
-                // Flip local + persisted state immediately so the
-                // picker never depends on a bridge round-trip for
-                // visible feedback. The live bridge, when available,
-                // still receives set_llm and will confirm via
-                // llm_changed.
-                selectLLMForSession(activeSessionId, idx);
-                if (
-                  bridgeStatus === "connected" ||
-                  bridgeStatus === "spawning"
-                ) {
-                  void sendIPCCommand(activeSessionId, {
-                    kind: "set_llm",
-                    llmIndex: idx,
-                  });
-                }
-              }}
-              onOpenLLMSwitcher={openLLMSwitcherFallback}
-              pendingApprovals={pendingApprovals}
-              approvalDecisions={approvalDecisions}
-              onSubmit={(t) => {
-                if (requiresManagedModelConfig) {
-                  openModelsForMissingConfig();
-                  return;
-                }
-                // Main screen always has an active session — Sidebar
-                // / EmptyState set it before transitioning here.
-                if (!activeSessionId) return;
-                const sid = activeSessionId;
-                const ensureBridgeThenSend = async (
-                  cmd:
-                    | { kind: "user_message"; text: string; images: string[] }
-                    | { kind: "ask_user_response"; text: string },
-                ) => {
-                  const runtime = useRuntimeStore.getState();
-                  const latestStatus =
-                    runtime.byId[sid]?.bridgeStatus ?? "idle";
-                  if (
-                    latestStatus !== "spawning" &&
-                    (latestStatus !== "connected" ||
-                      !runtime.hasBridgeClient(sid))
-                  ) {
-                    await activateSession(sid);
+          <BrowserControlAttentionSurface
+            show={showBrowserControlAttention}
+            onOpen={openBrowserControlSetup}
+          >
+            {screen === "empty" ? (
+              <EmptyState
+                llmDisplayName={llmDisplayName}
+                conversationWidth={conversationWidth}
+                projectName={activeProject?.name}
+                showPromptSuggestions={!activeProject}
+                focusTick={emptyComposerFocusTick}
+                llms={llms}
+                llmConfigHint={llmConfigHint}
+                onConfigureModels={openModelConfigFromSwitcher}
+                requiresModelConfig={requiresManagedModelConfig}
+                onSelectLLM={(idx) => {
+                  // EmptyState always configures the *next* new
+                  // session: stash pendingLLMIndex + flip the
+                  // top-level llms projection so the Composer pill
+                  // reflects the pick. activateSession consumes
+                  // pendingLLMIndex when submitOnEmpty creates and
+                  // spawns the fresh session.
+                  selectLLMForNewSession(idx);
+                }}
+                onOpenLLMSwitcher={openLLMSwitcherFallback}
+                onSubmit={(t) => {
+                  if (requiresManagedModelConfig) {
+                    openModelsForMissingConfig();
+                    return;
                   }
-                  if (cmd.kind === "user_message") {
-                    let historyReady = await ensureHistoryReplayComplete(sid);
-                    if (!historyReady) {
-                      console.warn(
-                        "[main] history replay did not confirm; restarting bridge.",
-                        { sid },
-                      );
-                      await shutdownBridge(sid);
+                  void submitOnEmpty(
+                    t,
+                    activeSessionId,
+                    createSession,
+                    activateSession,
+                    appendUserTurn,
+                    sendIPCCommand,
+                    setScreen,
+                    reportUserSendFailure,
+                    activeProjectFilter,
+                  ).then(() => {
+                    if (activeProjectFilter) setActiveProjectFilter(undefined);
+                  });
+                }}
+                onQuickPrompt={(p) => {
+                  if (requiresManagedModelConfig) {
+                    openModelsForMissingConfig();
+                    return;
+                  }
+                  void submitOnEmpty(
+                    p,
+                    activeSessionId,
+                    createSession,
+                    activateSession,
+                    appendUserTurn,
+                    sendIPCCommand,
+                    setScreen,
+                    reportUserSendFailure,
+                    activeProjectFilter,
+                  ).then(() => {
+                    if (activeProjectFilter) setActiveProjectFilter(undefined);
+                  });
+                }}
+              />
+            ) : (
+              <MainView
+                turns={turns}
+                llmDisplayName={llmDisplayName}
+                projectName={
+                  activeSession?.projectId
+                    ? projects.find((p) => p.id === activeSession.projectId)
+                        ?.name
+                    : undefined
+                }
+                llms={llms}
+                llmConfigHint={llmConfigHint}
+                onConfigureModels={openModelConfigFromSwitcher}
+                requiresModelConfig={requiresManagedModelConfig}
+                onSelectLLM={(idx) => {
+                  if (!activeSessionId) return;
+                  // Flip local + persisted state immediately so the
+                  // picker never depends on a bridge round-trip for
+                  // visible feedback. The live bridge, when available,
+                  // still receives set_llm and will confirm via
+                  // llm_changed.
+                  selectLLMForSession(activeSessionId, idx);
+                  if (
+                    bridgeStatus === "connected" ||
+                    bridgeStatus === "spawning"
+                  ) {
+                    void sendIPCCommand(activeSessionId, {
+                      kind: "set_llm",
+                      llmIndex: idx,
+                    });
+                  }
+                }}
+                onOpenLLMSwitcher={openLLMSwitcherFallback}
+                pendingApprovals={pendingApprovals}
+                approvalDecisions={approvalDecisions}
+                onSubmit={(t) => {
+                  if (requiresManagedModelConfig) {
+                    openModelsForMissingConfig();
+                    return;
+                  }
+                  // Main screen always has an active session — Sidebar
+                  // / EmptyState set it before transitioning here.
+                  if (!activeSessionId) return;
+                  const sid = activeSessionId;
+                  const ensureBridgeThenSend = async (
+                    cmd:
+                      | { kind: "user_message"; text: string; images: string[] }
+                      | { kind: "ask_user_response"; text: string },
+                  ) => {
+                    const runtime = useRuntimeStore.getState();
+                    const latestStatus =
+                      runtime.byId[sid]?.bridgeStatus ?? "idle";
+                    if (
+                      latestStatus !== "spawning" &&
+                      (latestStatus !== "connected" ||
+                        !runtime.hasBridgeClient(sid))
+                    ) {
                       await activateSession(sid);
-                      historyReady = await ensureHistoryReplayComplete(sid);
+                    }
+                    if (cmd.kind === "user_message") {
+                      let historyReady = await ensureHistoryReplayComplete(sid);
                       if (!historyReady) {
-                        throw new Error(copy.app.restoreTimeout);
+                        console.warn(
+                          "[main] history replay did not confirm; restarting bridge.",
+                          { sid },
+                        );
+                        await shutdownBridge(sid);
+                        await activateSession(sid);
+                        historyReady = await ensureHistoryReplayComplete(sid);
+                        if (!historyReady) {
+                          throw new Error(copy.app.restoreTimeout);
+                        }
                       }
                     }
+                    await sendIPCCommand(sid, cmd);
+                  };
+                  const reportSendFailure = (e: unknown) =>
+                    reportUserSendFailure(sid, "send_user_message", e);
+                  // `/btw` is a side question (interruption-free,
+                  // not a main-agent turn). Route to the transient
+                  // user-turn path so it doesn't disturb the main
+                  // agent's running state — bridge intercepts the
+                  // user_message command and runs the btw worker
+                  // independently of the task queue.
+                  const trimmed = t.trimStart();
+                  if (trimmed === "/btw" || trimmed.startsWith("/btw ")) {
+                    appendSideQuestionUserTurn(sid, t);
+                    void ensureBridgeThenSend({
+                      kind: "user_message",
+                      text: t,
+                      images: [],
+                    }).catch(reportSendFailure);
+                    return;
                   }
-                  await sendIPCCommand(sid, cmd);
-                };
-                const reportSendFailure = (e: unknown) =>
-                  reportUserSendFailure(sid, "send_user_message", e);
-                // `/btw` is a side question (interruption-free,
-                // not a main-agent turn). Route to the transient
-                // user-turn path so it doesn't disturb the main
-                // agent's running state — bridge intercepts the
-                // user_message command and runs the btw worker
-                // independently of the task queue.
-                const trimmed = t.trimStart();
-                if (trimmed === "/btw" || trimmed.startsWith("/btw ")) {
-                  appendSideQuestionUserTurn(sid, t);
-                  void ensureBridgeThenSend({
-                    kind: "user_message",
-                    text: t,
-                    images: [],
-                  }).catch(reportSendFailure);
-                  return;
-                }
-                // Snapshot pendingAskUser **before** appendUserTurn
-                // clears it — we need to know which IPC command to
-                // send. ask_user_response and user_message both
-                // ultimately call agent.put_task on the bridge side
-                // (same agent_runner_loop kickoff), but keeping
-                // them distinct preserves audit-trail clarity:
-                // "this user message was a reply to a specific
-                // question" vs "this was a fresh prompt".
-                const wasAskUser = pendingAskUser !== null;
-                appendUserTurn(sid, t);
-                if (wasAskUser) {
-                  void ensureBridgeThenSend({
-                    kind: "ask_user_response",
-                    text: t,
-                  }).catch(reportSendFailure);
-                } else {
-                  void ensureBridgeThenSend({
-                    kind: "user_message",
-                    text: t,
-                    images: [],
-                  }).catch(reportSendFailure);
-                }
-              }}
-              onApprove={(approvalId, decision) => {
-                if (!activeSessionId) return;
-                recordApprovalDecision(activeSessionId, approvalId, decision);
-                removePendingApproval(activeSessionId, approvalId);
-                if (bridgeStatus === "connected") {
-                  sendIPCCommand(activeSessionId, {
-                    kind: "approval_response",
-                    approvalId,
-                    decision,
-                  });
-                }
-              }}
-              onStop={() => {
-                console.info("[main] stop");
-                if (!activeSessionId) return;
-                if (bridgeStatus === "connected") {
-                  sendIPCCommand(activeSessionId, { kind: "abort" });
-                }
-              }}
-              isRunning={isRunning}
-              currentTurnIndex={currentTurnIndex}
-              userSubmitTick={userSubmitTick}
-              inFlightContent={inFlightContent}
-              pendingAskUser={pendingAskUser}
-              conversationWidth={conversationWidth}
-              activeSessionId={activeSessionId}
-            />
-          )
+                  // Snapshot pendingAskUser **before** appendUserTurn
+                  // clears it — we need to know which IPC command to
+                  // send. ask_user_response and user_message both
+                  // ultimately call agent.put_task on the bridge side
+                  // (same agent_runner_loop kickoff), but keeping
+                  // them distinct preserves audit-trail clarity:
+                  // "this user message was a reply to a specific
+                  // question" vs "this was a fresh prompt".
+                  const wasAskUser = pendingAskUser !== null;
+                  appendUserTurn(sid, t);
+                  if (wasAskUser) {
+                    void ensureBridgeThenSend({
+                      kind: "ask_user_response",
+                      text: t,
+                    }).catch(reportSendFailure);
+                  } else {
+                    void ensureBridgeThenSend({
+                      kind: "user_message",
+                      text: t,
+                      images: [],
+                    }).catch(reportSendFailure);
+                  }
+                }}
+                onApprove={(approvalId, decision) => {
+                  if (!activeSessionId) return;
+                  recordApprovalDecision(activeSessionId, approvalId, decision);
+                  removePendingApproval(activeSessionId, approvalId);
+                  if (bridgeStatus === "connected") {
+                    sendIPCCommand(activeSessionId, {
+                      kind: "approval_response",
+                      approvalId,
+                      decision,
+                    });
+                  }
+                }}
+                onStop={() => {
+                  console.info("[main] stop");
+                  if (!activeSessionId) return;
+                  if (bridgeStatus === "connected") {
+                    sendIPCCommand(activeSessionId, { kind: "abort" });
+                  }
+                }}
+                isRunning={isRunning}
+                currentTurnIndex={currentTurnIndex}
+                userSubmitTick={userSubmitTick}
+                inFlightContent={inFlightContent}
+                pendingAskUser={pendingAskUser}
+                conversationWidth={conversationWidth}
+                activeSessionId={activeSessionId}
+              />
+            )}
+          </BrowserControlAttentionSurface>
         }
       />
 

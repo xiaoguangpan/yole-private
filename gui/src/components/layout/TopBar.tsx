@@ -286,9 +286,12 @@ function BrowserControlIndicator({
   const checking = status === "unknown";
   const missing = status === "not_connected";
   const error = status === "error";
+  const needsAttention = missing || error;
   const label = checking
     ? copy.browserControlChecking
-    : copy.browserControlPending;
+    : error
+      ? copy.browserControlError
+      : copy.browserControlPending;
   const title = connected
     ? copy.browserControlConnectedTitle
     : error
@@ -321,11 +324,11 @@ function BrowserControlIndicator({
         "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow,transform]",
         "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:translate-y-[0.5px]",
         error
-          ? "border-error/30 bg-error/[0.06] text-error hover:bg-error/[0.1]"
+          ? "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25"
           : checking
             ? "border-line bg-elevated text-ink-muted hover:bg-hover hover:text-ink"
-            : "border-warning/30 bg-warning/10 font-medium text-warning hover:bg-warning/20",
-        missing && "browser-control-attention",
+            : "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25",
+        needsAttention && "browser-control-attention",
       )}
       aria-label={title}
     >
