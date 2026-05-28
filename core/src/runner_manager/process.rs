@@ -8,7 +8,7 @@ use crate::process_command;
 use crate::runner_manager::error::{RunnerSpawnError, SendCommandError};
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,6 +41,10 @@ const STDERR_TAIL_MAX: usize = 8;
 pub enum BroadcastItem {
     Event(Box<IpcEvent>),
     Malformed(String),
+    Closed {
+        code: Option<i32>,
+        signal: Option<i32>,
+    },
 }
 
 /// Arguments to [`RunnerProcess::spawn`].
@@ -81,7 +85,8 @@ pub struct SpawnArgs {
 /// One Python runner subprocess + the live infrastructure around it.
 pub struct RunnerProcess {
     session_id: String,
-    child: Child,
+    child: Arc<Mutex<Child>>,
+    pid: Option<u32>,
     stdin: ChildStdin,
     /// Cloned by [`subscribe`](Self::subscribe) to hand out receivers.
     stdout_tx: broadcast::Sender<BroadcastItem>,
@@ -90,6 +95,10 @@ pub struct RunnerProcess {
     /// to decide whether the session is eviction-protected. Shared with the
     /// reader task via `Arc`.
     agent_running: Arc<AtomicBool>,
+    /// True once shutdown/kill is user-initiated by Galley. The stdout reader
+    /// still emits a close event, but maps it to a clean close so GUI does not
+    /// show a crash toast for deliberate lifecycle transitions.
+    expected_close: Arc<AtomicBool>,
     /// Rolling buffer of the last [`STDERR_TAIL_MAX`] stderr lines. Used to
     /// surface "bridge died with this Python error" toasts on abnormal exit
     /// (the prod-build failure mode hit 2026-05-15 on first .dmg dogfood,
@@ -174,6 +183,7 @@ impl RunnerProcess {
                 }
             })?;
 
+        let pid = child.id();
         let stdin = child
             .stdin
             .take()
@@ -195,7 +205,9 @@ impl RunnerProcess {
 
         let (tx, _) = broadcast::channel::<BroadcastItem>(BROADCAST_CAPACITY);
         let agent_running = Arc::new(AtomicBool::new(false));
+        let expected_close = Arc::new(AtomicBool::new(false));
         let stderr_tail = Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_TAIL_MAX)));
+        let child = Arc::new(Mutex::new(child));
 
         // stdout reader task: parse each line as IpcEvent, broadcast.
         // Also flips agent_running on turn_start / clears on turn_end /
@@ -204,6 +216,8 @@ impl RunnerProcess {
         {
             let tx = tx.clone();
             let agent_running = agent_running.clone();
+            let child = child.clone();
+            let expected_close = expected_close.clone();
             let sid_for_log = args.session_id.clone();
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout).lines();
@@ -237,6 +251,34 @@ impl RunnerProcess {
                         }
                     }
                 }
+                agent_running.store(false, Ordering::SeqCst);
+                let closed = {
+                    let status = {
+                        let mut child = child.lock().await;
+                        match child.wait().await {
+                            Ok(status) => Some(status),
+                            Err(e) => {
+                                eprintln!("[runner wait error {sid_for_log}] {e}");
+                                None
+                            }
+                        }
+                    };
+                    match status {
+                        Some(_) if expected_close.load(Ordering::SeqCst) => BroadcastItem::Closed {
+                            code: Some(0),
+                            signal: None,
+                        },
+                        Some(status) => BroadcastItem::Closed {
+                            code: status.code(),
+                            signal: exit_signal(&status),
+                        },
+                        None => BroadcastItem::Closed {
+                            code: None,
+                            signal: None,
+                        },
+                    }
+                };
+                let _ = tx.send(closed);
             });
         }
 
@@ -262,9 +304,11 @@ impl RunnerProcess {
         Ok(Self {
             session_id: args.session_id,
             child,
+            pid,
             stdin,
             stdout_tx: tx,
             agent_running,
+            expected_close,
             stderr_tail,
         })
     }
@@ -272,7 +316,7 @@ impl RunnerProcess {
     /// PID of the live subprocess. None if the OS reported the process as
     /// already gone at spawn time (extremely rare).
     pub fn pid(&self) -> Option<u32> {
-        self.child.id()
+        self.pid
     }
 
     pub fn session_id(&self) -> &str {
@@ -348,10 +392,12 @@ impl RunnerProcess {
     /// Returns whether shutdown was graceful (`true`) or whether the
     /// caller still needs to drop for the kill path (`false`).
     pub async fn shutdown(&mut self, timeout: Duration) -> bool {
+        self.expected_close.store(true, Ordering::SeqCst);
         // Best-effort: write to stdin can fail if the subprocess already
         // crashed. Either way we proceed to wait.
         let _ = self.send_command(&IpcCommand::Shutdown).await;
-        match tokio::time::timeout(timeout, self.child.wait()).await {
+        let mut child = self.child.lock().await;
+        match tokio::time::timeout(timeout, child.wait()).await {
             Ok(Ok(_)) => true,
             // Subprocess exit returned an io error → treat as ungraceful.
             Ok(Err(_)) => false,
@@ -362,8 +408,10 @@ impl RunnerProcess {
     /// Force kill the subprocess. Equivalent to letting it drop (which
     /// triggers `kill_on_drop`) but blocks until the child has reaped.
     pub async fn kill(&mut self) -> std::io::Result<()> {
-        self.child.start_kill()?;
-        let _ = self.child.wait().await;
+        self.expected_close.store(true, Ordering::SeqCst);
+        let mut child = self.child.lock().await;
+        child.start_kill()?;
+        let _ = child.wait().await;
         Ok(())
     }
 
@@ -371,7 +419,21 @@ impl RunnerProcess {
     /// caches the result internally.
     #[allow(dead_code)] // Used by tests + reserved for future watchers
     pub async fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
-        self.child.wait().await
+        let mut child = self.child.lock().await;
+        child.wait().await
+    }
+}
+
+fn exit_signal(status: &ExitStatus) -> Option<i32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        status.signal()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = status;
+        None
     }
 }
 
@@ -451,6 +513,7 @@ mod tests {
                 }
             }
             BroadcastItem::Malformed(_) => panic!("wrong variant"),
+            BroadcastItem::Closed { .. } => panic!("wrong variant"),
         }
     }
 

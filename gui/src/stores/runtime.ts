@@ -245,6 +245,7 @@ const _lruOrder: string[] = [];
 const LRU_CAP = 20;
 const BRIDGE_CLIENT_WAIT_MS = 15_000;
 const CONNECTED_CLIENT_WAIT_MS = 1_000;
+const BRIDGE_READY_WAIT_MS = 30_000;
 
 function currentCopy() {
   return copyForLanguage(
@@ -281,6 +282,39 @@ async function _waitForBridgeClient(
     await sleep(50);
   }
   return _bridgeClients.get(sessionId);
+}
+
+async function _waitForBridgeReady(
+  sessionId: string,
+  timeoutMs: number = BRIDGE_READY_WAIT_MS,
+): Promise<boolean> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const status =
+      useRuntimeStore.getState().byId[sessionId]?.bridgeStatus ?? "idle";
+    if (status === "connected" && _bridgeClients.has(sessionId)) {
+      return true;
+    }
+    if (status === "idle" || status === "closed" || status === "error") {
+      return false;
+    }
+    await sleep(50);
+  }
+  return (
+    (useRuntimeStore.getState().byId[sessionId]?.bridgeStatus ?? "idle") ===
+      "connected" && _bridgeClients.has(sessionId)
+  );
+}
+
+async function bridgeStartupTimeoutMessage(sessionId: string): Promise<string> {
+  const base = currentCopy().app.bridgeStartupTimeout;
+  try {
+    const tail: string[] = await invoke("runner_stderr_tail", { sessionId });
+    if (tail.length === 0) return base;
+    return `${base}\n${tail.slice(-3).join("\n")}`;
+  } catch {
+    return base;
+  }
 }
 
 function missingBridgeMessage(
@@ -805,6 +839,7 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
   },
 
   sendIPCCommand: async (sessionId, cmd) => {
+    const userVisibleCommand = shouldFailWhenBridgeMissing(cmd);
     let client = _bridgeClients.get(sessionId);
     if (!client) {
       const status = get().byId[sessionId]?.bridgeStatus ?? "idle";
@@ -825,10 +860,30 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
         `[runtime] sendIPCCommand(${sessionId}) called but no bridge is alive:`,
         cmd,
       );
-      if (shouldFailWhenBridgeMissing(cmd)) {
+      if (userVisibleCommand) {
         throw new Error(message);
       }
       return;
+    }
+    if (userVisibleCommand) {
+      const ready = await _waitForBridgeReady(sessionId);
+      if (!ready) {
+        const slot = get().byId[sessionId];
+        if (slot?.bridgeError) {
+          throw new Error(slot.bridgeError);
+        }
+        throw new Error(await bridgeStartupTimeoutMessage(sessionId));
+      }
+      client = _bridgeClients.get(sessionId);
+      if (!client) {
+        const slot = get().byId[sessionId];
+        throw new Error(
+          missingBridgeMessage(
+            slot?.bridgeStatus ?? "idle",
+            slot?.bridgeError ?? null,
+          ),
+        );
+      }
     }
     await client.send(cmd);
   },

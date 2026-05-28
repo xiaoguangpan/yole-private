@@ -452,6 +452,12 @@ async fn handle_stream<R, W>(
                                 return;
                             }
                         }
+                        Ok(BroadcastItem::Closed { .. }) => {
+                            let payload =
+                                StreamEnvelope::end(request_id.clone(), "subprocess_exited");
+                            let _ = write_stream_line(&mut write_half, &payload).await;
+                            return;
+                        }
                         Err(RecvError::Lagged(_)) => continue,
                         Err(RecvError::Closed) => {
                             let payload =

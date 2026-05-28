@@ -20,13 +20,11 @@
 //! |------------------|--------------------------------------------------|
 //! | `runner-event`   | `{ sessionId: string, event: IpcEvent }`        |
 //! | `runner-malformed` | `{ sessionId, line }`                          |
-//! | `runner-closed`  | `{ sessionId, code: number\|null, signal: null }` |
+//! | `runner-closed`  | `{ sessionId, code: number\|null, signal: number\|null }` |
 //!
-//! `runner-closed` fires when the broadcast sender drops (= subprocess
-//! stdout reached EOF = subprocess exited). `code` is captured if the
-//! manager initiated the shutdown / kill (which knows the exit status);
-//! otherwise null. `signal` is reserved for future use — Tokio's
-//! `ExitStatus` doesn't surface signal numbers portably.
+//! `runner-closed` fires when the subprocess exits. `code` is captured when
+//! available; user-initiated shutdown / kill maps to a clean close so the GUI
+//! does not show a crash toast for deliberate lifecycle transitions.
 //!
 //! Stderr is NOT pushed event-by-event. The TS side pulls the tail buffer
 //! via [`runner_stderr_tail`] when it needs to surface a toast — this is
@@ -433,6 +431,15 @@ pub(crate) fn spawn_emit_task(
                     };
                     let _ = app.emit("runner-malformed", payload);
                 }
+                Ok(BroadcastItem::Closed { code, signal }) => {
+                    let payload = RunnerClosedPayload {
+                        session_id: session_id.clone(),
+                        code,
+                        signal,
+                    };
+                    let _ = app.emit("runner-closed", payload);
+                    break;
+                }
                 Err(RecvError::Lagged(skipped)) => {
                     // Subscriber lagged past the broadcast capacity (1024
                     // events). Surface this as a structured warning event
@@ -445,13 +452,10 @@ pub(crate) fn spawn_emit_task(
                     continue;
                 }
                 Err(RecvError::Closed) => {
-                    // Sender dropped — subprocess stdout reached EOF =
-                    // the subprocess exited. Emit a final close event.
-                    // We don't know the exit code from this side; the
-                    // manager's shutdown path captures it but doesn't
-                    // (yet) plumb it through to the emit task. Code = None
-                    // matches the legacy plugin-shell behavior for
-                    // signal-induced kills.
+                    // Last-resort fallback: the stdout reader should normally emit
+                    // BroadcastItem::Closed with an exit status before the
+                    // channel closes, but channel closure still means this
+                    // stream is over.
                     let payload = RunnerClosedPayload {
                         session_id: session_id.clone(),
                         code: None,

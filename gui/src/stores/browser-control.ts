@@ -14,14 +14,12 @@ interface BrowserControlState {
   layoutError: string | null;
   lastProbe: BrowserControlProbe | null;
   setupOpen: boolean;
-  autoPromptShown: boolean;
   busy: boolean;
   error: string | null;
   ensureLayout: () => Promise<BrowserControlLayout | null>;
   probe: () => Promise<BrowserControlProbe | null>;
   openSetup: () => void;
   closeSetup: () => void;
-  maybeOpenStartupSetup: () => void;
 }
 
 export const useBrowserControlStore = create<BrowserControlState>(
@@ -31,7 +29,6 @@ export const useBrowserControlStore = create<BrowserControlState>(
     layoutError: null,
     lastProbe: null,
     setupOpen: false,
-    autoPromptShown: false,
     busy: false,
     error: null,
 
@@ -95,12 +92,7 @@ export const useBrowserControlStore = create<BrowserControlState>(
       }
     },
 
-    openSetup: () => set({ setupOpen: true, autoPromptShown: true }),
+    openSetup: () => set({ setupOpen: true }),
     closeSetup: () => set({ setupOpen: false }),
-    maybeOpenStartupSetup: () => {
-      const state = get();
-      if (state.autoPromptShown || state.status === "connected") return;
-      set({ setupOpen: true, autoPromptShown: true });
-    },
   }),
 );

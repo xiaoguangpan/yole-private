@@ -72,9 +72,6 @@ function App() {
   const probeBrowserControl = useBrowserControlStore((s) => s.probe);
   const openBrowserControlSetup = useBrowserControlStore((s) => s.openSetup);
   const closeBrowserControlSetup = useBrowserControlStore((s) => s.closeSetup);
-  const maybeOpenBrowserStartupSetup = useBrowserControlStore(
-    (s) => s.maybeOpenStartupSetup,
-  );
 
   // Sidebar live-status comes from `sessions` directly: messagesStore's
   // `fireSessionMirror` writes sidebar-visible fields (status,
@@ -387,23 +384,6 @@ function App() {
     if (!browserControlSetupOpen) return;
     closeBrowserControlSetup();
   }, [activeRuntimeKind, browserControlSetupOpen, closeBrowserControlSetup]);
-
-  useEffect(() => {
-    if (activeRuntimeKind !== "managed") return;
-    if (requiresManagedModelConfig) return;
-    if (
-      browserControlStatus === "unknown" ||
-      browserControlStatus === "connected"
-    ) {
-      return;
-    }
-    maybeOpenBrowserStartupSetup();
-  }, [
-    activeRuntimeKind,
-    requiresManagedModelConfig,
-    browserControlStatus,
-    maybeOpenBrowserStartupSetup,
-  ]);
 
   // Session creation is **lazy** — we no longer auto-create on
   // landing in the empty screen. Earlier versions did, which
@@ -1551,17 +1531,15 @@ export default App;
  * Flow:
  *   1. If there's already an active session id, reuse it.
  *   2. Otherwise createSession + activateSession (which awaits the
- *      bridge spawn). Bridge `ready` event arrives shortly after;
- *      sendIPCCommand can write to stdin as soon as the process is
- *      spawned (bridge's command queue buffers until ready).
+ *      process spawn). sendIPCCommand then waits for the bridge `ready`
+ *      event before writing the user message.
  *   3. Append the user turn locally and send the IPC message.
  *   4. Transition to main view so the user sees the thinking
  *      placeholder appear under their message.
  *
- * No bridgeStatus gate — the bridge may still be "spawning" when we
- * call sendIPCCommand, but the underlying tauri Command.create has
- * already returned a writable stdin. Bridge processes commands in
- * FIFO order, so user_message lands right after the spawn handshake.
+ * sendIPCCommand waits for the bridge `ready` event before writing
+ * user-visible commands. This keeps first-run Windows startup stalls from
+ * turning into a silent, indefinite "thinking" state.
  */
 async function submitOnEmpty(
   text: string,

@@ -116,15 +116,14 @@ export function BrowserControlSetupDialog({
           )}
         >
           <div className="relative px-6 py-5">
-            <Dialog.Close asChild>
-              <IconButton
-                ariaLabel={copy.close}
-                className="absolute right-3 top-3"
-                variant="ghost"
-              >
-                <X size={14} weight="thin" />
-              </IconButton>
-            </Dialog.Close>
+            <IconButton
+              ariaLabel={copy.close}
+              className="absolute right-3 top-3"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
+              <X size={14} weight="thin" />
+            </IconButton>
 
             <div className="flex items-start gap-3 pr-8">
               <div
@@ -256,11 +255,13 @@ export function BrowserControlSetupDialog({
                   {copy.runDemo}
                 </Button>
               ) : (
-                <Dialog.Close asChild>
-                  <Button variant="ghost" size="md">
-                    {copy.later}
-                  </Button>
-                </Dialog.Close>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => onOpenChange(false)}
+                >
+                  {copy.later}
+                </Button>
               )}
             </DialogActionRow>
           </div>

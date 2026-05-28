@@ -158,6 +158,44 @@ for line in sys.stdin:
     fs::write(runner_dir.join("workbench_bridge.py"), script).expect("write mock");
 }
 
+fn write_exiting_runner(dir: &std::path::Path, code: i32) {
+    let runner_dir = dir.join("runner");
+    fs::create_dir_all(&runner_dir).expect("mkdir runner");
+    fs::write(runner_dir.join("__init__.py"), "").expect("write __init__");
+    let script = format!(
+        r#"
+import argparse
+import json
+import os
+import sys
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--ga-path", required=True)
+parser.add_argument("--session-id", required=True)
+parser.add_argument("--cwd", required=False)
+parser.add_argument("--llm-no", type=int, default=0)
+args = parser.parse_args()
+
+print(json.dumps({{
+    "kind": "ready",
+    "sessionId": args.session_id,
+    "protocolVersion": "0.1",
+    "gaCommit": "mock",
+    "gaCommitDate": "2026-05-19T00:00:00+00:00",
+    "gaPath": args.ga_path,
+    "llmName": "mock-llm",
+    "cwd": args.cwd or os.getcwd(),
+    "pid": os.getpid(),
+    "availableLLMs": [],
+    "timestamp": "2026-05-19T10:00:00+00:00"
+}}), flush=True)
+print("mock bridge exiting", file=sys.stderr, flush=True)
+sys.exit({code})
+"#
+    );
+    fs::write(runner_dir.join("workbench_bridge.py"), script).expect("write mock");
+}
+
 fn make_args(session_id: &str, bridge_cwd: PathBuf) -> SpawnArgs {
     let python = mock_python_path().unwrap_or_else(|| "python3".to_string());
     SpawnArgs {
@@ -179,9 +217,23 @@ async fn next_event(rx: &mut tokio::sync::broadcast::Receiver<BroadcastItem>) ->
         match timeout(Duration::from_secs(5), rx.recv()).await {
             Ok(Ok(BroadcastItem::Event(boxed))) => return Some(*boxed),
             Ok(Ok(BroadcastItem::Malformed(_))) => continue,
+            Ok(Ok(BroadcastItem::Closed { .. })) => return None,
             Ok(Err(RecvError::Lagged(_))) => continue,
             Ok(Err(RecvError::Closed)) => return None,
             Err(_timeout) => return None,
+        }
+    }
+}
+
+async fn next_closed(
+    rx: &mut tokio::sync::broadcast::Receiver<BroadcastItem>,
+) -> Option<(Option<i32>, Option<i32>)> {
+    loop {
+        match timeout(Duration::from_secs(5), rx.recv()).await {
+            Ok(Ok(BroadcastItem::Closed { code, signal })) => return Some((code, signal)),
+            Ok(Ok(BroadcastItem::Event(_))) | Ok(Ok(BroadcastItem::Malformed(_))) => continue,
+            Ok(Err(RecvError::Lagged(_))) => continue,
+            Ok(Err(RecvError::Closed)) | Err(_) => return None,
         }
     }
 }
@@ -210,6 +262,29 @@ async fn spawn_emits_ready_event() {
         }
         other => panic!("expected Ready, got {:?}", other),
     }
+
+    mgr.shutdown_all(Duration::from_secs(2)).await;
+}
+
+#[tokio::test]
+async fn subprocess_exit_broadcasts_closed_event() {
+    if mock_python_path().is_none() {
+        return;
+    }
+    let dir = TempDir::new().expect("tempdir");
+    write_exiting_runner(dir.path(), 7);
+
+    let mgr = RunnerManager::new();
+    mgr.spawn(make_args("s_exit", dir.path().to_path_buf()), None)
+        .await
+        .expect("spawn");
+
+    let mut rx = mgr.subscribe("s_exit").await.expect("subscribe");
+    let ev = next_event(&mut rx).await.expect("ready event");
+    assert!(matches!(ev, IpcEvent::Ready(_)));
+
+    let (code, _signal) = next_closed(&mut rx).await.expect("closed event");
+    assert_eq!(code, Some(7));
 
     mgr.shutdown_all(Duration::from_secs(2)).await;
 }
