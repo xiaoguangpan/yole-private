@@ -162,11 +162,13 @@ branch.
 
 ### 8. Verify Live Update Channel
 
-Fetch the live beta manifest:
+Run the live channel verifier:
 
 ```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
+node scripts/check-update-channel.mjs \
+  --repo wangjc683/galley \
+  --tag "${RELEASE_TAG}" \
+  --channel beta
 ```
 
 Check:
@@ -174,7 +176,12 @@ Check:
 - `version` matches the promoted tag.
 - Platform URLs point at the published GitHub Release assets.
 - `signature` values are inline signature contents, not `.sig` URLs.
+- Platform asset URLs return a successful HTTP status.
 - The manifest changed on `galley-update-channel`.
+
+The promote workflow runs the same verifier after it pushes the channel branch.
+If this step fails, treat the update channel as not promoted even if the
+workflow generated a local `latest.json`.
 
 ### 9. Dogfood App Update
 
@@ -222,6 +229,7 @@ Then:
 | App says update channel not connected | Build lacks updater compile-time config | Expected in Dev; for release, inspect generated Tauri config |
 | Update downloads during active task | Protection regression | Stop release, fix before promotion |
 | Manifest URL points at wrong version | Wrong tag promoted | Promote the correct tag |
+| Live channel verifier returns 404 | Channel branch was not promoted or raw URL is wrong | Rerun promote, then verify `updates/beta/latest.json` on `galley-update-channel` |
 
 ## Done Criteria
 

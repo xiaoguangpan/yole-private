@@ -83,8 +83,16 @@ jobs:
           git -C "$worktree_dir" add "updates/$CHANNEL/latest.json" "updates/$CHANNEL/README.md"
           if git -C "$worktree_dir" diff --cached --quiet; then
             echo "Update channel $CHANNEL already points at $TAG."
-            exit 0
+          else
+            git -C "$worktree_dir" commit -m "Promote Galley $TAG to $CHANNEL update channel"
+            git -C "$worktree_dir" push origin "HEAD:$CHANNEL_BRANCH"
           fi
 
-          git -C "$worktree_dir" commit -m "Promote Galley $TAG to $CHANNEL update channel"
-          git -C "$worktree_dir" push origin "HEAD:$CHANNEL_BRANCH"
+      - name: Verify live update channel
+        run: |
+          node scripts/check-update-channel.mjs \
+            --repo "${{ github.repository }}" \
+            --tag "${{ inputs.tag }}" \
+            --channel "${{ inputs.channel }}" \
+            --retries 6 \
+            --retry-delay-ms 10000
