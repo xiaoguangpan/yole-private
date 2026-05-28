@@ -63,7 +63,20 @@ not understand the `./scripts/...` shell path. The release workflow now writes
 config. This is safe because release CI already runs `Prepare CLI sidecar` as a
 dedicated cross-platform step before invoking `tauri build`.
 
+The third dry-run passed on all release matrix entries:
+
+- `galley-macos-15-x64`
+- `galley-macos-15-aarch64`
+- `galley-windows-2022-x64`
+
+The tag-only GitHub Release job was skipped, so no public Release or updater
+channel promotion happened. These artifacts are suitable for private install
+dogfood, but not for app updater E2E because Actions artifacts require GitHub
+authentication and are not a public updater endpoint.
+
 ## Next
 
-重跑 release dry-run；通过后先下载 Actions artifacts 做内部安装 dogfood。公开
-发布和 beta channel promotion 仍然等 dogfood 通过后再做。
+先下载 Actions artifacts 做内部安装 dogfood。公开发布和 beta channel promotion
+仍然等 dogfood 通过后再做。如果要在公开发布前测试 “旧版本检查更新 -> 下载 ->
+重启安装” 的完整 updater E2E，需要单独准备一个内部但无需认证的 HTTPS update
+channel；GitHub draft/private assets 不适合作为 app updater endpoint。
