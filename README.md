@@ -5,7 +5,7 @@
 <h1 align="center">Galley</h1>
 
 <p align="center">
-  <strong>在本机并行运行、管理和恢复多个 AI Agent session</strong>
+  <strong>在自己的电脑上同时运行多个 AI Agent 会话，随时切换、管理和继续</strong>
   <br/>
   自带 GenericAgent 内核 · GUI / CLI 双原生 · Local-first
 </p>
