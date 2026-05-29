@@ -571,7 +571,7 @@ const zhCopy = {
       "Galley 不会修改你的 GenericAgent。删除 Galley 后 GenericAgent 仍可独立运行。",
     modelTitle: "为 Galley 配置模型",
     modelSubtitle: "选择你要接入的模型服务，再填入密钥和模型。",
-    connectExistingButton: "接入已有的 GenericAgent",
+    connectExistingButton: "接入已有 GenericAgent",
     testAndStart: "测试并开始使用 Galley",
     startUsingGalley: "开始使用 Galley",
     attachTitle: "接入已经安装的 GenericAgent",

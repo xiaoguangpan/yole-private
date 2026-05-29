@@ -95,7 +95,7 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     protocol: "anthropic",
     apiBase: "https://open.bigmodel.cn/api/anthropic",
     model: "glm-5.1",
-    displayName: "Zhipu GLM",
+    displayName: "ZAI",
     modelPlaceholder: "glm-5.1",
     advancedOptions: {
       max_retries: 3,
@@ -109,7 +109,7 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     protocol: "anthropic",
     apiBase: "https://api.kimi.com/coding",
     model: "kimi-for-coding",
-    displayName: "Kimi for Coding",
+    displayName: "Kimi",
     modelPlaceholder: "kimi-for-coding",
     advancedOptions: {
       fake_cc_system_prompt: true,

@@ -406,8 +406,8 @@ export function StepModelConfig({
         )}
       </div>
 
-      <div className="mt-9 flex flex-wrap items-start gap-2">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-9 flex flex-wrap items-center gap-3">
+        <div className="flex min-w-[180px] items-center">
           <button
             type="button"
             onClick={onAttachExisting}
