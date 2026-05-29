@@ -9,8 +9,8 @@ live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.2.0-alpha.1`
-- Git tag / GitHub Release: `v0.2.0-alpha.1`
+- Package version: `0.2.0-alpha.2`
+- Git tag / GitHub Release: `v0.2.0-alpha.2`
 - Agent API schema: `schemaVersion: 1`
 - Release tier: alpha prerelease; do not mark GitHub Release as Latest
 - Product shape: dual-native local agent team orchestrator
@@ -21,18 +21,18 @@ Supervisor automation on the same machine.
 
 ## Current Release Gates
 
-Before publishing `v0.2.0-alpha.1`:
+Before publishing `v0.2.0-alpha.2`:
 
-1. Finish local dogfood on the dual-native build.
-2. Decide whether menubar / background mode is required for this alpha or can
-   stay deferred.
-3. Run Windows smoke, or explicitly ship with a documented Windows caveat.
-4. Run release/update dry-run if packaging, signing, or updater config changed.
-5. Finalize release notes and devlog.
-6. Publish only after smoke. Do not promote the beta update channel for this
+1. Finish local dogfood on the managed runtime and Settings -> IM flow.
+2. Run Windows smoke, especially Settings -> IM QR generation / refresh and
+   managed runtime startup paths.
+3. Run release/update dry-run if packaging, signing, updater config, or bundled
+   Python dependencies changed.
+4. Finalize release notes and devlog.
+5. Publish only after smoke. Do not promote the beta update channel for this
    invited-tester alpha unless we explicitly decide to make it available to
    all update-channel users.
-7. Run the standard verification set:
+6. Run the standard verification set:
    - `cargo check --workspace`
    - `cargo test --workspace`
    - `pnpm typecheck`
@@ -73,12 +73,12 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Use `0.2.0-alpha.1` inside package metadata:
+- Use `0.2.0-alpha.2` inside package metadata:
   - `core/tauri.conf.json`
   - `core/Cargo.toml`
   - `cli/Cargo.toml`
   - `gui/package.json`
-- Use `v0.2.0-alpha.1` for Git tag and GitHub Release title.
+- Use `v0.2.0-alpha.2` for Git tag and GitHub Release title.
 - Keep Agent API at `schemaVersion: 1`.
 - A breaking Agent API change requires `schemaVersion: 2`, with explicit
   compatibility notes in [agent-api](./agent-api.md).

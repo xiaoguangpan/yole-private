@@ -68,6 +68,7 @@ requireFile(path.join(patchRoot, "manifest.md"));
 requireFile(path.join(codeRoot, "agentmain.py"));
 requireFile(path.join(codeRoot, "agent_loop.py"));
 requireFile(path.join(codeRoot, "llmcore.py"));
+requireFile(path.join(codeRoot, "frontends", "wechatapp.py"));
 if (fs.existsSync(path.join(managedRoot, "galley-prompts"))) {
   fail("managed prompt profile is embedded in Core; remove managed-ga/galley-prompts");
 }

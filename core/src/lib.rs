@@ -6,6 +6,7 @@ pub mod credential_store;
 pub mod db;
 pub mod discovery;
 pub mod error;
+pub mod im_supervisor;
 pub mod ipc;
 pub mod managed_model_config;
 pub mod managed_model_probe;
@@ -91,6 +92,11 @@ fn cleanup_and_exit<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
         use std::time::Duration;
         use tauri::Manager;
+        if let Some(im_manager) =
+            app.try_state::<std::sync::Arc<im_supervisor::ImSupervisorManager>>()
+        {
+            im_manager.stop_all().await;
+        }
         let manager = app.state::<std::sync::Arc<runner_manager::RunnerManager>>();
         manager.shutdown_all(Duration::from_secs(5)).await;
         ALLOW_APP_EXIT.store(true, Ordering::SeqCst);
@@ -243,6 +249,43 @@ async fn open_browser_control_extensions_page(
     browser_control::open_extensions_page(browser)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_im_supervisor_status(
+    app: tauri::AppHandle,
+    manager: tauri::State<'_, std::sync::Arc<im_supervisor::ImSupervisorManager>>,
+    platform: String,
+) -> std::result::Result<im_supervisor::ImSupervisorStatus, String> {
+    manager.status(&app, platform).await
+}
+
+#[tauri::command]
+async fn start_im_supervisor(
+    app: tauri::AppHandle,
+    manager: tauri::State<'_, std::sync::Arc<im_supervisor::ImSupervisorManager>>,
+    platform: String,
+    relogin: bool,
+) -> std::result::Result<im_supervisor::ImSupervisorStatus, String> {
+    manager.inner().start(app, platform, relogin).await
+}
+
+#[tauri::command]
+async fn stop_im_supervisor(
+    app: tauri::AppHandle,
+    manager: tauri::State<'_, std::sync::Arc<im_supervisor::ImSupervisorManager>>,
+    platform: String,
+) -> std::result::Result<im_supervisor::ImSupervisorStatus, String> {
+    manager.stop(app, platform).await
+}
+
+#[tauri::command]
+async fn logout_im_supervisor(
+    app: tauri::AppHandle,
+    manager: tauri::State<'_, std::sync::Arc<im_supervisor::ImSupervisorManager>>,
+    platform: String,
+) -> std::result::Result<im_supervisor::ImSupervisorStatus, String> {
+    manager.logout(app, platform).await
 }
 
 #[tauri::command]
@@ -995,6 +1038,9 @@ pub fn run() {
         // Mode keeps window close from tearing down the process; true app
         // quit runs `shutdown_all` from Rust before allowing exit.
         .manage(std::sync::Arc::new(runner_manager::RunnerManager::new()))
+        .manage(std::sync::Arc::new(
+            im_supervisor::ImSupervisorManager::new(),
+        ))
         .invoke_handler(tauri::generate_handler![
             path_exists,
             get_supervisor_sop,
@@ -1007,6 +1053,10 @@ pub fn run() {
             ensure_browser_control_layout,
             probe_browser_control,
             open_browser_control_extensions_page,
+            get_im_supervisor_status,
+            start_im_supervisor,
+            stop_im_supervisor,
+            logout_im_supervisor,
             list_managed_model_providers,
             save_managed_model_provider,
             delete_managed_model_provider,
@@ -1178,6 +1228,19 @@ pub fn run() {
                     }
                 }
             }
+
+            {
+                use tauri::Manager;
+                let im_manager: std::sync::Arc<im_supervisor::ImSupervisorManager> = _app
+                    .state::<std::sync::Arc<im_supervisor::ImSupervisorManager>>()
+                    .inner()
+                    .clone();
+                let app_for_im = _app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    im_manager.autostart(app_for_im).await;
+                });
+            }
+
             // Windows-only custom chrome: drop native decorations and
             // restore the drop shadow via window-shadows-v2 so the borderless
             // window doesn't look like a flat rectangle. Mac keeps its

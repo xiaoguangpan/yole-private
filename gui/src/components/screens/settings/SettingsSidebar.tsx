@@ -1,4 +1,5 @@
 import {
+  ChatCircleText,
   Cpu,
   Info,
   Keyboard,
@@ -24,12 +25,14 @@ export function SettingsSidebar({
   languagePreference,
   resolvedLanguage,
   onChangeLanguagePreference,
+  showImTab,
 }: {
   tab: SettingsTab;
   onChange: (tab: SettingsTab) => void;
   languagePreference: LanguagePreference;
   resolvedLanguage: ResolvedLanguage;
   onChangeLanguagePreference: (preference: LanguagePreference) => void;
+  showImTab: boolean;
 }) {
   const copy = useCopy();
   const showChineseHelpers = isChineseLanguage(resolvedLanguage);
@@ -65,6 +68,15 @@ export function SettingsSidebar({
           subLabel={showChineseHelpers ? tabCopy.agent.helper : undefined}
           onClick={() => onChange("integration")}
         />
+        {showImTab && (
+          <SettingsTabButton
+            active={tab === "im"}
+            Icon={ChatCircleText}
+            label={tabCopy.im.label}
+            subLabel={showChineseHelpers ? tabCopy.im.helper : undefined}
+            onClick={() => onChange("im")}
+          />
+        )}
         <SettingsTabButton
           active={tab === "shortcuts"}
           Icon={Keyboard}

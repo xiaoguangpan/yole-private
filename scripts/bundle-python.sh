@@ -29,6 +29,8 @@ GA_DEPS=(
   "bottle==0.13.4"
   "simple-websocket-server==0.4.4"
   "aiohttp==3.13.5"
+  "qrcode[pil]==8.2"
+  "pycryptodome==3.23.0"
 )
 
 ARCH="${1:-}"
@@ -145,6 +147,10 @@ import os
 import sys
 sys.path.insert(0, os.environ["GALLEY_VERIFY_GA_PATH"])
 import agentmain
+import qrcode
+from Crypto.Cipher import AES
+import importlib.util
+assert importlib.util.find_spec("frontends.wechatapp") is not None
 print("  managed GA import OK (bundle is bridge-ready)")
 '
 else

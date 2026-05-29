@@ -164,7 +164,8 @@ Every baseline upgrade must check GenericAgent `pyproject.toml`:
 - If `[project.dependencies]` changes, update `scripts/bundle-python.sh`.
 - Rebuild bundled Python for release targets.
 - `optional-dependencies` for GenericAgent UI/frontends are not automatically in
-  Galley scope; Galley provides its own UI.
+  Galley scope. Galley only bundles frontend deps when a managed product
+  surface owns that frontend.
 
 Current bundled GenericAgent core deps:
 
@@ -173,6 +174,8 @@ Current bundled GenericAgent core deps:
 - `bottle`
 - `simple-websocket-server`
 - `aiohttp`
+- `qrcode[pil]` (managed WeChat IM Supervisor)
+- `pycryptodome` (managed WeChat IM Supervisor)
 
 Runtime packaging details live in [desktop runtime](./desktop-runtime.md).
 

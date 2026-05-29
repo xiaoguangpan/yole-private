@@ -606,6 +606,15 @@ Do not expose non-native text-protocol sessions, mixin failover, IM bot config,
 Langfuse, or arbitrary GA template fields in first-run onboarding. Those can
 become advanced Settings later if there is real demand.
 
+Managed IM Supervisor is the first advanced Settings exception. It lives under
+Settings -> IM, not Onboarding. Phase 1 exposes only WeChat and keeps the user
+flow to: connect, scan, chat. Galley owns the process, state paths, bundled
+dependencies, managed model config, and managed prompt injection.
+
+WeChat token, QR image, and logs live under Galley's managed state
+`managed-ga-state/im/wechat/`. The official GA default `~/.wxbot/token.json`
+must not be used by Galley's managed launcher.
+
 Attach mode never reads Galley's model records, and managed mode never reads the
 user's external GA `mykey.py`. Keeping model ownership separate is part of the
 trust boundary.
@@ -1060,6 +1069,11 @@ Current implementation slice:
   `GALLEY_PERSONA_PROMPT_TEXT` only for managed spawns.
 - The Python bridge reads those managed-only env values and appends them as
   `backend.extra_sys_prompt`, after GA's core prompt and memory.
+- Managed IM Supervisor adds a short `GALLEY_IM_SUPERVISOR_PROMPT_TEXT` layer
+  for IM dispatch behavior. It does not inject the full Supervisor SOP on every
+  turn.
+- Rust Core materializes the bundled Supervisor SOP as a Galley-owned reference
+  file for the IM agent to read when orchestration rules are needed.
 - `prompt_profile` defaults to `galley-persona-v1` for managed sessions at the
   DB insertion boundary. External sessions keep `prompt_profile = null`.
 

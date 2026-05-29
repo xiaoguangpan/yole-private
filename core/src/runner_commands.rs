@@ -157,10 +157,17 @@ struct ManagedRuntimeModel {
     advanced_options: serde_json::Value,
 }
 
-pub(crate) async fn prepare_managed_spawn_args(
-    mut args: SpawnArgs,
+pub(crate) struct ManagedRuntimeProcessContext {
+    pub diagnostics: managed_runtime::ManagedRuntimeDiagnostics,
+    pub bridge_cwd: PathBuf,
+    pub env: Vec<(String, String)>,
+    pub requested_model_index: Option<i64>,
+}
+
+pub(crate) async fn prepare_managed_runtime_context(
     app: &AppHandle,
-) -> Result<SpawnArgs, RunnerSpawnError> {
+    requested_model_id: Option<&str>,
+) -> Result<ManagedRuntimeProcessContext, RunnerSpawnError> {
     let diagnostics = managed_runtime::ensure_for_app(app).map_err(|e| {
         RunnerSpawnError::ManagedRuntimeInvalid {
             detail: format!("layout initialization failed: {e}"),
@@ -186,14 +193,13 @@ pub(crate) async fn prepare_managed_spawn_args(
         }
     })?;
     let mut runtime_models = Vec::new();
-    let requested_model_id = args.llm_key.clone();
     let mut requested_model_index: Option<i64> = None;
     for model in models {
         let api_key = match credential_store::get_secret(&galley, &model.api_key_ref).await {
             Ok(secret) if !secret.trim().is_empty() => secret,
             _ => continue,
         };
-        if requested_model_id.as_deref() == Some(model.id.as_str()) {
+        if requested_model_id == Some(model.id.as_str()) {
             requested_model_index = Some(runtime_models.len() as i64);
         }
         runtime_models.push(ManagedRuntimeModel {
@@ -210,14 +216,6 @@ pub(crate) async fn prepare_managed_spawn_args(
             detail: "no managed model has a usable credential; open Settings -> Models to re-enter the model key".into(),
         });
     }
-    if requested_model_id.is_some() {
-        // The selected managed model may have been deleted or lost its
-        // credential since the session last ran. Falling back to the current
-        // default is safer than reusing the stale numeric index, which could
-        // silently point at a different model after reordering.
-        args.llm_index = requested_model_index;
-    }
-    args.llm_key = None;
 
     let model_config_dir = PathBuf::from(&diagnostics.paths.model_config_dir);
     let model_config_path = model_config_dir.join(managed_model_config::GENERATED_CONFIG_FILENAME);
@@ -242,35 +240,60 @@ pub(crate) async fn prepare_managed_spawn_args(
         detail: format!("serializing managed runtime model config failed: {e}"),
     })?;
 
-    args.ga_path = PathBuf::from(&diagnostics.paths.code_root);
-    args.bridge_cwd = managed_runtime::bridge_cwd_for_app(app).map_err(|e| {
+    let bridge_cwd = managed_runtime::bridge_cwd_for_app(app).map_err(|e| {
         RunnerSpawnError::ManagedRuntimeInvalid {
             detail: format!("resolving managed bridge cwd failed: {e}"),
         }
     })?;
+    let env = vec![
+        ("GALLEY_RUNTIME_KIND".into(), "managed".into()),
+        ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
+        (
+            "GALLEY_GA_STATE_ROOT".into(),
+            diagnostics.paths.state_root.clone(),
+        ),
+        (
+            "GALLEY_MANAGED_MODEL_CONFIG_PATH".into(),
+            model_config_path.to_string_lossy().into_owned(),
+        ),
+        (
+            "GALLEY_RUNTIME_PROMPT_TEXT".into(),
+            managed_prompt::RUNTIME_PROMPT.into(),
+        ),
+        (
+            "GALLEY_PERSONA_PROMPT_TEXT".into(),
+            managed_prompt::PERSONA_PROMPT.into(),
+        ),
+        ("GALLEY_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config),
+    ];
+
+    Ok(ManagedRuntimeProcessContext {
+        diagnostics,
+        bridge_cwd,
+        env,
+        requested_model_index,
+    })
+}
+
+pub(crate) async fn prepare_managed_spawn_args(
+    mut args: SpawnArgs,
+    app: &AppHandle,
+) -> Result<SpawnArgs, RunnerSpawnError> {
+    let requested_model_id = args.llm_key.clone();
+    let context = prepare_managed_runtime_context(app, requested_model_id.as_deref()).await?;
+    if requested_model_id.is_some() {
+        // The selected managed model may have been deleted or lost its
+        // credential since the session last ran. Falling back to the current
+        // default is safer than reusing the stale numeric index, which could
+        // silently point at a different model after reordering.
+        args.llm_index = context.requested_model_index;
+    }
+    args.llm_key = None;
+
+    args.ga_path = PathBuf::from(&context.diagnostics.paths.code_root);
+    args.bridge_cwd = context.bridge_cwd;
     args.cwd = None;
-    args.env
-        .push(("GALLEY_RUNTIME_KIND".into(), "managed".into()));
-    args.env
-        .push(("PYTHONDONTWRITEBYTECODE".into(), "1".into()));
-    args.env.push((
-        "GALLEY_GA_STATE_ROOT".into(),
-        diagnostics.paths.state_root.clone(),
-    ));
-    args.env.push((
-        "GALLEY_MANAGED_MODEL_CONFIG_PATH".into(),
-        model_config_path.to_string_lossy().into_owned(),
-    ));
-    args.env.push((
-        "GALLEY_RUNTIME_PROMPT_TEXT".into(),
-        managed_prompt::RUNTIME_PROMPT.into(),
-    ));
-    args.env.push((
-        "GALLEY_PERSONA_PROMPT_TEXT".into(),
-        managed_prompt::PERSONA_PROMPT.into(),
-    ));
-    args.env
-        .push(("GALLEY_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config));
+    args.env.extend(context.env);
     Ok(args)
 }
 

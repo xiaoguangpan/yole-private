@@ -3,6 +3,7 @@ export type SettingsTab =
   | "models"
   | "approval"
   | "integration"
+  | "im"
   | "shortcuts"
   | "about";
 

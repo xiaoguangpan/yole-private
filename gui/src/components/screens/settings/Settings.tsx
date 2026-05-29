@@ -1,9 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X as XIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SettingsAbout } from "@/components/screens/settings/SettingsAbout";
 import { SettingsApproval } from "@/components/screens/settings/SettingsApproval";
+import { SettingsIM } from "@/components/screens/settings/SettingsIM";
 import { SettingsIntegration } from "@/components/screens/settings/SettingsIntegration";
 import { SettingsModels } from "@/components/screens/settings/SettingsModels";
 import { SettingsRuntime } from "@/components/screens/settings/SettingsRuntime";
@@ -114,6 +115,11 @@ export function Settings({
     useState<SettingsTab>(defaultTab);
   const tab = controlledTab ?? uncontrolledTab;
   const setTab = onTabChange ?? setUncontrolledTab;
+  const showImTab = activeRuntimeKind === "managed";
+
+  useEffect(() => {
+    if (!showImTab && tab === "im") setTab("runtime");
+  }, [setTab, showImTab, tab]);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -137,6 +143,7 @@ export function Settings({
             languagePreference={languagePreference}
             resolvedLanguage={resolvedLanguage}
             onChangeLanguagePreference={onChangeLanguagePreference}
+            showImTab={showImTab}
           />
 
           <div className="relative min-w-0 flex-1 overflow-y-auto bg-app">
@@ -182,6 +189,12 @@ export function Settings({
                 />
               )}
               {tab === "integration" && <SettingsIntegration />}
+              {showImTab && tab === "im" && (
+                <SettingsIM
+                  hasManagedRuntimeConfigured={hasManagedRuntimeConfigured}
+                  onOpenModels={() => setTab("models")}
+                />
+              )}
               {tab === "shortcuts" && <SettingsShortcuts />}
               {tab === "about" && (
                 <SettingsAbout
