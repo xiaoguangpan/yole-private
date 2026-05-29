@@ -28,6 +28,10 @@ creating sessions.
 
 1. **Inventory before action.** Run `status`, `sessions list`, or
    `sessions search` before creating or changing sessions.
+   `sessions list` and `sessions search` default to the GUI's current runtime.
+   Use `--runtime all` only when the user asks to search across managed and
+   external GA history. `--all` only includes archived sessions; it does not
+   change runtime scope.
 2. **Faithful delegation.** Session prompts must preserve the user's goal.
    Do not silently expand scope, hide assumptions, or invent requirements.
 3. **Confirm risky actions.** `archive`, `stop`, and `project delete` require
@@ -301,9 +305,11 @@ All commands support `--help`.
 |---|---|
 | `"$GALLEY" status` | Global counts and health summary |
 | `"$GALLEY" sessions list` | Recent active sessions |
-| `"$GALLEY" sessions list --all` | Include archived sessions |
+| `"$GALLEY" sessions list --all` | Include archived sessions in the current runtime |
+| `"$GALLEY" sessions list --runtime all` | Cross-runtime active listing when explicitly needed |
 | `"$GALLEY" sessions list --status=running` | Active agent work |
-| `"$GALLEY" sessions search "<kw>"` | Find related conversations |
+| `"$GALLEY" sessions search "<kw>"` | Find related conversations in the current runtime |
+| `"$GALLEY" sessions search "<kw>" --runtime all` | Cross-runtime search when explicitly needed |
 | `"$GALLEY" session brief <id>` | One-session summary |
 | `"$GALLEY" session show <id> --tail=20` | Recent messages |
 | `"$GALLEY" session watch <id>` | Stream live runner events; no backlog |
@@ -345,6 +351,10 @@ Summarize session titles, statuses, and last activity.
 
 First search for related work. If no suitable session exists:
 
+When searching for related work, the search stays in the same runtime context
+the user sees in Galley. Use `--runtime all` only when the user explicitly
+wants to look across both managed and external GA history.
+
 ```bash
 "$GALLEY" session new "<clear task prompt>" \
   --supervisor=my-agent/v1 \
@@ -369,6 +379,10 @@ same current runtime the user sees in the GUI.
   --supervisor=my-agent/v1 \
   --reason="user follow-up"
 ```
+
+If the target session id came from `sessions search --runtime all`, inspect
+`session brief` first and verify that the runtime matches the user's intent
+before sending a follow-up.
 
 If the response says `dispatch: "persisted_only"`, the message is saved but no
 live runner consumed it. Do not send the same instruction again. Tell the user
@@ -415,6 +429,10 @@ Use a Project as the visible container for a small group of child sessions:
   --reason="split user task into child task B"
 "$GALLEY" project follow <project-id> --tail=80 --until-idle --final-show
 ```
+
+The duplicate search above stays in the current runtime by default. Do not
+cross into another runtime's history unless the user asks for it or the task
+clearly depends on previous work from that runtime.
 
 Each child prompt should preserve the user's original goal, name only that
 session's responsibility, and state scope limits such as "do not book, pay, post
