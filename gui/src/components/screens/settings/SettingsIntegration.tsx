@@ -255,9 +255,24 @@ export function SettingsIntegration() {
           external agent they want to empower as Supervisor. */}
       <section>
         <SettingsSectionLabel>{agentCopy.agentSop}</SettingsSectionLabel>
-        <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-soft">
+        <p className="mt-2 max-w-[58ch] text-[12.5px] leading-[1.55] text-ink-soft">
           {agentCopy.sopDescription}
         </p>
+        <ul className="mt-3 space-y-1.5">
+          {agentCopy.sopCapabilities.map((capability) => (
+            <li
+              key={capability}
+              className="flex items-start gap-2 text-[12.5px] leading-[1.45] text-ink"
+            >
+              <Check
+                size={13}
+                weight="bold"
+                className="mt-[2px] shrink-0 text-ink-muted"
+              />
+              <span className="min-w-0">{capability}</span>
+            </li>
+          ))}
+        </ul>
         <div className="mt-3 flex items-center gap-3">
           <Button
             type="button"

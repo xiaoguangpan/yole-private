@@ -43,14 +43,71 @@ creating sessions.
 
 1. Resolve the Galley CLI path from the discovery file.
 2. Inspect current Galley state.
-3. Decide whether to reuse an existing session, send a follow-up, or create
-   one or more new sessions.
-4. For complex goals, propose or perform a faithful task split.
+3. Choose the orchestration mode: direct read, existing-session follow-up,
+   single new session, or Project-backed session group.
+4. For complex goals, create a faithful first split and adapt after results.
 5. Confirm destructive or ambiguous actions.
 6. Run the CLI command with origin fields.
 7. Report what changed and what the user should expect next.
 
-## 4. User-Facing Galley Mode Copy
+## 4. Choose Orchestration Mode
+
+Choose the lightest mode that can complete the user's goal without hiding
+important work.
+
+| User goal shape | Use | Why |
+|---|---|---|
+| Inspect current state, find a session, show progress | Direct read commands | No new agent work is needed. |
+| Add one requirement to one known thread | Existing-session follow-up | Preserves context and avoids duplicate work. |
+| One bounded task with one obvious owner | Single new session | Lower coordination cost than a group. |
+| Complex goal with independent angles, evidence gathering, review, or synthesis | Project-backed session group | A Project is the visible container users can inspect later. |
+| User explicitly asked for implementation or fixes | Single-writer Project-backed group | One session may write; other sessions review, test, or verify. |
+| Unclear split, same-file edits by multiple agents, external sending, payment, deletion, or credential changes | Ask or narrow first | These fail badly when parallelized blindly. |
+
+Do not expose "Project batch" as a user-facing product term. Say "I will split
+this into a few Galley sessions under one Project" when the user needs to know
+what will happen.
+
+This SOP uses Galley Projects as the orchestration surface. Do not launch GA
+Goal, GA Hive, or another agent runtime's long-running workflow mode from this
+SOP. If the user explicitly asks for those modes, explain that this Galley SOP
+does not operate them directly and ask whether to continue with Galley Project
+orchestration instead.
+
+### Project-Backed Session Groups
+
+A Project-backed session group means: create or reuse one Galley Project, create
+2-4 child sessions inside it, follow the Project until idle, then synthesize the
+results. It is a workflow pattern, not a new Galley data model.
+
+Use two-stage orchestration:
+
+1. Start with 2-4 child sessions whose responsibilities are independent and easy
+   to merge.
+2. Follow with `project follow --until-idle --final-show`.
+3. Synthesize evidence, conflicts, and gaps.
+4. If the first wave is incomplete, create at most 1-2 follow-up or verification
+   sessions in the same Project.
+5. After the second wave, summarize for the user instead of continuing to spawn
+   more sessions silently.
+
+Only synthesize from actual final answers or a stable `project show` snapshot.
+If `project follow` exits with only progress summaries, wait briefly and inspect
+the Project or individual sessions again instead of treating the group as done.
+
+Creating a Project-backed group does not require confirmation when the user's
+goal is clear. Actions inside the group still follow the normal safety rules:
+confirm destructive or external actions, never auto-approve Galley prompts, and
+do not expand the user's scope.
+
+For write tasks, only allow a child session to change files when the user
+explicitly asked to implement, fix, edit, or commit. Prefer **single writer,
+multiple reviewers**: one implementation session owns the write path, while the
+other child sessions are read-only review, test, or verification sessions. If
+multiple writers are truly needed, each child prompt must state non-overlapping
+file or module ownership.
+
+## 5. User-Facing Galley Mode Copy
 
 Users often copy this SOP into a local Supervisor Agent without reading the
 whole document themselves. When the user is new to Galley, asks what you can do
@@ -112,7 +169,7 @@ is useful user language, but internally you are just following this Supervisor
 SOP. Avoid explaining CLI commands, Project/session internals, or runner
 lifecycle unless the user asks.
 
-## 5. Resolve Galley CLI
+## 6. Resolve Galley CLI
 
 Always read the discovery file first. Do not assume `galley` is on PATH. The
 first line is the CLI executable path; later lines may contain metadata such as
@@ -165,7 +222,7 @@ When you need strict forward compatibility, pin schema v1 on CLI commands:
 If the pin returns `schema_mismatch`, stop and tell the user this SOP may need
 an update before you continue.
 
-## 6. Task Splitting And Session Prompts
+## 7. Task Splitting And Session Prompts
 
 When the user gives a complex goal, you may split it into multiple Galley
 sessions to run in parallel. Good splits are independent, bounded, and easy to
@@ -179,7 +236,7 @@ Before creating sessions, check for existing related work:
 "$GALLEY" project list
 ```
 
-For a complex goal split into multiple sessions, use a Project as the batch
+For a complex goal split into multiple sessions, use a Project as the visible
 container. Reuse a clearly related Project when one exists; otherwise create a
 short-lived Project for this user goal and create every child session with
 `--project=<project-id>`. Do not create a separate "task group" concept in your
@@ -189,10 +246,22 @@ A good session prompt should include:
 
 - The user's original goal.
 - This session's specific responsibility.
+- Whether this session may modify files or must stay read-only.
+- File / module ownership when the session may modify files.
+- Absolute file paths or repo root paths for file-based tasks.
 - Scope limits.
 - Important assumptions.
 - Expected output.
-- The shared Project / batch context when this is one part of a split.
+- The shared Project / session-group context when this is one part of a split.
+
+For file-based work, do not rely on Project `rootPath` to set the runner's
+working directory. `--root-path` is stored on the Project row for user context,
+but the child prompt should still include the absolute repo root and any
+important absolute file paths.
+
+When the user asks for implementation, create one writer session and separate
+read-only review or verification sessions unless the ownership boundaries are
+obvious and non-overlapping.
 
 Example split:
 
@@ -201,7 +270,7 @@ Replace `proj_from_create` with the `project.id` returned by `project create`.
 ```bash
 "$GALLEY" project create "Release readiness review" \
   --supervisor=my-agent/v1 \
-  --reason="create batch container for release readiness review"
+  --reason="create Project container for release readiness review"
 
 "$GALLEY" session new "User goal: assess release upgrade readiness. This is one child session in the Release readiness review project. This session only checks app identity, data directory, SQLite migrations, and backup behavior. Do not change files. Output: concise risk list with evidence." \
   --project=proj_from_create \
@@ -214,10 +283,14 @@ Replace `proj_from_create` with the `project.id` returned by `project create`.
   --reason="split release readiness review into packaging work"
 ```
 
-If the task requires code changes, deleting data, changing configuration, or
-starting many sessions, first tell the user your split and wait for approval.
+If the first wave leaves important gaps, create one or two follow-up sessions in
+the same Project instead of opening a new Project.
 
-## 7. Command Cheatsheet
+If the task requires deleting data, changing credentials or configuration,
+posting externally, paying for something, or starting many sessions, first tell
+the user the likely impact and wait for approval.
+
+## 8. Command Cheatsheet
 
 Full schema: `https://github.com/wangjc683/galley/blob/main/docs/agent-api.md`.
 All commands support `--help`.
@@ -238,7 +311,7 @@ All commands support `--help`.
 | `"$GALLEY" project list` | Available projects |
 | `"$GALLEY" project brief <id>` | Project status counts and running sessions |
 | `"$GALLEY" project show <id> --tail=20` | Project sessions plus transcript tails |
-| `"$GALLEY" project follow <id> --tail=10 --until-idle --final-show` | Follow a Project batch until all child sessions are idle, then emit final context |
+| `"$GALLEY" project follow <id> --tail=10 --until-idle --final-show` | Follow a Project-backed session group until all child sessions are idle, then emit final context |
 | `"$GALLEY" llm list` | Available LLMs |
 | `"$GALLEY" health` | Troubleshooting |
 
@@ -257,7 +330,7 @@ All commands support `--help`.
 | `"$GALLEY" llm set <session-id> "<llm-name>"` | Switch a session's LLM |
 | `"$GALLEY" project delete <id> --supervisor=<id> --reason=<why>` | Delete project; sessions survive but become unassigned |
 
-## 8. Common Scenarios
+## 9. Common Scenarios
 
 ### "What is running in Galley?"
 
@@ -325,7 +398,7 @@ the user; do not leave a watcher running accidentally.
 
 ### "Split a complex task into parallel sessions"
 
-Use a Project as the visible batch container:
+Use a Project as the visible container for a small group of child sessions:
 
 ```bash
 "$GALLEY" status
@@ -333,7 +406,7 @@ Use a Project as the visible batch container:
 "$GALLEY" sessions search "<keywords>"
 "$GALLEY" project create "<short user-goal name>" \
   --supervisor=my-agent/v1 \
-  --reason="create batch container for user task"
+  --reason="create Project container for user task"
 "$GALLEY" session new "<child task A prompt>" --project=<project-id> \
   --supervisor=my-agent/v1 \
   --reason="split user task into child task A"
@@ -344,8 +417,9 @@ Use a Project as the visible batch container:
 ```
 
 Each child prompt should preserve the user's original goal, name only that
-session's responsibility, and state scope limits such as "do not book, pay, or
-change files" unless the user explicitly asked for those actions.
+session's responsibility, and state scope limits such as "do not book, pay, post
+externally, delete, or change files" unless the user explicitly asked for those
+actions.
 
 `project follow --until-idle --final-show` exits after a short quiet window
 once no child session is `connecting`, `running`, or `waiting_approval`. It
@@ -356,10 +430,42 @@ also emits a final snapshot. If you need a smaller final payload, reduce
 "$GALLEY" project show <project-id> --tail=80
 ```
 
-Summarize by child-session responsibility, evidence, conflicts, and next
-actions. Do not delete the Project after finishing; users can inspect the
-batch history in Galley. Archiving sessions or deleting the Project requires
-confirmation.
+If the first wave is incomplete, create at most one or two follow-up sessions in
+the same Project:
+
+```bash
+"$GALLEY" session new "<verification or follow-up prompt>" \
+  --project=<project-id> \
+  --supervisor=my-agent/v1 \
+  --reason="follow up on gap found in first project wave"
+"$GALLEY" project follow <project-id> --tail=80 --until-idle --final-show
+```
+
+Summarize by child-session responsibility, evidence, conflicts, follow-up
+sessions created, and next actions. Do not delete the Project after finishing;
+users can inspect the group history in Galley. Archiving sessions or deleting
+the Project requires confirmation.
+
+### "Implement or fix X with multiple sessions"
+
+Use one writer and one or more read-only reviewers:
+
+```bash
+"$GALLEY" project create "<short user-goal name>" \
+  --supervisor=my-agent/v1 \
+  --reason="create project for implementation plus review"
+"$GALLEY" session new "User goal: <goal>. This is the only writer session in this Project. Implement the requested change. Own only the files/modules named here: <ownership>. Output: summary of files changed, tests run, and residual risk." \
+  --project=<project-id> \
+  --supervisor=my-agent/v1 \
+  --reason="delegate implementation as the single writer"
+"$GALLEY" session new "User goal: <goal>. This is a read-only review session in the same Project. Do not change files. Review the implementation area for risks, missing tests, and user-facing regressions. Output: findings with evidence." \
+  --project=<project-id> \
+  --supervisor=my-agent/v1 \
+  --reason="delegate read-only verification"
+```
+
+Do not create multiple writer sessions for the same files. If the split needs
+multiple writers, state non-overlapping ownership in every prompt.
 
 ### "Archive / stop / delete"
 
@@ -393,22 +499,23 @@ not deleted.
 If `llm list` is empty, ask the user to open a Galley session once so the LLM
 cache can warm up.
 
-## 9. Confirmation Rules
+## 10. Confirmation Rules
 
 | User asks | You should |
 |---|---|
 | "看看现在跑啥" | Read directly |
 | "开一个 session" | Search for duplicates, then create |
-| "把这个复杂任务跑一下" | Use Project as batch container, split into bounded sessions |
+| "把这个复杂任务跑一下" | Use a Project-backed session group with 2-4 bounded child sessions |
+| "实现/修复这个复杂问题" | Use one writer session plus read-only review or verification sessions |
 | "继续那个 session" | Brief/show, then send follow-up |
-| "看进度/盯一下" | Use `session follow`; use `project follow` for a batch |
+| "看进度/盯一下" | Use `session follow`; use `project follow` for a Project group |
 | "归档/停掉" | Brief, ask confirmation, then execute |
 | "新建 project" | Create directly if name/scope is clear |
 | "删除 project" | Brief, state session-detach effect, ask confirmation |
 | "改 Galley/GA 设置" | Direct the user to GUI Settings |
 | "改 GA memory" | Refuse; GA memory is GA-owned |
 
-## 10. Origin Fields
+## 11. Origin Fields
 
 Use a stable supervisor id:
 
@@ -425,7 +532,7 @@ Use a short reason in the user's words or an honest paraphrase:
 
 Reasons matter because Galley shows supervisor-origin actions in the GUI.
 
-## 11. Error Recovery
+## 12. Error Recovery
 
 CLI errors are JSON on stdout:
 
@@ -446,7 +553,7 @@ Never blindly retry. For `session send` and `llm set`, `dispatch:
 command; report that distinction instead of resending the same message. For
 `session stop`, `dispatch: "already_stopped"` is success.
 
-## 12. Boundaries
+## 13. Boundaries
 
 Do not:
 
@@ -454,6 +561,8 @@ Do not:
 - Auto-approve Galley approval prompts for the user.
 - Pretend to inspect a session without running `brief` or `show`.
 - Create many sessions without a clear split.
+- Create multiple writer sessions for the same files.
+- Launch GA Goal, GA Hive, or another workflow runtime from this SOP.
 - Expand the user's request beyond what they asked.
 - Manage another machine's Galley. Galley is local-only.
 
@@ -461,22 +570,25 @@ You may:
 
 - Write clear task prompts for Galley sessions.
 - Split work into parallel sessions.
+- Create small Project-backed session groups and synthesize their results.
 - Ask clarifying questions when the split is uncertain.
 - Summarize and merge results for the user.
 
-## 13. Self-Check
+## 14. Self-Check
 
 Before acting, ask yourself:
 
 - Did I resolve `"$GALLEY"` from the discovery file?
 - Did I inspect existing sessions first?
 - Am I preserving the user's actual goal?
+- Did I choose the lightest orchestration mode that can work?
 - Does this action need confirmation?
+- If there is a writer, is there only one writer for each file/module?
 - Did I include `--supervisor` and `--reason` when the command supports them?
 - Did I distinguish `dispatched`, `persisted_only`, and `already_stopped`?
 - Will my response help the user decide the next step?
 
-## 14. References
+## 15. References
 
 - Agent API: `https://github.com/wangjc683/galley/blob/main/docs/agent-api.md`
 - PRD: `https://github.com/wangjc683/galley/blob/main/docs/PRD.md`

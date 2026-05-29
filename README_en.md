@@ -45,7 +45,7 @@ Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) e
 
 | | |
 |---|---|
-| 📦 **Out of the box**<br/>Bundled GenericAgent runtime, CPython 3.11, and runtime dependencies. | 🪟 **Multi-session + projects**<br/>Run multiple tasks in parallel; humans and Supervisor Agents see the same workbench. |
+| 📦 **Out of the box**<br/>Bundled GenericAgent runtime, CPython 3.11, and runtime dependencies. | 🪟 **Multi-session + Project orchestration**<br/>Run multiple tasks in parallel; complex goals can be split into one Project and synthesized by a Supervisor Agent. |
 | ⚙️ **GUI + CLI dual-native**<br/>Humans operate in the GUI; Supervisor Agents operate through the stable `galley` CLI. Both share the same sessions and history. | 💬 **IM integration path**<br/>WeChat, Feishu/Lark, QQ, Telegram, Discord, and other GA IM frontends come with the bundled GA runtime. |
 | 🔒 **Localhost-only**<br/>Core listens only on a Unix socket / Windows named pipe; remote transport belongs to the Supervisor Agent. | 🔧 **Tool timeline + approvals**<br/>Tool calls, args, results, and timing are shown inline; risky actions can use approval, allowlists, or YOLO mode. |
 | 🌐 **Browser Control**<br/>After connecting Chrome/Chromium, the agent can operate your signed-in browser. There is a lot of room to explore. | 💾 **Persistence + search + background mode**<br/>Close the window, keep working via a Supervisor Agent, then come back to continue or search past sessions. |
@@ -89,10 +89,10 @@ In the running GUI, open **Settings -> Agent**:
 
 | Button | What it does |
 |---|---|
-| **Copy SOP** | Copies [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md), so your Agent can learn how to dispatch and orchestrate Galley |
+| **Copy SOP** | Copies [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md), so your Agent can choose between one session, an existing-session follow-up, or a Project-backed session group |
 | **Open Agent API docs** | Opens the full command reference, JSON schemas, and exit codes |
 
-You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Galley. IM integration currently uses SOP + CLI first; a one-click GUI setup path will come later.
+You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Galley. Complex work does not become one giant prompt: the Supervisor SOP first chooses an orchestration mode, follows one session for simple requests, and uses a Project-backed group of sessions for independent work that needs synthesis. IM integration currently uses SOP + CLI first; a one-click GUI setup path will come later.
 
 <details>
 <summary>Show CLI examples</summary>
@@ -108,6 +108,18 @@ galley sessions list
 galley session new --project=proj_work \
   --supervisor=ga-claude-1 --reason="follow up on PR review" \
   "look at the feedback on #1234"
+
+# Complex goal: use one Project to hold a group of sessions
+galley project create "Release readiness review" \
+  --supervisor=ga-claude-1 --reason="parallel release-risk review"
+
+galley session new "Read-only check of app identity, data directory, SQLite migrations, and backup risks. Output risks with evidence." \
+  --project=proj_from_create --supervisor=ga-claude-1 --reason="check data safety"
+
+galley session new "Read-only check of packaging, release workflow, bundled resources, and version bumps. Output a release blocker checklist." \
+  --project=proj_from_create --supervisor=ga-claude-1 --reason="check release packaging"
+
+galley project follow proj_from_create --tail=80 --until-idle --final-show
 
 # Watch one session's event stream
 galley session watch <id>

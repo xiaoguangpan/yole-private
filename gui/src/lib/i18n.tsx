@@ -510,13 +510,18 @@ const zhCopy = {
         "Galley 启动时把 CLI 二进制的绝对路径写到这个文件。Galley Supervisor SOP 第一步读它来定位 galley。",
       agentSop: "Galley Supervisor SOP",
       sopDescription:
-        "这是一份给本地 Agent 的操作说明。复制给它后，它就知道如何查看、创建、拆分、跟进和汇总 Galley sessions。之后你可以通过微信、飞书、QQ、Telegram、Discord 等入口，随时随地调度 Galley。",
+        "复制给你信任的本地 Agent，让它通过 Galley 调度 sessions。",
+      sopCapabilities: [
+        "继续现有 session",
+        "新开单个 session",
+        "用 Project 并行跑一组 sessions，最后统一汇总",
+      ],
       tryPrompts: "可以这样说",
       promptExamples: [
         "看看 Galley 现在有哪些 session 在跑，分别进展到哪了。",
         "继续最近那个客户拜访计划 session，补充要求：把会议议程和后续跟进清单也整理出来。",
         "开一个 Galley session，检查这个 repo 的测试失败原因。先不要改文件，只给结论。",
-        "用 Galley 帮我规划上海到杭州两天一夜周末游，拆成交通、住宿、行程 3 个 session 并行跑，最后汇总。",
+        "用 Galley 帮我规划上海到杭州两天一夜周末游，建一个 Project，拆成交通、住宿、行程 3 个 session 并行跑，最后统一汇总。",
       ],
       copyExample: "复制这句话",
       exampleCopied: "已复制",
@@ -1385,13 +1390,18 @@ const enCopy: AppCopy = {
         "Galley writes the absolute CLI binary path here on startup. Galley Supervisor SOP reads it first to locate galley.",
       agentSop: "Galley Supervisor SOP",
       sopDescription:
-        "This is the operating guide for a local Agent. After you copy it over, the Agent will know how to inspect, create, split, follow, and summarize Galley sessions. Then you can coordinate Galley anytime through WeChat, Feishu/Lark, QQ, Telegram, Discord, or similar chat apps.",
+        "Copy it to a local Agent you trust so it can coordinate Galley sessions.",
+      sopCapabilities: [
+        "Continue an existing session",
+        "Start one focused session",
+        "Run a Project-backed group of sessions, then synthesize the results",
+      ],
       tryPrompts: "Try Saying",
       promptExamples: [
         "Show me which Galley sessions are running and where each one stands.",
         "Continue the recent client-visit planning session. Add this requirement: also prepare the meeting agenda and follow-up checklist.",
         "Start a Galley session to investigate why this repo's tests are failing. Do not change files yet; report conclusions only.",
-        "Use Galley to plan a two-day weekend trip from Shanghai to Hangzhou. Split it into 3 sessions for transportation, lodging, and itinerary, then summarize the results.",
+        "Use Galley to plan a two-day weekend trip from Shanghai to Hangzhou. Create a Project, split it into 3 sessions for transportation, lodging, and itinerary, then synthesize the results.",
       ],
       copyExample: "Copy this prompt",
       exampleCopied: "Copied",
