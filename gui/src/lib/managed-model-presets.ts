@@ -3,12 +3,16 @@ import type {
   ManagedModelProviderRecord,
 } from "@/types/managed-models";
 
+const DEFAULT_MODEL_PLACEHOLDER = "model-name";
+
 export type ManagedModelProviderPresetId =
   | "deepseek"
-  | "zhipu-glm"
   | "kimi-coding"
   | "minimax"
   | "openrouter"
+  | "siliconflow"
+  | "xiaomi-mimo"
+  | "zhipu-glm"
   | "custom-anthropic"
   | "custom-openai";
 
@@ -19,7 +23,8 @@ export interface ManagedModelProviderPreset {
   apiBase: string;
   model: string;
   displayName: string;
-  modelPlaceholder: string;
+  apiKeyPlaceholder?: string;
+  modelPlaceholder?: string;
   advancedOptions?: Record<string, unknown>;
 }
 
@@ -90,20 +95,6 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
     },
   },
   {
-    id: "zhipu-glm",
-    label: "Zhipu GLM",
-    protocol: "anthropic",
-    apiBase: "https://open.bigmodel.cn/api/anthropic",
-    model: "glm-5.1",
-    displayName: "ZAI",
-    modelPlaceholder: "glm-5.1",
-    advancedOptions: {
-      max_retries: 3,
-      read_timeout: 180,
-      stream: true,
-    },
-  },
-  {
     id: "kimi-coding",
     label: "Kimi for Coding",
     protocol: "anthropic",
@@ -148,6 +139,49 @@ export const MANAGED_MODEL_PROVIDER_PRESETS: ManagedModelProviderPreset[] = [
       stream: true,
     },
   },
+  {
+    id: "siliconflow",
+    label: "SiliconFlow",
+    protocol: "openai",
+    apiBase: "https://api.siliconflow.cn/v1",
+    model: "",
+    displayName: "SiliconFlow",
+    advancedOptions: {
+      api_mode: "chat_completions",
+      max_retries: 3,
+      read_timeout: 180,
+      stream: true,
+    },
+  },
+  {
+    id: "xiaomi-mimo",
+    label: "Xiaomi MiMo",
+    protocol: "anthropic",
+    apiBase: "https://token-plan-cn.xiaomimimo.com/anthropic",
+    model: "mimo-v2.5-pro",
+    displayName: "Xiaomi MiMo",
+    apiKeyPlaceholder: "tp-xxxxx",
+    modelPlaceholder: "mimo-v2.5-pro",
+    advancedOptions: {
+      max_retries: 3,
+      read_timeout: 180,
+      stream: true,
+    },
+  },
+  {
+    id: "zhipu-glm",
+    label: "Zhipu GLM",
+    protocol: "anthropic",
+    apiBase: "https://open.bigmodel.cn/api/anthropic",
+    model: "glm-5.1",
+    displayName: "ZAI",
+    modelPlaceholder: "glm-5.1",
+    advancedOptions: {
+      max_retries: 3,
+      read_timeout: 180,
+      stream: true,
+    },
+  },
 ];
 
 export function getManagedModelProviderPreset(
@@ -174,6 +208,12 @@ export function managedModelProviderPresetDraft(
       ? { advancedOptions: preset.advancedOptions }
       : {}),
   };
+}
+
+export function modelPlaceholderForManagedModelProviderPreset(
+  preset: ManagedModelProviderPreset,
+): string {
+  return preset.modelPlaceholder ?? DEFAULT_MODEL_PLACEHOLDER;
 }
 
 export function customManagedModelProviderPresetId(

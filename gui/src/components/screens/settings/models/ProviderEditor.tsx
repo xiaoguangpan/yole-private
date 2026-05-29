@@ -14,6 +14,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { useCopy } from "@/lib/i18n";
 import {
   getManagedModelProviderPreset,
+  modelPlaceholderForManagedModelProviderPreset,
   type ManagedModelProviderPresetId,
 } from "@/lib/managed-model-presets";
 import { cn } from "@/lib/utils";
@@ -155,7 +156,11 @@ export function ProviderEditor({
               value={form.apiKey}
               onChange={(apiKey) => onChange({ apiKey })}
               type={apiKeyVisible ? "text" : "password"}
-              placeholder={form.id ? copy.leaveExistingKey : "sk-..."}
+              placeholder={
+                form.id
+                  ? copy.leaveExistingKey
+                  : selectedPreset.apiKeyPlaceholder ?? "sk-..."
+              }
               reserveTrailing
               trailing={
                 form.apiKey.length > 0 ? (
@@ -194,7 +199,9 @@ export function ProviderEditor({
                       label={copy.model}
                       value={form.model}
                       onChange={(model) => onChange({ model })}
-                      placeholder={selectedPreset.modelPlaceholder}
+                      placeholder={modelPlaceholderForManagedModelProviderPreset(
+                        selectedPreset,
+                      )}
                     />
                   </div>
                   <Button

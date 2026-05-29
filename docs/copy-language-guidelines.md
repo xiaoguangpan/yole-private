@@ -149,7 +149,7 @@ About
 | `API Key` | 字段名可保留；正文可说「密钥」 |
 | `YOLO` | 模式名，保留 |
 | `LLM` | 紧凑控件可保留；正文优先说「模型」或「大语言模型」 |
-| 模型 / 服务品牌 | OpenAI、Anthropic、Claude、GPT、DeepSeek、Kimi、GLM、MiniMax、OpenRouter 等保留 |
+| 模型 / 服务品牌 | OpenAI、Anthropic、Claude、GPT、DeepSeek、Kimi、GLM、MiniMax、OpenRouter、SiliconFlow、Xiaomi MiMo 等保留 |
 | `galley` | 命令名，保留并用 inline code |
 | 文件 / 目录名 | `agentmain.py`、`mykey.py`、`.venv`、`memory/`、`assets/` 等保留 |
 | Tool id | `file_patch`、`code_run`、`start_long_term_update` 等保留，但旁边要有中文解释 |

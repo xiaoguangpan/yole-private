@@ -126,9 +126,10 @@ Interaction rules:
 - Use one screen.
 - First managed-runtime onboarding uses a Provider preset dropdown. It may
   expose official-brand shortcuts such as OpenAI, Anthropic, DeepSeek, Kimi,
-  GLM, MiniMax, and OpenRouter, plus protocol-family entries when useful.
+  MiniMax, OpenRouter, SiliconFlow, Xiaomi MiMo, and GLM, plus protocol-family
+  entries when useful.
 - A fresh setup must not select a Provider implicitly. Show an explicit empty
-  state such as "选择模型提供商" first, then fill the dependent Provider fields
+  state such as "选择提供商" first, then fill the dependent Provider fields
   from the selected preset.
 - Keep onboarding copy plain and low-friction. Settings can use the more precise
   terms `Provider` and `Model`, but first run should not make the user learn the
@@ -489,10 +490,12 @@ First-run Provider preset dropdown:
 OpenAI
 Anthropic
 DeepSeek
-Zhipu GLM
 Kimi for Coding
 MiniMax
 OpenRouter
+SiliconFlow
+Xiaomi MiMo
+Zhipu GLM
 ```
 
 These are UI shortcuts, not separate runtime families. They should still compile

@@ -71,8 +71,13 @@ export function ManagedModelProviderPicker({
         <Popover.Content
           align="start"
           sideOffset={6}
+          collisionPadding={12}
+          style={{
+            maxHeight:
+              "min(420px, var(--radix-popover-content-available-height))",
+          }}
           className={cn(
-            "z-[80] max-h-[320px] w-[var(--radix-popover-trigger-width)] overflow-auto rounded-sm border border-line bg-elevated p-1 shadow-elevated",
+            "z-[80] w-[var(--radix-popover-trigger-width)] overflow-auto rounded-sm border border-line bg-elevated p-1 shadow-elevated",
           )}
         >
           {MANAGED_MODEL_PROVIDER_PRESETS.map((preset) => {

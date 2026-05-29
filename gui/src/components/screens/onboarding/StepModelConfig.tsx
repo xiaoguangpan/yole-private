@@ -28,6 +28,7 @@ import { useCopy } from "@/lib/i18n";
 import {
   getManagedModelProviderPreset,
   managedModelProviderPresetDraft,
+  modelPlaceholderForManagedModelProviderPreset,
   type ManagedModelProviderPresetId,
 } from "@/lib/managed-model-presets";
 import { cn } from "@/lib/utils";
@@ -311,7 +312,7 @@ export function StepModelConfig({
                 setApiKey(value);
                 resetConnectionTest();
               }}
-              placeholder="sk-..."
+              placeholder={selectedPreset.apiKeyPlaceholder ?? "sk-..."}
               reserveTrailing
               trailing={
                 apiKey.length > 0 ? (
@@ -352,7 +353,9 @@ export function StepModelConfig({
                 setModel(value);
                 resetConnectionTest();
               }}
-              placeholder={selectedPreset.modelPlaceholder}
+              placeholder={modelPlaceholderForManagedModelProviderPreset(
+                selectedPreset,
+              )}
             />
 
             <div className="flex flex-wrap items-center gap-2">
