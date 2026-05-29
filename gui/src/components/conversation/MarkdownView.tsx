@@ -1,4 +1,5 @@
 import { Check, Copy } from "@phosphor-icons/react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   Children,
   isValidElement,
@@ -7,7 +8,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+} from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createOnigurumaEngine } from "shiki/engine/oniguruma";
@@ -68,7 +72,11 @@ export function MarkdownView({
         : PROSE_THINKING;
   return (
     <div className={cn("select-text", proseClass, className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={COMPONENTS}
+        urlTransform={markdownUrlTransform}
+      >
         {source}
       </ReactMarkdown>
     </div>
@@ -436,9 +444,44 @@ const COMPONENTS: Components = {
     );
   },
   img({ src, alt }) {
-    return <MarkdownImageLink src={src} alt={alt} />;
+    return <MarkdownImage src={src} alt={alt} />;
   },
 };
+
+function MarkdownImage({
+  src,
+  alt,
+}: {
+  src?: string | null;
+  alt?: string | null;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const rawSrc = src?.trim() ?? "";
+  const preview = failedSrc === rawSrc ? null : markdownImagePreview(src);
+  const label = alt?.trim() || "";
+
+  if (!preview) return <MarkdownImageLink src={src} alt={alt} />;
+
+  return (
+    <span className="my-3 block max-w-full">
+      <a
+        href={preview.openHref}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="inline-block max-w-full no-underline"
+      >
+        <img
+          src={preview.previewSrc}
+          alt={label}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailedSrc(rawSrc)}
+          className="block max-h-[420px] max-w-full rounded-[6px] border border-line bg-surface object-contain"
+        />
+      </a>
+    </span>
+  );
+}
 
 function MarkdownImageLink({
   src,
@@ -464,9 +507,99 @@ function MarkdownImageLink({
   );
 }
 
+interface MarkdownImagePreview {
+  previewSrc: string;
+  openHref: string;
+}
+
+const RASTER_IMAGE_EXT_RE = /\.(?:png|jpe?g|webp|gif)(?:[?#].*)?$/i;
+const WINDOWS_ABSOLUTE_PATH_RE = /^[a-zA-Z]:[\\/]/;
+const WINDOWS_UNC_PATH_RE = /^\\\\[^\\]+\\[^\\]+/;
+
+function markdownImagePreview(
+  value?: string | null,
+): MarkdownImagePreview | null {
+  const src = value?.trim();
+  if (!src || !RASTER_IMAGE_EXT_RE.test(src)) return null;
+
+  if (/^https:\/\//i.test(src)) {
+    return { previewSrc: src, openHref: src };
+  }
+
+  const localPath = localPathFromMarkdownImageSrc(src);
+  if (localPath) {
+    const previewSrc = localPathToAssetSrc(localPath);
+    return previewSrc ? { previewSrc, openHref: previewSrc } : null;
+  }
+
+  return null;
+}
+
+function markdownUrlTransform(
+  value: string,
+  key: string,
+  node: { tagName?: string },
+): string | null | undefined {
+  if (
+    key === "src" &&
+    node.tagName === "img" &&
+    localPathFromMarkdownImageSrc(value)
+  ) {
+    return value;
+  }
+  return defaultUrlTransform(value);
+}
+
+function localPathFromMarkdownImageSrc(src: string): string | null {
+  if (/^file:\/\//i.test(src)) return fileUrlToLocalPath(src);
+
+  const path = decodeMarkdownLocalPath(src);
+  return isAbsoluteLocalPath(path) ? path : null;
+}
+
+function fileUrlToLocalPath(src: string): string | null {
+  try {
+    const url = new URL(src);
+    if (url.protocol !== "file:") return null;
+    const path = decodeURIComponent(url.pathname);
+    if (url.hostname && url.hostname !== "localhost") {
+      return `\\\\${decodeURIComponent(url.hostname)}${path.replace(/\//g, "\\")}`;
+    }
+    return /^\/[a-zA-Z]:\//.test(path) ? path.slice(1) : path;
+  } catch {
+    return null;
+  }
+}
+
+function decodeMarkdownLocalPath(src: string): string {
+  try {
+    return decodeURI(src);
+  } catch {
+    return src;
+  }
+}
+
+function isAbsoluteLocalPath(src: string): boolean {
+  return (
+    src.startsWith("/") ||
+    WINDOWS_ABSOLUTE_PATH_RE.test(src) ||
+    WINDOWS_UNC_PATH_RE.test(src)
+  );
+}
+
+function localPathToAssetSrc(path: string): string | null {
+  try {
+    return convertFileSrc(path);
+  } catch {
+    return null;
+  }
+}
+
 function safeMarkdownHref(value?: string | null): string | undefined {
   const href = value?.trim();
   if (!href) return undefined;
+  const localPath = localPathFromMarkdownImageSrc(href);
+  if (localPath) return localPathToAssetSrc(localPath) ?? href;
   if (/^(https?:|file:|\/|\.\/|\.\.\/|#)/i.test(href)) return href;
   return undefined;
 }

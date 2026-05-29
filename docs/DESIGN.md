@@ -378,7 +378,7 @@ Final answer 跟 Thinking summary 都通过 `react-markdown` + `remark-gfm` + Sh
 | `strong` | font-medium（不到 bolder，跟 Newsreader 协调） |
 | `em` | italic |
 | `~~del~~` (GFM) | line-through ink-muted |
-| `![alt](url)` | 不直接拉取/渲染图片；降级成低调的图片链接 pill，避免远程请求和版面撑坏 |
+| `![alt](url)` | `https://` 与绝对本地 raster 图片（png / jpg / jpeg / webp / gif）内联预览；本地路径支持 macOS/Linux 绝对路径、Windows drive path、`file://`；相对路径、`http://`、`data:`、`svg`、加载失败降级为图片链接 pill |
 
 **视觉哲学**：每个 markdown 元素 reuse 现有 Newsreader / Inter / JetBrains-Mono token，不为 markdown 单独引入字号 ramp。整段对话读起来是一个 document，不是 stylesheet 拼贴。
 
