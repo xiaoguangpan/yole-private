@@ -25,15 +25,15 @@ export const isWindows = ua.includes("Windows");
 
 /**
  * OS-appropriate example path for the GenericAgent install dir.
- * Used as Onboarding's initial GA Path value, StepAttach's input
- * placeholder, and tutorial markdown ("解压到例如 ..."). Mac value
+ * Used as StepAttach / Settings input placeholder, and tutorial
+ * markdown ("解压到例如 ..."). Mac value
  * uses tilde shorthand (familiar to macOS / Linux users); Win value
- * is a real Windows path with `你的名字` standing in for the user's
+ * is a real Windows path with `YourName` standing in for the user's
  * profile folder.
  */
 export const EXAMPLE_GA_PATH = isMac
   ? "~/Documents/GenericAgent"
-  : "C:\\Users\\你的名字\\Documents\\GenericAgent";
+  : "C:\\Users\\YourName\\Documents\\GenericAgent";
 
 /**
  * True when the given event target should trigger a window-chrome

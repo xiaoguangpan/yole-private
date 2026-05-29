@@ -27,6 +27,7 @@ import {
   BUNDLED_PYTHON_VERSION,
   validateGAPath,
 } from "@/lib/onboarding-validation";
+import { EXAMPLE_GA_PATH } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useManagedModelsStore } from "@/stores/managed-models";
 import { usePrefsStore } from "@/stores/prefs";
@@ -101,6 +102,7 @@ export function SettingsRuntime({
       <PathField
         label={runtimeCopy.externalPath}
         value={info.gaPath}
+        placeholder={EXAMPLE_GA_PATH}
         onPick={onChangeGAPath}
         onCommit={onCommitGAPath}
         hint={runtimeCopy.pathHint}
@@ -397,6 +399,7 @@ function RuntimeDiagnosticRow({
 function PathField({
   label,
   value,
+  placeholder,
   hint,
   onPick,
   onCommit,
@@ -404,6 +407,7 @@ function PathField({
 }: {
   label: string;
   value: string;
+  placeholder?: string;
   hint?: string;
   onPick?: () => void;
   /** When provided, the input becomes editable + validates on type +
@@ -504,13 +508,14 @@ function PathField({
         <input
           type="text"
           value={editable ? draft : value}
+          placeholder={placeholder}
           readOnly={!editable}
           onChange={editable ? handleChange : undefined}
           onBlur={editable ? () => void tryCommit() : undefined}
           onKeyDown={editable ? handleKeyDown : undefined}
           spellCheck={false}
           className={cn(
-            "min-w-0 flex-1 rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none",
+            "min-w-0 flex-1 rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[12.5px] text-ink outline-none placeholder:text-ink-muted/70",
             editable &&
               "focus:border-brand focus:ring-[3px] focus:ring-brand/20",
           )}

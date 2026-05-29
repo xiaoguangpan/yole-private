@@ -61,7 +61,7 @@ export const DEFAULT_APPROVAL_CONFIG: ApprovalConfig = {
 };
 
 export const DEFAULT_RUNTIME_INFO: RuntimeInfo = {
-  gaPath: "~/Documents/GenericAgent",
+  gaPath: "",
   pythonVersion: "3.11.9 (system)",
   llmDisplayName: DEFAULT_LLM_DISPLAY_NAME,
   bridgePid: 48213,

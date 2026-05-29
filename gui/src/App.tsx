@@ -896,6 +896,11 @@ function App() {
           canContinueWithCurrentModel={
             activeRuntimeKind === "managed" && hasConfiguredManagedModel
           }
+          languagePreference={languagePreference}
+          resolvedLanguage={resolvedLanguage}
+          onChangeLanguagePreference={(preference) => {
+            void setLanguagePreference(preference);
+          }}
           onComplete={(gaPath, pythonAlias) => {
             // Persist the validated path + the probed Python alias so
             // subsequent bridge spawns use the right interpreter, not

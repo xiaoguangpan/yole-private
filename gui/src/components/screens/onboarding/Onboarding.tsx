@@ -1,6 +1,7 @@
 import { Check } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
+import { LanguagePreferenceMenu } from "@/components/language/LanguagePreferenceMenu";
 import {
   StepAttach,
   type PathValidation,
@@ -16,8 +17,7 @@ import {
   type TutorialId,
 } from "@/lib/onboarding-tutorials";
 import { useCopy } from "@/lib/i18n";
-import { resolveLanguagePreference } from "@/lib/language";
-import { EXAMPLE_GA_PATH } from "@/lib/platform";
+import type { LanguagePreference, ResolvedLanguage } from "@/lib/language";
 import { cn } from "@/lib/utils";
 import { usePrefsStore } from "@/stores/prefs";
 import type { HealthCheckItem } from "@/types/inspector";
@@ -67,6 +67,9 @@ export interface OnboardingProps {
    * without re-entering an API key or changing model configuration.
    */
   canContinueWithCurrentModel?: boolean;
+  languagePreference: LanguagePreference;
+  resolvedLanguage: ResolvedLanguage;
+  onChangeLanguagePreference: (preference: LanguagePreference) => void;
 }
 
 /**
@@ -89,12 +92,14 @@ export function Onboarding({
   onCancel,
   initialPath,
   canContinueWithCurrentModel = false,
+  languagePreference,
+  resolvedLanguage,
+  onChangeLanguagePreference,
 }: OnboardingProps) {
   const copy = useCopy();
-  const languagePreference = usePrefsStore((s) => s.languagePreference);
   const tutorials = useMemo(
-    () => tutorialsForLanguage(resolveLanguagePreference(languagePreference)),
-    [languagePreference],
+    () => tutorialsForLanguage(resolvedLanguage),
+    [resolvedLanguage],
   );
   const isRevisit = mode === "revisit";
   const isSetup = mode === "setup";
@@ -104,7 +109,7 @@ export function Onboarding({
   const [step, setStep] = useState<OnboardingStep>(
     isRevisit ? "health" : "model",
   );
-  const [path, setPath] = useState(initialPath ?? EXAMPLE_GA_PATH);
+  const [path, setPath] = useState(initialPath ?? "");
   const [validation, setValidation] = useState<PathValidation>(null);
   // Active tutorial modal id; null = closed. Set by StepAttach
   // tutorial buttons and StepHealth row-action clicks. Surfaces the
@@ -247,7 +252,10 @@ export function Onboarding({
   const handleManagedComplete = () => {
     onManagedComplete?.();
   };
-  const showSettingsEscape = isSetup && Boolean(onCancel);
+  const showSettingsEscape = (isSetup || isRevisit) && Boolean(onCancel);
+  const settingsEscapeLabel = isRevisit
+    ? copy.common.cancel
+    : copy.onboarding.backToSettings;
 
   return (
     // Outer container is a Tauri drag region so the user can move the
@@ -265,11 +273,19 @@ export function Onboarding({
       >
         <div className="flex items-center justify-between gap-4">
           <StepProgress step={step} />
-          {showSettingsEscape && (
-            <Button variant="ghost" size="sm" onClick={() => onCancel?.()}>
-              {copy.onboarding.backToSettings}
-            </Button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {showSettingsEscape && (
+              <Button variant="ghost" size="sm" onClick={() => onCancel?.()}>
+                {settingsEscapeLabel}
+              </Button>
+            )}
+            <LanguagePreferenceMenu
+              preference={languagePreference}
+              resolvedLanguage={resolvedLanguage}
+              onChange={onChangeLanguagePreference}
+              variant="compact"
+            />
+          </div>
         </div>
 
         <div className="mt-10">

@@ -33,7 +33,7 @@ export interface HealthCheckItem {
  * bridge-level metadata that the user often wants at a glance.
  */
 export interface RuntimeInfo {
-  /** ~/Documents/GenericAgent or wherever the user attached. */
+  /** Empty until the user attaches an external GenericAgent folder. */
   gaPath: string;
   pythonVersion: string;
   /** Active LLM UI label from the bridge runtime-mode display rule. */

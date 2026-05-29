@@ -85,7 +85,7 @@ Items to verify on the Win machine. Hand back to Mac for any failures.
 ### Onboarding
 
 - [ ] Welcome screen renders (Newsreader font visible, no fallback to Times New Roman)
-- [ ] StepAttach placeholder reads `C:\Users\你的名字\Documents\GenericAgent`
+- [ ] StepAttach placeholder reads `C:\Users\YourName\Documents\GenericAgent`
 - [ ] "选择" button opens Windows file dialog
 - [ ] Path validation runs (red on bad path, green on real GA)
 - [ ] StepHealth checks pass (Python found as `python`, not `python3`)

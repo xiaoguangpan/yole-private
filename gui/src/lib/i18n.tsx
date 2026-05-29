@@ -255,7 +255,7 @@ const zhCopy = {
       externalGA: "外部 GA",
       externalPath: "外部 GA 路径",
       pathHint:
-        "点「选择」走文件夹选取，或直接在框里输入 / 粘贴路径 · 回车提交",
+        "选择包含 agentmain.py 的 GenericAgent 目录，或粘贴路径后回车",
       healthDescription:
         "不知道哪儿出问题了？跑一次完整体检 —— 重新探测 Python 解释器、检查 GA 路径和必要文件。",
       runHealthCheck: "跑一次 Health Check",
@@ -1126,7 +1126,8 @@ const enCopy: AppCopy = {
       bundledReady: "Bundled GA is ready",
       externalGA: "External GA",
       externalPath: "External GA folder",
-      pathHint: "Choose a folder, or paste a path and press Enter",
+      pathHint:
+        "Choose the GenericAgent folder that contains agentmain.py, or paste a path and press Enter",
       healthDescription:
         "Not sure what is wrong? Run a full Health Check to re-detect Python, verify the GA folder, and check required files.",
       runHealthCheck: "Run Health Check",
