@@ -64,14 +64,17 @@ export interface SettingsProps {
  * Settings open while operating the main session). Doing that needs a
  * Tauri WebviewWindow + a second React entry, which lands in #10
  * alongside IPC. For #7 we ship a modal-style overlay with the same
- * 720x560 frame and the same tab/content split — when #10 graduates
+ * 1040x680 frame and the same tab/content split — when #10 graduates
  * to a real window the React API stays exactly the same.
  *
  * Layout:
- *   - 960x680, centered (uses portal + backdrop scrim)
+ *   - 1040x680, centered (uses portal + backdrop scrim)
  *   - left tab list 180px
- *   - right content area 780px
+ *   - right content area 860px
  *   - close button top-right (Esc also works via Radix Dialog)
+ *   - backdrop clicks do not close Settings; users often leave Galley
+ *     to copy model provider keys/URLs, and accidental outside clicks
+ *     must not discard in-progress settings forms.
  *
  * Changes are immediate (DESIGN.md §9 "no sticky save button"); each
  * tab fires the matching callback when the user makes an edit. The
@@ -118,8 +121,10 @@ export function Settings({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-overlay" />
         <Dialog.Content
           aria-describedby={undefined}
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 flex h-[680px] w-[960px] -translate-x-1/2 -translate-y-1/2",
+            "fixed left-1/2 top-1/2 z-50 flex h-[680px] w-[1040px] -translate-x-1/2 -translate-y-1/2",
             "overflow-hidden rounded-lg border border-line bg-elevated shadow-elevated",
             "max-h-[calc(100vh-32px)] max-w-[calc(100vw-32px)]",
           )}

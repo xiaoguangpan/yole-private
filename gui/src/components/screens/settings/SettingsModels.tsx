@@ -188,10 +188,16 @@ export function SettingsModels({
         <SettingsSectionLabel>
           {modelCopy.connectedProviders}
         </SettingsSectionLabel>
-        <div className="mt-3 divide-y divide-line rounded-sm border border-line bg-surface">
-          {loading && <LoadingRow />}
+        <div className="mt-3 space-y-1.5">
+          {loading && (
+            <div className="rounded-sm border border-line bg-surface">
+              <LoadingRow />
+            </div>
+          )}
           {!loading && providers.length === 0 && (
-            <EmptyRow text={modelCopy.noProviders} />
+            <div className="rounded-sm border border-line bg-surface">
+              <EmptyRow text={modelCopy.noProviders} />
+            </div>
           )}
           {!loading &&
             providers.map((provider) => (

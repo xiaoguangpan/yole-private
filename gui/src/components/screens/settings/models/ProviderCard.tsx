@@ -117,29 +117,38 @@ export function ProviderCard({
       (modelProbeState.kind === "success" && modelOptions.length === 0));
 
   return (
-    <div className={cn("transition-colors", open && "bg-elevated/25")}>
+    <div
+      className={cn(
+        "group/provider overflow-hidden rounded-sm border border-line bg-surface",
+        "transition-[background-color,border-color,box-shadow,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+        "hover:-translate-y-[0.5px] hover:border-line-strong hover:bg-hover/45 hover:shadow-card",
+        "active:translate-y-[0.5px] active:bg-hover/60 active:shadow-[inset_0_1px_2px_rgba(31,27,23,0.08)]",
+        "focus-within:border-line-strong focus-within:bg-hover/45 focus-within:shadow-card",
+        open &&
+          "border-line-strong bg-selected/35 shadow-card hover:bg-selected/45 focus-within:bg-selected/35 active:bg-selected/50",
+      )}
+    >
       <div
         className={cn(
           "flex min-w-0 items-center gap-3 px-2 py-1.5 transition-colors",
-          open && "bg-elevated/55",
+          open && "bg-selected/35",
         )}
       >
         <button
           type="button"
           aria-expanded={open}
           className={cn(
-            "group flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5 text-left transition-colors",
-            "hover:bg-elevated/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20",
-            open && "bg-surface/70 hover:bg-surface",
+            "group/toggle flex min-w-0 flex-1 items-center gap-3 rounded-sm px-1.5 py-0.5 text-left",
+            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20",
           )}
           onClick={onToggle}
         >
           <span
             className={cn(
-              "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors",
+              "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm transition-colors",
               open
                 ? "bg-brand-soft text-brand-strong"
-                : "text-ink-muted group-hover:bg-surface group-hover:text-ink",
+                : "text-ink-muted group-hover/provider:bg-brand-soft group-hover/provider:text-brand-strong group-focus-within/provider:bg-brand-soft group-focus-within/provider:text-brand-strong",
             )}
           >
             {open ? (
@@ -151,7 +160,8 @@ export function ProviderCard({
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span
               className={cn(
-                "min-w-0 truncate text-[13px] font-medium transition-colors group-hover:text-brand-strong",
+                "min-w-0 truncate text-[13px] font-medium transition-colors",
+                "group-hover/provider:text-brand-strong group-focus-within/provider:text-brand-strong",
                 open ? "text-brand-strong" : "text-ink",
               )}
               title={provider.displayName}
@@ -159,7 +169,13 @@ export function ProviderCard({
               {provider.displayName}
             </span>
             <CredentialBadge status={provider.credentialStatus} />
-            <span className="inline-flex shrink-0 rounded-sm border border-line bg-elevated px-1.5 py-px text-[10.5px] text-ink-muted">
+            <span
+              className={cn(
+                "inline-flex shrink-0 rounded-sm border border-line bg-surface/80 px-1.5 py-px text-[10.5px] text-ink-muted transition-colors",
+                "group-hover/provider:border-line-strong group-hover/provider:bg-selected/30 group-focus-within/provider:border-line-strong group-focus-within/provider:bg-selected/30",
+                open && "border-line-strong bg-selected/30",
+              )}
+            >
               {copy.enabledModelsCount(models.length)}
             </span>
             <ProtocolBadge
@@ -168,7 +184,13 @@ export function ProviderCard({
             />
           </span>
         </button>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        <div
+          className={cn(
+            "ml-auto flex shrink-0 items-center gap-1.5 opacity-75 transition-opacity",
+            "group-hover/provider:opacity-100 group-focus-within/provider:opacity-100",
+            providerProbeState.kind === "loading" && "opacity-100",
+          )}
+        >
           <Button
             variant="ghost"
             size="sm"
@@ -210,8 +232,8 @@ export function ProviderCard({
         className="px-4 pb-3"
       />
       {open && (
-        <div className="border-t border-line/60 bg-elevated/30 px-3 py-2.5">
-          <div className="space-y-2.5 pl-9 pr-1">
+        <div className="border-t border-line/70 bg-hover/25 px-2.5 py-1.5">
+          <div className="space-y-1.5 pl-8 pr-1">
             {providerEditor}
             {expanded && (
               <>
@@ -235,12 +257,12 @@ export function ProviderCard({
                     ))}
                   </div>
                 ) : (
-                  <div className="py-2 text-[12.5px] text-ink-muted">
+                  <div className="py-1.5 text-[12.5px] text-ink-muted">
                     {copy.noEnabledModels}
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -281,7 +303,7 @@ export function ProviderCard({
                 )}
 
                 {modelOptions.length > 0 && (
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-1.5 pt-0.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-[12.5px] font-medium text-ink">
                         {copy.availableModels}
@@ -376,7 +398,7 @@ function EnabledModelRow({
   const showRemoveConfirm = confirmingRemove && !isDefault;
 
   return (
-    <div className="group/model rounded-sm px-2 py-1.5 transition-colors hover:bg-surface/75 focus-within:bg-surface/75">
+    <div className="group/model rounded-sm px-2 py-1 transition-colors hover:bg-surface/75 focus-within:bg-surface/75">
       <div className="flex min-w-0 items-center gap-2">
         <div className="min-w-0 flex-1 pr-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -554,12 +576,12 @@ function DetectedModelRow({
 }) {
   const copy = useCopy().settings.models;
   return (
-    <div className="flex min-w-0 items-center gap-3 px-3 py-2">
+    <div className="flex min-w-0 items-center gap-3 px-2.5 py-1.5">
       <div className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
         {modelName}
       </div>
       {enabled ? (
-        <span className="inline-flex min-h-8 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent bg-success/[0.06] px-2.5 text-[12px] leading-none text-success">
+        <span className="inline-flex min-h-7 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent bg-success/[0.06] px-2.5 text-[12px] leading-none text-success">
           <CheckCircle size={12} weight="fill" />
           {copy.enabled}
         </span>
@@ -570,7 +592,7 @@ function DetectedModelRow({
           disabled={saving}
           onClick={onEnable}
           className={cn(
-            "inline-flex min-h-8 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent px-2.5 text-[12px] leading-none text-ink-muted",
+            "inline-flex min-h-7 min-w-[76px] shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent px-2.5 text-[12px] leading-none text-ink-muted",
             "transition-[background-color,border-color,color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
             "hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand/20 active:translate-y-[0.5px]",
             "disabled:cursor-not-allowed disabled:opacity-40 disabled:translate-y-0",
