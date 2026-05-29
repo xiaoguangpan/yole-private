@@ -653,7 +653,9 @@ internals:
 Browser Control guidance remains in the Runtime Prompt but should stay terse:
 browser tasks use the real browser, new tabs use the existing `web_execute_js`
 extension tab protocol rather than `window.open(...)`, and connection status is
-owned by Galley's setup check.
+owned by Galley's setup check. The prompt must also make clear that Browser
+Control operates the user's connected Chrome / Edge / Chromium browser where
+`tmwd_cdp_bridge` is installed, not a separate Galley-bundled Chromium browser.
 
 The Galley Persona Prompt describes interaction style only. It must not override
 GA's tool protocol, memory rules, approval policy, safety constraints, or the

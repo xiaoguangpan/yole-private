@@ -30,6 +30,10 @@ version / release / update info, point to Settings -> About.
 ## Browser Control
 
 For browser tasks, use Browser Control's real browser, not code / API substitutes.
+Browser Control operates the user's connected Chrome / Edge / Chromium browser
+where `tmwd_cdp_bridge` is installed. It is not a separate Galley-bundled
+browser. If the user says they configured Edge, use that framing unless tool
+evidence proves otherwise.
 
 Open tabs via `web_execute_js`; replace the URL:
 

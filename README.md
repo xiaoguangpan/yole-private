@@ -52,7 +52,7 @@ Galley 在你的电脑上并行运行多个 AI agent session。Human 用 GUI 看
 | 📦 **开箱即用**<br/>内置 GenericAgent runtime、bundled CPython 3.11 和运行依赖。 | 🪟 **多 session + Project 编排**<br/>多任务并行跑；复杂目标可由 Supervisor Agent 拆到一个 Project 下统一汇总。 |
 | ⚙️ **GUI + CLI 双原生**<br/>人在 GUI 里操作，Supervisor Agent 通过稳定的 `galley` CLI 操作；两边共享同一份 session 和历史。 | 💬 **IM 接入**<br/>在 **Settings → IM** 扫码接入微信；Galley 运行时，可以直接从微信给 Galley 发消息。更多聊天软件后续扩展。 |
 | 🔒 **Localhost-only**<br/>Core 只监听 Unix socket / Windows named pipe；远程传输交给 Supervisor Agent。 | 🔧 **工具时间线 + 审批**<br/>工具调用、参数、结果、时延内联展示；高风险动作可审批、白名单或 YOLO。 |
-| 🌐 **浏览器控制**<br/>连接 Chrome/Chromium 后，agent 可以操作你已登录的浏览器。发挥你的想象空间。 | 💾 **持久化 + 搜索 + 后台常驻**<br/>关窗不退出，远程通过 Supervisor Agent 调度，回来继续聊、搜索历史会话。 |
+| 🌐 **浏览器控制**<br/>连接 Chrome / Edge / Chromium 后，agent 可以操作你已登录的浏览器。发挥你的想象空间。 | 💾 **持久化 + 搜索 + 后台常驻**<br/>关窗不退出，远程通过 Supervisor Agent 调度，回来继续聊、搜索历史会话。 |
 
 ---
 
