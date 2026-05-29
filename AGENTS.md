@@ -20,7 +20,8 @@ Current target:
 - Version: `0.2.0-alpha.2`
 - Release tag: `v0.2.0-alpha.2`
 - Agent API: `schemaVersion: 1`
-- Release tier: alpha prerelease; do not mark GitHub Release as Latest
+- Release tier: alpha release; marked as GitHub Latest after macOS and Windows
+  dogfood. Do not promote the update channel unless explicitly requested.
 
 Read [project status](./docs/project-status.md) for the current milestone,
 release gates, and compact phase state.

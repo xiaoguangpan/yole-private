@@ -16,9 +16,12 @@ Release and update are two separate gates:
 
 Do not point the update channel at a draft, untested, or failed build. The
 draft Release `latest.json` is a review artifact, not the live user channel.
-For tester / early-adopter alpha releases, publish the GitHub Pre-release for
-manual downloads only and skip the beta-channel promotion unless we explicitly
-decide to offer that alpha to all current update-channel users.
+For tester / early-adopter alpha releases, publish for manual downloads only and
+skip the beta-channel promotion unless we explicitly decide to offer that alpha
+to all current update-channel users. Alpha releases normally stay marked as
+GitHub Pre-release; if we want the repo sidebar to show the alpha as GitHub
+Latest, GitHub requires removing the prerelease flag. This still does not
+promote the app update channel.
 
 ## Pre-Flight
 
@@ -111,7 +114,8 @@ Pass criteria:
 Open the draft Release in GitHub and check:
 
 - Version and title are correct.
-- It is marked prerelease for alpha / beta / rc tags.
+- It is marked prerelease for alpha / beta / rc tags, unless we explicitly plan
+  to mark this release as GitHub Latest after smoke.
 - Release notes are user-facing, not just commit messages.
 - Assets are present for supported platforms.
 - Updater artifacts are present:

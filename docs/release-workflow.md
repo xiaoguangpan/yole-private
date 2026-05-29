@@ -195,7 +195,7 @@ b) **摘 prerelease flag + 标 Latest**：选信心最高的 release：
    gh release edit vX.Y.Z-rc.N --prerelease=false --latest
    ```
    失去 GitHub 灰色 "Pre-release" badge，但 sidebar 现出且能下。title 文字（如 "macOS (Release Candidate)"）+ notes 内部说明仍然传达 tier。
-   今天 v0.1 用了 b（详 [2026-05-15 v0.1 ship devlog](./devlog/2026-05-15-v0.1-ship-and-ci-fallback.md#d3-github-不允许-prerelease-标-latestmac-rc-摘掉-prerelease-flag)）。
+   v0.1 和 v0.2.0-alpha.2 都用了 b（详 [2026-05-15 v0.1 ship devlog](./devlog/2026-05-15-v0.1-ship-and-ci-fallback.md#d3-github-不允许-prerelease-标-latestmac-rc-摘掉-prerelease-flag)）。注意这只影响 GitHub release 展示；自动更新仍由 update channel 决定。
 
 ### Step 6. Promote update channel
 

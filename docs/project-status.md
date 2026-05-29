@@ -12,26 +12,30 @@ live in [refactor](./refactor/README.md).
 - Package version: `0.2.0-alpha.2`
 - Git tag / GitHub Release: `v0.2.0-alpha.2`
 - Agent API schema: `schemaVersion: 1`
-- Release tier: alpha prerelease; do not mark GitHub Release as Latest
+- Release tier: alpha release; marked as GitHub Latest after macOS and Windows
+  dogfood. Update channel not promoted.
 - Product shape: dual-native local agent team orchestrator
 
 Galley GUI and Galley CLI are peer frontends over Rust-side Galley Core. The
 GUI is for the human operator at the desk; the CLI is for trusted Agent /
 Supervisor automation on the same machine.
 
-## Current Release Gates
+## Current Release State
 
-Before publishing `v0.2.0-alpha.2`:
+`v0.2.0-alpha.2` is published on GitHub and marked as the repo's Latest
+release. The beta update channel is intentionally unchanged, so installed apps
+do not receive this alpha automatically.
 
-1. Finish local dogfood on the managed runtime and Settings -> IM flow.
-2. Run Windows smoke, especially Settings -> IM QR generation / refresh and
-   managed runtime startup paths.
+For the next release:
+
+1. Finish local dogfood for the changed runtime / GUI paths.
+2. Run Windows smoke for path handling, bundled runtime startup, Browser
+   Control, and IM QR refresh.
 3. Run release/update dry-run if packaging, signing, updater config, or bundled
    Python dependencies changed.
 4. Finalize release notes and devlog.
-5. Publish only after smoke. Do not promote the beta update channel for this
-   invited-tester alpha unless we explicitly decide to make it available to
-   all update-channel users.
+5. Publish only after smoke. Promote the beta update channel only when we
+   explicitly decide that installed users should receive the build.
 6. Run the standard verification set:
    - `cargo check --workspace`
    - `cargo test --workspace`
