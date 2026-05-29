@@ -7,7 +7,7 @@
 <p align="center">
   <strong>在自己的电脑上同时运行多个 AI Agent 会话，随时切换、管理和继续</strong>
   <br/>
-  自带 GenericAgent 内核 · GUI / CLI 双原生 · Local-first
+  自带 GenericAgent 内核 · GUI / CLI 双原生 · 本地优先
 </p>
 
 <p align="center">
