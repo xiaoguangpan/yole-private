@@ -98,6 +98,9 @@ Approval
 Agent
 智能体接入
 
+Channels
+聊天软件
+
 Shortcuts
 快捷键
 
@@ -112,6 +115,7 @@ Runtime
 Models
 Approval
 Agent
+Channels
 Shortcuts
 About
 ```
@@ -143,6 +147,7 @@ About
 | `Supervisor` | `Supervisor SOP` 或 supervisor 集成语境保留 |
 | `SOP` | 保留；必要时用中文短句补语义 |
 | `Runtime` | 模块名保留；正文可以说「运行环境」 |
+| `Channels` | Settings tab / TopBar 入口保留；中文辅助标签用「聊天软件」，正文可说「微信等应用」 |
 | `Health Check` | 作为流程 / 组件名保留 |
 | `CLI`、`API`、`MCP`、`Socket`、`schemaVersion` | 协议 / 契约词，保留 |
 | `Python` | 保留 |

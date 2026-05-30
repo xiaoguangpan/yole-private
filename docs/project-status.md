@@ -26,11 +26,19 @@ Supervisor automation on the same machine.
 release. The beta update channel is intentionally unchanged, so installed apps
 do not receive this alpha automatically.
 
+Post-alpha.2 dogfood fixes are now on `main` but not yet tagged as a release:
+small-screen onboarding, external-GA runtime probing, clearer model probe copy,
+unified tooltip behavior, compact bottom-left toasts, and the managed-mode
+Channels TopBar entry.
+
 For the next release:
 
-1. Finish local dogfood for the changed runtime / GUI paths.
-2. Run Windows smoke for path handling, bundled runtime startup, Browser
-   Control, and IM QR refresh.
+1. Finish local dogfood for the post-alpha.2 runtime / GUI fixes: small-screen
+   onboarding, external-GA runtime probe, model probe copy, compact toasts, and
+   Channels entry.
+2. Run Windows smoke for path handling, selected GA virtualenv / user-Python
+   probing, bundled runtime startup, `960x600` minimum window, Browser Control,
+   Channels entry, and IM QR refresh.
 3. Run release/update dry-run if packaging, signing, updater config, or bundled
    Python dependencies changed.
 4. Finalize release notes and devlog.
@@ -53,7 +61,7 @@ For the next release:
 | Managed GA runtime | M9 package gate implemented; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials in dogfood | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
 | Release path | macOS DMG + Windows NSIS + gated updater channel | [release / update SOP](./release-update-sop.md) |
-| Windows | Artifact path exists; smoke remains a release gate | [Windows checklist](./windows-build-checklist.md) |
+| Windows | Artifact path exists; smoke must cover path / probe / min-window / IM flows | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline

@@ -2,7 +2,7 @@
 
 > Status: **draft**. Tracks what's needed to produce a Galley `.exe` installer on Windows manually and the smoke tests to run on Win release artifacts.
 >
-> Galley v0.1 ships Mac-only (`.app` + `.dmg`). v0.2+ release path is **CI-driven** — see [release-workflow.md](./release-workflow.md). This document is the **fallback / offline build path**: use it when CI is unavailable, when smoke-testing a CI-produced `.exe`, or when validating a local change on a Win machine before pushing.
+> Galley v0.2+ release path is **CI-driven** — see [release-workflow.md](./release-workflow.md). This document is the **fallback / offline build path** and Windows smoke checklist: use it when CI is unavailable, when smoke-testing a CI-produced `.exe`, or when validating a local change on a Win machine before pushing.
 
 ## 1 · Prerequisites
 
@@ -33,19 +33,19 @@ If `cargo` errors with "missing linker", re-run the MSVC Build Tools installer a
 
 ```powershell
 git clone https://github.com/wangjc683/galley.git
-cd galley\gui
+cd galley
 pnpm install
 pnpm tauri build
 ```
 
 Artifacts land in `core\target\release\bundle\`:
 
-- `nsis\Galley_0.1.0_x64-setup.exe` — installer (~50-80 MB depending on WebView2 inclusion)
-- `msi\Galley_0.1.0_x64_en-US.msi` — only if `"msi"` is added to bundle targets (not default)
+- `nsis\Galley_<version>_x64-setup.exe` — installer
+- `msi\Galley_<version>_x64_en-US.msi` — only if `"msi"` is added to bundle targets (not default)
 
 ## 3 · Install + first run
 
-1. Double-click `Galley_0.1.0_x64-setup.exe`
+1. Double-click `Galley_<version>_x64-setup.exe`
 2. NSIS installer runs in current-user mode (no UAC prompt — see `bundle.windows.nsis.installMode: "currentUser"`)
 3. Galley appears in Start Menu under "Galley"
 4. First launch: Onboarding flow should appear
@@ -85,18 +85,47 @@ Items to verify on the Win machine. Hand back to Mac for any failures.
 ### Onboarding
 
 - [ ] Welcome screen renders (Newsreader font visible, no fallback to Times New Roman)
+- [ ] Window can be resized down to `960x600`; onboarding still shows the primary action
 - [ ] StepAttach placeholder reads `C:\Users\YourName\Documents\GenericAgent`
 - [ ] "选择" button opens Windows file dialog
 - [ ] Path validation runs (red on bad path, green on real GA)
+- [ ] External GA path with leading / trailing whitespace is trimmed before validation
+- [ ] `~`, `~/`, and `~\` expand to the user home before validation
 - [ ] StepHealth checks pass (Python found as `python`, not `python3`)
+- [ ] External GA runtime probe imports GA, lists models, and reports a useful error for missing dependencies
+- [ ] LLM row copy mentions the real test and one-output-token cap
 - [ ] "继续" enters main app
 
 ### Bridge / chat
 
-- [ ] First user message reaches GA (no spawn errors)
+- [ ] Managed GA: first user message reaches GA (no spawn errors)
+- [ ] External GA: first user message uses the Python selected by onboarding / runtime probe
 - [ ] LLM streaming visible
 - [ ] Tool approval modal works (if YOLO mode is off; default is on)
 - [ ] Conversation persists after app restart
+
+### Settings / runtime
+
+- [ ] Settings -> Runtime can switch between managed and external GA without losing the other mode's sessions
+- [ ] Runtime-switch toast appears bottom-left, stays compact, and does not show "Copy details"
+- [ ] Settings close button remains clickable while toasts are visible
+- [ ] Error / warning toast still shows diagnostic copy details when traceback or context exists
+
+### Settings -> Models
+
+- [ ] Provider list-model action is labeled as reading the model list when no model exists
+- [ ] Existing model rows use an icon-only test action with fast tooltip feedback
+- [ ] Saved model test shows low-weight copy: `模型测试最多 1 个输出 token`
+- [ ] A provider that cannot list models should not be treated as unusable if a saved model test succeeds
+
+### Channels
+
+- [ ] Managed GA mode shows the TopBar Channels icon between Browser Control and Settings
+- [ ] External GA mode hides the TopBar Channels icon and the Settings Channels tab
+- [ ] Clicking the TopBar Channels icon opens Settings -> Channels
+- [ ] Channels icon has no status dot or unread-message badge
+- [ ] Settings sidebar shows `Channels` with Chinese helper `聊天软件`
+- [ ] WeChat QR refresh uses a fresh image path and does not show a stale QR code
 
 ### Tutorial modal
 
