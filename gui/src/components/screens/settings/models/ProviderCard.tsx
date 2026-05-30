@@ -33,7 +33,7 @@ import {
   ProbeErrorLine,
   ProtocolBadge,
 } from "./ModelPrimitives";
-import type { ModelDraftState, ProbeState } from "./types";
+import type { ModelDraftState, ProbeAction, ProbeState } from "./types";
 
 export function ProviderCard({
   provider,
@@ -96,8 +96,16 @@ export function ProviderCard({
 }) {
   const copy = useCopy().settings.models;
   const keyMissing = provider.credentialStatus === "missing";
-  const canUseProvider =
-    !keyMissing && providerProbeState.kind !== "loading" && !saving;
+  const headerUsesModelList = models.length === 0;
+  const providerProbeAction: ProbeAction =
+    headerUsesModelList ? "model-list" : "model-test";
+  const headerProbeState = headerUsesModelList
+    ? modelProbeState
+    : providerProbeState;
+  const providerProbeLoading =
+    headerProbeState.kind === "loading" &&
+    headerProbeState.action === providerProbeAction;
+  const canUseProvider = !keyMissing && !providerProbeLoading && !saving;
   const canFetchModels =
     !keyMissing && modelProbeState.kind !== "loading" && !saving;
   const enabledModelNames = useMemo(
@@ -188,36 +196,52 @@ export function ProviderCard({
           className={cn(
             "ml-auto flex shrink-0 items-center gap-1.5 opacity-75 transition-opacity",
             "group-hover/provider:opacity-100 group-focus-within/provider:opacity-100",
-            providerProbeState.kind === "loading" && "opacity-100",
+            headerProbeState.kind === "loading" && "opacity-100",
           )}
         >
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "px-2 text-ink-muted",
-              providerProbeState.kind === "loading" &&
-                providerProbeState.action === "provider-test" &&
-                "bg-hover text-ink",
-            )}
-            disabled={!canUseProvider}
-            onClick={onTestProvider}
-            leadingIcon={
-              providerProbeState.kind === "loading" &&
-              providerProbeState.action === "provider-test" ? (
+          {headerUsesModelList ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "px-2 text-ink-muted",
+                providerProbeLoading && "bg-hover text-ink",
+              )}
+              disabled={!canUseProvider}
+              onClick={onFetchModels}
+              leadingIcon={
+                providerProbeLoading ? (
+                  <span className="spin">
+                    <CircleNotch size={12} weight="thin" />
+                  </span>
+                ) : (
+                  <ListMagnifyingGlass size={12} weight="thin" />
+                )
+              }
+            >
+              {copy.fetchModelList}
+            </Button>
+          ) : (
+            <IconButton
+              ariaLabel={copy.checkService}
+              size="sm"
+              active={providerProbeLoading}
+              disabled={!canUseProvider}
+              onClick={onTestProvider}
+              className="text-ink-muted"
+            >
+              {providerProbeLoading ? (
                 <span className="spin">
                   <CircleNotch size={12} weight="thin" />
                 </span>
               ) : (
                 <PlugsConnected size={12} weight="thin" />
-              )
-            }
-          >
-            {copy.check}
-          </Button>
+              )}
+            </IconButton>
+          )}
           <InlineProbeStatus
-            state={providerProbeState}
-            action="provider-test"
+            state={headerProbeState}
+            action={providerProbeAction}
           />
           <ProviderActionsMenu
             disabled={saving}
@@ -227,8 +251,8 @@ export function ProviderCard({
         </div>
       </div>
       <ProbeErrorLine
-        state={providerProbeState}
-        action="provider-test"
+        state={headerProbeState}
+        action={providerProbeAction}
         className="px-4 pb-3"
       />
       {open && (

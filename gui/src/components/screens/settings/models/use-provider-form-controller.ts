@@ -21,7 +21,7 @@ import {
   newProviderForm,
   providerFormFromPreset,
 } from "./model-settings-utils";
-import type { ProbeState, ProviderFormState } from "./types";
+import type { ProbeAction, ProbeState, ProviderFormState } from "./types";
 
 export function useProviderFormController({
   loading,
@@ -165,32 +165,44 @@ export function useProviderFormController({
       return;
     }
     const testModel = visibleProviderForm.model.trim();
+    const action: ProbeAction = testModel ? "model-test" : "model-list";
     setProviderFormProbeState({
       kind: "loading",
-      action: "provider-test",
+      action,
     });
     try {
-      const result = await testManagedModelConnectionWithLatency({
-        id: visibleProviderForm.id,
-        providerId: visibleProviderForm.id,
-        protocol: visibleProviderForm.protocol,
-        apiKey: visibleProviderForm.apiKey || undefined,
-        apiBase: visibleProviderForm.apiBase,
-        model: testModel || undefined,
-      });
+      const message = testModel
+        ? connectionSuccessMessage(
+            await testManagedModelConnectionWithLatency({
+              id: visibleProviderForm.id,
+              providerId: visibleProviderForm.id,
+              protocol: visibleProviderForm.protocol,
+              apiKey: visibleProviderForm.apiKey || undefined,
+              apiBase: visibleProviderForm.apiBase,
+              model: testModel,
+            }),
+            "setup-model",
+            modelCopy,
+          )
+        : listModelsMessage(
+            await listManagedModelOptions({
+              id: visibleProviderForm.id,
+              providerId: visibleProviderForm.id,
+              protocol: visibleProviderForm.protocol,
+              apiKey: visibleProviderForm.apiKey || undefined,
+              apiBase: visibleProviderForm.apiBase,
+            }),
+            modelCopy,
+          );
       setProviderFormProbeState({
         kind: "success",
-        action: "provider-test",
-        message: connectionSuccessMessage(
-          result,
-          testModel ? "setup-model" : "provider",
-          modelCopy,
-        ),
+        action,
+        message,
       });
     } catch (e) {
       setProviderFormProbeState({
         kind: "error",
-        action: "provider-test",
+        action,
         message: managedModelProbeErrorMessage(e, modelCopy),
       });
     }
@@ -307,4 +319,13 @@ export function useProviderFormController({
     updateProviderForm,
     visibleProviderForm,
   };
+}
+
+function listModelsMessage(
+  result: { models: string[] },
+  copy: ReturnType<typeof useCopy>["settings"]["models"],
+): string {
+  return result.models.length > 0
+    ? copy.foundModels(result.models.length)
+    : copy.connectedNoModels;
 }

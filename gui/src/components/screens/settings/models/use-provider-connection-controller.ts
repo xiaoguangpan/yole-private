@@ -34,10 +34,11 @@ export function useProviderConnectionController() {
   ) => {
     if (provider.credentialStatus === "missing") return;
     const providerTestModel = providerModels[0]?.model;
+    if (!providerTestModel) return;
     setProviderProbeStates((current) =>
       withProbeState(current, provider.id, {
         kind: "loading",
-        action: "provider-test",
+        action: "model-test",
       }),
     );
     try {
@@ -51,15 +52,15 @@ export function useProviderConnectionController() {
       setProviderProbeStates((current) =>
         withProbeState(current, provider.id, {
           kind: "success",
-          action: "provider-test",
-          message: connectionSuccessMessage(result, "provider", modelCopy),
+          action: "model-test",
+          message: connectionSuccessMessage(result, "saved-model", modelCopy),
         }),
       );
     } catch (e) {
       setProviderProbeStates((current) =>
         withProbeState(current, provider.id, {
           kind: "error",
-          action: "provider-test",
+          action: "model-test",
           message: managedModelProbeErrorMessage(e, modelCopy),
         }),
       );

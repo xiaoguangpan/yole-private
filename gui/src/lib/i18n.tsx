@@ -338,6 +338,7 @@ const zhCopy = {
       testConnection: "测试连接",
       autoTestingConnection: "正在测试连接...",
       retryConnectionTest: "重新测试",
+      modelTestCostHint: "模型测试最多 1 个输出 token",
       connectionLatency: (message: string, latencyMs: number) =>
         `${message} · ${latencyMs} ms`,
       errorUnauthorized:
@@ -383,6 +384,7 @@ const zhCopy = {
       providerCreatedToastMessage:
         "已接入模型提供商，并启用 1 个模型；可以继续在这个 Provider 下添加模型。",
       check: "检查",
+      checkService: "检查服务",
       keyNeedsResave: "这个服务的密钥需要重新保存。",
       addManually: "手动添加",
       availableModels: "可添加模型",
@@ -1271,6 +1273,7 @@ const enCopy: AppCopy = {
       testConnection: "Test connection",
       autoTestingConnection: "Testing connection...",
       retryConnectionTest: "Retry test",
+      modelTestCostHint: "Model tests use at most 1 output token",
       connectionLatency: (message, latencyMs) => `${message} · ${latencyMs} ms`,
       errorUnauthorized:
         "401 Unauthorized: the API Key is invalid or cannot access this model.",
@@ -1319,6 +1322,7 @@ const enCopy: AppCopy = {
       providerCreatedToastMessage:
         "Provider connected and 1 model enabled; you can keep adding models under this provider.",
       check: "Check",
+      checkService: "Check provider",
       keyNeedsResave: "This service needs its API Key saved again.",
       addManually: "Add manually",
       availableModels: "Available models",

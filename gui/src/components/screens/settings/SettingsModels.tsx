@@ -162,9 +162,14 @@ export function SettingsModels({
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <SettingsSectionLabel>
-            {modelCopy.connectedProviders}
-          </SettingsSectionLabel>
+          <div>
+            <SettingsSectionLabel>
+              {modelCopy.connectedProviders}
+            </SettingsSectionLabel>
+            <div className="mt-1 text-[11px] leading-none text-ink-muted/60">
+              {modelCopy.modelTestCostHint}
+            </div>
+          </div>
           <Button
             variant="primary"
             size="sm"

@@ -26,7 +26,7 @@ import {
   ProbeErrorLine,
   SettingsInput,
 } from "./ModelPrimitives";
-import type { ProbeState, ProviderFormState } from "./types";
+import type { ProbeAction, ProbeState, ProviderFormState } from "./types";
 
 export function ProviderEditor({
   form,
@@ -78,6 +78,15 @@ export function ProviderEditor({
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const apiKeyRevealLabel = apiKeyVisible ? copy.hideApiKey : copy.showApiKey;
   const trimmedModel = form.model.trim();
+  const secondaryProbeAction: ProbeAction =
+    trimmedModel === "" ? "model-list" : "model-test";
+  const secondaryProbeLabel =
+    secondaryProbeAction === "model-list"
+      ? copy.fetchModelList
+      : copy.testModel;
+  const secondaryProbeLoading =
+    probeState.kind === "loading" && probeState.action === secondaryProbeAction;
+  const showSecondaryProbe = isCreatingProvider && trimmedModel !== "";
   const selectedModelOutsideFetchedList =
     isCreatingProvider &&
     modelOptions.length > 0 &&
@@ -255,25 +264,33 @@ export function ProviderEditor({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!canTest}
-                onClick={onTest}
-                leadingIcon={
-                  probeState.kind === "loading" &&
-                  probeState.action === "provider-test" ? (
-                    <span className="spin">
-                      <CircleNotch size={12} weight="thin" />
-                    </span>
-                  ) : (
-                    <PlugsConnected size={12} weight="thin" />
-                  )
-                }
-              >
-                {copy.testConnection}
-              </Button>
-              <InlineProbeStatus state={probeState} action="provider-test" />
+              {showSecondaryProbe && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={!canTest}
+                    onClick={onTest}
+                    leadingIcon={
+                      secondaryProbeLoading ? (
+                        <span className="spin">
+                          <CircleNotch size={12} weight="thin" />
+                        </span>
+                      ) : secondaryProbeAction === "model-list" ? (
+                        <ListMagnifyingGlass size={12} weight="thin" />
+                      ) : (
+                        <PlugsConnected size={12} weight="thin" />
+                      )
+                    }
+                  >
+                    {secondaryProbeLabel}
+                  </Button>
+                  <InlineProbeStatus
+                    state={probeState}
+                    action={secondaryProbeAction}
+                  />
+                </>
+              )}
               <Button
                 variant="primary"
                 size="sm"
@@ -291,8 +308,18 @@ export function ProviderEditor({
               >
                 {form.id ? copy.saveService : copy.saveAndEnableModel}
               </Button>
+              {showSecondaryProbe && secondaryProbeAction === "model-test" && (
+                <span className="text-[11px] leading-none text-ink-muted/60">
+                  {copy.modelTestCostHint}
+                </span>
+              )}
             </div>
-            <ProbeErrorLine state={probeState} action="provider-test" />
+            {showSecondaryProbe && (
+              <ProbeErrorLine
+                state={probeState}
+                action={secondaryProbeAction}
+              />
+            )}
           </>
         )}
       </div>

@@ -91,6 +91,7 @@ type ManagedModelProbeErrorCopy = {
   errorServer: (status: number) => string;
   errorTimeout: string;
   errorNetwork: string;
+  modelListManualFallback: string;
   errorUnknownWithDetail: (detail: string) => string;
 };
 
@@ -100,6 +101,9 @@ export function managedModelProbeErrorMessage(
 ): string {
   const detail = extractErrorMessage(error);
   const status = extractHttpStatus(detail);
+  if (isSoftModelListFailure(detail, status)) {
+    return copy.modelListManualFallback;
+  }
   if (status === 401) return copy.errorUnauthorized;
   if (status === 403) return copy.errorForbidden;
   if (status === 404) return copy.errorNotFound;
@@ -127,6 +131,20 @@ export function managedModelProbeErrorMessage(
   }
 
   return detail ? copy.errorUnknownWithDetail(detail) : copy.actionFailed;
+}
+
+function isSoftModelListFailure(
+  detail: string,
+  status: number | undefined,
+): boolean {
+  const normalized = detail.toLowerCase();
+  const isModelListFailure =
+    detail.includes("无法获取模型列表") ||
+    normalized.includes("model list response is not json");
+  if (!isModelListFailure) return false;
+  if (status === 401 || status === 403 || status === 429) return false;
+  if (status && status >= 500) return false;
+  return true;
 }
 
 function nowMs(): number {
