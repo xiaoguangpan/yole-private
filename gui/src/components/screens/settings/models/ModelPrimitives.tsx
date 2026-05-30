@@ -1,4 +1,3 @@
-import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   CheckCircle,
   CircleNotch,
@@ -8,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ManagedModelProtocol } from "@/types/managed-models";
@@ -283,27 +283,18 @@ export function ProtocolBadge({
 
 export function InfoTooltip({ label, text }: { label: string; text: string }) {
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          className="inline-flex size-5 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink"
-        >
-          <Info size={11} weight="bold" />
-        </button>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="top"
-          align="start"
-          sideOffset={6}
-          className="z-[80] max-w-[260px] rounded-sm border border-line bg-elevated p-2 text-[11.5px] leading-4 text-ink-soft shadow-elevated"
-        >
-          {text}
-          <Tooltip.Arrow className="fill-elevated" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+    <TooltipLabel
+      text={text}
+      align="start"
+      contentClassName="max-w-[260px] p-2 leading-4"
+    >
+      <button
+        type="button"
+        aria-label={label}
+        className="inline-flex size-5 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink"
+      >
+        <Info size={11} weight="bold" />
+      </button>
+    </TooltipLabel>
   );
 }

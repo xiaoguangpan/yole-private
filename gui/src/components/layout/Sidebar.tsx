@@ -404,39 +404,40 @@ function SidebarHeader({
           Galley
         </div>
         {externalRuntimeBadge ? (
-          <div
-            className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-soft"
-            title={externalRuntimeBadge.title}
-          >
-            <RuntimeDot tone={externalRuntimeBadge.tone} />
-            <span className="min-w-0 truncate">
-              {externalRuntimeBadge.label}
-            </span>
-          </div>
+          <IconTooltip text={externalRuntimeBadge.title} side="bottom">
+            <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-soft">
+              <RuntimeDot tone={externalRuntimeBadge.tone} />
+              <span className="min-w-0 truncate">
+                {externalRuntimeBadge.label}
+              </span>
+            </div>
+          </IconTooltip>
         ) : null}
       </div>
       {indicator?.action === "models" ? (
-        <button
-          type="button"
-          onClick={onOpenModelsSettings}
-          title={indicator.title}
-          aria-label={indicator.ariaLabel}
-          className="flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-[11.5px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-        >
-          <RuntimeDot tone={indicator.tone} />
-          <span className="min-w-0 truncate">{indicator.label}</span>
-        </button>
+        <IconTooltip text={indicator.title} side="bottom">
+          <button
+            type="button"
+            onClick={onOpenModelsSettings}
+            aria-label={indicator.ariaLabel}
+            className="flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-[11.5px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
+          >
+            <RuntimeDot tone={indicator.tone} />
+            <span className="min-w-0 truncate">{indicator.label}</span>
+          </button>
+        </IconTooltip>
       ) : indicator?.action === "runtime" ? (
-        <button
-          type="button"
-          onClick={onOpenRuntimeSettings}
-          title={indicator.title}
-          aria-label={indicator.ariaLabel}
-          className="flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-[11.5px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
-        >
-          <RuntimeDot tone={indicator.tone} />
-          <span className="min-w-0 truncate">{indicator.label}</span>
-        </button>
+        <IconTooltip text={indicator.title} side="bottom">
+          <button
+            type="button"
+            onClick={onOpenRuntimeSettings}
+            aria-label={indicator.ariaLabel}
+            className="flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-[11.5px] text-ink-soft transition-colors hover:bg-hover hover:text-ink"
+          >
+            <RuntimeDot tone={indicator.tone} />
+            <span className="min-w-0 truncate">{indicator.label}</span>
+          </button>
+        </IconTooltip>
       ) : showSupervisorSop ? (
         <IconTooltip text={supervisorSopTooltip} side="bottom">
           <button
@@ -450,13 +451,12 @@ function SidebarHeader({
           </button>
         </IconTooltip>
       ) : indicator ? (
-        <div
-          className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-soft"
-          title={indicator.title}
-        >
-          <RuntimeDot tone={indicator.tone} />
-          <span className="min-w-0 truncate">{indicator.label}</span>
-        </div>
+        <IconTooltip text={indicator.title} side="bottom">
+          <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-soft">
+            <RuntimeDot tone={indicator.tone} />
+            <span className="min-w-0 truncate">{indicator.label}</span>
+          </div>
+        </IconTooltip>
       ) : (
         <span aria-hidden="true" />
       )}
@@ -585,7 +585,6 @@ function ProjectQuickAction({
         onClick={onClick}
         aria-pressed={active}
         aria-label={projectActionLabel}
-        title={projectActionLabel}
         className={cn(
           "flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-3 py-2 text-left outline-none",
           "focus-visible:ring-2 focus-visible:ring-brand/30",
@@ -603,23 +602,24 @@ function ProjectQuickAction({
           {copy.sidebar.projects}
         </span>
       </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onNewProject?.();
-        }}
-        aria-label={copy.sidebar.newProject}
-        title={copy.sidebar.newProject}
-        className={cn(
-          "mr-0.5 inline-flex size-[32px] shrink-0 items-center justify-center rounded-sm",
-          "text-ink-muted transition-[background-color,color] duration-75",
-          "hover:bg-hover hover:text-ink active:bg-selected/60",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
-        )}
-      >
-        <Plus size={12} weight="thin" />
-      </button>
+      <IconTooltip text={copy.sidebar.newProject}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNewProject?.();
+          }}
+          aria-label={copy.sidebar.newProject}
+          className={cn(
+            "mr-0.5 inline-flex size-[32px] shrink-0 items-center justify-center rounded-sm",
+            "text-ink-muted transition-[background-color,color] duration-75",
+            "hover:bg-hover hover:text-ink active:bg-selected/60",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+          )}
+        >
+          <Plus size={12} weight="thin" />
+        </button>
+      </IconTooltip>
     </div>
   );
 }
@@ -639,7 +639,6 @@ function QuickAction({
     <button
       type="button"
       onClick={onClick}
-      title={label}
       className="mx-1.5 flex w-[calc(100%-12px)] cursor-pointer items-center gap-2.5 rounded-sm px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-hover"
     >
       <span className="shrink-0 text-ink-soft">{icon}</span>
@@ -989,13 +988,14 @@ function SidebarSessionRow({
             </div>
           )}
           {petAttached && (
-            <span
-              aria-label={copy.sidebar.desktopPetAttached}
-              title={copy.sidebar.desktopPetAttachedTitle}
-              className="inline-flex shrink-0 text-ink-soft"
-            >
-              <Cat size={12} weight="thin" />
-            </span>
+            <IconTooltip text={copy.sidebar.desktopPetAttachedTitle}>
+              <span
+                aria-label={copy.sidebar.desktopPetAttached}
+                className="inline-flex shrink-0 text-ink-soft"
+              >
+                <Cat size={12} weight="thin" />
+              </span>
+            </IconTooltip>
           )}
         </div>
         {sublineText && (
@@ -1034,33 +1034,39 @@ function SidebarSessionRow({
       </div>
       <div className="flex h-5 w-3 items-center justify-center pt-[5px]">
         {attention === "error" ? (
-          <span
-            aria-label={copy.sidebar.errorBadge(session.errorCount || 1)}
-            title={copy.sidebar.errorBadge(session.errorCount || 1)}
-            className="sidebar-attention-pop size-2 rounded-full bg-error"
-          />
+          <IconTooltip text={copy.sidebar.errorBadge(session.errorCount || 1)}>
+            <span
+              aria-label={copy.sidebar.errorBadge(session.errorCount || 1)}
+              className="sidebar-attention-pop size-2 rounded-full bg-error"
+            />
+          </IconTooltip>
         ) : attention === "ask_user" ? (
-          <span
-            aria-label={copy.sidebar.waitingForYou}
-            title={copy.sidebar.gaWaitingForReply}
-            className="sidebar-attention-pop size-2 rounded-full bg-warning"
-          />
+          <IconTooltip text={copy.sidebar.gaWaitingForReply}>
+            <span
+              aria-label={copy.sidebar.waitingForYou}
+              className="sidebar-attention-pop size-2 rounded-full bg-warning"
+            />
+          </IconTooltip>
         ) : attention === "approval" ? (
-          <span
-            aria-label={copy.sidebar.pendingApprovalBadge(
+          <IconTooltip
+            text={copy.sidebar.pendingApprovalBadge(
               session.pendingApprovalCount || 1,
             )}
-            title={copy.sidebar.pendingApprovalBadge(
-              session.pendingApprovalCount || 1,
-            )}
-            className="sidebar-attention-pop size-2 rounded-full bg-warning"
-          />
+          >
+            <span
+              aria-label={copy.sidebar.pendingApprovalBadge(
+                session.pendingApprovalCount || 1,
+              )}
+              className="sidebar-attention-pop size-2 rounded-full bg-warning"
+            />
+          </IconTooltip>
         ) : attention === "unread" ? (
-          <span
-            aria-label={copy.sidebar.unread}
-            title={copy.sidebar.newReplyTitle}
-            className="sidebar-unread-pop size-2 rounded-full bg-brand"
-          />
+          <IconTooltip text={copy.sidebar.newReplyTitle}>
+            <span
+              aria-label={copy.sidebar.unread}
+              className="sidebar-unread-pop size-2 rounded-full bg-brand"
+            />
+          </IconTooltip>
         ) : null}
       </div>
     </div>
@@ -1556,25 +1562,26 @@ function SidebarProjectRow({
         />
       )}
       {onStartConversation && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStartConversation();
-          }}
-          aria-label={newConversationTitle}
-          title={newConversationTitle}
-          className={cn(
-            "-mr-2 inline-flex size-[32px] shrink-0 items-center justify-center rounded-sm",
-            "pointer-events-none text-ink-muted opacity-0 transition-[background-color,color,opacity] duration-75",
-            "group-hover:pointer-events-auto group-hover:text-ink-soft group-hover:opacity-100",
-            "hover:bg-hover hover:text-ink active:bg-selected/60",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
-            active && "pointer-events-auto text-ink-soft opacity-100",
-          )}
-        >
-          <Plus size={13} weight="thin" />
-        </button>
+        <IconTooltip text={newConversationTitle}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartConversation();
+            }}
+            aria-label={newConversationTitle}
+            className={cn(
+              "-mr-2 inline-flex size-[32px] shrink-0 items-center justify-center rounded-sm",
+              "pointer-events-none text-ink-muted opacity-0 transition-[background-color,color,opacity] duration-75",
+              "group-hover:pointer-events-auto group-hover:text-ink-soft group-hover:opacity-100",
+              "hover:bg-hover hover:text-ink active:bg-selected/60",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+              active && "pointer-events-auto text-ink-soft opacity-100",
+            )}
+          >
+            <Plus size={13} weight="thin" />
+          </button>
+        </IconTooltip>
       )}
     </div>
   );
@@ -1767,21 +1774,22 @@ function SidebarProjectEmptyHint({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onStartProjectConversation}
-      aria-label={newConversationTitle}
-      title={newConversationTitle}
-      className={cn(
-        "mx-1.5 mt-3 flex w-[calc(100%-12px)] cursor-pointer items-center gap-2 rounded-sm border border-line/70 bg-elevated/55 px-3 py-2 text-left",
-        "text-[12px] font-medium text-ink-soft transition-[background-color,border-color,color]",
-        "hover:border-brand/35 hover:bg-selected/70 hover:text-ink",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
-      )}
-    >
-      <Plus size={12} weight="thin" className="shrink-0" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-    </button>
+    <IconTooltip text={newConversationTitle}>
+      <button
+        type="button"
+        onClick={onStartProjectConversation}
+        aria-label={newConversationTitle}
+        className={cn(
+          "mx-1.5 mt-3 flex w-[calc(100%-12px)] cursor-pointer items-center gap-2 rounded-sm border border-line/70 bg-elevated/55 px-3 py-2 text-left",
+          "text-[12px] font-medium text-ink-soft transition-[background-color,border-color,color]",
+          "hover:border-brand/35 hover:bg-selected/70 hover:text-ink",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+        )}
+      >
+        <Plus size={12} weight="thin" className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+      </button>
+    </IconTooltip>
   );
 }
 

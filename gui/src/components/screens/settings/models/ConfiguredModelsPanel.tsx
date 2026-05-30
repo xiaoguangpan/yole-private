@@ -1,4 +1,3 @@
-import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   ArrowDown,
   ArrowUp,
@@ -7,6 +6,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { IconButton } from "@/components/ui/button";
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ManagedModelRecord } from "@/types/managed-models";
@@ -74,43 +74,35 @@ function ModelScopeHint({
   copy: ReturnType<typeof useCopy>["settings"]["models"];
 }) {
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <button
-          type="button"
-          aria-label={copy.sessionModelScopeTitle}
-          className={cn(
-            "inline-flex size-5 items-center justify-center rounded-sm border border-transparent",
-            "text-ink-muted transition-[background-color,border-color,color,transform]",
-            "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
-            "hover:border-line hover:bg-hover hover:text-ink",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
-            "active:translate-y-[0.5px]",
-          )}
-        >
-          <Info size={12} weight="bold" />
-        </button>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="top"
-          align="start"
-          sideOffset={6}
-          className={cn(
-            "z-[80] max-w-[300px] rounded-sm border border-line bg-elevated p-2.5",
-            "text-left shadow-elevated",
-          )}
-        >
+    <TooltipLabel
+      align="start"
+      contentClassName="max-w-[300px] p-2.5 text-left leading-normal"
+      text={
+        <>
           <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
             {copy.sessionModelScopeTitle}
           </div>
           <div className="mt-1 text-[11.5px] leading-4 text-ink-soft">
             {copy.sessionModelScopeHint}
           </div>
-          <Tooltip.Arrow className="fill-elevated" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+        </>
+      }
+    >
+      <button
+        type="button"
+        aria-label={copy.sessionModelScopeTitle}
+        className={cn(
+          "inline-flex size-5 items-center justify-center rounded-sm border border-transparent",
+          "text-ink-muted transition-[background-color,border-color,color,transform]",
+          "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+          "hover:border-line hover:bg-hover hover:text-ink",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+          "active:translate-y-[0.5px]",
+        )}
+      >
+        <Info size={12} weight="bold" />
+      </button>
+    </TooltipLabel>
   );
 }
 

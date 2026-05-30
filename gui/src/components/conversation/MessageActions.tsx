@@ -4,7 +4,6 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useEffect, useRef, useState } from "react";
 
 import { IconButton } from "@/components/ui/button";
-import { IconTooltip } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -135,30 +134,27 @@ function ActionButton({
   activeLabel: string;
   onClick: () => void;
 }) {
-  // Icon-only: Radix-backed IconTooltip handles the hover label
-  // (~100ms, see main.tsx Provider). `aria-label` carries the
-  // semantic name for screen readers, and `aria-live="polite"`
-  // on a hidden span announces the post-click state change since
-  // the success feedback is purely visual (Check + tint swap).
+  // Icon-only: IconButton's Radix-backed tooltip handles the hover
+  // label, while `aria-label` carries the semantic name for screen
+  // readers. `aria-live="polite"` announces the post-click state
+  // change since the success feedback is purely visual.
   const label = active ? activeLabel : idleLabel;
   return (
-    <IconTooltip text={label}>
-      <IconButton
-        ariaLabel={label}
-        onClick={onClick}
-        size="xs"
-        className={cn(
-          "size-6",
-          active
-            ? "text-success"
-            : "text-ink-muted hover:bg-hover hover:text-ink-soft",
-        )}
-      >
-        {active ? activeIcon : idleIcon}
-        <span className="sr-only" aria-live="polite">
-          {label}
-        </span>
-      </IconButton>
-    </IconTooltip>
+    <IconButton
+      ariaLabel={label}
+      onClick={onClick}
+      size="xs"
+      className={cn(
+        "size-6",
+        active
+          ? "text-success"
+          : "text-ink-muted hover:bg-hover hover:text-ink-soft",
+      )}
+    >
+      {active ? activeIcon : idleIcon}
+      <span className="sr-only" aria-live="polite">
+        {label}
+      </span>
+    </IconButton>
   );
 }

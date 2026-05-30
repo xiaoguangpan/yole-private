@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type SegmentedControlSize = "sm" | "md";
@@ -47,13 +48,12 @@ export function SegmentedControl<TValue extends string>({
     >
       {options.map((option) => {
         const active = option.value === value;
-        return (
+        const button = (
           <button
             key={option.value}
             type="button"
             role="radio"
             aria-checked={active}
-            title={option.title}
             disabled={option.disabled}
             onClick={() => {
               if (!option.disabled && !active) onValueChange?.(option.value);
@@ -71,6 +71,12 @@ export function SegmentedControl<TValue extends string>({
             {option.icon}
             <span>{option.label}</span>
           </button>
+        );
+        if (!option.title) return button;
+        return (
+          <TooltipLabel key={option.value} text={option.title}>
+            {button}
+          </TooltipLabel>
         );
       })}
     </div>

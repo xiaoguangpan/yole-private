@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { cn } from "@/lib/utils";
+import { IconTooltip, type TooltipSide } from "@/components/ui/tooltip";
 
 /**
  * Canonical button surface for Galley. Every new button should use
@@ -111,6 +112,9 @@ export interface IconButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
   /** Accessible name. Icon-only buttons must not rely on visual icon meaning. */
   ariaLabel: string;
+  /** Fast Radix tooltip text. Defaults to `title ?? ariaLabel`; `false` disables it. */
+  tooltip?: string | false;
+  tooltipSide?: TooltipSide;
   variant?: IconButtonVariant;
   size?: IconButtonSize;
   active?: boolean;
@@ -282,17 +286,18 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       className,
       children,
       type = "button",
+      tooltip,
+      tooltipSide,
       title,
       ...rest
     },
     ref,
   ) {
-    return (
+    const button = (
       <button
         ref={ref}
         type={type}
         aria-label={ariaLabel}
-        title={title ?? ariaLabel}
         className={cn(
           "inline-flex select-none items-center justify-center rounded-sm transition-[background-color,border-color,color,box-shadow,transform]",
           "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:duration-[45ms]",
@@ -306,6 +311,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       >
         {children}
       </button>
+    );
+    const tooltipText = tooltip === false ? null : (tooltip ?? title ?? ariaLabel);
+    if (!tooltipText) return button;
+    return (
+      <IconTooltip text={tooltipText} side={tooltipSide}>
+        {button}
+      </IconTooltip>
     );
   },
 );

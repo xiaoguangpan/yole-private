@@ -16,19 +16,25 @@ import { cn } from "@/lib/utils";
  *
  * Usage:
  *
- *   <IconTooltip text="Copy">
+ *   <TooltipLabel text="Copy">
  *     <button>...</button>
- *   </IconTooltip>
+ *   </TooltipLabel>
  *
  * The child must be a single element that accepts ref/props
  * (Radix's `asChild` requirement). Wrap a fragment with a single
  * element if you're composing multiple things.
  */
-export interface IconTooltipProps {
+export type TooltipSide = "top" | "right" | "bottom" | "left";
+
+export interface TooltipLabelProps {
   /** Tooltip body text. */
-  text: string;
+  text: React.ReactNode;
   /** Placement relative to the trigger. Default "top". */
-  side?: "top" | "right" | "bottom" | "left";
+  side?: TooltipSide;
+  /** Alignment along the trigger side. */
+  align?: "start" | "center" | "end";
+  sideOffset?: number;
+  contentClassName?: string;
   /** Per-instance override of the provider's default delay. Use
    * sparingly — consistent timing across the app is what makes the
    * tooltip system feel cohesive. */
@@ -36,12 +42,15 @@ export interface IconTooltipProps {
   children: React.ReactNode;
 }
 
-export function IconTooltip({
+export function TooltipLabel({
   text,
   side = "top",
+  align = "center",
+  sideOffset = 6,
+  contentClassName,
   delay,
   children,
-}: IconTooltipProps) {
+}: TooltipLabelProps) {
   const trigger = (
     <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
   );
@@ -50,10 +59,12 @@ export function IconTooltip({
     <Tooltip.Portal>
       <Tooltip.Content
         side={side}
-        sideOffset={6}
+        align={align}
+        sideOffset={sideOffset}
         className={cn(
           "z-[80] select-none rounded-sm border border-line bg-elevated px-2 py-1",
           "text-[11.5px] leading-none text-ink-soft shadow-elevated",
+          contentClassName,
         )}
       >
         {text}
@@ -82,3 +93,5 @@ export function IconTooltip({
     </Tooltip.Root>
   );
 }
+
+export const IconTooltip = TooltipLabel;

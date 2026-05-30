@@ -173,19 +173,18 @@ export function ProviderEditor({
               reserveTrailing
               trailing={
                 form.apiKey.length > 0 ? (
-                  <button
-                    type="button"
-                    aria-label={apiKeyRevealLabel}
-                    title={apiKeyRevealLabel}
+                  <IconButton
+                    ariaLabel={apiKeyRevealLabel}
                     onClick={() => setApiKeyVisible((visible) => !visible)}
-                    className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-hover hover:text-ink-soft"
+                    size="xs"
+                    className="size-6 text-ink-muted hover:text-ink-soft"
                   >
                     {apiKeyVisible ? (
                       <EyeSlash size={13} weight="thin" />
                     ) : (
                       <Eye size={13} weight="thin" />
                     )}
-                  </button>
+                  </IconButton>
                 ) : null
               }
             />

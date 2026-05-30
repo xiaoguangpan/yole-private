@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -412,50 +413,54 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
             )}
           >
             {stopMode && !isSideQuestion ? (
-              <button
-                type="button"
-                onClick={onStop}
-                title={copy.composer.stop}
-                aria-label={copy.composer.stop}
-                className={cn("composer-stop-breath", COMPOSER_STOP_BUTTON)}
-              >
-                <Stop size={14} weight="fill" />
-              </button>
+              <TooltipLabel text={copy.composer.stop}>
+                <button
+                  type="button"
+                  onClick={onStop}
+                  aria-label={copy.composer.stop}
+                  className={cn("composer-stop-breath", COMPOSER_STOP_BUTTON)}
+                >
+                  <Stop size={14} weight="fill" />
+                </button>
+              </TooltipLabel>
             ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={
-                  disabled ||
-                  !text?.trim() ||
-                  (requiresModelConfig && !onConfigureModels)
-                }
-                title={
+              <TooltipLabel
+                text={
                   requiresModelConfig
                     ? copy.composer.configureModelBeforeSending
                     : copy.composer.sendWithEnter
                 }
-                aria-label={
-                  requiresModelConfig
-                    ? copy.composer.configureModelBeforeSending
-                    : copy.composer.send
-                }
-                className={cn(
-                  requiresModelConfig
-                    ? COMPOSER_CONFIG_BUTTON
-                    : COMPOSER_SEND_BUTTON,
-                  (disabled ||
-                    !text?.trim() ||
-                    (requiresModelConfig && !onConfigureModels)) &&
-                    "cursor-not-allowed opacity-50 hover:translate-y-0 hover:shadow-none",
-                )}
               >
-                {requiresModelConfig ? (
-                  <Gear size={15} weight="thin" />
-                ) : (
-                  <ArrowUp size={16} weight="bold" />
-                )}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={
+                    disabled ||
+                    !text?.trim() ||
+                    (requiresModelConfig && !onConfigureModels)
+                  }
+                  aria-label={
+                    requiresModelConfig
+                      ? copy.composer.configureModelBeforeSending
+                      : copy.composer.send
+                  }
+                  className={cn(
+                    requiresModelConfig
+                      ? COMPOSER_CONFIG_BUTTON
+                      : COMPOSER_SEND_BUTTON,
+                    (disabled ||
+                      !text?.trim() ||
+                      (requiresModelConfig && !onConfigureModels)) &&
+                      "cursor-not-allowed opacity-50 hover:translate-y-0 hover:shadow-none",
+                  )}
+                >
+                  {requiresModelConfig ? (
+                    <Gear size={15} weight="thin" />
+                  ) : (
+                    <ArrowUp size={16} weight="bold" />
+                  )}
+                </button>
+              </TooltipLabel>
             )}
           </span>
         </div>

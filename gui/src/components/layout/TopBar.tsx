@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { Button, IconButton } from "@/components/ui/button";
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { isMac, isWindowActionTarget } from "@/lib/platform";
 import { formatShortcutReadable } from "@/lib/shortcuts";
@@ -299,48 +300,50 @@ function BrowserControlIndicator({
       : copy.browserControlPendingTitle;
   if (connected) {
     return (
-      <button
-        type="button"
-        onClick={onOpen}
-        title={title}
-        className={cn(
-          "relative flex size-7 items-center justify-center rounded-sm border border-transparent text-ink-muted",
-          "transition-[background-color,border-color,color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
-          "hover:border-line hover:bg-hover hover:text-ink active:translate-y-[0.5px]",
-        )}
-        aria-label={title}
-      >
-        <PuzzlePiece size={16} weight="thin" />
-      </button>
+      <TooltipLabel text={title}>
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            "relative flex size-7 items-center justify-center rounded-sm border border-transparent text-ink-muted",
+            "transition-[background-color,border-color,color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)]",
+            "hover:border-line hover:bg-hover hover:text-ink active:translate-y-[0.5px]",
+          )}
+          aria-label={title}
+        >
+          <PuzzlePiece size={16} weight="thin" />
+        </button>
+      </TooltipLabel>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title={title}
-      className={cn(
-        "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow,transform]",
-        "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:translate-y-[0.5px]",
-        error
-          ? "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25"
-          : checking
-            ? "border-line bg-elevated text-ink-muted hover:bg-hover hover:text-ink"
-            : "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25",
-        needsAttention && "browser-control-attention",
-      )}
-      aria-label={title}
-    >
-      {checking ? (
-        <CircleNotch size={14} weight="thin" className="spin" />
-      ) : error ? (
-        <Warning size={14} weight="thin" />
-      ) : (
-        <PuzzlePiece size={14} weight="thin" />
-      )}
-      <span>{label}</span>
-    </button>
+    <TooltipLabel text={title}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={cn(
+          "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px] transition-[background-color,border-color,color,box-shadow,transform]",
+          "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:translate-y-[0.5px]",
+          error
+            ? "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25"
+            : checking
+              ? "border-line bg-elevated text-ink-muted hover:bg-hover hover:text-ink"
+              : "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25",
+          needsAttention && "browser-control-attention",
+        )}
+        aria-label={title}
+      >
+        {checking ? (
+          <CircleNotch size={14} weight="thin" className="spin" />
+        ) : error ? (
+          <Warning size={14} weight="thin" />
+        ) : (
+          <PuzzlePiece size={14} weight="thin" />
+        )}
+        <span>{label}</span>
+      </button>
+    </TooltipLabel>
   );
 }
 
@@ -739,27 +742,29 @@ function WidthToggleButton({
 }) {
   const copy = useCopy();
   const isWide = mode === "wide";
+  const tooltip = isWide
+    ? copy.topbar.compactWidthTitle
+    : copy.topbar.wideWidthTitle;
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      title={
-        isWide ? copy.topbar.compactWidthTitle : copy.topbar.wideWidthTitle
-      }
-      aria-label={isWide ? copy.topbar.compactWidth : copy.topbar.wideWidth}
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors",
-        isWide
-          ? "border border-brand/30 bg-brand/10 text-brand-strong hover:bg-brand/20"
-          : "border border-transparent text-ink-soft hover:bg-hover hover:text-ink",
-      )}
-    >
-      {isWide ? (
-        <ArrowsInLineHorizontal size={14} weight="thin" />
-      ) : (
-        <ArrowsOutLineHorizontal size={14} weight="thin" />
-      )}
-      {isWide ? copy.topbar.wideLabel : copy.topbar.compactLabel}
-    </button>
+    <TooltipLabel text={tooltip}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={isWide ? copy.topbar.compactWidth : copy.topbar.wideWidth}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors",
+          isWide
+            ? "border border-brand/30 bg-brand/10 text-brand-strong hover:bg-brand/20"
+            : "border border-transparent text-ink-soft hover:bg-hover hover:text-ink",
+        )}
+      >
+        {isWide ? (
+          <ArrowsInLineHorizontal size={14} weight="thin" />
+        ) : (
+          <ArrowsOutLineHorizontal size={14} weight="thin" />
+        )}
+        {isWide ? copy.topbar.wideLabel : copy.topbar.compactLabel}
+      </button>
+    </TooltipLabel>
   );
 }

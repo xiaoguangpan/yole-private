@@ -1,7 +1,7 @@
-import * as Tooltip from "@radix-ui/react-tooltip";
 import { PauseCircle } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
+import { TooltipLabel } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { PendingAskUser } from "@/types/conversation";
@@ -60,18 +60,16 @@ export function AskUserBubble({
         {pending.question}
       </div>
       {pending.candidates.length > 0 && (
-        <Tooltip.Provider delayDuration={200}>
-          <div className="flex flex-wrap gap-1.5">
-            {pending.candidates.map((c, i) => (
-              <CandidateChip
-                key={`${i}-${c}`}
-                text={c}
-                onClick={() => onPickCandidate(c)}
-                disabled={disabled}
-              />
-            ))}
-          </div>
-        </Tooltip.Provider>
+        <div className="flex flex-wrap gap-1.5">
+          {pending.candidates.map((c, i) => (
+            <CandidateChip
+              key={`${i}-${c}`}
+              text={c}
+              onClick={() => onPickCandidate(c)}
+              disabled={disabled}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -110,18 +108,12 @@ function CandidateChip({
   // lean for the common short-candidate case.
   if (truncated === text) return button;
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>{button}</Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="top"
-          sideOffset={4}
-          className="z-50 max-w-[320px] rounded-sm border border-line bg-elevated px-2 py-1 text-[12px] text-ink shadow-card"
-        >
-          {text}
-          <Tooltip.Arrow className="fill-elevated" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+    <TooltipLabel
+      text={text}
+      sideOffset={4}
+      contentClassName="z-50 max-w-[320px] text-[12px] leading-normal text-ink shadow-card"
+    >
+      {button}
+    </TooltipLabel>
   );
 }
