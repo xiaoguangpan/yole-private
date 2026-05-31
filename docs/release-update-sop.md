@@ -28,7 +28,7 @@ promote the app update channel.
 Set the release tag for the rest of the checklist:
 
 ```bash
-RELEASE_TAG=v0.2.0-alpha.1
+RELEASE_TAG=v0.2.0
 ```
 
 Replace the example value before every release.
@@ -42,6 +42,7 @@ Replace the example value before every release.
 - [ ] `docs/devlog/` has the durable release narrative if this is more than a
       tiny hotfix.
 - [ ] Version is bumped consistently:
+  - `package.json`
   - `gui/package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`
@@ -124,6 +125,80 @@ Open the draft Release in GitHub and check:
   - `latest.json` candidate
 
 Do not publish if assets are missing or release notes are misleading.
+
+#### Stable Release Notes Template
+
+Use this compact template for stable releases. Keep it user-facing: what changed
+and which installer to download. Replace `<TAG>` with the Git tag (for example
+`v0.2.0`) and `<VERSION>` with the package version (for example `0.2.0`).
+
+````markdown
+## What's New
+
+- 内置 GA：新用户只需要配置模型，就可以开始使用 Galley。
+- 外部 GA：已有 GenericAgent 环境的用户可以继续接入自己的 GA。
+- Agent / CLI：本机上的 Agent 可以通过 `galley` 命令创建、管理和跟进对话。
+- Browser Control：内置 GA 支持连接浏览器扩展，执行浏览器任务。
+- Channels：支持通过微信和 Galley 对话。
+- 小屏适配：Onboarding 在小尺寸笔记本上也可以完成。
+- Windows 路径修复：修复外部 GA 路径里的空格、`~` 和 Windows 路径处理问题。
+- 外部 GA 检测：提前检查 Python、依赖和模型配置，避免进入主界面后才发现 Bridge 崩溃。
+- 模型测试说明：在 Onboarding 和 Settings 里标明真实测试最多 1 个输出 token。
+- 系统反馈降噪：Tooltip 更快出现，Toast 更小、更安静，并避免遮挡关键按钮。
+
+## 安装指南
+
+### macOS
+
+- [下载 Apple Silicon 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_aarch64.dmg)
+- [下载 Intel 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_x64.dmg)
+
+如果 macOS 提示无法打开 Galley，可以在终端执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Galley.app
+```
+
+### Windows
+
+- [下载 Windows 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_Windows_x64-setup.exe)
+
+如果 Windows SmartScreen 提示风险，点击「更多信息」->「仍要运行」。
+
+---
+
+## What's New
+
+- Bundled GA: new users only need to configure a model to start using Galley.
+- External GA: users with an existing GenericAgent setup can keep using their own GA environment.
+- Agent / CLI: local Agents can use the `galley` command to create, manage, and follow conversations.
+- Browser Control: bundled GA can connect to the browser extension and run browser tasks.
+- Channels: talk to Galley from WeChat.
+- Small-screen support: onboarding can be completed on smaller laptops.
+- Windows path fixes: external GA paths now handle surrounding spaces, `~`, and Windows path forms more reliably.
+- External GA checks: Galley checks Python, dependencies, and model config before entering the main screen.
+- Model test clarity: onboarding and Settings now say that real model tests use at most 1 output token.
+- Quieter system feedback: tooltips appear faster, and toasts are smaller, calmer, and avoid covering key buttons.
+
+## Installation Guide
+
+### macOS
+
+- [Download for Apple Silicon](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_aarch64.dmg)
+- [Download for Intel](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_x64.dmg)
+
+If macOS says Galley cannot be opened, run this in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Galley.app
+```
+
+### Windows
+
+- [Download for Windows](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_Windows_x64-setup.exe)
+
+If Windows SmartScreen shows a warning, click "More info" -> "Run anyway".
+````
 
 #### Alpha Release Notes Template
 

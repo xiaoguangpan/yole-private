@@ -1,7 +1,7 @@
 # 2026-05-31 — Alpha.2 dogfood UX polish
 
 **Date:** 2026-05-31
-**Status:** Implemented on `main`; pending macOS / Windows dogfood
+**Status:** Implemented on `main`; feeding into `v0.2.0` release prep
 **Related:** [project status](../project-status.md), [copy language guidelines](../copy-language-guidelines.md), [managed GA runtime](../managed-ga-runtime.md), [Managed IM Supervisor](./2026-05-29-managed-im-supervisor-wechat.md)
 
 ## Context
@@ -99,6 +99,6 @@ complexity, while the UI remains quiet once something is configured.
 
 ## Next
 
-Dogfood these post-alpha.2 fixes on macOS and Windows before cutting another
-alpha. Keep the release channel unchanged unless there is an explicit decision
-to promote installed users onto the next build.
+Dogfood these post-alpha.2 fixes on macOS and Windows before publishing
+`v0.2.0`. Keep the update channel unchanged unless there is an explicit
+decision to promote installed users onto the release.
