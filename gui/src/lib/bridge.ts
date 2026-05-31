@@ -149,19 +149,11 @@ export async function spawnBridge(
   const wantBundled = import.meta.env.PROD && !args.useExternalPython;
   const python = await resolvePythonPath(args.python, wantBundled);
 
-  // bridgeCwd resolution mirrors the v0.1 logic: production uses the
-  // Tauri resourceDir (where `runner/` was packaged); dev uses the
-  // caller-supplied path (typically the workbench repo root).
-  const bridgeCwd = import.meta.env.PROD
-    ? await resolveProductionBridgeCwd(args.bridgeCwd)
-    : args.bridgeCwd;
-
-  if (!bridgeCwd) {
-    const msg =
-      "bridge cwd unresolved (production resourceDir failed and no dev path was supplied)";
-    handlers.onError?.(msg);
-    throw new Error(msg);
-  }
+  // Rust Core is authoritative for bridge cwd: dev resolves to the
+  // repo root and production resolves to the packaged resource dir.
+  // Keep this field only because the Tauri command schema still
+  // requires it before Rust normalizes the runtime-specific value.
+  const bridgeCwd = args.bridgeCwd?.trim() || ".";
 
   const spawnArgs: SpawnRunnerArgsJson = {
     python,
@@ -450,21 +442,6 @@ export async function resolvePythonPath(
     );
   }
   return fallback;
-}
-
-async function resolveProductionBridgeCwd(
-  dev: string | undefined,
-): Promise<string | undefined> {
-  try {
-    const { resourceDir } = await import("@tauri-apps/api/path");
-    return await resourceDir();
-  } catch (e) {
-    console.warn(
-      "[bridge] resolveProductionBridgeCwd failed; falling back to dev path.",
-      e,
-    );
-    return dev;
-  }
 }
 
 /**
