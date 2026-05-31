@@ -29,6 +29,13 @@ pnpm tauri build    # 打 .app / .dmg
 `prefs.theme_preference`，并同步 `localStorage.galley_theme_preference`
 给首屏防闪白脚本使用。
 
+## Managed models + Channels
+
+Managed model edits write the generated non-secret config and refresh
+`prefs.managed_model_config_revision`. Channel processes record the revision
+they started with; when it falls behind, the UI offers `Restart Channels`.
+That action restarts enabled Channel processes without logging the user out.
+
 ## IPC types
 
 `src/types/ipc.ts` 镜像 `../bridge/ipc.py`。协议改时三处同改：`docs/ipc-protocol.md` → `bridge/ipc.py` → `desktop/src/types/ipc.ts`。

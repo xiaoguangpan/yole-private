@@ -624,6 +624,12 @@ const zhCopy = {
       disconnectDialogTitle: "解除微信接入？",
       disconnectDialogBody:
         "这只会让 Galley 停止通过当前微信会话收发消息，不会退出你手机上的微信账号。",
+      restartChannelsTitle: "Channels 正在使用旧模型配置",
+      restartChannelsBody:
+        "重启后，已启用 Channels 会使用最新模型配置。可能中断当前回复，不会退出登录。",
+      restartChannelsDialogTitle: "重启 Channels？",
+      restartChannelsDialogBody:
+        "这会重启所有已启用的 Channels，可能中断当前回复；不会退出登录。",
       openModels: "先去配置模型",
       modelRequired:
         "微信接入会使用 Galley 已配置的模型。接入前，需要先在 Models 里配置一个可用模型。",
@@ -831,6 +837,14 @@ const zhCopy = {
     modelConfigSaved: "模型配置已保存",
     modelConfigSavedMessage:
       "新对话会立即使用最新配置；已启动的对话重启 Galley 后生效。",
+    modelConfigSavedChannelsMessage:
+      "已启用 Channels 重启后使用新模型配置。",
+    modelConfigSavedChannelsSuffix: "已启用 Channels 重启后使用新模型配置。",
+    restartChannels: "重启 Channels",
+    channelsRestarted: "Channels 已重启",
+    channelsRestartedMessage: "已启用 Channels 正在使用最新模型配置。",
+    channelsRestartFailed: "重启 Channels 失败",
+    channelsRestartNone: "没有已启用的 Channel。",
     modelSelectionChanged: "已切换到默认模型",
     modelSelectionChangedMessage:
       "这个对话之前使用的模型已不可用，Galley 已改用当前默认模型。",
@@ -1586,6 +1600,12 @@ const enCopy: AppCopy = {
       disconnectDialogTitle: "Disconnect WeChat?",
       disconnectDialogBody:
         "This only stops Galley from sending and receiving through the current WeChat session. It will not log you out of WeChat on your phone.",
+      restartChannelsTitle: "Channels are using old model config",
+      restartChannelsBody:
+        "After restart, enabled Channels will use the latest model config. This may interrupt the current reply, but will not log you out.",
+      restartChannelsDialogTitle: "Restart Channels?",
+      restartChannelsDialogBody:
+        "This restarts all enabled Channels. It may interrupt the current reply, but will not log you out.",
       openModels: "Configure models first",
       modelRequired:
         "WeChat uses Galley's configured models. Add a usable model in Models before connecting.",
@@ -1801,6 +1821,16 @@ const enCopy: AppCopy = {
     modelConfigSaved: "Model config saved",
     modelConfigSavedMessage:
       "New conversations use the latest config immediately; already-started conversations update after restarting Galley.",
+    modelConfigSavedChannelsMessage:
+      "Enabled Channels use the new model config after restart.",
+    modelConfigSavedChannelsSuffix:
+      "Enabled Channels use the new model config after restart.",
+    restartChannels: "Restart Channels",
+    channelsRestarted: "Channels restarted",
+    channelsRestartedMessage:
+      "Enabled Channels are using the latest model config.",
+    channelsRestartFailed: "Could not restart Channels",
+    channelsRestartNone: "No enabled Channel.",
     modelSelectionChanged: "Switched to the default model",
     modelSelectionChangedMessage:
       "The model this conversation used is no longer available, so Galley is using the current default.",

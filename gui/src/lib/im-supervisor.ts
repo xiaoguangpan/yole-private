@@ -17,6 +17,8 @@ export interface ImSupervisorStatus {
   botId?: string | null;
   qrImagePath?: string | null;
   lastError?: string | null;
+  modelConfigRevision?: string | null;
+  modelConfigStale: boolean;
   updatedAt: string;
 }
 
@@ -37,4 +39,8 @@ export function stopImSupervisor(platform: "wechat") {
 
 export function logoutImSupervisor(platform: "wechat") {
   return invoke<ImSupervisorStatus>("logout_im_supervisor", { platform });
+}
+
+export function restartEnabledImSupervisors() {
+  return invoke<ImSupervisorStatus[]>("restart_enabled_im_supervisors");
 }

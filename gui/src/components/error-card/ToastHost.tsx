@@ -78,6 +78,14 @@ function ToastFrame({
         variant="toast"
         onDismiss={() => onDismiss(toast.id)}
         {...actions}
+        onRestartChannels={
+          actions.onRestartChannels
+            ? () => {
+                onDismiss(toast.id);
+                actions.onRestartChannels?.();
+              }
+            : undefined
+        }
       />
     </div>
   );

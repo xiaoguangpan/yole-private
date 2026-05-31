@@ -289,6 +289,14 @@ async fn logout_im_supervisor(
 }
 
 #[tauri::command]
+async fn restart_enabled_im_supervisors(
+    app: tauri::AppHandle,
+    manager: tauri::State<'_, std::sync::Arc<im_supervisor::ImSupervisorManager>>,
+) -> std::result::Result<Vec<im_supervisor::ImSupervisorStatus>, String> {
+    manager.inner().restart_enabled(app).await
+}
+
+#[tauri::command]
 async fn list_managed_model_providers(
 ) -> std::result::Result<Vec<api::ManagedModelProviderRecord>, String> {
     let galley = SqliteGalley::open().await.map_err(stringify_error)?;
@@ -502,7 +510,23 @@ async fn sync_managed_model_config(
         std::path::Path::new(&diagnostics.paths.model_config_dir),
         &models,
     )
-    .map_err(stringify_error)
+    .map_err(stringify_error)?;
+    let revision = managed_model_config::new_revision();
+    galley
+        .set_pref_json(
+            managed_model_config::REVISION_PREF_KEY,
+            serde_json::json!(revision),
+        )
+        .await
+        .map_err(stringify_error)?;
+    {
+        use tauri::Manager;
+        if let Some(manager) = app.try_state::<std::sync::Arc<im_supervisor::ImSupervisorManager>>()
+        {
+            manager.refresh_model_config_staleness(app).await;
+        }
+    }
+    Ok(())
 }
 
 fn new_managed_model_id() -> String {
@@ -1057,6 +1081,7 @@ pub fn run() {
             start_im_supervisor,
             stop_im_supervisor,
             logout_im_supervisor,
+            restart_enabled_im_supervisors,
             list_managed_model_providers,
             save_managed_model_provider,
             delete_managed_model_provider,

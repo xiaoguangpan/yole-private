@@ -11,6 +11,7 @@ import {
   Pause,
   Power,
   QrCode,
+  ArrowsClockwise,
   WarningCircle,
 } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -20,15 +21,19 @@ import { Button, DialogActionRow, IconButton } from "@/components/ui/button";
 import { useImSupervisorStatus } from "@/hooks/useImSupervisorStatus";
 import {
   logoutImSupervisor,
+  restartEnabledImSupervisors,
   startImSupervisor,
   stopImSupervisor,
   type ImSupervisorState,
   type ImSupervisorStatus,
 } from "@/lib/im-supervisor";
 import { useCopy } from "@/lib/i18n";
+import { useUiStore } from "@/stores/ui";
+import { makeAppError } from "@/types/app-error";
 import { cn } from "@/lib/utils";
 
 type ImCopy = ReturnType<typeof useCopy>["settings"]["im"];
+type BusyAction = "connect" | "rescan" | "stop" | "disconnect" | "restart" | null;
 
 export function SettingsIM({
   hasManagedRuntimeConfigured,
@@ -44,13 +49,12 @@ export function SettingsIM({
     setStatus,
     loadError: statusLoadError,
   } = useImSupervisorStatus("wechat", hasManagedRuntimeConfigured);
-  const [busyAction, setBusyAction] = useState<
-    "connect" | "rescan" | "stop" | "disconnect" | null
-  >(null);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [invokeError, setInvokeError] = useState<string | null>(null);
+  const [confirmRestartOpen, setConfirmRestartOpen] = useState(false);
 
   const runAction = async (
-    action: "connect" | "rescan" | "stop" | "disconnect",
+    action: Exclude<BusyAction, null | "restart">,
     fn: () => Promise<ImSupervisorStatus>,
   ) => {
     setBusyAction(action);
@@ -59,6 +63,54 @@ export function SettingsIM({
       setStatus(await fn());
     } catch (e) {
       setInvokeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const restartChannels = async () => {
+    setBusyAction("restart");
+    setInvokeError(null);
+    try {
+      const statuses = await restartEnabledImSupervisors();
+      const wechat = statuses.find((item) => item.platform === "wechat");
+      if (wechat) {
+        setStatus(wechat);
+      }
+      useUiStore.getState().pushToast(
+        makeAppError({
+          id: "channels-restarted",
+          category: "business",
+          severity: "info",
+          title:
+            statuses.length > 0
+              ? copy.toasts.channelsRestarted
+              : copy.toasts.channelsRestartNone,
+          message:
+            statuses.length > 0 ? copy.toasts.channelsRestartedMessage : "",
+          hint: null,
+          retryable: false,
+          context: "restart_enabled_im_supervisors",
+          traceback: null,
+          autoDismissMs: 4200,
+        }),
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setInvokeError(message);
+      useUiStore.getState().pushToast(
+        makeAppError({
+          id: "channels-restart-failed",
+          category: "business",
+          severity: "error",
+          title: copy.toasts.channelsRestartFailed,
+          message,
+          hint: null,
+          retryable: false,
+          context: "restart_enabled_im_supervisors",
+          traceback: null,
+        }),
+      );
     } finally {
       setBusyAction(null);
     }
@@ -87,23 +139,151 @@ export function SettingsIM({
           </Button>
         </div>
       ) : (
-        <WeChatCard
-          status={status}
-          busyAction={busyAction}
-          invokeError={invokeError ?? statusLoadError}
-          onConnect={() =>
-            runAction("connect", () => startImSupervisor("wechat", false))
-          }
-          onRescan={() =>
-            runAction("rescan", () => startImSupervisor("wechat", true))
-          }
-          onStop={() => runAction("stop", () => stopImSupervisor("wechat"))}
-          onDisconnect={() =>
-            runAction("disconnect", () => logoutImSupervisor("wechat"))
-          }
-        />
+        <div className="space-y-3">
+          {status?.enabled && status.modelConfigStale ? (
+            <ChannelsConfigStaleBanner
+              busy={busyAction === "restart"}
+              onRestart={() => setConfirmRestartOpen(true)}
+            />
+          ) : null}
+          <WeChatCard
+            status={status}
+            busyAction={busyAction}
+            invokeError={invokeError ?? statusLoadError}
+            onConnect={() =>
+              runAction("connect", () => startImSupervisor("wechat", false))
+            }
+            onRescan={() =>
+              runAction("rescan", () => startImSupervisor("wechat", true))
+            }
+            onStop={() => runAction("stop", () => stopImSupervisor("wechat"))}
+            onDisconnect={() =>
+              runAction("disconnect", () => logoutImSupervisor("wechat"))
+            }
+          />
+          <RestartChannelsDialog
+            open={confirmRestartOpen}
+            busy={busyAction === "restart"}
+            onOpenChange={setConfirmRestartOpen}
+            onConfirm={() => {
+              setConfirmRestartOpen(false);
+              void restartChannels();
+            }}
+          />
+        </div>
       )}
     </div>
+  );
+}
+
+function ChannelsConfigStaleBanner({
+  busy,
+  onRestart,
+}: {
+  busy: boolean;
+  onRestart: () => void;
+}) {
+  const copy = useCopy();
+  const imCopy = copy.settings.im;
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-sm border border-warning/25 bg-warning/[0.07] px-3 py-2.5">
+      <WarningCircle size={16} weight="bold" className="shrink-0 text-warning" />
+      <div className="min-w-[180px] flex-1">
+        <div className="text-[13px] font-medium text-ink">
+          {imCopy.restartChannelsTitle}
+        </div>
+        <div className="mt-0.5 text-[12px] leading-5 text-ink-soft">
+          {imCopy.restartChannelsBody}
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={busy}
+        leadingIcon={
+          busy ? (
+            <CircleNotch size={13} className="animate-spin" />
+          ) : (
+            <ArrowsClockwise size={13} />
+          )
+        }
+        onClick={onRestart}
+      >
+        {copy.toasts.restartChannels}
+      </Button>
+    </div>
+  );
+}
+
+function RestartChannelsDialog({
+  open,
+  busy,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  busy: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const copy = useCopy();
+  const imCopy = copy.settings.im;
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-overlay" />
+        <Dialog.Content
+          role="alertdialog"
+          aria-describedby="restart-channels-desc"
+          className={cn(
+            "fixed left-1/2 top-1/2 z-[60] w-[420px] -translate-x-1/2 -translate-y-1/2",
+            "max-w-[calc(100vw-32px)] rounded-lg border border-line bg-elevated p-5 shadow-elevated",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <ArrowsClockwise
+              size={18}
+              weight="bold"
+              className="text-warning"
+            />
+            <Dialog.Title className="font-serif text-[15px] font-medium text-ink">
+              {imCopy.restartChannelsDialogTitle}
+            </Dialog.Title>
+          </div>
+          <p
+            id="restart-channels-desc"
+            className="mt-2 text-[12.5px] leading-[1.55] text-ink-soft"
+          >
+            {imCopy.restartChannelsDialogBody}
+          </p>
+          <DialogActionRow>
+            <Button
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+              autoFocus
+            >
+              {copy.common.cancel}
+            </Button>
+            <Button
+              variant="warning"
+              disabled={busy}
+              leadingIcon={
+                busy ? (
+                  <CircleNotch size={13} className="animate-spin" />
+                ) : (
+                  <ArrowsClockwise size={13} />
+                )
+              }
+              onClick={onConfirm}
+            >
+              {copy.toasts.restartChannels}
+            </Button>
+          </DialogActionRow>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -117,7 +297,7 @@ function WeChatCard({
   onDisconnect,
 }: {
   status: ImSupervisorStatus | null;
-  busyAction: "connect" | "rescan" | "stop" | "disconnect" | null;
+  busyAction: BusyAction;
   invokeError: string | null;
   onConnect: () => void;
   onRescan: () => void;
@@ -357,7 +537,7 @@ function primaryActionForState({
 }: {
   imCopy: ImCopy;
   state: ImSupervisorState;
-  busyAction: "connect" | "rescan" | "stop" | "disconnect" | null;
+  busyAction: BusyAction;
   expanded: boolean;
   onConnect: () => void;
   onRescan: () => void;

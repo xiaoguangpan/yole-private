@@ -44,11 +44,17 @@ export interface AppError {
   /** Python traceback (when available; surfaced only in expanded details). */
   traceback: string | null;
   /** Optional single-action CTA for positive desktop feedback toasts. */
-  action?: {
-    kind: "view_project";
-    label: string;
-    projectId: string;
-  } | null;
+  action?:
+    | {
+        kind: "view_project";
+        label: string;
+        projectId: string;
+      }
+    | {
+        kind: "restart_channels";
+        label: string;
+      }
+    | null;
   /** Per-toast override. Useful for short positive confirmations. */
   autoDismissMs?: number;
   timestamp: string;

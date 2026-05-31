@@ -30,6 +30,8 @@ export interface ErrorCardActions {
   onOpenGADocs?: () => void;
   /** Open a project scope from a positive feedback toast. */
   onViewProject?: (projectId: string) => void;
+  /** Restart enabled Channels from an actionable toast. */
+  onRestartChannels?: () => void;
 }
 
 interface ErrorCardProps extends ErrorCardActions {
@@ -63,6 +65,7 @@ export function ErrorCard({
   onOpenMyKey,
   onOpenGADocs,
   onViewProject,
+  onRestartChannels,
 }: ErrorCardProps) {
   const copy = useCopy();
   const [open, setOpen] = useState(false);
@@ -88,6 +91,7 @@ export function ErrorCard({
         onOpenMyKey,
         onOpenGADocs,
         onViewProject,
+        onRestartChannels,
       }),
   );
 
@@ -137,6 +141,7 @@ export function ErrorCard({
                 onOpenMyKey={onOpenMyKey}
                 onOpenGADocs={onOpenGADocs}
                 onViewProject={onViewProject}
+                onRestartChannels={onRestartChannels}
                 onToggleDetails={() => setOpen((v) => !v)}
                 detailsOpen={open}
               />
@@ -185,9 +190,10 @@ export function ErrorCard({
               onRetry={onRetry}
               onSwitchLLM={onSwitchLLM}
               onOpenMyKey={onOpenMyKey}
-              onOpenGADocs={onOpenGADocs}
-              onViewProject={onViewProject}
-              onToggleDetails={() => setOpen((v) => !v)}
+                onOpenGADocs={onOpenGADocs}
+                onViewProject={onViewProject}
+                onRestartChannels={onRestartChannels}
+                onToggleDetails={() => setOpen((v) => !v)}
               detailsOpen={open}
             />
           ))}
@@ -225,6 +231,7 @@ interface ActionDef {
     | "onOpenMyKey"
     | "onOpenGADocs"
     | "onViewProject"
+    | "onRestartChannels"
     | "copyDetails"
     | "toggleDetails";
 }
@@ -352,6 +359,14 @@ function defaultActions(error: AppError, copy: AppCopy): ActionDef[] {
       handler: "onViewProject",
     });
   }
+  if (error.action?.kind === "restart_channels") {
+    actions.push({
+      id: "restart-channels",
+      label: error.action.label,
+      kind: "primary",
+      handler: "onRestartChannels",
+    });
+  }
   if (error.retryable) {
     actions.push({
       id: "retry",
@@ -376,7 +391,12 @@ function isActionAvailable(
   error: AppError,
   handlers: Pick<
     ErrorCardActions,
-    "onRetry" | "onSwitchLLM" | "onOpenMyKey" | "onOpenGADocs" | "onViewProject"
+    | "onRetry"
+    | "onSwitchLLM"
+    | "onOpenMyKey"
+    | "onOpenGADocs"
+    | "onViewProject"
+    | "onRestartChannels"
   >,
 ): boolean {
   switch (action.handler) {
@@ -391,6 +411,11 @@ function isActionAvailable(
     case "onViewProject":
       return (
         error.action?.kind === "view_project" && Boolean(handlers.onViewProject)
+      );
+    case "onRestartChannels":
+      return (
+        error.action?.kind === "restart_channels" &&
+        Boolean(handlers.onRestartChannels)
       );
     case "copyDetails":
       return hasDiagnosticDetails(error);
@@ -413,6 +438,7 @@ function ActionButton({
   onOpenMyKey,
   onOpenGADocs,
   onViewProject,
+  onRestartChannels,
   onToggleDetails,
   detailsOpen,
 }: {
@@ -423,6 +449,7 @@ function ActionButton({
   onOpenMyKey?: () => void;
   onOpenGADocs?: () => void;
   onViewProject?: (projectId: string) => void;
+  onRestartChannels?: () => void;
   onToggleDetails: () => void;
   detailsOpen: boolean;
 }) {
@@ -446,6 +473,11 @@ function ActionButton({
           const { projectId } = error.action;
           return () => onViewProject(projectId);
         }
+      case "onRestartChannels":
+        if (error.action?.kind !== "restart_channels") {
+          return undefined;
+        }
+        return onRestartChannels;
       case "copyDetails":
         return () => {
           void copyTextToClipboard(formatErrorDetails(error)).then(() => {

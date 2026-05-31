@@ -24,6 +24,7 @@ import {
 } from "@/components/screens/project/EditProjectDialog";
 import { CopyProvider, copyForLanguage } from "@/lib/i18n";
 import { useImSupervisorStatus } from "@/hooks/useImSupervisorStatus";
+import { restartEnabledImSupervisors } from "@/lib/im-supervisor";
 import { ensureHistoryReplayComplete } from "@/lib/ipc-handlers";
 import { resolveLanguagePreference } from "@/lib/language";
 import {
@@ -271,6 +272,47 @@ function App() {
       return;
     }
     setPaletteOpen(true);
+  };
+  const restartChannelsFromToast = async () => {
+    try {
+      const statuses = await restartEnabledImSupervisors();
+      const wechat = statuses.find((status) => status.platform === "wechat");
+      if (wechat) {
+        channelsStatus.setStatus(wechat);
+      }
+      pushToast(
+        makeAppError({
+          id: "channels-restarted",
+          category: "business",
+          severity: "info",
+          title:
+            statuses.length > 0
+              ? copy.toasts.channelsRestarted
+              : copy.toasts.channelsRestartNone,
+          message:
+            statuses.length > 0 ? copy.toasts.channelsRestartedMessage : "",
+          hint: null,
+          retryable: false,
+          context: "restart_enabled_im_supervisors",
+          traceback: null,
+          autoDismissMs: 4200,
+        }),
+      );
+    } catch (e) {
+      pushToast(
+        makeAppError({
+          id: "channels-restart-failed",
+          category: "business",
+          severity: "error",
+          title: copy.toasts.channelsRestartFailed,
+          message: e instanceof Error ? e.message : String(e),
+          hint: null,
+          retryable: false,
+          context: "restart_enabled_im_supervisors",
+          traceback: null,
+        }),
+      );
+    }
   };
 
   const storeTurns = useMessagesStore((s) =>
@@ -1584,6 +1626,9 @@ function App() {
         toasts={toasts}
         onDismiss={dismissToast}
         onViewProject={openProjectInSidebar}
+        onRestartChannels={() => {
+          void restartChannelsFromToast();
+        }}
       />
 
       <YoloIntroDialog

@@ -13,6 +13,7 @@ use crate::api::ManagedModelRecord;
 use crate::error::{GalleyError, Result};
 
 pub const GENERATED_CONFIG_FILENAME: &str = "managed-models.json";
+pub const REVISION_PREF_KEY: &str = "managed_model_config_revision";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,4 +41,8 @@ pub fn write_nonsecret_config(
         message: format!("writing {}: {e}", path.display()),
     })?;
     Ok(())
+}
+
+pub fn new_revision() -> String {
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
 }

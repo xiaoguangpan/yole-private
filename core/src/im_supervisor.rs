@@ -5,6 +5,7 @@
 
 use crate::api::GalleyApi;
 use crate::db::SqliteGalley;
+use crate::managed_model_config;
 use crate::managed_prompt;
 use crate::managed_runtime;
 use crate::process_command;
@@ -24,6 +25,7 @@ use tokio::time::{sleep, Duration};
 const EVENT_NAME: &str = "im-supervisor-updated";
 const WECHAT: &str = "wechat";
 const WECHAT_PREF: &str = "im_supervisor_wechat";
+const PLATFORMS: [&str; 1] = [WECHAT];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -47,7 +49,25 @@ pub struct ImSupervisorStatus {
     pub bot_id: Option<String>,
     pub qr_image_path: Option<String>,
     pub last_error: Option<String>,
+    pub model_config_revision: Option<String>,
+    pub model_config_stale: bool,
     pub updated_at: String,
+}
+
+impl ImSupervisorStatus {
+    fn with_pref(
+        mut self,
+        pref: ImSupervisorPref,
+        current_revision: Option<String>,
+    ) -> ImSupervisorStatus {
+        self.enabled = pref.enabled;
+        self.model_config_stale = model_config_stale(
+            self.model_config_revision.as_ref(),
+            current_revision.as_ref(),
+            pref.enabled,
+        );
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -55,6 +75,7 @@ pub struct ImSupervisorStatus {
 struct ImSupervisorPref {
     enabled: bool,
     auto_start: bool,
+    model_config_revision: Option<String>,
 }
 
 struct ProcessSlot {
@@ -90,11 +111,9 @@ impl ImSupervisorManager {
     ) -> Result<ImSupervisorStatus, String> {
         let platform = normalize_platform(&platform)?;
         if let Some(status) = self.current_status(platform).await {
-            let pref = read_pref().await;
-            return Ok(ImSupervisorStatus {
-                enabled: pref.enabled,
-                ..status
-            });
+            let pref = read_pref(platform).await;
+            let current_revision = read_model_config_revision().await;
+            return Ok(status.with_pref(pref, current_revision));
         }
         self.derived_status(app, platform).await
     }
@@ -105,6 +124,16 @@ impl ImSupervisorManager {
         platform: String,
         relogin: bool,
     ) -> Result<ImSupervisorStatus, String> {
+        self.start_inner(app, platform, relogin, false).await
+    }
+
+    async fn start_inner(
+        self: &Arc<Self>,
+        app: AppHandle,
+        platform: String,
+        relogin: bool,
+        force_restart: bool,
+    ) -> Result<ImSupervisorStatus, String> {
         let platform = normalize_platform(&platform)?;
         if let Some(status) = self.current_status(platform).await {
             if matches!(
@@ -113,8 +142,10 @@ impl ImSupervisorManager {
                     | ImSupervisorState::WaitingScan
                     | ImSupervisorState::Running
             ) {
-                if !relogin {
-                    return Ok(status);
+                if !relogin && !force_restart {
+                    let pref = read_pref(platform).await;
+                    let current_revision = read_model_config_revision().await;
+                    return Ok(status.with_pref(pref, current_revision));
                 }
                 if let Some(child) = self.take_child(platform).await {
                     let _ = child.lock().await.start_kill();
@@ -122,10 +153,15 @@ impl ImSupervisorManager {
             }
         }
 
-        write_pref(ImSupervisorPref {
-            enabled: true,
-            auto_start: true,
-        })
+        let model_config_revision = read_model_config_revision().await;
+        write_pref(
+            platform,
+            ImSupervisorPref {
+                enabled: true,
+                auto_start: true,
+                model_config_revision: model_config_revision.clone(),
+            },
+        )
         .await?;
 
         let context = prepare_managed_runtime_context(&app, None)
@@ -194,6 +230,8 @@ impl ImSupervisorManager {
             bot_id: None,
             qr_image_path: None,
             last_error: None,
+            model_config_revision,
+            model_config_stale: false,
             updated_at: now_iso(),
         };
         self.set_slot(platform, Some(child.clone()), status.clone(), &app)
@@ -232,10 +270,14 @@ impl ImSupervisorManager {
         platform: String,
     ) -> Result<ImSupervisorStatus, String> {
         let platform = normalize_platform(&platform)?;
-        write_pref(ImSupervisorPref {
-            enabled: false,
-            auto_start: false,
-        })
+        write_pref(
+            platform,
+            ImSupervisorPref {
+                enabled: false,
+                auto_start: false,
+                model_config_revision: None,
+            },
+        )
         .await?;
         let child = {
             let mut slots = self.slots.lock().await;
@@ -255,6 +297,8 @@ impl ImSupervisorManager {
             bot_id: None,
             qr_image_path: self.qr_path(&app, platform).await,
             last_error: None,
+            model_config_revision: None,
+            model_config_stale: false,
             updated_at: now_iso(),
         };
         self.set_slot(platform, None, status.clone(), &app).await;
@@ -268,10 +312,14 @@ impl ImSupervisorManager {
     ) -> Result<ImSupervisorStatus, String> {
         let platform = normalize_platform(&platform)?;
         let _ = self.stop(app.clone(), platform.into()).await;
-        write_pref(ImSupervisorPref {
-            enabled: false,
-            auto_start: false,
-        })
+        write_pref(
+            platform,
+            ImSupervisorPref {
+                enabled: false,
+                auto_start: false,
+                model_config_revision: None,
+            },
+        )
         .await?;
         if let Ok(state_dir) = wechat_state_dir(&app) {
             let _ = std::fs::remove_file(state_dir.join("token.json"));
@@ -285,6 +333,8 @@ impl ImSupervisorManager {
             bot_id: None,
             qr_image_path: None,
             last_error: None,
+            model_config_revision: None,
+            model_config_stale: false,
             updated_at: now_iso(),
         };
         self.set_slot(platform, None, status.clone(), &app).await;
@@ -292,9 +342,52 @@ impl ImSupervisorManager {
     }
 
     pub async fn autostart(self: Arc<Self>, app: AppHandle) {
-        let pref = read_pref().await;
+        let pref = read_pref(WECHAT).await;
         if pref.enabled && pref.auto_start {
             let _ = self.start(app, WECHAT.into(), false).await;
+        }
+    }
+
+    pub async fn restart_enabled(
+        self: &Arc<Self>,
+        app: AppHandle,
+    ) -> Result<Vec<ImSupervisorStatus>, String> {
+        let mut statuses = Vec::new();
+        for platform in PLATFORMS {
+            let pref = read_pref(platform).await;
+            if pref.enabled {
+                statuses.push(
+                    self.start_inner(app.clone(), platform.into(), false, true)
+                        .await?,
+                );
+            }
+        }
+        Ok(statuses)
+    }
+
+    pub async fn refresh_model_config_staleness(&self, app: &AppHandle) {
+        let current_revision = read_model_config_revision().await;
+        for platform in PLATFORMS {
+            let pref = read_pref(platform).await;
+            let next_status = {
+                let mut slots = self.slots.lock().await;
+                let Some(slot) = slots.get_mut(platform) else {
+                    continue;
+                };
+                let mut next = slot
+                    .status
+                    .clone()
+                    .with_pref(pref.clone(), current_revision.clone());
+                if next.enabled == slot.status.enabled
+                    && next.model_config_stale == slot.status.model_config_stale
+                {
+                    continue;
+                }
+                next.updated_at = now_iso();
+                slot.status = next.clone();
+                next
+            };
+            let _ = app.emit(EVENT_NAME, next_status);
         }
     }
 
@@ -470,10 +563,16 @@ impl ImSupervisorManager {
         app: &AppHandle,
         platform: &'static str,
     ) -> Result<ImSupervisorStatus, String> {
-        let pref = read_pref().await;
+        let pref = read_pref(platform).await;
+        let current_revision = read_model_config_revision().await;
         let state_dir = wechat_state_dir(app)?;
         let token_exists = state_dir.join("token.json").is_file();
         let qr_path = latest_wechat_qr_path(&state_dir);
+        let model_config_stale = model_config_stale(
+            pref.model_config_revision.as_ref(),
+            current_revision.as_ref(),
+            pref.enabled,
+        );
         Ok(ImSupervisorStatus {
             platform: platform.into(),
             state: if token_exists {
@@ -486,6 +585,8 @@ impl ImSupervisorManager {
             bot_id: None,
             qr_image_path: qr_path.map(|path| path.to_string_lossy().into_owned()),
             last_error: None,
+            model_config_revision: pref.model_config_revision,
+            model_config_stale,
             updated_at: now_iso(),
         })
     }
@@ -538,22 +639,54 @@ fn normalize_platform(platform: &str) -> Result<&'static str, String> {
     }
 }
 
-async fn read_pref() -> ImSupervisorPref {
+async fn read_pref(platform: &str) -> ImSupervisorPref {
     let Ok(galley) = SqliteGalley::open().await else {
         return ImSupervisorPref::default();
     };
-    let Ok(Some(value)) = galley.get_pref_json(WECHAT_PREF).await else {
+    let Some(key) = pref_key(platform) else {
+        return ImSupervisorPref::default();
+    };
+    let Ok(Some(value)) = galley.get_pref_json(key).await else {
         return ImSupervisorPref::default();
     };
     serde_json::from_value(value).unwrap_or_default()
 }
 
-async fn write_pref(pref: ImSupervisorPref) -> Result<(), String> {
+async fn write_pref(platform: &str, pref: ImSupervisorPref) -> Result<(), String> {
     let galley = SqliteGalley::open().await.map_err(|e| e.to_string())?;
+    let key = pref_key(platform).ok_or_else(|| format!("unsupported IM platform: {platform}"))?;
     galley
-        .set_pref_json(WECHAT_PREF, json!(pref))
+        .set_pref_json(key, json!(pref))
         .await
         .map_err(|e| e.to_string())
+}
+
+async fn read_model_config_revision() -> Option<String> {
+    let Ok(galley) = SqliteGalley::open().await else {
+        return None;
+    };
+    let Ok(Some(value)) = galley
+        .get_pref_json(managed_model_config::REVISION_PREF_KEY)
+        .await
+    else {
+        return None;
+    };
+    value.as_str().map(ToOwned::to_owned)
+}
+
+fn model_config_stale(
+    used_revision: Option<&String>,
+    current_revision: Option<&String>,
+    enabled: bool,
+) -> bool {
+    enabled && current_revision.is_some() && used_revision != current_revision
+}
+
+fn pref_key(platform: &str) -> Option<&'static str> {
+    match platform {
+        WECHAT => Some(WECHAT_PREF),
+        _ => None,
+    }
 }
 
 fn materialize_sop_reference(state_root: &Path) -> std::io::Result<PathBuf> {
