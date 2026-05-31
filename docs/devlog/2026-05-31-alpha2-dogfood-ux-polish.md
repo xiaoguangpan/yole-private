@@ -1,7 +1,7 @@
 # 2026-05-31 — Alpha.2 dogfood UX polish
 
 **Date:** 2026-05-31
-**Status:** Implemented on `main`; feeding into `v0.2.0` release prep
+**Status:** Shipped in `v0.2.0`; GitHub Release published and update channel promoted on 2026-05-31
 **Related:** [project status](../project-status.md), [copy language guidelines](../copy-language-guidelines.md), [managed GA runtime](../managed-ga-runtime.md), [Managed IM Supervisor](./2026-05-29-managed-im-supervisor-wechat.md)
 
 ## Context
@@ -58,6 +58,9 @@ complexity, while the UI remains quiet once something is configured.
 - While Galley is small, GitHub Issues are primarily the external feedback
   entrance. Maintainer-found problems can be handled directly in code and
   devlog without self-filing every internal task as an issue.
+- Release follow-through used `v0.2.0` as the first stable tag, published it as
+  GitHub Latest, and promoted the beta update channel so installed users can
+  upgrade through the app.
 
 ## Rejected Alternatives
 
@@ -86,9 +89,9 @@ complexity, while the UI remains quiet once something is configured.
 
 ## Open Questions
 
-- Windows smoke needs to cover external GA path normalization, selected Python /
-  virtualenv probing, bundled runtime startup, `960x600` onboarding, Browser
-  Control, Channels entry, and IM QR refresh.
+- Post-release feedback should especially watch Windows external GA path
+  normalization, selected Python / virtualenv probing, bundled runtime startup,
+  `960x600` onboarding, Browser Control, Channels entry, and IM QR refresh.
 - When Channels has multiple real platforms, decide whether to rename internal
   `im` routes / components or keep the old identifiers until a larger cleanup.
 - Managed bundled Python may need a documented dependency coverage policy:
@@ -99,6 +102,5 @@ complexity, while the UI remains quiet once something is configured.
 
 ## Next
 
-Dogfood these post-alpha.2 fixes on macOS and Windows before publishing
-`v0.2.0`. Keep the update channel unchanged unless there is an explicit
-decision to promote installed users onto the release.
+Monitor `v0.2.0` feedback. If P0 / P1 regressions appear, ship a focused
+`v0.2.1` hotfix rather than mixing bug fixes with larger feature work.

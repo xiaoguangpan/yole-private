@@ -50,7 +50,7 @@ Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) e
 | | |
 |---|---|
 | 📦 **Out of the box**<br/>Bundled GenericAgent runtime, CPython 3.11, and runtime dependencies. | 🪟 **Multi-session + Project orchestration**<br/>Run multiple tasks in parallel; complex goals can be split into one Project and synthesized by a Supervisor Agent. |
-| ⚙️ **GUI + CLI dual-native**<br/>Humans operate in the GUI; Supervisor Agents operate through the stable `galley` CLI. Both share the same sessions and history. | 💬 **IM integration**<br/>Connect WeChat from **Settings -> IM** by scanning a QR code; while Galley is running, you can message Galley from WeChat. More messaging apps can be added later. |
+| ⚙️ **GUI + CLI dual-native**<br/>Humans operate in the GUI; Supervisor Agents operate through the stable `galley` CLI. Both share the same sessions and history. | 💬 **Channels**<br/>Connect WeChat from **Settings -> Channels** by scanning a QR code; while Galley is running, you can message Galley from WeChat. More messaging apps can be added later. |
 | 🔒 **Localhost-only**<br/>Core listens only on a Unix socket / Windows named pipe; remote transport belongs to the Supervisor Agent. | 🔧 **Tool timeline + approvals**<br/>Tool calls, args, results, and timing are shown inline; risky actions can use approval, allowlists, or YOLO mode. |
 | 🌐 **Browser Control**<br/>After connecting Chrome / Edge / Chromium, the agent can operate your signed-in browser. There is a lot of room to explore. | 💾 **Persistence + search + background mode**<br/>Close the window, keep working via a Supervisor Agent, then come back to continue or search past sessions. |
 
@@ -76,7 +76,7 @@ Prepare a usable LLM service first: API Key, Base URL, and model name.
 Galley is not code-signed yet. If macOS blocks the first launch, run:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Galley.app
 ```
 
 On Windows, when SmartScreen says the publisher is unknown, choose "More info" -> "Run anyway".
@@ -87,7 +87,7 @@ If you already have a GenericAgent environment, choose the GA folder from **Sett
 
 ---
 
-## Supervisor / IM
+## Supervisor / Channels
 
 In the running GUI, open **Settings -> Agent**:
 
@@ -96,7 +96,7 @@ In the running GUI, open **Settings -> Agent**:
 | **Copy SOP** | Copies [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md), so your Agent can choose between one session, an existing-session follow-up, or a Project-backed session group |
 | **Open Agent API docs** | Opens the full command reference, JSON schemas, and exit codes |
 
-You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Galley. Complex work does not become one giant prompt: the Supervisor SOP first chooses an orchestration mode, follows one session for simple requests, and uses a Project-backed group of sessions for independent work that needs synthesis. You can also connect WeChat from **Settings -> IM**, scan the QR code, and message Galley from WeChat.
+You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Galley. Complex work does not become one giant prompt: the Supervisor SOP first chooses an orchestration mode, follows one session for simple requests, and uses a Project-backed group of sessions for independent work that needs synthesis. You can also connect WeChat from **Settings -> Channels**, scan the QR code, and message Galley from WeChat.
 
 <details>
 <summary>Show CLI examples</summary>

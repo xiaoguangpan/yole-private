@@ -606,10 +606,10 @@ Do not expose non-native text-protocol sessions, mixin failover, IM bot config,
 Langfuse, or arbitrary GA template fields in first-run onboarding. Those can
 become advanced Settings later if there is real demand.
 
-Managed IM Supervisor is the first advanced Settings exception. It lives under
-Settings -> IM, not Onboarding. Phase 1 exposes only WeChat and keeps the user
-flow to: connect, scan, chat. Galley owns the process, state paths, bundled
-dependencies, managed model config, and managed prompt injection.
+Managed Channels is the first advanced Settings exception. It lives under
+Settings -> Channels, not Onboarding. Phase 1 exposes only WeChat and keeps the
+user flow to: connect, scan, chat. Galley owns the process, state paths,
+bundled dependencies, managed model config, and managed prompt injection.
 
 WeChat token, QR image, and logs live under Galley's managed state
 `managed-ga-state/im/wechat/`. The official GA default `~/.wxbot/token.json`
@@ -925,7 +925,7 @@ protecting API keys better than official GA's plain-file default.
 Scope:
 
 - Add managed model records in Galley DB with non-secret metadata only.
-- Store API keys in encrypted SQLite rows for the unsigned beta.
+- Store API keys in encrypted SQLite rows for unsigned release builds.
 - Use `apiKeyRef` in Galley DB and generated runtime config.
 - Add model connection test before first conversation.
 - Add Settings -> Runtime / Models management for adding, testing, renaming,
@@ -938,7 +938,7 @@ Current implementation slice:
 - `managed_model_providers` and `managed_models` store Provider / Model
   metadata only.
 - `managed_model_secrets` stores encrypted API key payloads keyed by
-  `apiKeyRef`; `managed_model_secret_keys` stores the local beta encryption key
+  `apiKeyRef`; `managed_model_secret_keys` stores the local encryption key
   so backups can restore credentials with the DB.
 - Passive model/provider list APIs return credential status from encrypted row
   presence (`present` / `missing`) without decrypting API key values.
@@ -956,9 +956,9 @@ Acceptance:
 - The database and generated config do not contain real API key values.
 - Deleting an encrypted secret row makes the corresponding model fail with an
   actionable `managed_model_not_configured` / credential error.
-- Galley backup includes encrypted managed model credentials and the local beta
-  key; restored backups can use configured managed models without re-entering
-  API keys.
+- Galley backup includes encrypted managed model credentials and the local key;
+  restored backups can use configured managed models without re-entering API
+  keys.
 - A user can complete first-run model setup without seeing `mykey.py`, Python,
   venv, GA checkout paths, or generated config.
 
@@ -1166,7 +1166,7 @@ Acceptance:
 
 - Galley backup restores managed sessions and managed state.
 - A restored backup on a new machine preserves encrypted managed model
-  credentials for the unsigned beta.
+  credentials for unsigned release builds.
 - Managed GA code can be replaced without overwriting memory, SOP, skills,
   temp state, or model responses.
 - Existing attach users do not see changed GA behavior after upgrade.
@@ -1184,8 +1184,8 @@ Current implementation slice:
   managed sessions, `managed-ga-state/`, non-secret `managed-model-config/`,
   and encrypted managed model credentials in `workbench.db` are included.
 - Plaintext API keys are never written to generated config, diagnostics, or
-  backup sidecar files. The unsigned beta DB contains both encrypted payloads
-  and the local beta key by design.
+  backup sidecar files. The unsigned release DB contains both encrypted payloads
+  and the local key by design.
 - Settings -> Runtime -> Advanced Diagnostics now shows active runtime mode,
   managed GA baseline, patch stack, code/prompt readiness, state path,
   configured managed model metadata, and generated non-secret config presence.
@@ -1312,5 +1312,5 @@ Before shipping managed runtime, verify:
 - Managed runtime upgrade replaces code without overwriting memory, SOP, skills,
   or other state.
 - Galley backup restores managed sessions, state, and encrypted managed model
-  credentials on a new machine for the unsigned beta.
+  credentials on a new machine for unsigned release builds.
 - `node scripts/check-managed-ga-payload.mjs` passes locally and in CI.

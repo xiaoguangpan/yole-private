@@ -159,8 +159,8 @@ Managed / bundled GA keeps code and state separate:
   `managed-ga/patches/`.
 - Application Support contains `managed-ga-state/` and
   `managed-model-config/`.
-- For the unsigned beta, `workbench.db` contains encrypted managed model API key
-  payloads plus the local beta encryption key. Generated runtime config stores
+- For unsigned release builds, `workbench.db` contains encrypted managed model
+  API key payloads plus the local encryption key. Generated runtime config stores
   only `apiKeyRef`, never plaintext API keys.
 
 Galley may replace the managed code payload during an app update, but it must
@@ -171,7 +171,7 @@ keys.
 
 Backups of Application Support are expected to restore sessions, managed GA
 state, non-secret model metadata, and encrypted managed model credentials for
-the unsigned beta.
+unsigned release builds.
 
 The managed-runtime product and upgrade rules live in
 [managed GA runtime](./managed-ga-runtime.md).
@@ -199,6 +199,4 @@ Windows manual smoke lives in [windows build checklist](./windows-build-checklis
 - `macOS` means the operating system. Use for platform names, system
   requirements, and release titles.
 - `Mac` means the hardware family or user device.
-- Release title examples:
-  - `Galley v0.2.0-alpha.1 · macOS (Alpha)`
-  - `Galley v0.2.0-alpha.1 · Windows (Alpha)`
+- Release title example: `Galley v0.2.0`.

@@ -12,8 +12,8 @@ live in [refactor](./refactor/README.md).
 - Package version: `0.2.0`
 - Git tag / GitHub Release: `v0.2.0`
 - Agent API schema: `schemaVersion: 1`
-- Release tier: first stable release candidate; publish only after macOS and
-  Windows smoke. Update channel promotion remains a separate gate.
+- Release tier: first stable release; published as GitHub Latest and promoted
+  to the beta update channel on 2026-05-31.
 - Product shape: dual-native local agent team orchestrator
 
 Galley GUI and Galley CLI are peer frontends over Rust-side Galley Core. The
@@ -22,26 +22,24 @@ Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.2.0` is being prepared from `main` as Galley's first stable release. It
-includes the alpha.2 build plus post-alpha.2 dogfood fixes: small-screen
-onboarding, external-GA runtime probing, clearer model probe copy, unified
-tooltip behavior, compact bottom-left toasts, and the managed-mode Channels
-TopBar entry.
+`v0.2.0` is published as Galley's first stable release. It includes the
+alpha.2 build plus post-alpha.2 dogfood fixes: small-screen onboarding,
+external-GA runtime probing, clearer model probe copy, unified tooltip
+behavior, compact bottom-left toasts, and the managed-mode Channels TopBar
+entry.
 
 For the next release:
 
-1. Finish local dogfood for the v0.2.0 runtime / GUI fixes: small-screen
-   onboarding, external-GA runtime probe, model probe copy, compact toasts, and
-   Channels entry.
-2. Run Windows smoke for path handling, selected GA virtualenv / user-Python
-   probing, bundled runtime startup, `960x600` minimum window, Browser Control,
-   Channels entry, and IM QR refresh.
+1. Monitor post-release feedback, especially Windows path handling, selected GA
+   virtualenv / user-Python probing, bundled runtime startup, `960x600`
+   minimum window behavior, Browser Control, Channels entry, and IM QR refresh.
+2. Use `v0.2.1` for focused P0 / P1 bug fixes; do not bundle broad feature
+   work into a hotfix.
 3. Run release/update dry-run if packaging, signing, updater config, or bundled
    Python dependencies changed.
-4. Finalize release notes and devlog.
-5. Publish only after smoke. Promote the beta update channel only when we
-   explicitly decide that installed users should receive the build.
-6. Run the standard verification set:
+4. Keep GitHub Release publishing and update-channel promotion as separate
+   gates, even for stable releases.
+5. Run the standard verification set:
    - `cargo check --workspace`
    - `cargo test --workspace`
    - `pnpm typecheck`
@@ -55,10 +53,10 @@ For the next release:
 | Core architecture | Rust Galley Core is authoritative | [architecture demo](./architecture-demo.md) |
 | CLI / Agent API | Feature-complete for v0.2; schema frozen | [agent-api](./agent-api.md) |
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
-| Managed GA runtime | M9 package gate implemented; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials in dogfood | [managed GA runtime](./managed-ga-runtime.md) |
+| Managed GA runtime | Shipped in v0.2.0; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | macOS DMG + Windows NSIS + gated updater channel | [release / update SOP](./release-update-sop.md) |
-| Windows | Artifact path exists; smoke must cover path / probe / min-window / IM flows | [Windows checklist](./windows-build-checklist.md) |
+| Release path | v0.2.0 published; macOS DMG + Windows NSIS + gated updater channel are live | [release / update SOP](./release-update-sop.md) |
+| Windows | v0.2.0 artifact shipped; post-release feedback should especially watch path / probe / min-window / IM flows | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline
@@ -72,7 +70,7 @@ For the next release:
 | B1 | Complete | Rust core skeleton + read-only CLI |
 | B2 | Complete | Bridge ownership moved to Rust + local socket / named pipe |
 | B3 | Complete | `useAppStore.ts` removed; state split into domain stores |
-| B4 | Main body complete, v0.2.0 release prep | CLI writes, schema freeze, discovery file, Settings -> Agent, SOP, Claude Skill, activity UI, backup mechanism |
+| B4 | Shipped with v0.2.0 | CLI writes, schema freeze, discovery file, Settings -> Agent, SOP, Claude Skill, activity UI, backup mechanism |
 
 Detailed phase narratives are intentionally not duplicated here. Use:
 
@@ -82,13 +80,13 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Use `0.2.0` inside package metadata:
+- Current package metadata uses `0.2.0`. For the next release, update:
   - `package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`
   - `cli/Cargo.toml`
   - `gui/package.json`
-- Use `v0.2.0` for Git tag and GitHub Release title.
+- Use `vX.Y.Z` for Git tag and GitHub Release title.
 - Keep Agent API at `schemaVersion: 1`.
 - A breaking Agent API change requires `schemaVersion: 2`, with explicit
   compatibility notes in [agent-api](./agent-api.md).

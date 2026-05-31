@@ -469,13 +469,13 @@ migration 失败 → app 拒绝启动 + 显示错误页面：
 |---|---|---|
 | v0.1 Mac release | 5月下旬 ✅ | 现有代码出包 (.app + .dmg) |
 | v0.1.1 内置 Python | 2026-05-18 ✅ | bundled CPython + GA core deps，零 Python 配置；Mac arm64 + Intel + Win 全 ship |
-| Windows parity | v0.2.0-alpha.1 ship 前 smoke | NSIS .exe + Win/Mac 跨平台 |
+| Windows parity | 2026-05-31 ✅ | NSIS .exe + Win/Mac 跨平台 |
 | Prototype: Rust-owned subprocess | B1 前 2-3 天 ✅ (2026-05-18) | throwaway 验证 (17/17 PASS · GO for B1) |
 | B1: Rust core 骨架 + CLI 只读 | 1 session ✅ (2026-05-18) | 目录重组、core/cli/gui/runner 四目录、6 个 read 命令 |
 | B2: Runner ownership 迁 Rust | 1 session ✅ (2026-05-19) | Rust 持 child handle，CLI send_message 写命令 |
 | B3: useAppStore 拆 slice 改订阅 | 2 day calendar ✅ (2026-05-20, tag `b3-complete`) | GUI 改 presenter，最 risky 阶段；useAppStore.ts 删除 |
-| B4: CLI feature-complete + background mode | 进行中 (7/9 milestones shipped) | 全命令 ✅ M1 + menubar ⏳ M2 + SOP ✅ M4 T4.1 + Skill ✅ M5 + agent-api.md ✅ M6 frozen + supervisor activity GUI ✅ M7 + 数据迁移备份 ✅ M8 |
-| **v0.2.0-alpha.1** | TBD (invited dogfood 后 ship) | dual-native orchestrator alpha 预发版 |
+| B4: CLI feature-complete + background mode | v0.2 主线已 ship ✅ | 全命令 ✅ M1 + background/tray ✅ + SOP ✅ M4 T4.1 + Skill ✅ M5 + agent-api.md ✅ M6 frozen + supervisor activity GUI ✅ M7 + 数据迁移备份 ✅ M8 |
+| **v0.2.0** | 2026-05-31 ✅ | first stable dual-native orchestrator release；GitHub Latest + beta update channel promoted |
 
 详细 phase invariant、dogfood 策略、failure handling 见 [vision pivot devlog](./devlog/2026-05-15-vision-pivot-to-orchestrator.md) §D4 + §D13。
 
@@ -565,7 +565,7 @@ migration 失败 → app 拒绝启动 + 显示错误页面：
 
 继承 v0.2 PRD 附录 A 全部内容。v0.2 新增条目：
 
-- v0.2.0-alpha.1 GA baseline：TBD（在 release 前可能再升一次，详见 [vision pivot devlog](./devlog/2026-05-15-vision-pivot-to-orchestrator.md) Open Question O9）
+- v0.2.0 GA baseline：见 [GA baseline](./ga-baseline.md)；release 前 dogfood fixes 见 [2026-05-31 devlog](./devlog/2026-05-31-alpha2-dogfood-ux-polish.md)
 - runner/ 目录（重命名自 bridge/）继续遵循附录 A.2 的接入点表
 
 ## 附录 B：v0.2 ↔ v0.3 diff 摘要

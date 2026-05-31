@@ -4,7 +4,7 @@
 > with [architecture](./architecture.md).
 
 > **Purpose**: M9 T9.1 / A13 acceptance deliverable.
-> **Status**: v0.2.0-beta.1 draft, 2026-05-20.
+> **Status**: v0.2.0 shipped, 2026-05-31.
 > **Scope**: 把 [CLAUDE.md "Galley 架构原则"](../CLAUDE.md) 4 条原则逐条 demo 到具体代码位置 + grep / 测试可验证项。
 
 ---
@@ -67,7 +67,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 ### Document references
 
 - [`docs/agent-api.md`](./agent-api.md) §1 stability promise + §1.1 stable identifier sets + §1.2 schema pin pattern + §6 unified flat error envelope `{error, message}`
-- [`docs/agent-api.md`](./agent-api.md) §7 banner: `STATUS: FROZEN for v0.2.0-beta.1`
+- [`docs/agent-api.md`](./agent-api.md) §7 banner: `STATUS: FROZEN for v0.2.0`
 
 ### Tests demonstrating principle
 

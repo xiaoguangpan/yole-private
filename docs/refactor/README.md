@@ -30,31 +30,15 @@ docs/refactor/
 ## 当前 cursor
 
 ```
-Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → [B4 7/9 milestones ✅] → v0.2
-                                                ↑ 现在在这里
-Status:   B4 acceptance 10 ✅ / 1 ✅partial / 3 ⏳ (2026-05-20 night):
-          (M8) Pre-migration backup mechanism (B4-I6) ships. 4-state
-          BackupOutcome enum + sqlx read-only probe + hand-rolled
-          copy_dir_all + UTC compact timestamp. 11 unit tests pass.
-          A11 ✅ partial.
-          (M9 paperwork prep) sub-plan + README dual-native rewrite +
-          release notes draft + PRD §17 roadmap status align.
-          (Dogfood) JC dogfood pass 2026-05-20 — A9 (M4 SOP手动flow) /
-          A10 (M5 Claude Skill trigger) / A12 (M7 supervisor activity
-          GUI) all full ✅.
-          (A13) docs/architecture-demo.md ship — walks 4 CLAUDE.md
-          architecture principles with code refs + grep gates (4 gate
-          all exit 0) + tests + devlog provenance.
-Next:     v0.2 ship gate = A14 1-week dogfood + M2 menubar daemon.
-          M2 Mac spike scaffold shipped (see core/experiments/tray-mode/),
-          build verification + T1-T16 manual checks handed to JC for
-          local run (Tauri 2.11 cold rebuild was 8-15min on this session;
-          JC takes the launch + smoke check). Once T1-T16 PASS → lift
-          load-bearing pieces into core/src/lib.rs production setup hook.
-          M9 ship session = T9.1 acceptance walkthrough + T9.5 tag
-          v0.2.0-beta.1 + T9.6 GitHub publish + T9.8 devlogs.
-Blocker:  A14 calendar gate (1-week). M2 Win-gate if v0.2 wants Win
-          parity. M2 Mac path gated on JC's local spike validation.
+Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → B4 ✅ → v0.2.0 ✅
+                                                               ↑ 现在在这里
+Status:   v0.2.0 shipped 2026-05-31 as the first stable Galley release.
+          GitHub Release is public / non-prerelease / Latest, and the beta
+          update channel points at 0.2.0 for installed users.
+Next:     Post-release feedback watch. Use v0.2.1 for focused P0 / P1
+          hotfixes; plan broader feature work only after real feedback.
+Blocker:  None for v0.2.0. Future release gates still follow
+          docs/release-update-sop.md.
 ```
 
 **Cursor 更新协议**：每个 sub-task 完成 → 当前 phase playbook 顶部的 cursor 行更新 → 本文件总 cursor 表跟着更新（只 phase 级别）。**不要批量更新**——每 task 一更，防止 session 中断后丢状态。
@@ -67,8 +51,8 @@ Blocker:  A14 calendar gate (1-week). M2 Win-gate if v0.2 wants Win
 | B1: Rust core 骨架 + CLI 只读 | ✅ COMPLETE · M1-M7 · 11/12 A acceptance | — | [B1-rust-core.md](./B1-rust-core.md) · [devlog](../devlog/2026-05-18-b1-rust-core-complete.md) | 2026-05-18 single session — 21× faster than 3-week estimate |
 | B2: Bridge ownership 迁 Rust | ✅ COMPLETE · M1-M7 · 83 tests pass · tag `b2-complete` | — | [B2-bridge-ownership.md](./B2-bridge-ownership.md) · [devlog](../devlog/2026-05-19-b2-bridge-ownership-complete.md) | 2026-05-19 single session — full pipeline + docs + tag. Dogfood validation moved to B3 M2 启动门 ([prereq relaxation devlog](../devlog/2026-05-19-b3-prereq-relaxation.md)) |
 | B3: useAppStore 拆 slice + 改订阅 | ✅ COMPLETE · M1-M6 · A1-A11 全 tick · tag `b3-complete` | — | [B3-store-slice.md](./B3-store-slice.md) · [B3 完成 devlog](../devlog/2026-05-20-b3-store-slice-complete.md) · M1 [devlog](../devlog/2026-05-19-b3-m1-design-complete.md) · M3 [devlog](../devlog/2026-05-19-b3-m3-complete.md) · M4 [devlog](../devlog/2026-05-19-b3-m4-complete.md) · M5 [devlog](../devlog/2026-05-19-b3-m5-complete.md) · 3 M1 design artifact [mapping](./b3-slice-mapping.md)/[ADR](./b3-slice-adr.md)/[emit catalogue](./b3-rust-emit-catalogue.md) · [M3 sub-plan](./B3-M3-sub-plan.md) · [M4 sub-plan](./B3-M4-sub-plan.md) · [M5 sub-plan](./B3-M5-sub-plan.md) · [M6 sub-plan](./B3-M6-sub-plan.md) | 2026-05-20 sixth session: M6 sub-plan + impl + M7 acceptance + devlog + tag 全 ship。B3 整体跨 6 session、2 day calendar (estimate 3-4 weeks)，21× faster. JC dev dogfood 2026-05-20 initial pass。最终 6 文件 + 1 lib orchestrator. useAppStore.ts 整文件删除. tag `b3-complete`. |
-| B4: CLI feature-complete + background + artifact | ✅ 10 acceptance ticks (A1/A2/A5/A6/A7/A8/A9/A10/A12/A13) + A11 partial · M2 / A14 / M9 ship next | A14 1-week dogfood OR M2 Mac-only spike OR cleanup | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) · [B4 M1 sub-plan](./B4-M1-sub-plan.md) · [B4 M8 sub-plan](./B4-M8-sub-plan.md) · [B4 M9 sub-plan](./B4-M9-sub-plan.md) | 2026-05-20 continuing spree: M1 (4 commits) → M4 T4.1 SOP doc `bf9e607` → M3 (4 commits) → M5 → M6 schema freeze → M7 supervisor activity GUI → **M8 COMPLETE (2 commits `12277ad` + `81fc691`)** pre-migration backup mechanism (B4-I6) — re-scoped first (B2 mig 006/007 already shipped origin fields, v0.2 no schema delta), real work = backup mechanism + 11 unit tests + sub-plan + devlog → **M9 paperwork prep `3f3ab84`**: sub-plan + README rewrite (v0.1 工作台 → v0.2 dual-native) + release notes draft + PRD §17 roadmap align → **A9/A10/A12 ✅** JC dogfood pass + **A13 ✅** [architecture-demo.md](../architecture-demo.md) ship (4 principle × code refs × grep gates × tests). `schemaVersion: 1` FROZEN. 180 tests + typecheck/lint clean throughout. |
-| **v0.2 milestone** | ⏳ ship gated on dogfood + A1-A14 acceptance walkthrough | T9.1 acceptance run + T9.2 1-week dogfood + T9.5 tag v0.2.0-beta.1 | [B4-M9-sub-plan.md](./B4-M9-sub-plan.md) | M9 paperwork prep done 2026-05-20; tag + publish pending dogfood |
+| B4: CLI feature-complete + background + artifact | ✅ Shipped with v0.2.0 | Post-release feedback / hotfix only | [B4-cli-bg-artifact.md](./B4-cli-bg-artifact.md) · [B4 M1 sub-plan](./B4-M1-sub-plan.md) · [B4 M8 sub-plan](./B4-M8-sub-plan.md) · [B4 M9 sub-plan](./B4-M9-sub-plan.md) | v0.2.0 shipped 2026-05-31. `schemaVersion: 1` frozen; release workflow produced macOS arm64, macOS x64, and Windows x64 artifacts; update channel promoted after publish. |
+| **v0.2 milestone** | ✅ Shipped | Monitor feedback; v0.2.1 only for focused hotfixes | [v0.2.0 release devlog](../devlog/2026-05-31-v020-stable-release.md) | First stable release published as GitHub Latest and promoted to the beta update channel. |
 
 预计总时长：**10-12 周**（不含 v0.2 Windows release）。
 

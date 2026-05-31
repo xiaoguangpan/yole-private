@@ -17,11 +17,11 @@ operators:
 
 Current target:
 
-- Version: `0.2.0-alpha.2`
-- Release tag: `v0.2.0-alpha.2`
+- Version: `0.2.0`
+- Release tag: `v0.2.0`
 - Agent API: `schemaVersion: 1`
-- Release tier: alpha release; marked as GitHub Latest after macOS and Windows
-  dogfood. Do not promote the update channel unless explicitly requested.
+- Release tier: first stable release; published as GitHub Latest and promoted
+  to the beta update channel on 2026-05-31.
 
 Read [project status](./docs/project-status.md) for the current milestone,
 release gates, and compact phase state.
@@ -100,7 +100,7 @@ change this constitution.
 Galley CLI JSON is the stable contract for agents. Read
 [agent-api](./docs/agent-api.md) before changing it.
 
-- `schemaVersion: 1` is frozen for `v0.2.0-alpha.2`.
+- `schemaVersion: 1` is frozen for `v0.2.0`.
 - v1 changes are additive-only.
 - Breaking change requires `schemaVersion: 2`.
 - CLI callers pin with `--schema=1`.
