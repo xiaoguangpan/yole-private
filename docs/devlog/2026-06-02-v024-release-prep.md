@@ -47,6 +47,10 @@ pressure while `v0.2.4` is prepared.
   The first draft build showed the code in a non-selectable card, which made
   the primary login path feel broken. The fix adds a shared device-code card
   with a copy CTA and text selection in both Onboarding and Settings.
+- ChatGPT / Codex login completion must probe with the payload shape expected
+  by the Codex responses backend. The smoke build returned HTTP 400 with
+  `Instructions are required` after OAuth succeeded, so the probe now sends a
+  minimal `instructions` field and has a unit test for that request body.
 
 ## Rejected alternatives
 

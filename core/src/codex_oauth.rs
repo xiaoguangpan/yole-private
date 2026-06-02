@@ -33,6 +33,8 @@ const CODEX_OAUTH_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CODEX_OAUTH_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const CODEX_AUTH_ISSUER: &str = "https://auth.openai.com";
 const CODEX_DEVICE_URL: &str = "https://auth.openai.com/codex/device";
+const CODEX_PROBE_INSTRUCTIONS: &str =
+    "This is a Galley model health check. Reply with a short acknowledgement.";
 const REFRESH_SKEW_SECONDS: i64 = 120;
 const HTTP_TIMEOUT_SECS: u64 = 20;
 
@@ -142,7 +144,9 @@ struct CredentialIpcResponse {
 pub async fn start_device_login() -> Result<CodexDeviceLoginStart> {
     let client = http_client()?;
     let resp = client
-        .post(format!("{CODEX_AUTH_ISSUER}/api/accounts/deviceauth/usercode"))
+        .post(format!(
+            "{CODEX_AUTH_ISSUER}/api/accounts/deviceauth/usercode"
+        ))
         .json(&serde_json::json!({ "client_id": CODEX_OAUTH_CLIENT_ID }))
         .send()
         .await
@@ -182,7 +186,9 @@ pub async fn start_device_login() -> Result<CodexDeviceLoginStart> {
     })
 }
 
-pub async fn complete_device_login(input: CompleteCodexDeviceLoginInput) -> Result<CodexAuthSetupResult> {
+pub async fn complete_device_login(
+    input: CompleteCodexDeviceLoginInput,
+) -> Result<CodexAuthSetupResult> {
     let authorization = poll_device_authorization(&input).await?;
     let secret = exchange_authorization_code(authorization).await?;
     persist_probe_and_return(secret).await
@@ -191,13 +197,15 @@ pub async fn complete_device_login(input: CompleteCodexDeviceLoginInput) -> Resu
 pub async fn import_cli_login() -> Result<CodexAuthSetupResult> {
     let auth_path = codex_cli_auth_path()?;
     let body = std::fs::read_to_string(&auth_path).map_err(|e| GalleyError::InvalidArgs {
-        message: format!("Codex CLI login was not found at {}: {e}", auth_path.display()),
+        message: format!(
+            "Codex CLI login was not found at {}: {e}",
+            auth_path.display()
+        ),
     })?;
-    let file: CodexCliAuthFile = serde_json::from_str(&body).map_err(|e| {
-        GalleyError::InvalidArgs {
+    let file: CodexCliAuthFile =
+        serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
             message: format!("Codex CLI auth file is invalid JSON: {e}"),
-        }
-    })?;
+        })?;
     let mut secret = CodexOAuthSecret::new(file.tokens.access_token, file.tokens.refresh_token)?;
     if token_is_expiring(&secret.access_token, REFRESH_SKEW_SECONDS) {
         secret = refresh_secret(secret).await?;
@@ -206,7 +214,9 @@ pub async fn import_cli_login() -> Result<CodexAuthSetupResult> {
 }
 
 pub async fn logout_provider(input: CodexProviderActionInput) -> Result<()> {
-    let provider_id = input.provider_id.unwrap_or_else(|| CODEX_PROVIDER_ID.into());
+    let provider_id = input
+        .provider_id
+        .unwrap_or_else(|| CODEX_PROVIDER_ID.into());
     let galley = SqliteGalley::open().await?;
     let api_key_ref = galley
         .list_managed_model_providers()
@@ -233,11 +243,10 @@ pub async fn resolve_access_token(
     api_key_ref: &str,
 ) -> Result<ResolvedCodexAccessToken> {
     let raw = credential_store::get_secret(galley, api_key_ref).await?;
-    let mut secret: CodexOAuthSecret = serde_json::from_str(&raw).map_err(|e| {
-        GalleyError::InvalidArgs {
+    let mut secret: CodexOAuthSecret =
+        serde_json::from_str(&raw).map_err(|e| GalleyError::InvalidArgs {
             message: format!("ChatGPT / Codex credential is invalid: {e}"),
-        }
-    })?;
+        })?;
     if token_is_expiring(&secret.access_token, REFRESH_SKEW_SECONDS) {
         secret = refresh_secret(secret).await?;
         let serialized = serde_json::to_string(&secret).map_err(|e| GalleyError::Internal {
@@ -291,7 +300,12 @@ async fn persist_probe_and_return(secret: CodexOAuthSecret) -> Result<CodexAuthS
             make_default: false,
         })
         .await?;
-    let status = probe_with_access_token(&secret.access_token, CODEX_DEFAULT_MODEL, CODEX_DEFAULT_REASONING).await?;
+    let status = probe_with_access_token(
+        &secret.access_token,
+        CODEX_DEFAULT_MODEL,
+        CODEX_DEFAULT_REASONING,
+    )
+    .await?;
     Ok(CodexAuthSetupResult {
         provider,
         model,
@@ -312,7 +326,9 @@ pub fn codex_default_advanced_options() -> serde_json::Value {
     })
 }
 
-async fn poll_device_authorization(input: &CompleteCodexDeviceLoginInput) -> Result<DevicePollResponse> {
+async fn poll_device_authorization(
+    input: &CompleteCodexDeviceLoginInput,
+) -> Result<DevicePollResponse> {
     let client = http_client()?;
     let interval = input.interval_seconds.unwrap_or(5).max(3);
     let started = std::time::Instant::now();
@@ -358,7 +374,9 @@ async fn poll_device_authorization(input: &CompleteCodexDeviceLoginInput) -> Res
     })
 }
 
-async fn exchange_authorization_code(authorization: DevicePollResponse) -> Result<CodexOAuthSecret> {
+async fn exchange_authorization_code(
+    authorization: DevicePollResponse,
+) -> Result<CodexOAuthSecret> {
     let code = nonempty(authorization.authorization_code, "authorization_code")?;
     let verifier = nonempty(authorization.code_verifier, "code_verifier")?;
     let client = http_client()?;
@@ -367,7 +385,10 @@ async fn exchange_authorization_code(authorization: DevicePollResponse) -> Resul
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code.as_str()),
-            ("redirect_uri", "https://auth.openai.com/deviceauth/callback"),
+            (
+                "redirect_uri",
+                "https://auth.openai.com/deviceauth/callback",
+            ),
             ("client_id", CODEX_OAUTH_CLIENT_ID),
             ("code_verifier", verifier.as_str()),
         ])
@@ -428,9 +449,10 @@ async fn token_response_to_secret(
             },
         });
     }
-    let token: TokenResponse = serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
-        message: format!("ChatGPT / Codex token response is invalid JSON: {e}"),
-    })?;
+    let token: TokenResponse =
+        serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+            message: format!("ChatGPT / Codex token response is invalid JSON: {e}"),
+        })?;
     let access_token = nonempty(token.access_token, "access_token")?;
     let refresh_token = token
         .refresh_token
@@ -455,14 +477,7 @@ async fn probe_with_access_token(
         .header("Accept", "application/json")
         .header("User-Agent", "codex_cli_rs/0.0.0 (Galley)")
         .header("originator", "codex_cli_rs")
-        .json(&serde_json::json!({
-            "model": model,
-            "input": "ping",
-            "stream": false,
-            "store": false,
-            "max_output_tokens": 16,
-            "reasoning": { "effort": normalize_reasoning(reasoning_effort) }
-        }));
+        .json(&codex_probe_payload(model, reasoning_effort));
     if let Some(account_id) = account_id_from_jwt(access_token) {
         req = req.header("ChatGPT-Account-ID", account_id);
     }
@@ -497,6 +512,18 @@ async fn probe_with_access_token(
         endpoint,
         model_found: Some(true),
         message: "ChatGPT / Codex ready".into(),
+    })
+}
+
+fn codex_probe_payload(model: &str, reasoning_effort: &str) -> Value {
+    serde_json::json!({
+        "model": model,
+        "instructions": CODEX_PROBE_INSTRUCTIONS,
+        "input": "ping",
+        "stream": false,
+        "store": false,
+        "max_output_tokens": 16,
+        "reasoning": { "effort": normalize_reasoning(reasoning_effort) }
     })
 }
 
@@ -698,11 +725,10 @@ where
         .map_err(|e| GalleyError::RunnerError {
             message: format!("reading credential IPC request failed: {e}"),
         })?;
-    let req: CredentialIpcRequest = serde_json::from_str(&line).map_err(|e| {
-        GalleyError::InvalidArgs {
+    let req: CredentialIpcRequest =
+        serde_json::from_str(&line).map_err(|e| GalleyError::InvalidArgs {
             message: format!("credential IPC request is invalid JSON: {e}"),
-        }
-    })?;
+        })?;
     if req.token != expected_token {
         return Err(GalleyError::InvalidArgs {
             message: "credential IPC token mismatch".into(),
@@ -731,4 +757,29 @@ where
             message: format!("writing credential IPC response failed: {e}"),
         })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_probe_payload_includes_required_instructions() {
+        let payload = codex_probe_payload("gpt-5.5", "high");
+
+        assert_eq!(payload["model"], "gpt-5.5");
+        assert_eq!(payload["input"], "ping");
+        assert_eq!(payload["instructions"], CODEX_PROBE_INSTRUCTIONS);
+        assert_eq!(payload["stream"], false);
+        assert_eq!(payload["store"], false);
+        assert_eq!(payload["max_output_tokens"], 16);
+        assert_eq!(payload["reasoning"]["effort"], "high");
+    }
+
+    #[test]
+    fn codex_probe_payload_normalizes_unknown_reasoning() {
+        let payload = codex_probe_payload("gpt-5.5", "surprise");
+
+        assert_eq!(payload["reasoning"]["effort"], CODEX_DEFAULT_REASONING);
+    }
 }
