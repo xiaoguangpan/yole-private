@@ -144,6 +144,16 @@ export function Settings({
         >
           <Dialog.Title className="sr-only">{copy.settings.title}</Dialog.Title>
 
+          <Dialog.Close asChild>
+            <IconButton
+              ariaLabel={copy.settings.close}
+              variant="secondary"
+              className="absolute right-3 top-3 z-20 bg-elevated/95"
+            >
+              <XIcon size={14} weight="thin" />
+            </IconButton>
+          </Dialog.Close>
+
           <SettingsSidebar
             tab={tab}
             onChange={setTab}
@@ -156,16 +166,7 @@ export function Settings({
             showImTab={showImTab}
           />
 
-          <div className="relative min-w-0 flex-1 overflow-y-auto bg-app">
-            <Dialog.Close asChild>
-              <IconButton
-                ariaLabel={copy.settings.close}
-                className="absolute right-3 top-3 z-10"
-              >
-                <XIcon size={14} weight="thin" />
-              </IconButton>
-            </Dialog.Close>
-
+          <div className="min-w-0 flex-1 overflow-y-auto bg-app">
             <div className="px-8 py-7">
               {tab === "runtime" && (
                 <SettingsRuntime
