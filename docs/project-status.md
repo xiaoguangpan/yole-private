@@ -9,9 +9,9 @@ live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.2.2`
-- Git tag / GitHub Release: preparing `v0.2.2`; `v0.2.1` remains the current
-  published release until the draft is reviewed and published.
+- Package version: `0.2.3`
+- Git tag / GitHub Release: preparing `v0.2.3`; `v0.2.2` remains the current
+  published GitHub Latest release until the draft is reviewed and published.
 - Agent API schema: `schemaVersion: 1`
 - Release tier: stable patch release prep; publish as GitHub Latest and promote
   to the beta update channel only after draft review and installer smoke.
@@ -23,26 +23,31 @@ Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.2.2` is the current stable patch release target on `main`. It builds on
-`v0.2.1` with the audited GenericAgent baseline upgrade to `5f46b438`, improved
-selection-copy behavior, clearer Settings update copy, close-to-background
-feedback, and release/update verification polish.
+`v0.2.3` is the current stable patch release target on `main`. It builds on
+`v0.2.2` with Browser Control onboarding and diagnostics fixes: Galley now
+distinguishes "extension connected but no ordinary webpage is open" from a
+broken bridge, the setup guide adds a browser-specific test page step, macOS /
+Windows folder reveal selects the whole `tmwd_cdp_bridge` folder, and the
+setup dialog keeps primary actions visible at the 600px minimum window height.
 
-`v0.2.1` remains the current published GitHub Latest release and beta update
-channel version until the `v0.2.2` draft release is reviewed, smoke tested,
+`v0.2.2` remains the current published GitHub Latest release and beta update
+channel version until the `v0.2.3` draft release is reviewed, smoke tested,
 published, and promoted.
 
 For the next release:
 
-1. Dogfood update from an installed `v0.2.1` build before promoting `v0.2.2`.
-2. Smoke managed-GA conversation startup, Settings -> About update status,
+1. Dogfood update from an installed `v0.2.2` build before promoting `v0.2.3`.
+2. Smoke Browser Control setup on macOS and Windows: install / reveal the
+   extension folder, open the test page, run Galley test, and verify the
+   connected-no-page state is quiet after cold start.
+3. Smoke managed-GA conversation startup, Settings -> About update status,
    model-config Channels restart, close-to-background feedback, selection-copy
    toolbar, and Windows/macOS launch.
-3. Run release/update dry-run if packaging, signing, updater config, or bundled
+4. Run release/update dry-run if packaging, signing, updater config, or bundled
    Python dependencies changed.
-4. Keep GitHub Release publishing and update-channel promotion as separate
+5. Keep GitHub Release publishing and update-channel promotion as separate
    gates, even for stable releases.
-5. Run the standard verification set:
+6. Run the standard verification set:
    - `cargo check --workspace`
    - `cargo test --workspace`
    - `pnpm typecheck`
@@ -58,8 +63,8 @@ For the next release:
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
 | Managed GA runtime | Shipped in v0.2.0; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | v0.2.2 release prep; macOS DMG + Windows NSIS + gated updater channel remain the release path | [release / update SOP](./release-update-sop.md) |
-| Windows | v0.2.1 artifact shipped; v0.2.2 smoke should re-check path / probe / min-window / IM flows | [Windows checklist](./windows-build-checklist.md) |
+| Release path | v0.2.3 release prep; macOS DMG + Windows NSIS + gated updater channel remain the release path | [release / update SOP](./release-update-sop.md) |
+| Windows | v0.2.2 artifact shipped; v0.2.3 smoke should re-check Browser Control extension / test-page / probe / min-window flows | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline
@@ -83,7 +88,7 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Current package metadata uses `0.2.2`. For the next release, update:
+- Current package metadata uses `0.2.3`. For the next release, update:
   - `package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`
