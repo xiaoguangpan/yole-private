@@ -452,6 +452,7 @@ def test_reinject_tools_command_round_trip() -> None:
 def test_tools_reinjected_event_round_trip() -> None:
     ev = ToolsReinjectedEvent(sessionId="s1", blocksAdded=12)
     decoded = decode_event(encode(ev))
+    assert isinstance(decoded, ToolsReinjectedEvent)
     assert decoded.sessionId == "s1"
     assert decoded.blocksAdded == 12
     assert decoded.kind == "tools_reinjected"
@@ -460,6 +461,7 @@ def test_tools_reinjected_event_round_trip() -> None:
 def test_attach_pet_command_round_trip_default_port() -> None:
     cmd = AttachPetCommand()
     decoded = decode_command(encode(cmd))
+    assert isinstance(decoded, AttachPetCommand)
     assert decoded == cmd
     assert decoded.port == 41983
 
@@ -467,6 +469,7 @@ def test_attach_pet_command_round_trip_default_port() -> None:
 def test_attach_pet_command_round_trip_custom_port() -> None:
     cmd = AttachPetCommand(port=51234)
     decoded = decode_command(encode(cmd))
+    assert isinstance(decoded, AttachPetCommand)
     assert decoded.port == 51234
 
 
@@ -480,6 +483,7 @@ def test_detach_pet_command_round_trip() -> None:
 def test_pet_attached_event_round_trip() -> None:
     ev = PetAttachedEvent(sessionId="s1", port=41983)
     decoded = decode_event(encode(ev))
+    assert isinstance(decoded, PetAttachedEvent)
     assert decoded.sessionId == "s1"
     assert decoded.port == 41983
     assert decoded.kind == "pet_attached"

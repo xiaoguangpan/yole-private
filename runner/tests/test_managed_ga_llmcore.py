@@ -5,6 +5,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import Any, cast
 
 _MANAGED_GA_CODE = Path(__file__).resolve().parents[2] / "managed-ga" / "code"
 if str(_MANAGED_GA_CODE) not in sys.path:
@@ -12,11 +13,12 @@ if str(_MANAGED_GA_CODE) not in sys.path:
 
 sys.modules.setdefault("requests", types.ModuleType("requests"))
 urllib3_stub = types.ModuleType("urllib3")
-urllib3_stub.exceptions = types.SimpleNamespace(InsecureRequestWarning=Warning)
-urllib3_stub.disable_warnings = lambda *_args, **_kwargs: None
+urllib3_typed = cast(Any, urllib3_stub)
+urllib3_typed.exceptions = types.SimpleNamespace(InsecureRequestWarning=Warning)
+urllib3_typed.disable_warnings = lambda *_args, **_kwargs: None
 sys.modules.setdefault("urllib3", urllib3_stub)
 
-import llmcore  # noqa: E402
+import llmcore  # type: ignore[import-not-found]  # noqa: E402
 
 
 def test_tryparse_repairs_raw_windows_path_backslashes() -> None:

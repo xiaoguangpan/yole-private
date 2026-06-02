@@ -50,7 +50,8 @@ def _redirect_logs(log_path: Path) -> IO[str]:
     sys.stdout = sys.stderr = logf
     # Some GA frontends explicitly write to sys.__stdout__; keep the JSON line
     # channel private to this launcher and send frontend prints to the log.
-    sys.__stdout__ = sys.__stderr__ = logf
+    sys.__stdout__ = logf  # type: ignore[misc]
+    sys.__stderr__ = logf  # type: ignore[misc]
     return logf
 
 

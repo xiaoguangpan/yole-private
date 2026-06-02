@@ -53,7 +53,7 @@ def _llm_matches(llm: dict[str, Any], needle: str) -> bool:
     return needle in haystack
 
 
-def _ready(bridge_proc: "_BridgeProc") -> dict[str, Any]:
+def _ready(bridge_proc: _BridgeProc) -> dict[str, Any]:
     """Read ready and optionally switch to E2E_LLM_NAME before a test run.
 
     Real e2e runs depend on whichever model is current in the user's GA config.
