@@ -19,6 +19,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { CodexDeviceCodeCard } from "@/components/managed-models/CodexDeviceCodeCard";
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
 import { ManagedModelOptionPicker } from "@/components/managed-models/ManagedModelOptionPicker";
 import { Button, IconButton } from "@/components/ui/button";
@@ -397,14 +398,11 @@ export function StepModelConfig({
               {modelCopy.chatgptCodexReadyBody}
             </div>
             {codexLoginStart && (
-              <div className="rounded-sm border border-brand/25 bg-brand-soft px-3 py-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-                  {modelCopy.chatgptCodexDeviceCode}
-                </div>
-                <div className="mt-1 font-mono text-[20px] font-semibold tracking-[0.08em] text-ink">
-                  {codexLoginStart.userCode}
-                </div>
-              </div>
+              <CodexDeviceCodeCard
+                userCode={codexLoginStart.userCode}
+                copy={modelCopy}
+                className="py-2"
+              />
             )}
             <div className="flex flex-wrap gap-2">
               <Button

@@ -41,6 +41,13 @@ pressure while `v0.2.4` is prepared.
 - Publish GitHub Release and promote the beta update channel as two separate
   gates. `v0.2.4` should not reach installed users until installer smoke passes.
 
+## Smoke blocker found before publish
+
+- ChatGPT / Codex device-login codes must be directly copyable and selectable.
+  The first draft build showed the code in a non-selectable card, which made
+  the primary login path feel broken. The fix adds a shared device-code card
+  with a copy CTA and text selection in both Onboarding and Settings.
+
 ## Rejected alternatives
 
 - Directly promoting the update channel after CI green: CI covers compilation

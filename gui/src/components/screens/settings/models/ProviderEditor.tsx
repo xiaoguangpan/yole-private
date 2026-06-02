@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
+import { CodexDeviceCodeCard } from "@/components/managed-models/CodexDeviceCodeCard";
 import { ManagedModelProviderPicker } from "@/components/managed-models/ManagedModelProviderPicker";
 import { Button, IconButton } from "@/components/ui/button";
 import { useCopy } from "@/lib/i18n";
@@ -182,14 +183,11 @@ export function ProviderEditor({
               {copy.chatgptCodexReadyBody}
             </p>
             {codexLoginStart && (
-              <div className="mt-4 rounded-sm border border-brand/25 bg-brand-soft px-3 py-2.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-                  {copy.chatgptCodexDeviceCode}
-                </div>
-                <div className="mt-1 font-mono text-[20px] font-semibold tracking-[0.08em] text-ink">
-                  {codexLoginStart.userCode}
-                </div>
-              </div>
+              <CodexDeviceCodeCard
+                userCode={codexLoginStart.userCode}
+                copy={copy}
+                className="mt-4"
+              />
             )}
             <div className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-2">
               <Button

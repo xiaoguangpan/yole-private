@@ -369,6 +369,8 @@ const zhCopy = {
       chatgptCodexReadyBody:
         "连接你的 ChatGPT 账号，让 Galley 使用你的 Codex 额度。",
       chatgptCodexDeviceCode: "设备码",
+      copyDeviceCode: "复制",
+      deviceCodeCopied: "已复制",
       signInWithChatGPT: "登录 ChatGPT",
       chatgptCodexCodeReady: "登录码已生成",
       openChatGPTLoginPage: "打开登录页面",
@@ -1381,6 +1383,8 @@ const enCopy: AppCopy = {
       chatgptCodexReadyBody:
         "Connect your ChatGPT account so Galley can use your Codex quota.",
       chatgptCodexDeviceCode: "Device code",
+      copyDeviceCode: "Copy",
+      deviceCodeCopied: "Copied",
       signInWithChatGPT: "Sign in with ChatGPT",
       chatgptCodexCodeReady: "Sign-in code ready",
       openChatGPTLoginPage: "Open sign-in page",
