@@ -32,6 +32,7 @@ use db::{
 };
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
@@ -49,8 +50,47 @@ const TRAY_HIDE_GALLEY_LABEL: &str = "Hide Galley";
 static QUIT_REQUEST_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static ALLOW_APP_EXIT: AtomicBool = AtomicBool::new(false);
 
+/// Pref key recording whether the one-time "Galley keeps running in the
+/// background after you close the window" hint has been shown on this
+/// device. Written by the close handler the first time the window is
+/// hidden to background (see `CloseRequested`). Mirrors the
+/// `yolo_intro_seen` disclosure-once pattern.
+const CLOSE_HINT_SEEN_PREF: &str = "close_to_background_hint_seen";
+
+/// Process-local guard so the background hint fires at most once per
+/// launch even under rapid repeated close events. Seeded from the
+/// persisted `CLOSE_HINT_SEEN_PREF` during `setup` (right after the SQL
+/// plugin runs migrations), so a returning user who already dismissed
+/// the hint is protected even if they close the window before the GUI
+/// finishes hydrating. The close handler reads this guard, not the DB,
+/// because it runs synchronously inside the window-event callback.
+static CLOSE_HINT_SHOWN: AtomicBool = AtomicBool::new(false);
+
 struct TrayMenuState {
     toggle_window_item: tauri::menu::MenuItem<tauri::Wry>,
+}
+
+/// Localized copy for the background-mode close hint dialog. The close
+/// handler is a synchronous window-event callback and can't await a
+/// pref read or reach into GUI i18n, so the localized strings are
+/// pushed from the frontend (hydrate + on language change) via
+/// `set_close_hint_copy` and parked here. Defaults to English so the
+/// dialog is still coherent if the frontend hasn't pushed yet.
+struct CloseHintCopy {
+    title: Mutex<String>,
+    body: Mutex<String>,
+}
+
+impl Default for CloseHintCopy {
+    fn default() -> Self {
+        Self {
+            title: Mutex::new("Galley is still running".to_string()),
+            body: Mutex::new(
+                "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the menu bar / tray."
+                    .to_string(),
+            ),
+        }
+    }
 }
 
 fn set_tray_window_visible(app: &tauri::AppHandle<tauri::Wry>, visible: bool) {
@@ -87,6 +127,73 @@ fn toggle_main_window(app: &tauri::AppHandle<tauri::Wry>) {
             show_main_window(app);
         }
     }
+}
+
+/// One-time disclosure that closing the window hides Galley to the
+/// background rather than quitting. Fires the first time the window is
+/// hidden via `CloseRequested` on macOS / Windows. Subsequent closes
+/// (and returning users who already dismissed it) skip silently.
+///
+/// `swap(true)` makes the process-local guard self-arming: the first
+/// caller observes `false` and shows the dialog; everyone after gets
+/// `true` and returns. The guard is also seeded `true` during `setup`
+/// from the persisted `CLOSE_HINT_SEEN_PREF` for users who saw the hint
+/// on a prior launch, so the dialog is genuinely once-per-device, not
+/// once-per-launch — and that seed happens before the window can be
+/// closed, closing the hydrate-timing race.
+///
+/// The seen flag is persisted here — close handling is Rust's authority,
+/// and the GUI only mirrors copy inward. The dialog is shown
+/// non-blocking (single OK button); the window stays hidden underneath,
+/// matching the user's close intent.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn maybe_show_background_hint(app: &tauri::AppHandle<tauri::Wry>) {
+    use tauri::Manager;
+
+    if CLOSE_HINT_SHOWN.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    // Persist the seen flag so it survives the next launch. Best-effort:
+    // a write failure only means the hint may show once more, never an
+    // exit-path regression.
+    tauri::async_runtime::spawn(async move {
+        if let Ok(galley) = SqliteGalley::open().await {
+            let _ = galley
+                .set_pref_json(CLOSE_HINT_SEEN_PREF, serde_json::json!(true))
+                .await;
+        }
+    });
+
+    let (title, body) = match app.try_state::<CloseHintCopy>() {
+        Some(copy) => {
+            let title = copy
+                .title
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_else(|_| "Galley is still running".to_string());
+            let body = copy
+                .body
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_else(|_| {
+                    "Closing the window only hides Galley. To quit completely, choose Quit Galley from the menu bar / tray.".to_string()
+                });
+            (title, body)
+        }
+        None => (
+            "Galley is still running".to_string(),
+            "Closing the window only hides Galley. To quit completely, choose Quit Galley from the menu bar / tray.".to_string(),
+        ),
+    };
+
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    app.dialog()
+        .message(body)
+        .title(title)
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::Ok)
+        .show(|_| {});
 }
 
 fn cleanup_and_exit<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
@@ -883,6 +990,27 @@ async fn set_pref_json(key: String, value: serde_json::Value) -> std::result::Re
         .map_err(stringify_error)
 }
 
+/// Update the localized copy for the background-mode close hint. Called
+/// by the GUI at hydrate and again whenever the UI language changes, so
+/// the native dialog (which runs synchronously inside the close handler
+/// and can't reach GUI i18n) always has the active-language strings
+/// ready.
+///
+/// The seen flag is NOT handled here: it's seeded from the persisted
+/// pref during `setup` (so a returning user is protected even if they
+/// close the window before hydrate runs) and persisted by the close
+/// handler on first show. This command only mirrors copy inward and
+/// never touches SQLite.
+#[tauri::command]
+fn set_close_hint_copy(title: String, body: String, copy: tauri::State<'_, CloseHintCopy>) {
+    if let Ok(mut guard) = copy.title.lock() {
+        *guard = title;
+    }
+    if let Ok(mut guard) = copy.body.lock() {
+        *guard = body;
+    }
+}
+
 #[tauri::command]
 async fn bulk_archive_sessions(
     ids: Vec<SessionId>,
@@ -1066,6 +1194,12 @@ pub fn run() {
         .manage(std::sync::Arc::new(
             im_supervisor::ImSupervisorManager::new(),
         ))
+        // Localized copy for the background-mode close hint, pushed from
+        // the GUI (hydrate + on language change). Managed on every
+        // platform because `set_close_hint_copy` is registered for all
+        // targets; the close handler that consumes it is macOS/Windows
+        // only. Defaults to English until the GUI pushes.
+        .manage(CloseHintCopy::default())
         .invoke_handler(tauri::generate_handler![
             path_exists,
             get_supervisor_sop,
@@ -1118,6 +1252,7 @@ pub fn run() {
             load_tool_events_by_session,
             get_pref_json,
             set_pref_json,
+            set_close_hint_copy,
             bulk_archive_sessions,
             bulk_unarchive_sessions,
             bulk_delete_sessions,
@@ -1180,6 +1315,31 @@ pub fn run() {
                     .add_migrations(DB_URL, migrations)
                     .build(),
             )?;
+
+            // Seed the background-mode close-hint guard from the
+            // persisted seen flag, now that the SQL plugin above has run
+            // migrations and the `prefs` table exists. This must happen
+            // before the window can receive `CloseRequested` (the close
+            // handler is registered later in this same setup, but the
+            // event can't fire until the event loop starts after setup
+            // returns). Seeding here — not at GUI hydrate — closes the
+            // race where a returning user who closes the window before
+            // hydrate completes would otherwise see the "one-time" hint
+            // again. macOS/Windows only: the hint and its handler don't
+            // exist elsewhere. Best-effort: a read failure leaves the
+            // guard `false`, whose worst case is one extra hint, never a
+            // wrong-exit regression.
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            {
+                let seen = tauri::async_runtime::block_on(async {
+                    let galley = SqliteGalley::open().await.ok()?;
+                    let value = galley.get_pref_json(CLOSE_HINT_SEEN_PREF).await.ok()?;
+                    value.and_then(|v| v.as_bool())
+                });
+                if seen == Some(true) {
+                    CLOSE_HINT_SHOWN.store(true, Ordering::SeqCst);
+                }
+            }
 
             // Start the local socket listener (Unix socket on macOS/Linux,
             // Windows named pipe on Windows). CLI clients connect here to
@@ -1399,9 +1559,14 @@ pub fn run() {
                         if ALLOW_APP_EXIT.load(Ordering::SeqCst) {
                             return;
                         }
+                        // Background Mode: hide instead of quit. Hide
+                        // first so the close gesture feels instant, then
+                        // surface the one-time hint explaining where the
+                        // window went and how to truly quit.
                         api.prevent_close();
                         let _ = window_for_close.hide();
                         let _ = tray_toggle_for_close.set_text(TRAY_SHOW_GALLEY_LABEL);
+                        maybe_show_background_hint(window_for_close.app_handle());
                     }
                 });
 

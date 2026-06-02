@@ -24,6 +24,7 @@ import {
 } from "@/components/screens/project/EditProjectDialog";
 import { CopyProvider, copyForLanguage } from "@/lib/i18n";
 import { useImSupervisorStatus } from "@/hooks/useImSupervisorStatus";
+import { pushCloseHintCopy } from "@/lib/close-hint";
 import { restartEnabledImSupervisors } from "@/lib/im-supervisor";
 import { ensureHistoryReplayComplete } from "@/lib/ipc-handlers";
 import { resolveLanguagePreference } from "@/lib/language";
@@ -430,6 +431,19 @@ function App() {
       themeAppliedRef.current = true;
     }
   }, [resolvedTheme]);
+
+  // Keep the native background-mode close hint in the active language.
+  // hydrate pushes the initial copy; this re-pushes copy on later
+  // language changes. Skips the first run so we don't double-push at
+  // startup — the ref flips after the initial render.
+  const closeHintLangRef = useRef(false);
+  useEffect(() => {
+    if (!closeHintLangRef.current) {
+      closeHintLangRef.current = true;
+      return;
+    }
+    void pushCloseHintCopy(languagePreference);
+  }, [languagePreference]);
 
   // Browser Control is part of the intended managed-GA experience. On each
   // launch in managed mode we sync the stable extension folder and run a real

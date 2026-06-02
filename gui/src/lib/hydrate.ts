@@ -38,6 +38,7 @@ import {
   deleteEmptyNewSessions,
   getPref,
 } from "@/lib/db";
+import { pushCloseHintCopy } from "@/lib/close-hint";
 import { useAppUpdateStore } from "@/stores/app-update";
 import { useManagedModelsStore } from "@/stores/managed-models";
 import { usePrefsStore } from "@/stores/prefs";
@@ -69,6 +70,13 @@ export async function hydrateApp(): Promise<void> {
   if (realVersion) {
     void useAppUpdateStore.getState().noteAppLaunched(realVersion);
   }
+
+  // 2b. Push the background-mode close hint copy into Galley Core for
+  // the current language. The Rust close handler can't reach GUI i18n,
+  // so we hand it the localized strings here. The seen flag is owned by
+  // Rust (seeded at setup), so the GUI only carries copy. Fire-and-
+  // forget — never blocks paint.
+  void pushCloseHintCopy(usePrefsStore.getState().languagePreference);
 
   // 3. Managed runtime layout. This is intentionally safe to run on
   // every cold start: it only creates missing Galley-owned directories.

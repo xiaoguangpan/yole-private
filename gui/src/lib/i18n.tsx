@@ -49,6 +49,13 @@ const zhCopy = {
     minimize: "最小化",
     maximize: "最大化",
     restoreWindow: "向下还原",
+    closeBackgroundHint: {
+      title: "Galley 仍在后台运行",
+      bodyMac:
+        "关闭窗口只是隐藏 Galley，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从菜单栏的 Galley 图标选择 Quit Galley。",
+      bodyWindows:
+        "关闭窗口只是隐藏 Galley，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从系统托盘的 Galley 图标选择 Quit Galley。",
+    },
   },
   sidebar: {
     configureModels: "配置模型",
@@ -1008,6 +1015,13 @@ const enCopy: AppCopy = {
     minimize: "Minimize",
     maximize: "Maximize",
     restoreWindow: "Restore down",
+    closeBackgroundHint: {
+      title: "Galley is still running",
+      bodyMac:
+        "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the Galley menu bar icon.",
+      bodyWindows:
+        "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the Galley tray icon.",
+    },
   },
   sidebar: {
     configureModels: "Set up model",

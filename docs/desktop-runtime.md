@@ -89,6 +89,19 @@ main window hides the window; it does not quit the app or shut down Galley Core.
 This keeps local socket access alive for the CLI, Supervisor automation, and
 external IM / agent frontends while the desktop window is out of the way.
 
+The first time the window is hidden to background on a device, Galley shows a
+one-time native dialog explaining that closing only hides the window and that
+true exit happens via `Quit Galley`. The dialog is informational (single OK
+button); it never offers to quit and never blocks the hide. The seen state is
+persisted in the `close_to_background_hint_seen` pref: written by the Rust close
+handler on first show, and read back during Rust `setup` (right after
+migrations) to arm an in-process guard before the window can be closed. Seeding
+in `setup` rather than at GUI hydrate is deliberate — it keeps the hint
+at-most-once-per-device even if the user closes the window before the GUI
+finishes hydrating. The dialog copy is localized: the GUI pushes the
+active-language title / body into Galley Core at hydrate and on language change
+(the close handler runs synchronously and cannot reach GUI i18n itself).
+
 Platform behavior:
 
 - macOS: window close and `Cmd+W` hide the main window. The Dock icon remains,
