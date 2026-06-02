@@ -5,8 +5,29 @@ import {
   probeBrowserControl,
   type BrowserControlLayout,
   type BrowserControlProbe,
+  type BrowserControlProbeContext,
+  type BrowserControlProbeStatus,
   type BrowserControlStatus,
 } from "@/lib/browser-control";
+import { getPref, setPref } from "@/lib/db";
+
+const BROWSER_CONTROL_VERIFIED_PREF = "browser_control_verified";
+
+function isSuccessfulProbeStatus(status: BrowserControlProbeStatus): boolean {
+  return status === "connected" || status === "connected_no_tabs";
+}
+
+function statusForProbe(
+  probe: BrowserControlProbe,
+  verified: boolean,
+): BrowserControlStatus {
+  if (probe.status === "connected") return "connected";
+  if (probe.status === "connected_no_tabs") return "connected_no_tabs";
+  if (probe.status === "not_connected") {
+    return verified ? "offline" : "not_connected";
+  }
+  return "error";
+}
 
 interface BrowserControlState {
   status: BrowserControlStatus;
@@ -16,8 +37,13 @@ interface BrowserControlState {
   setupOpen: boolean;
   busy: boolean;
   error: string | null;
+  verified: boolean;
+  verificationHydrated: boolean;
+  hydrateVerification: () => Promise<boolean>;
   ensureLayout: () => Promise<BrowserControlLayout | null>;
-  probe: () => Promise<BrowserControlProbe | null>;
+  probe: (
+    context?: BrowserControlProbeContext,
+  ) => Promise<BrowserControlProbe | null>;
   openSetup: () => void;
   closeSetup: () => void;
 }
@@ -31,6 +57,22 @@ export const useBrowserControlStore = create<BrowserControlState>(
     setupOpen: false,
     busy: false,
     error: null,
+    verified: false,
+    verificationHydrated: false,
+
+    hydrateVerification: async () => {
+      const state = get();
+      if (state.verificationHydrated) return state.verified;
+      try {
+        const verified =
+          (await getPref<boolean>(BROWSER_CONTROL_VERIFIED_PREF)) === true;
+        set({ verified, verificationHydrated: true });
+        return verified;
+      } catch {
+        set({ verificationHydrated: true });
+        return get().verified;
+      }
+    },
 
     ensureLayout: async () => {
       set({ busy: true, error: null, layoutError: null });
@@ -44,7 +86,9 @@ export const useBrowserControlStore = create<BrowserControlState>(
           error: recoveredLayoutError ? null : state.error,
           status:
             recoveredLayoutError && state.status === "error"
-              ? "not_connected"
+              ? state.verified
+                ? "offline"
+                : "not_connected"
               : state.status,
           busy: false,
         });
@@ -56,20 +100,20 @@ export const useBrowserControlStore = create<BrowserControlState>(
       }
     },
 
-    probe: async () => {
+    probe: async (context = "manual") => {
       set({ busy: true, error: null });
       try {
-        const probe = await probeBrowserControl();
-        const status: BrowserControlStatus =
-          probe.status === "connected"
-            ? "connected"
-            : probe.status === "connected_no_tabs"
-              ? "connected_no_tabs"
-            : probe.status === "not_connected"
-              ? "not_connected"
-              : "error";
+        const wasVerified = await get().hydrateVerification();
+        const probe = await probeBrowserControl(context);
+        const verified = wasVerified || isSuccessfulProbeStatus(probe.status);
+        if (verified && !wasVerified) {
+          void setPref(BROWSER_CONTROL_VERIFIED_PREF, true).catch(() => {});
+        }
+        const status = statusForProbe(probe, verified);
         set({
           status,
+          verified,
+          verificationHydrated: true,
           lastProbe: probe,
           layout: {
             extensionDir: probe.extensionDir,

@@ -346,8 +346,9 @@ fn ensure_browser_control_layout(
 #[tauri::command]
 async fn probe_browser_control(
     app: tauri::AppHandle,
+    context: Option<browser_control::BrowserControlProbeContext>,
 ) -> std::result::Result<browser_control::BrowserControlProbe, String> {
-    browser_control::probe_for_app(app)
+    browser_control::probe_for_app(app, context.unwrap_or_default())
         .await
         .map_err(|e| e.to_string())
 }

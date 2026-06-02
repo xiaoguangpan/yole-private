@@ -55,17 +55,23 @@ export function BrowserControlSetupDialog({
   const extensionDir = layout?.extensionDir ?? lastProbe?.extensionDir ?? "";
   const connected = status === "connected";
   const connectedNoTabs = status === "connected_no_tabs";
+  const offline = status === "offline";
+  const needsWebpage = offline || connectedNoTabs;
   const bridgeReady = connected || connectedNoTabs;
   const layoutReady = Boolean(extensionDir);
   const statusMessage = connected
     ? copy.connectedStatus
     : connectedNoTabs
       ? copy.connectedNoTabsStatus
-      : error || lastProbe?.message || copy.waitingStatus;
+      : offline
+        ? copy.offlineStatus
+        : error || lastProbe?.message || copy.waitingStatus;
   const statusDetail = connected
     ? copy.connectedStatusDetail(lastProbe?.tabCount ?? 0)
     : connectedNoTabs
       ? copy.connectedNoTabsStatusDetail
+      : offline
+        ? copy.offlineStatusDetail
       : "";
 
   useEffect(() => {
@@ -121,8 +127,15 @@ export function BrowserControlSetupDialog({
     window.setTimeout(() => setCopied(false), 1200);
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setShowRepair(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-overlay" />
         <Dialog.Content
@@ -137,7 +150,7 @@ export function BrowserControlSetupDialog({
               ariaLabel={copy.close}
               className="absolute right-3 top-3"
               variant="ghost"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
             >
               <X size={14} weight="thin" />
             </IconButton>
@@ -159,6 +172,8 @@ export function BrowserControlSetupDialog({
                     ? copy.connectedTitle
                     : connectedNoTabs
                       ? copy.connectedNoTabsTitle
+                      : offline
+                        ? copy.offlineTitle
                       : copy.title}
                 </Dialog.Title>
                 <p className="mt-1 text-[12.5px] leading-[1.6] text-ink-soft">
@@ -166,6 +181,8 @@ export function BrowserControlSetupDialog({
                     ? copy.connectedDescription
                     : connectedNoTabs
                       ? copy.connectedNoTabsDescription
+                      : offline
+                        ? copy.offlineDescription
                       : copy.description}
                 </p>
               </div>
@@ -173,7 +190,7 @@ export function BrowserControlSetupDialog({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3 [@media(max-height:640px)]:py-2">
-            {connected ? (
+            {connected || needsWebpage ? (
               <div className="grid gap-3">
                 <ConnectionStatusCard
                   busy={busy}
@@ -181,6 +198,15 @@ export function BrowserControlSetupDialog({
                   status={status}
                   statusDetail={statusDetail}
                   statusMessage={statusMessage}
+                  actions={
+                    needsWebpage ? (
+                      <TestPageActions
+                        copy={copy}
+                        openError={showRepair ? null : openError}
+                        openTestPage={openTestPage}
+                      />
+                    ) : undefined
+                  }
                 />
 
                 {showRepair && (
@@ -226,13 +252,7 @@ export function BrowserControlSetupDialog({
 
                   {layoutReady && (
                     <SetupStep index={6} title={copy.stepTest}>
-                      <StepHint>
-                        {copy.stepTestHintPrefix}
-                        <StrongTerm>{copy.sameBrowser}</StrongTerm>
-                        {copy.stepTestHintMiddle}
-                        <StrongTerm>{copy.anyWebsite}</StrongTerm>
-                        {copy.stepTestHintSuffix}
-                      </StepHint>
+                      <StepHint>{copy.stepTestHint}</StepHint>
                       <div className="mt-2.5">
                         <ConnectionStatusCard
                           busy={busy}
@@ -258,7 +278,7 @@ export function BrowserControlSetupDialog({
                 variant={connected ? "ghost" : "secondary"}
                 size="md"
                 disabled={busy || !layoutReady}
-                onClick={() => void probe()}
+                onClick={() => void probe(needsWebpage ? "recheck" : "manual")}
                 leadingIcon={
                   busy ? (
                     <CircleNotch size={13} weight="thin" className="spin" />
@@ -269,16 +289,26 @@ export function BrowserControlSetupDialog({
                   )
                 }
               >
-                {busy ? copy.testing : connected ? copy.retest : copy.test}
+                {busy
+                  ? copy.testing
+                  : connected
+                    ? copy.retest
+                    : needsWebpage
+                      ? copy.recheck
+                      : copy.test}
               </Button>
-              {connected && (
+              {(connected || needsWebpage) && (
                 <Button
                   variant="ghost"
                   size="md"
                   onClick={() => setShowRepair((show) => !show)}
                   leadingIcon={<PuzzlePiece size={13} weight="thin" />}
                 >
-                  {showRepair ? copy.hideRepair : copy.repairTitle}
+                  {showRepair
+                    ? copy.hideRepair
+                    : needsWebpage
+                      ? copy.reinstallOrRepair
+                      : copy.repairTitle}
                 </Button>
               )}
             </div>
@@ -288,7 +318,7 @@ export function BrowserControlSetupDialog({
                 size="md"
                 title={copy.runDemoTitle}
                 onClick={() => {
-                  onOpenChange(false);
+                  handleOpenChange(false);
                   onRunDemo?.();
                 }}
               >
@@ -298,7 +328,7 @@ export function BrowserControlSetupDialog({
               <Button
                 variant="ghost"
                 size="md"
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleOpenChange(false)}
               >
                 {copy.later}
               </Button>
@@ -307,6 +337,44 @@ export function BrowserControlSetupDialog({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function TestPageActions({
+  copy,
+  openError,
+  openTestPage,
+}: {
+  copy: ReturnType<typeof useCopy>["browserControl"];
+  openError: string | null;
+  openTestPage: (browser: BrowserControlBrowser) => Promise<void>;
+}) {
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void openTestPage("chrome")}
+          leadingIcon={<ArrowSquareOut size={13} weight="thin" />}
+        >
+          {copy.openChromeTestPage}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void openTestPage("edge")}
+          leadingIcon={<ArrowSquareOut size={13} weight="thin" />}
+        >
+          {copy.openEdgeTestPage}
+        </Button>
+      </div>
+      {openError && (
+        <div className="mt-2 rounded-sm border border-error/20 bg-error/[0.06] px-3 py-2 text-[12px] leading-[1.5] text-error">
+          {openError}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -514,18 +582,21 @@ function StrongTerm({ children }: { children: ReactNode }) {
 }
 
 function ConnectionStatusCard({
+  actions,
   busy,
   connected,
   status,
   statusDetail,
   statusMessage,
 }: {
+  actions?: ReactNode;
   busy: boolean;
   connected: boolean;
   status: string;
   statusDetail?: string;
   statusMessage: string;
 }) {
+  const offline = status === "offline";
   return (
     <div
       className={cn(
@@ -546,6 +617,8 @@ function ConnectionStatusCard({
             weight="thin"
             className="mt-0.5 shrink-0 text-success"
           />
+        ) : offline ? (
+          <PuzzlePiece size={14} weight="thin" className="mt-0.5 shrink-0" />
         ) : (
           <Warning size={14} weight="thin" className="mt-0.5 shrink-0" />
         )}
@@ -556,6 +629,7 @@ function ConnectionStatusCard({
               {statusDetail}
             </span>
           )}
+          {actions}
         </span>
       </div>
     </div>

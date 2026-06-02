@@ -363,6 +363,7 @@ function BrowserControlIndicator({
   const copy = useCopy().topbar;
   const connected = status === "connected";
   const connectedNoTabs = status === "connected_no_tabs";
+  const offline = status === "offline";
   const bridgeReady = connected || connectedNoTabs;
   const checking = status === "unknown";
   const missing = status === "not_connected";
@@ -377,10 +378,12 @@ function BrowserControlIndicator({
     ? copy.browserControlConnectedTitle
     : connectedNoTabs
       ? copy.browserControlNoTabsTitle
+      : offline
+        ? copy.browserControlOfflineTitle
       : error
         ? copy.browserControlErrorTitle
         : copy.browserControlPendingTitle;
-  if (bridgeReady) {
+  if (bridgeReady || offline) {
     return (
       <TooltipLabel text={title}>
         <button

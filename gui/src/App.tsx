@@ -456,7 +456,7 @@ function App() {
       const layout = await ensureBrowserControlLayout();
       if (cancelled) return;
       if (!layout) return;
-      await probeBrowserControl();
+      await probeBrowserControl("startup");
     })();
     return () => {
       cancelled = true;

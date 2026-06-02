@@ -107,8 +107,8 @@ def ask_user(question, candidates=None):
 
 import simphtml
 driver = None
-NO_BROWSER_TABS_MSG = "浏览器插件已连接，但没有可操作网页标签页。请在同一个 Chrome / Edge 里打开任意普通网页（http/https），然后重试。"
-NO_BROWSER_CONNECTION_MSG = "没有可用的浏览器标签页。请确认浏览器插件已加载，并在同一浏览器打开任意普通网页（http/https）。"
+NO_BROWSER_TABS_MSG = "浏览器插件已连接，但没有可用网页。请在同一个 Chrome / Edge 里打开一个网页，然后重试。"
+NO_BROWSER_CONNECTION_MSG = "浏览器当前没有连接。若已安装插件，请打开同一个 Chrome / Edge 的网页后重试；首次使用请先在 Galley 顶部的浏览器控制入口完成设置。"
 
 def browser_control_empty_msg():
     try:
@@ -122,9 +122,7 @@ def first_init_driver():
     global driver
     from TMWebDriver import TMWebDriver
     driver = TMWebDriver()
-    # Chrome MV3 alarms have a 30s floor; first-run Browser Control can need
-    # one alarm cycle before the extension service worker reconnects.
-    deadline = time.time() + 45
+    deadline = time.time() + 12
     sess = []
     while time.time() < deadline:
         time.sleep(1)

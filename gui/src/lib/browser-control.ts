@@ -8,12 +8,14 @@ export type BrowserControlProbeStatus =
 
 export type BrowserControlStatus =
   | "unknown"
+  | "offline"
   | "not_connected"
   | "connected_no_tabs"
   | "connected"
   | "error";
 
 export type BrowserControlBrowser = "chrome" | "edge";
+export type BrowserControlProbeContext = "startup" | "recheck" | "manual";
 
 export interface BrowserControlLayout {
   extensionDir: string;
@@ -35,8 +37,10 @@ export function ensureBrowserControlLayout(): Promise<BrowserControlLayout> {
   return invoke<BrowserControlLayout>("ensure_browser_control_layout");
 }
 
-export function probeBrowserControl(): Promise<BrowserControlProbe> {
-  return invoke<BrowserControlProbe>("probe_browser_control");
+export function probeBrowserControl(
+  context: BrowserControlProbeContext = "manual",
+): Promise<BrowserControlProbe> {
+  return invoke<BrowserControlProbe>("probe_browser_control", { context });
 }
 
 export function openBrowserControlExtensionsPage(

@@ -20,8 +20,6 @@ use tokio::time;
 
 use crate::{managed_runtime, process_command};
 
-const PROBE_PROCESS_TIMEOUT: Duration = Duration::from_secs(50);
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserControlLayout {
@@ -49,6 +47,34 @@ pub enum BrowserControlProbeStatus {
     ConnectedNoTabs,
     NotConnected,
     Error,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserControlProbeContext {
+    Startup,
+    Recheck,
+    Manual,
+}
+
+impl BrowserControlProbeContext {
+    fn wait_duration(self) -> Duration {
+        match self {
+            Self::Startup => Duration::from_secs(3),
+            Self::Recheck => Duration::from_secs(5),
+            Self::Manual => Duration::from_secs(12),
+        }
+    }
+
+    fn process_timeout(self) -> Duration {
+        self.wait_duration() + Duration::from_secs(3)
+    }
+}
+
+impl Default for BrowserControlProbeContext {
+    fn default() -> Self {
+        Self::Manual
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -128,13 +154,17 @@ pub fn ensure_for_app(app: &AppHandle) -> std::io::Result<BrowserControlLayout> 
     })
 }
 
-pub async fn probe_for_app(app: AppHandle) -> std::io::Result<BrowserControlProbe> {
+pub async fn probe_for_app(
+    app: AppHandle,
+    context: BrowserControlProbeContext,
+) -> std::io::Result<BrowserControlProbe> {
     let layout = ensure_for_app(&app)?;
     let diagnostics = managed_runtime::ensure_for_app(&app)?;
     let python = resolve_python(&app);
     let code_root = diagnostics.paths.code_root;
     let state_root = diagnostics.paths.state_root;
     let script = python_probe_script();
+    let wait_duration = context.wait_duration();
 
     let mut cmd = Command::new(python);
     process_command::configure_python(&mut cmd);
@@ -145,6 +175,10 @@ pub async fn probe_for_app(app: AppHandle) -> std::io::Result<BrowserControlProb
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .env("GALLEY_GA_STATE_ROOT", state_root)
         .env("GALLEY_BROWSER_PROBE_CODE_ROOT", code_root)
+        .env(
+            "GALLEY_BROWSER_PROBE_TIMEOUT_SECONDS",
+            format!("{:.3}", wait_duration.as_secs_f64()),
+        )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -155,7 +189,7 @@ pub async fn probe_for_app(app: AppHandle) -> std::io::Result<BrowserControlProb
         let _ = stdin.shutdown().await;
     }
 
-    let output = match time::timeout(PROBE_PROCESS_TIMEOUT, child.wait_with_output()).await {
+    let output = match time::timeout(context.process_timeout(), child.wait_with_output()).await {
         Ok(output) => output?,
         Err(_) => {
             return Ok(BrowserControlProbe {
@@ -165,7 +199,8 @@ pub async fn probe_for_app(app: AppHandle) -> std::io::Result<BrowserControlProb
                 tab_count: 0,
                 sample_title: None,
                 message: Some(
-                    "未检测到浏览器扩展连接。请确认扩展已加载并启用，然后重新测试。".into(),
+                    "未检测到浏览器扩展连接。请打开已安装扩展的 Chrome / Edge 网页，然后重新测试。"
+                        .into(),
                 ),
             });
         }
@@ -467,7 +502,11 @@ if code_root:
 try:
     from TMWebDriver import TMWebDriver
     driver = TMWebDriver()
-    deadline = time.time() + 45
+    try:
+        wait_seconds = float(os.environ.get("GALLEY_BROWSER_PROBE_TIMEOUT_SECONDS", "12"))
+    except Exception:
+        wait_seconds = 12.0
+    deadline = time.time() + max(0.5, wait_seconds)
     sessions = []
     bridge_status = {}
     while time.time() < deadline:
@@ -486,13 +525,13 @@ try:
             print(json.dumps({
                 "status": "connected_no_tabs",
                 "tab_count": 0,
-                "message": "浏览器插件已连接，但没有可操作网页标签页。请在同一浏览器打开任意普通网页（http/https），然后重新测试。"
+                "message": "浏览器插件已连接，但没有可用网页。请在同一浏览器打开一个网页，然后重新测试。"
             }, ensure_ascii=True))
             raise SystemExit(0)
         print(json.dumps({
             "status": "not_connected",
             "tab_count": 0,
-            "message": "未检测到浏览器扩展连接。请确认扩展已加载并启用，然后重新测试。"
+            "message": "未检测到浏览器扩展连接。请打开已安装扩展的 Chrome / Edge 网页，然后重新测试。"
         }, ensure_ascii=True))
     else:
         session_id = str(sessions[0].get("id"))

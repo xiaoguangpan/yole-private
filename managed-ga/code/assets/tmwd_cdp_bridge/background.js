@@ -16,6 +16,13 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 async function handleExtMessage(msg, sender) {
+  if (msg.cmd === 'wake') {
+    connectWS();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      setTimeout(() => { void sendTabsUpdate(); }, 0);
+    }
+    return { ok: true };
+  }
   if (msg.cmd === 'cookies') return await handleCookies(msg, sender);
   if (msg.cmd === 'cdp') return await handleCDP(msg, sender);
   if (msg.cmd === 'batch') return await handleBatch(msg, sender);
@@ -212,15 +219,33 @@ function buildCdpScript(code) {
 // --- WebSocket Client for TMWebDriver ---
 let ws = null;
 const WS_URL = 'ws://127.0.0.1:18765';
+const KEEPALIVE_MS = 25000;
+let keepaliveTimer = null;
 
 function scheduleProbe() {
-  // Chrome MV3 alarms do not fire more often than every 30s. Keep the server
-  // probe aligned with that floor so Galley waits through one wake-up cycle.
+  // Chrome MV3 alarms have a coarse floor. Use them only as a disconnected
+  // fallback; active pages and the keepalive timer do the fast path.
   chrome.alarms.create('tmwd-ws-probe', { delayInMinutes: 0.5 });
 }
 
+function clearKeepaliveTimer() {
+  if (!keepaliveTimer) return;
+  clearTimeout(keepaliveTimer);
+  keepaliveTimer = null;
+}
+
 function scheduleKeepalive() {
-  chrome.alarms.create('tmwd-ws-keepalive', { delayInMinutes: 0.5 });
+  clearKeepaliveTimer();
+  keepaliveTimer = setTimeout(() => {
+    keepaliveTimer = null;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send('{"type":"ping"}'); } catch (_) {}
+      scheduleKeepalive();
+    } else {
+      ws = null;
+      scheduleProbe();
+    }
+  }, KEEPALIVE_MS);
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -229,7 +254,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
   if (alarm.name === 'tmwd-ws-keepalive') {
-    // Keepalive: ping to keep SW alive + detect dead connections
     if (ws && ws.readyState === WebSocket.OPEN) {
       try { ws.send('{"type":"ping"}'); } catch (_) {}
       scheduleKeepalive();
@@ -326,6 +350,7 @@ function connectWS() {
   } catch (e) {
     console.error('[TMWD-WS] Constructor error:', e);
     ws = null;
+    clearKeepaliveTimer();
     scheduleProbe();
     return;
   }
@@ -370,6 +395,7 @@ function connectWS() {
   ws.onclose = () => {
     console.log('[TMWD-WS] Disconnected');
     ws = null;
+    clearKeepaliveTimer();
     scheduleProbe();
   };
   ws.onerror = (e) => {
