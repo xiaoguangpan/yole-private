@@ -374,10 +374,7 @@ function ArchivedRow({
             </div>
           )}
           <div className="mt-1 text-[10.5px] text-ink-muted">
-            {formatDate(session.updatedAt)}
-            {session.turnCount !== undefined && session.turnCount > 0 && (
-              <> · {copy.projects.turns(session.turnCount)}</>
-            )}
+            {copy.projects.archivedOn(formatDate(session.updatedAt))}
           </div>
         </div>
       </li>
@@ -396,10 +393,7 @@ function ArchivedRow({
           </div>
         )}
         <div className="mt-1 text-[10.5px] text-ink-muted">
-          {formatDate(session.updatedAt)}
-          {session.turnCount !== undefined && session.turnCount > 0 && (
-            <> · {copy.projects.turns(session.turnCount)}</>
-          )}
+          {copy.projects.archivedOn(formatDate(session.updatedAt))}
         </div>
       </div>
 

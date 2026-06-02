@@ -915,6 +915,7 @@ const zhCopy = {
     noEarlierEmpty: "7 天前还没有对话。",
     noMatchingConversations: "没有匹配的对话。",
     archivedCountLabel: (count: number) => `${count} 个已归档`,
+    archivedOn: (date: string) => `归档于 ${date}`,
     noArchived: "暂无归档",
     noArchivedConversations: "没有已归档的对话。",
     turns: (count: number) => `${count} 步`,
@@ -1938,6 +1939,7 @@ const enCopy: AppCopy = {
     noMatchingConversations: "No matching conversations.",
     archivedCountLabel: (count) =>
       `${count} archived conversation${count === 1 ? "" : "s"}`,
+    archivedOn: (date) => `Archived on ${date}`,
     noArchived: "No archived conversations",
     noArchivedConversations: "No archived conversations.",
     turns: (count) => `${count} step${count === 1 ? "" : "s"}`,
