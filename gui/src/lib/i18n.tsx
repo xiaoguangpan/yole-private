@@ -923,10 +923,11 @@ const zhCopy = {
     projectName: "项目名",
     close: "关闭",
     filterArchive: "按标题或摘要过滤…",
+    archivedTitle: "已归档",
     deleteAllArchived: "永久删除所有归档",
     create: "创建",
     select: "多选",
-    selected: (count: number) => `已选 ${count}`,
+    selected: (count: number) => `已选 ${count} 个对话`,
     selectAll: "全选",
     clearSelection: "取消全选",
     noMatches: "无匹配",
@@ -954,12 +955,15 @@ const zhCopy = {
     permanentlyDeleteSelectedBody:
       "这些对话连同它们的所有消息和工具调用记录将被永久删除。",
     permanentlyDeleteCount: (count: number) => `永久删除 ${count} 个`,
-    emptyAll: "永久删除全部...",
+    emptyArchive: (count: number) => `清空归档（${count}）`,
     emptyAllTitle: "永久删除所有归档？",
     emptyAllBody: (count: number) =>
       `将永久删除 ${count} 个已归档对话，包括它们的所有消息和工具调用记录。`,
+    emptyAllAction: (count: number) => `永久删除 ${count} 个对话`,
     acknowledgeCannotUndo: "我了解此操作无法撤销",
-    restoreSelected: "恢复",
+    restoreSelectedAction: (count: number) => `恢复已选的 ${count} 个对话`,
+    deleteSelectedAction: (count: number) =>
+      `永久删除已选的 ${count} 个对话`,
     archiveSelected: "Archive",
     pinned: "pinned",
   },
@@ -1965,6 +1969,7 @@ const enCopy: AppCopy = {
     projectName: "Project name",
     close: "Close",
     filterArchive: "Filter by title or summary...",
+    archivedTitle: "Archived",
     deleteAllArchived: "Permanently delete all archived conversations",
     create: "Create",
     select: "Select",
@@ -2000,12 +2005,17 @@ const enCopy: AppCopy = {
     permanentlyDeleteSelectedBody:
       "These conversations, including all messages and tool call records, will be permanently deleted.",
     permanentlyDeleteCount: (count) => `Permanently delete ${count}`,
-    emptyAll: "Permanently delete all...",
+    emptyArchive: (count) => `Empty archive (${count})`,
     emptyAllTitle: "Permanently delete all archived conversations?",
     emptyAllBody: (count) =>
       `${count} archived conversation${count === 1 ? "" : "s"}, including all messages and tool call records, will be permanently deleted.`,
+    emptyAllAction: (count) =>
+      `Permanently delete ${count} conversation${count === 1 ? "" : "s"}`,
     acknowledgeCannotUndo: "I understand this cannot be undone",
-    restoreSelected: "Restore",
+    restoreSelectedAction: (count) =>
+      `Restore ${count} selected conversation${count === 1 ? "" : "s"}`,
+    deleteSelectedAction: (count) =>
+      `Permanently delete ${count} selected conversation${count === 1 ? "" : "s"}`,
     archiveSelected: "Archive",
     pinned: "pinned",
   },

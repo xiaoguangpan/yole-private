@@ -312,7 +312,7 @@ function Header({
   return (
     <div className="flex items-center gap-3 border-b border-line bg-elevated px-5 py-3.5">
       <Dialog.Title className="text-[16px] font-semibold text-ink">
-        Archived
+        {copy.projects.archivedTitle}
       </Dialog.Title>
       <span className="text-[12.5px] text-ink-muted">{summary}</span>
 
@@ -324,19 +324,19 @@ function Header({
         ) : (
           <>
             {total > 0 && (
+              <Button variant="secondary" size="sm" onClick={onEnterSelectMode}>
+                {copy.projects.select}
+              </Button>
+            )}
+            {total > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onEmptyAll}
                 title={copy.projects.deleteAllArchived}
-                className="text-ink-muted hover:bg-error/10 hover:text-error active:bg-error/15"
+                className="px-1.5 font-normal text-ink-muted hover:bg-error/10 hover:text-error active:bg-error/15"
               >
-                {copy.projects.emptyAll}
-              </Button>
-            )}
-            {total > 0 && (
-              <Button variant="secondary" size="sm" onClick={onEnterSelectMode}>
-                {copy.projects.select}
+                {copy.projects.emptyArchive(total)}
               </Button>
             )}
           </>
@@ -513,6 +513,9 @@ function SelectActionBar({
           ? copy.projects.clearSelection
           : copy.projects.selectAll}
       </Button>
+      <span className="text-[12px] text-ink-muted">
+        {copy.projects.selected(selectedCount)}
+      </span>
 
       <div className="ml-auto flex items-center gap-1.5">
         <Button
@@ -520,24 +523,22 @@ function SelectActionBar({
           size="sm"
           onClick={onRestore}
           disabled={disabled}
+          aria-label={copy.projects.restoreSelectedAction(selectedCount)}
+          title={copy.projects.restoreSelectedAction(selectedCount)}
           leadingIcon={<ArrowUUpLeft size={12} weight="thin" />}
         >
           {copy.common.restore}
-          {selectedCount > 0 && (
-            <span className="text-ink-muted">· {selectedCount}</span>
-          )}
         </Button>
         <Button
           variant="destructive-soft"
           size="sm"
           onClick={onDelete}
           disabled={disabled}
+          aria-label={copy.projects.deleteSelectedAction(selectedCount)}
+          title={copy.projects.deleteSelectedAction(selectedCount)}
           leadingIcon={<Trash size={12} weight="thin" />}
         >
           {copy.common.deletePermanently}
-          {selectedCount > 0 && (
-            <span className="text-error/70">· {selectedCount}</span>
-          )}
         </Button>
       </div>
     </div>
@@ -787,7 +788,7 @@ function ConfirmEmptyAllDialog({
                 void onConfirm().then(() => setAcknowledged(false));
               }}
             >
-              {copy.projects.emptyAll}
+              {copy.projects.emptyAllAction(count)}
             </Button>
           </DialogActionRow>
         </Dialog.Content>
