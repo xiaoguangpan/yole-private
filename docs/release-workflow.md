@@ -32,7 +32,7 @@ ubuntu-latest 收集产物 + gh release create --draft
 点 publish → 用户可见 + 可下载
        ↓
 alpha 内测 / 尝鲜：停在这里，只供手动下载
-beta / stable：手动运行 Promote Update Channel → 默认更新通道 manifest 指向该版本
+stable / patch：继续运行 Promote Update Channel → 默认更新通道 manifest 指向该版本
 ```
 
 构建时间预估：每个 platform job 4-7 min（缓存命中后），三个并行。全流程 push tag 到 draft release ready 大约 **10-12 min**。
@@ -210,9 +210,15 @@ https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates
 配置成 stable URL。首次配置时这个 URL 可以还不存在；release publish 后跑
 promote workflow 才会写入。
 
-内测 / 尝鲜用的 alpha 版本默认只发布 GitHub Pre-release 供手动下载，不跑
-Promote Update Channel。只有当我们明确决定让当前更新频道用户也收到这个
-alpha 时，才把 alpha tag 填进 promote workflow。
+Stable / patch release 发布后默认继续跑 Promote Update Channel；这不是可选
+收尾，而是让老版本用户能在 Galley 里升级到新版的正式 release gate。
+
+内测 / 尝鲜用的 alpha / RC / beta tester 版本默认只发布 GitHub Pre-release
+供手动下载，不跑 Promote Update Channel。只有当我们明确决定让当前更新频道
+用户也收到这个版本时，才把对应 tag 填进 promote workflow。
+
+如果正式版需要暂不推送应用内更新，必须在 release notes 和
+`docs/project-status.md` 里明确标记 `manual-download only` 或 `hold updater`。
 
 操作：
 

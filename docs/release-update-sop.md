@@ -15,6 +15,18 @@ Release and update are two separate gates:
    after publish + smoke**. It also keeps `updates/beta/latest.json` as a
    legacy alias for older installed builds.
 
+For stable and patch releases, the release is not complete at GitHub publish.
+The default finish line is:
+
+1. publish the GitHub Release;
+2. promote the default update channel in the same release session;
+3. verify the live update manifest.
+
+Only skip promotion when the release owner explicitly marks the release as
+`manual-download only` or `hold updater`. If either exception is used, record it
+in the GitHub Release notes and [project status](./project-status.md), because
+installed users will not see that version through Galley's update UI.
+
 Do not point the update channel at a draft, untested, or failed build. The
 draft Release `latest.json` is a review artifact, not the live user channel.
 For tester / early-adopter alpha releases, publish for manual downloads only and
@@ -53,6 +65,11 @@ Replace the example value before every release.
   - Secret: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password
   - Variable: `GALLEY_UPDATER_PUBKEY`
   - Variable: `GALLEY_UPDATER_ENDPOINT`
+- [ ] Update-channel policy is decided:
+  - stable / patch release: promote `stable` after publish + smoke
+  - tester / early-adopter release: manual download only by default
+  - exception: `manual-download only` or `hold updater`, documented in notes and
+    project status
 
 Expected default endpoint:
 
@@ -159,9 +176,10 @@ Writing rules:
 - Installation links must point directly to GitHub Release assets.
 - Always include the macOS quarantine command and Windows SmartScreen note while
   Galley is unsigned.
-- If the app update channel has not been promoted yet, keep the "wait for
-  in-app update" note. If it has already been promoted, replace that sentence
-  with a direct "installed users can update in Galley" note.
+- Stable / patch release notes should end in the promoted state: after update
+  channel promotion, replace any "wait for in-app update" text with a direct
+  "installed users can update in Galley" note. Keep the waiting text only while
+  reviewing the draft before promotion.
 
 Replace `<TAG>` with the Git tag (for example `v0.2.5`) and `<VERSION>` with
 the package version (for example `0.2.5`).
@@ -192,7 +210,7 @@ xattr -dr com.apple.quarantine /Applications/Galley.app
 
 如果 Windows SmartScreen 提示风险，点击「更多信息」->「仍要运行」。
 
-已安装旧版的用户可以等待应用内更新；更新通道会在安装包 smoke 通过后再提升到 <TAG>。
+已安装旧版的用户可以在 Galley 里检查更新，升级到 <TAG>。
 
 ---
 
@@ -221,7 +239,7 @@ xattr -dr com.apple.quarantine /Applications/Galley.app
 
 If Windows SmartScreen shows a warning, click "More info" -> "Run anyway".
 
-Existing users can wait for the in-app update channel. The update channel will be promoted to <TAG> after installer smoke passes.
+Existing users can check for updates in Galley and upgrade to <TAG>.
 
 **Full Changelog**: https://github.com/wangjc683/galley/compare/<PREVIOUS_TAG>...<TAG>
 ````
@@ -290,15 +308,20 @@ Publish only after smoke passes.
 After publish:
 
 - The GitHub Release is user-visible.
-- The update channel is still unchanged.
+- The update channel is still unchanged until Step 7.
+- For stable / patch releases, continue immediately to Step 7. Do not stop here
+  unless the release is explicitly `manual-download only` or `hold updater`.
 - Existing installed apps will not see this version until promotion.
 
 ### 7. Promote Update Channel
 
-Promote after publish + smoke:
+Promote after publish + smoke. For stable / patch releases, this is a default
+release step, not optional cleanup.
 
 Skip this step for tester / early-adopter alpha releases unless we explicitly
 decide that all current update-channel users should receive the alpha build.
+Also skip only when the release is explicitly marked `manual-download only` or
+`hold updater` in the release notes and project status.
 
 ```bash
 gh workflow run promote-update-channel.yml \
@@ -340,6 +363,10 @@ The promote workflow runs the same verifier after it pushes the channel branch.
 It passes `--cache-bust` so GitHub raw CDN cache cannot keep returning a stale
 but valid old manifest. If this step fails, treat the update channel as not
 promoted even if the workflow generated a local `latest.json`.
+
+After verification passes, edit the GitHub Release notes if needed so installed
+users are told they can update in Galley, not that they should wait for the
+update channel.
 
 ### 9. Dogfood App Update
 
@@ -393,7 +420,9 @@ Then:
 ## Done Criteria
 
 - [ ] GitHub Release published.
-- [ ] Update channel promoted only after smoke.
-- [ ] Live `latest.json` verified.
+- [ ] For stable / patch releases, default update channel promoted after smoke,
+      unless the release is explicitly `manual-download only` or `hold updater`.
+- [ ] Live `updates/stable/latest.json` verified.
+- [ ] Legacy `updates/beta/latest.json` alias verified when promoting `stable`.
 - [ ] Older installed app can update to the new version.
 - [ ] Any release-specific caveats are in Release notes and devlog.
