@@ -279,6 +279,13 @@ function ManagedRuntimeCard({
   const promptStatus = diagnostics
     ? `${diagnostics.promptProfileId} · ${diagnostics.promptHash}`
     : copy.notLoaded;
+  const missingSeedFiles =
+    diagnostics?.state.memorySeed.criticalFilesMissing.length ?? 0;
+  const memorySeedStatus = diagnostics
+    ? diagnostics.state.memorySeed.criticalFilesPresent
+      ? `${copy.complete} · ${diagnostics.paths.memoryDir}`
+      : `${copy.missing} · ${missingSeedFiles} ${copy.criticalFiles} · ${diagnostics.paths.memorySeedDir}`
+    : copy.notLoaded;
   const modelStatus =
     models.length === 0
       ? copy.notConfigured
@@ -336,6 +343,10 @@ function ManagedRuntimeCard({
               }
             />
             <RuntimeDiagnosticRow label="Prompts" value={promptStatus} />
+            <RuntimeDiagnosticRow
+              label={copy.memorySop}
+              value={memorySeedStatus}
+            />
             <RuntimeDiagnosticRow
               label="State"
               value={

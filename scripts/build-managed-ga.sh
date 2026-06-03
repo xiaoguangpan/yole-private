@@ -7,6 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="${1:-$HOME/Documents/GenericAgent}"
 DEST="$ROOT/managed-ga/code"
+STATE_SEED_ROOT="$ROOT/managed-ga/state-seed"
+MEMORY_SEED_DEST="$STATE_SEED_ROOT/memory"
 EXPECTED_COMMIT="$(python3 - "$ROOT/managed-ga/manifest.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
@@ -57,6 +59,11 @@ rsync -a \
   --exclude 'model_responses' \
   "$SOURCE"/ "$DEST"/
 
+rm -rf "$MEMORY_SEED_DEST"
+mkdir -p "$STATE_SEED_ROOT"
+git -C "$SOURCE" archive "$EXPECTED_COMMIT" memory | tar -x -C "$STATE_SEED_ROOT"
+find "$MEMORY_SEED_DEST" -type f -print0 | xargs -0 perl -0pi -e 's/[ \t]+$//mg; s/\n+\z/\n/'
+
 shopt -s nullglob
 for patch in "$ROOT"/managed-ga/patches/*.patch; do
   (cd "$ROOT" && git apply --whitespace=nowarn --directory=managed-ga/code "$patch")
@@ -69,3 +76,4 @@ done
 perl -0pi -e 's/[ \t]+$//mg' "$DEST/agentmain.py" "$DEST/llmcore.py"
 
 echo "Managed GA code copied to $DEST"
+echo "Managed GA memory seed copied to $MEMORY_SEED_DEST"

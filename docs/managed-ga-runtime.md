@@ -756,6 +756,8 @@ App Resources/
   managed-ga/
     manifest.json               # pinned upstream baseline + patch stack id
     code/                       # read-only managed GA code payload
+    state-seed/
+      memory/                   # upstream tracked GA memory/SOP defaults
     patches/
       manifest.md
 
@@ -778,6 +780,11 @@ missing. Existing state must not be overwritten:
 if missing: create default
 if exists: leave it alone
 ```
+
+The default GA memory/SOP seed lives under app resources, but runtime reads and
+writes still go through `managed-ga-state/memory/`. The seed is copied
+missing-only so existing `global_mem.txt`, `global_mem_insight.txt`, custom SOPs,
+skills, and edited memory files survive normal Galley updates.
 
 ## Patch Discipline
 
@@ -1263,10 +1270,13 @@ Current implementation slice:
 - `scripts/check-managed-ga-payload.mjs` parses `tauri.conf.json` and
   `managed-ga/manifest.json`, verifies required files and patch entries, and
   recursively rejects generated / local / secret / user-state artifacts.
+  It also verifies `state-seed/memory` contains the critical GA memory/SOP
+  defaults and does not contain generated long-term memory files.
 - `scripts/prepare-cli-sidecar.sh` builds `galley-cli` for the target triple
   and places it at the Tauri `externalBin` source path.
 - `scripts/check-managed-ga-app-bundle.mjs` inspects the finished macOS
-  `.app`, including the CLI sibling and managed runtime resources.
+  `.app`, including the CLI sibling, managed runtime resources, and memory/SOP
+  seed.
 - `.github/workflows/check.yml` runs the payload gate after frontend lint and
   prepares the CLI sidecar before Cargo validation.
 - `.github/workflows/release.yml` runs the payload gate after bundled Python is

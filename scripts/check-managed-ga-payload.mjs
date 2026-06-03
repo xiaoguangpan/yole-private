@@ -8,6 +8,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const managedRoot = path.join(repoRoot, "managed-ga");
 const codeRoot = path.join(managedRoot, "code");
+const memorySeedRoot = path.join(managedRoot, "state-seed", "memory");
 const manifestPath = path.join(managedRoot, "manifest.json");
 const tauriConfigPath = path.join(repoRoot, "core", "tauri.conf.json");
 const patchRoot = path.join(managedRoot, "patches");
@@ -15,6 +16,23 @@ const patchRoot = path.join(managedRoot, "patches");
 const errors = [];
 const pythonAssetPathPattern =
   /os\.path\.join\([^)\n]*script_dir[^)\n]*(?:f?["']assets\/|["']assets\/)/;
+const criticalMemorySeedFiles = [
+  "memory_management_sop.md",
+  "plan_sop.md",
+  "tmwebdriver_sop.md",
+  "web_setup_sop.md",
+  "verify_sop.md",
+  "supervisor_sop.md",
+  "L4_raw_sessions/salient_mining_sop.md",
+  "L4_raw_sessions/compress_session.py",
+  "skill_search/SKILL.md",
+];
+const forbiddenMemorySeedFiles = new Set([
+  "global_mem.txt",
+  "global_mem_insight.txt",
+  "file_access_stats.json",
+  "all_histories.txt",
+]);
 
 function fail(message) {
   errors.push(message);
@@ -63,6 +81,7 @@ function walk(dir) {
 
 requireDir(managedRoot);
 requireDir(codeRoot);
+requireDir(memorySeedRoot);
 requireFile(manifestPath);
 requireFile(path.join(patchRoot, "manifest.md"));
 requireFile(path.join(codeRoot, "agentmain.py"));
@@ -160,6 +179,22 @@ if (fs.existsSync(codeRoot)) {
     const entryPath = path.join(codeRoot, name);
     if (fs.existsSync(entryPath)) {
       fail(`managed GA payload contains user-state root: ${relative(entryPath)}`);
+    }
+  }
+}
+
+if (fs.existsSync(memorySeedRoot)) {
+  for (const rel of criticalMemorySeedFiles) {
+    requireFile(path.join(memorySeedRoot, ...rel.split("/")));
+  }
+  for (const entryPath of walk(memorySeedRoot)) {
+    const name = path.basename(entryPath);
+    if (
+      forbiddenNames.has(name) ||
+      forbiddenMemorySeedFiles.has(name) ||
+      name.endsWith(".pyc")
+    ) {
+      fail(`managed GA memory seed contains generated/secret artifact: ${relative(entryPath)}`);
     }
   }
 }

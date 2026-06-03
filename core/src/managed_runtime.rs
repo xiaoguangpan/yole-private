@@ -4,6 +4,7 @@
 //! never reads or writes a user-owned external GenericAgent checkout.
 
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::managed_model_config;
@@ -13,6 +14,18 @@ use tauri::{AppHandle, Manager};
 
 const MANIFEST_JSON: &str = include_str!("../../managed-ga/manifest.json");
 const STATE_SCHEMA_VERSION: u32 = 1;
+const MEMORY_SEED_REL: &str = "state-seed/memory";
+const CRITICAL_MEMORY_SEED_FILES: &[&str] = &[
+    "memory_management_sop.md",
+    "plan_sop.md",
+    "tmwebdriver_sop.md",
+    "web_setup_sop.md",
+    "verify_sop.md",
+    "supervisor_sop.md",
+    "L4_raw_sessions/salient_mining_sop.md",
+    "L4_raw_sessions/compress_session.py",
+    "skill_search/SKILL.md",
+];
 pub use managed_prompt::PROMPT_PROFILE_ID;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -63,6 +76,7 @@ pub struct ManagedRuntimeDiagnostics {
 pub struct ManagedRuntimePaths {
     pub resource_root: String,
     pub code_root: String,
+    pub memory_seed_dir: String,
     pub manifest_path: String,
     pub patch_manifest_path: String,
     pub state_root: String,
@@ -91,6 +105,16 @@ pub struct ManagedStateDiagnostics {
     pub initialized: bool,
     pub created_dirs: Vec<String>,
     pub model_config_exists: bool,
+    pub memory_seed: ManagedMemorySeedDiagnostics,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagedMemorySeedDiagnostics {
+    pub source_exists: bool,
+    pub critical_files_present: bool,
+    pub critical_files_missing: Vec<String>,
+    pub copied_files: Vec<String>,
 }
 
 pub fn ensure_for_app(app: &AppHandle) -> std::io::Result<ManagedRuntimeDiagnostics> {
@@ -140,6 +164,8 @@ fn ensure_layout(
         }
     }
 
+    let memory_seed = ensure_memory_seed(&paths.memory_seed_dir, &paths.memory_dir)?;
+
     let state_initialized = [
         &paths.state_root,
         &paths.memory_dir,
@@ -166,6 +192,7 @@ fn ensure_layout(
         paths: ManagedRuntimePaths {
             resource_root: path_to_string(&paths.resource_root),
             code_root: path_to_string(&paths.code_root),
+            memory_seed_dir: path_to_string(&paths.memory_seed_dir),
             manifest_path: path_to_string(&paths.manifest_path),
             patch_manifest_path: path_to_string(&paths.patch_manifest_path),
             state_root: path_to_string(&paths.state_root),
@@ -188,8 +215,72 @@ fn ensure_layout(
             initialized: state_initialized,
             created_dirs,
             model_config_exists: paths.model_config_path.is_file(),
+            memory_seed,
         },
     })
+}
+
+fn ensure_memory_seed(
+    memory_seed_dir: &Path,
+    memory_dir: &Path,
+) -> io::Result<ManagedMemorySeedDiagnostics> {
+    let source_exists = memory_seed_dir.is_dir();
+    let mut copied_files = Vec::new();
+    if source_exists {
+        copy_missing_tree(
+            memory_seed_dir,
+            memory_dir,
+            memory_seed_dir,
+            &mut copied_files,
+        )?;
+    }
+    copied_files.sort();
+
+    let critical_files_missing = CRITICAL_MEMORY_SEED_FILES
+        .iter()
+        .filter(|rel| !memory_dir.join(rel_to_path(rel)).is_file())
+        .map(|rel| (*rel).to_string())
+        .collect::<Vec<_>>();
+    let critical_files_present = critical_files_missing.is_empty();
+
+    Ok(ManagedMemorySeedDiagnostics {
+        source_exists,
+        critical_files_present,
+        critical_files_missing,
+        copied_files,
+    })
+}
+
+fn copy_missing_tree(
+    source_root: &Path,
+    target_root: &Path,
+    current: &Path,
+    copied_files: &mut Vec<String>,
+) -> io::Result<()> {
+    let mut entries = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.path());
+
+    for entry in entries {
+        let source_path = entry.path();
+        let file_type = entry.file_type()?;
+        let rel = source_path
+            .strip_prefix(source_root)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let target_path = target_root.join(rel);
+
+        if file_type.is_dir() {
+            fs::create_dir_all(&target_path)?;
+            copy_missing_tree(source_root, target_root, &source_path, copied_files)?;
+        } else if file_type.is_file() && !target_path.exists() {
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&source_path, &target_path)?;
+            copied_files.push(path_to_slash(rel));
+        }
+    }
+
+    Ok(())
 }
 
 fn parse_manifest() -> std::io::Result<ManagedRuntimeManifest> {
@@ -221,6 +312,7 @@ fn resolve_resource_root(resource_dir: &Path) -> PathBuf {
 struct ManagedLayoutPaths {
     resource_root: PathBuf,
     code_root: PathBuf,
+    memory_seed_dir: PathBuf,
     manifest_path: PathBuf,
     patch_manifest_path: PathBuf,
     state_root: PathBuf,
@@ -241,6 +333,7 @@ fn layout_paths(resource_root: PathBuf, app_data_dir: PathBuf) -> ManagedLayoutP
     ManagedLayoutPaths {
         manifest_path: resource_root.join("manifest.json"),
         patch_manifest_path: resource_root.join("patches").join("manifest.md"),
+        memory_seed_dir: resource_root.join(rel_to_path(MEMORY_SEED_REL)),
         code_root,
         resource_root,
         memory_dir: state_root.join("memory"),
@@ -256,6 +349,15 @@ fn layout_paths(resource_root: PathBuf, app_data_dir: PathBuf) -> ManagedLayoutP
 
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+fn path_to_slash(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/")
+}
+
+fn rel_to_path(rel: &str) -> PathBuf {
+    rel.split('/').collect()
 }
 
 #[cfg(test)]
@@ -354,6 +456,82 @@ mod tests {
     }
 
     #[test]
+    fn ensure_layout_copies_missing_memory_seed_files() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let resource_root = tmp.path().join("resources").join("managed-ga");
+        fs::create_dir_all(resource_root.join("patches")).expect("resource dirs");
+        fs::write(resource_root.join("manifest.json"), "{}").expect("manifest placeholder");
+        fs::write(
+            resource_root.join("patches").join("manifest.md"),
+            "# patches",
+        )
+        .expect("patch manifest");
+        write_critical_memory_seed(&resource_root, b"seed");
+        write_memory_seed_file(&resource_root, "custom/custom_sop.md", b"extra");
+
+        let app_data = tmp.path().join("app-data");
+        let diagnostics = ensure_layout(resource_root.clone(), app_data.clone()).expect("ensure");
+        let memory_dir = app_data.join("managed-ga-state").join("memory");
+
+        assert!(diagnostics.state.memory_seed.source_exists);
+        assert!(diagnostics.state.memory_seed.critical_files_present);
+        assert!(diagnostics
+            .state
+            .memory_seed
+            .critical_files_missing
+            .is_empty());
+        assert!(diagnostics
+            .state
+            .memory_seed
+            .copied_files
+            .contains(&"memory_management_sop.md".to_string()));
+        assert_eq!(
+            fs::read(memory_dir.join("memory_management_sop.md")).expect("memory sop"),
+            b"seed"
+        );
+        assert_eq!(
+            fs::read(memory_dir.join("custom").join("custom_sop.md")).expect("custom sop"),
+            b"extra"
+        );
+
+        let second = ensure_layout(resource_root, app_data).expect("ensure again");
+        assert!(second.state.memory_seed.copied_files.is_empty());
+    }
+
+    #[test]
+    fn ensure_layout_never_overwrites_existing_memory_seed_files() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let resource_root = tmp.path().join("resources").join("managed-ga");
+        fs::create_dir_all(resource_root.join("patches")).expect("resource dirs");
+        fs::write(resource_root.join("manifest.json"), "{}").expect("manifest placeholder");
+        fs::write(
+            resource_root.join("patches").join("manifest.md"),
+            "# patches",
+        )
+        .expect("patch manifest");
+        write_critical_memory_seed(&resource_root, b"seed");
+
+        let app_data = tmp.path().join("app-data");
+        let memory_dir = app_data.join("managed-ga-state").join("memory");
+        fs::create_dir_all(&memory_dir).expect("memory dir");
+        fs::write(memory_dir.join("memory_management_sop.md"), b"user-edited")
+            .expect("existing sop");
+
+        let diagnostics = ensure_layout(resource_root, app_data).expect("ensure");
+
+        assert!(diagnostics.state.memory_seed.critical_files_present);
+        assert!(!diagnostics
+            .state
+            .memory_seed
+            .copied_files
+            .contains(&"memory_management_sop.md".to_string()));
+        assert_eq!(
+            fs::read(memory_dir.join("memory_management_sop.md")).expect("memory sop"),
+            b"user-edited"
+        );
+    }
+
+    #[test]
     fn managed_code_payload_excludes_user_state_artifacts() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -369,6 +547,7 @@ mod tests {
             "mykey.py",
             "mykey.json",
             "memory",
+            "sop",
             "skills",
             "temp",
             "model_responses",
@@ -379,6 +558,28 @@ mod tests {
             );
         }
         assert_no_generated_artifacts(&code_root);
+    }
+
+    #[test]
+    fn managed_state_seed_contains_critical_memory_sop_files() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("core/ has repo parent")
+            .to_path_buf();
+        let memory_seed_dir = repo_root
+            .join("managed-ga")
+            .join(rel_to_path(MEMORY_SEED_REL));
+
+        assert!(
+            memory_seed_dir.is_dir(),
+            "managed GA must ship a memory seed directory"
+        );
+        for rel in CRITICAL_MEMORY_SEED_FILES {
+            assert!(
+                memory_seed_dir.join(rel_to_path(rel)).is_file(),
+                "managed GA memory seed missing critical file: {rel}"
+            );
+        }
     }
 
     fn assert_no_generated_artifacts(root: &Path) {
@@ -413,5 +614,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn write_critical_memory_seed(resource_root: &Path, body: &[u8]) {
+        for rel in CRITICAL_MEMORY_SEED_FILES {
+            write_memory_seed_file(resource_root, rel, body);
+        }
+    }
+
+    fn write_memory_seed_file(resource_root: &Path, rel: &str, body: &[u8]) {
+        let path = resource_root
+            .join(rel_to_path(MEMORY_SEED_REL))
+            .join(rel_to_path(rel));
+        fs::create_dir_all(path.parent().expect("memory seed parent")).expect("memory seed dir");
+        fs::write(path, body).expect("memory seed file");
     }
 }

@@ -78,6 +78,7 @@ export interface ManagedRuntimeDiagnostics {
 export interface ManagedRuntimePaths {
   resourceRoot: string;
   codeRoot: string;
+  memorySeedDir: string;
   manifestPath: string;
   patchManifestPath: string;
   stateRoot: string;
@@ -102,4 +103,12 @@ export interface ManagedStateDiagnostics {
   initialized: boolean;
   createdDirs: string[];
   modelConfigExists: boolean;
+  memorySeed: ManagedMemorySeedDiagnostics;
+}
+
+export interface ManagedMemorySeedDiagnostics {
+  sourceExists: boolean;
+  criticalFilesPresent: boolean;
+  criticalFilesMissing: string[];
+  copiedFiles: string[];
 }
