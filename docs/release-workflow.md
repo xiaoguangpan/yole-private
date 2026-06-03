@@ -361,8 +361,8 @@ cd gui && pnpm tauri build --target x86_64-apple-darwin
 ../scripts/rename-artifact.sh x86_64-apple-darwin
 # 产物：core/target/x86_64-apple-darwin/release/bundle/dmg/Galley_X.Y.Z_macOS_x64.dmg
 
-# 3. 起草 release notes 到 /tmp/galley-<tag>-notes.md
-# 模板见 "Announcement templates" 一节
+# 3. 起草 GitHub Release notes 到 /tmp/galley-<tag>-notes.md
+# 模板见 docs/release-update-sop.md；下方 "Announcement templates" 只用于群公告 / 社媒通告
 
 # 4. 创建 draft release（不直接 publish，留给你 review）
 gh release create vX.Y.Z-rc.N \

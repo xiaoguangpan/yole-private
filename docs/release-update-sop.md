@@ -117,7 +117,8 @@ Open the draft Release in GitHub and check:
 - Version and title are correct.
 - It is marked prerelease for alpha / beta / rc tags, unless we explicitly plan
   to mark this release as GitHub Latest after smoke.
-- Release notes are user-facing, not just commit messages.
+- Release notes follow the template below. They are user-facing, not just
+  commit messages.
 - Assets are present for supported platforms.
 - Updater artifacts are present:
   - macOS `.app.tar.gz` plus `.sig`
@@ -128,23 +129,42 @@ Do not publish if assets are missing or release notes are misleading.
 
 #### Stable Release Notes Template
 
-Use this compact template for stable releases. Keep it user-facing: what changed
-and which installer to download. Replace `<TAG>` with the Git tag (for example
-`v0.2.0`) and `<VERSION>` with the package version (for example `0.2.0`).
+Use this compact template for stable and beta releases. Future GitHub Release
+notes should follow this structure unless the release owner explicitly approves
+a different format. The point is to answer two user questions directly: what
+changed, and which installer should I download? For alpha releases, use the
+alpha template below.
+
+Writing rules:
+
+- Chinese first, English second. Both sections should be complete; do not use a
+  thin machine translation.
+- Keep the headings stable: `## What's New`, `## 安装指南`, `---`,
+  `## What's New`, `## Installation Guide`.
+- Write bullets as `功能区域：用户看得见的变化` in Chinese and
+  `Area: user-visible change` in English.
+- For patch releases, 3-5 focused bullets are enough. For larger releases, keep
+  the list scannable instead of turning it into a changelog dump.
+- Keep established product terms such as `Galley`, `GA`, `GenericAgent`,
+  `Agent / CLI`, `Browser Control`, `Channels`, and `ChatGPT / Codex`.
+- Use `内置 GA` in Chinese and `Bundled GA` in English. Do not expose
+  `managed GA` in user-facing release notes.
+- Installation links must point directly to GitHub Release assets.
+- Always include the macOS quarantine command and Windows SmartScreen note while
+  Galley is unsigned.
+- If the app update channel has not been promoted yet, keep the "wait for
+  in-app update" note. If it has already been promoted, replace that sentence
+  with a direct "installed users can update in Galley" note.
+
+Replace `<TAG>` with the Git tag (for example `v0.2.5`) and `<VERSION>` with
+the package version (for example `0.2.5`).
 
 ````markdown
 ## What's New
 
-- 内置 GA：新用户只需要配置模型，就可以开始使用 Galley。
-- 外部 GA：已有 GenericAgent 环境的用户可以继续接入自己的 GA。
-- Agent / CLI：本机上的 Agent 可以通过 `galley` 命令创建、管理和跟进对话。
-- Browser Control：内置 GA 支持连接浏览器扩展，执行浏览器任务。
-- Channels：支持通过微信和 Galley 对话。
-- 小屏适配：Onboarding 在小尺寸笔记本上也可以完成。
-- Windows 路径修复：修复外部 GA 路径里的空格、`~` 和 Windows 路径处理问题。
-- 外部 GA 检测：提前检查 Python、依赖和模型配置，避免进入主界面后才发现 Bridge 崩溃。
-- 模型测试说明：在 Onboarding 和 Settings 里标明真实测试最多 1 个输出 token。
-- 系统反馈降噪：Tooltip 更快出现，Toast 更小、更安静，并避免遮挡关键按钮。
+- <功能区域>：<一句话说明用户看得见的新增、修复或体验变化>。
+- <功能区域>：<一句话说明用户看得见的新增、修复或体验变化>。
+- <功能区域>：<一句话说明用户看得见的新增、修复或体验变化>。
 
 ## 安装指南
 
@@ -165,20 +185,15 @@ xattr -dr com.apple.quarantine /Applications/Galley.app
 
 如果 Windows SmartScreen 提示风险，点击「更多信息」->「仍要运行」。
 
+已安装旧版的用户可以等待应用内更新；更新通道会在安装包 smoke 通过后再提升到 <TAG>。
+
 ---
 
 ## What's New
 
-- Bundled GA: new users only need to configure a model to start using Galley.
-- External GA: users with an existing GenericAgent setup can keep using their own GA environment.
-- Agent / CLI: local Agents can use the `galley` command to create, manage, and follow conversations.
-- Browser Control: bundled GA can connect to the browser extension and run browser tasks.
-- Channels: talk to Galley from WeChat.
-- Small-screen support: onboarding can be completed on smaller laptops.
-- Windows path fixes: external GA paths now handle surrounding spaces, `~`, and Windows path forms more reliably.
-- External GA checks: Galley checks Python, dependencies, and model config before entering the main screen.
-- Model test clarity: onboarding and Settings now say that real model tests use at most 1 output token.
-- Quieter system feedback: tooltips appear faster, and toasts are smaller, calmer, and avoid covering key buttons.
+- <Area>: <one sentence describing the user-visible addition, fix, or experience change>.
+- <Area>: <one sentence describing the user-visible addition, fix, or experience change>.
+- <Area>: <one sentence describing the user-visible addition, fix, or experience change>.
 
 ## Installation Guide
 
@@ -198,6 +213,10 @@ xattr -dr com.apple.quarantine /Applications/Galley.app
 - [Download for Windows](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_Windows_x64-setup.exe)
 
 If Windows SmartScreen shows a warning, click "More info" -> "Run anyway".
+
+Existing users can wait for the in-app update channel. The update channel will be promoted to <TAG> after installer smoke passes.
+
+**Full Changelog**: https://github.com/wangjc683/galley/compare/<PREVIOUS_TAG>...<TAG>
 ````
 
 #### Alpha Release Notes Template
