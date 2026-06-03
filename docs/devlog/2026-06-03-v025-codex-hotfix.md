@@ -1,0 +1,65 @@
+# 2026-06-03 - v0.2.5 Codex backend hotfix
+
+## Date / Status / Related
+
+- Date: 2026-06-03
+- Status: Stable hotfix release prep for `v0.2.5`; `v0.2.4` is published as
+  GitHub Latest and remains the beta update-channel target until `v0.2.5`
+  installer smoke passes.
+- Related:
+  - [Project status](../project-status.md)
+  - [Release / update SOP](../release-update-sop.md)
+  - [ChatGPT / Codex OAuth core](../../core/src/codex_oauth.rs)
+  - [Managed GA llmcore](../../managed-ga/code/llmcore.py)
+
+## Context
+
+`v0.2.4` shipped the ChatGPT / Codex managed model provider, but real dogfood
+found that the first implementation treated the Codex backend too much like the
+public Responses API. OAuth itself and Codex CLI credential import worked, but
+the automatic model probe failed on backend-specific request validation.
+
+The failures were sequential and useful: first `input` had to be a list, then
+`stream` had to be `true`, then `max_output_tokens` was rejected as unsupported.
+After removing the incompatible parameter and forcing Codex streaming, local
+dogfood confirmed Codex CLI import, model test, and a managed-GA conversation.
+
+## Decisions
+
+- Release `v0.2.5` as a narrow stable hotfix instead of waiting for a larger
+  feature release.
+- Keep the ChatGPT / Codex provider in managed-GA only; this fix does not
+  change Attach GA boundaries.
+- Treat the Codex backend as its own protocol variant, not a generic OpenAI
+  Responses endpoint.
+- Hide the stream toggle in Codex advanced settings because Codex requires
+  streaming and the switch would imply a control that cannot actually work.
+- Omit `max_output_tokens` for Codex backend requests while leaving it available
+  for ordinary OpenAI-compatible Responses providers.
+
+## Verification
+
+- `cargo test -p galley-core codex_probe_payload`
+- `cargo check --workspace`
+- `.venv/bin/python -m pytest runner/tests/test_workbench_bridge.py`
+- `.venv/bin/python -m mypy runner/managed_runtime.py`
+- `pnpm --dir gui typecheck`
+- `pnpm --dir gui lint`
+- `git diff --check`
+- Manual dogfood: Codex CLI login import succeeded, model probe succeeded, and a
+  managed-GA conversation completed using the ChatGPT / Codex provider.
+
+## Rejected alternatives
+
+- Reusing the public Responses payload unchanged: the backend rejected multiple
+  standard-looking parameters, so the request shape must be Codex-specific.
+- Keeping `stream` configurable: users should not see an option that produces a
+  known invalid Codex request.
+- Shipping the fix only after more unrelated polish: `v0.2.4` is already Latest,
+  and the broken path is a newly promoted setup path.
+
+## Next
+
+Bump package metadata to `0.2.5`, tag `v0.2.5`, let `release.yml` build a draft
+GitHub Release, rewrite the draft notes for review, smoke installers, then
+publish and promote the beta update channel after smoke passes.
