@@ -17,6 +17,10 @@ import { SelectionCopyToolbar } from "@/components/conversation/SelectionCopyToo
 import { ToolCallout } from "@/components/conversation/ToolCallout";
 import { UserQuestionRail } from "@/components/conversation/UserQuestionRail";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import {
+  composerRegisterCopyKey,
+  resolveComposerRegister,
+} from "@/lib/composer-register";
 import { useCopy } from "@/lib/i18n";
 import { cleanPartialContent, extractPreamble } from "@/lib/ipc-handlers";
 import { cn } from "@/lib/utils";
@@ -686,9 +690,14 @@ export function MainView({
           <Composer
             llmDisplayName={llmDisplayName}
             placeholder={
-              pendingAskUser
-                ? copy.composer.replyToContinue
-                : copy.composer.continueConversation
+              copy.composer[
+                composerRegisterCopyKey(
+                  resolveComposerRegister({
+                    isRunning,
+                    pendingAskUser: Boolean(pendingAskUser),
+                  }),
+                )
+              ]
             }
             onSubmit={onSubmit}
             stopMode={isRunning}

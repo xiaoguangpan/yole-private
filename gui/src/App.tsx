@@ -1188,7 +1188,6 @@ function App() {
                   llmDisplayName={llmDisplayName}
                   conversationWidth={conversationWidth}
                   projectName={activeProject?.name}
-                  showPromptSuggestions={!activeProject}
                   focusTick={emptyComposerFocusTick}
                   llms={llms}
                   llmConfigHint={llmConfigHint}
@@ -1211,26 +1210,6 @@ function App() {
                     }
                     void submitOnEmpty(
                       t,
-                      activeSessionId,
-                      createSession,
-                      activateSession,
-                      appendUserTurn,
-                      sendIPCCommand,
-                      setScreen,
-                      reportUserSendFailure,
-                      activeProjectFilter,
-                    ).then(() => {
-                      if (activeProjectFilter)
-                        setActiveProjectFilter(undefined);
-                    });
-                  }}
-                  onQuickPrompt={(p) => {
-                    if (requiresManagedModelConfig) {
-                      openModelsForMissingConfig();
-                      return;
-                    }
-                    void submitOnEmpty(
-                      p,
                       activeSessionId,
                       createSession,
                       activateSession,

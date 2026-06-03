@@ -33,7 +33,7 @@ matches who you are and what you are trying to do.
 | Touch managed / bundled GA runtime | [managed GA runtime](./managed-ga-runtime.md) |
 | Touch GUI or engineering workflow | [engineering workflow](./engineering-workflow.md) |
 | Touch visual design | [DESIGN.md](./DESIGN.md) |
-| Touch UI copy, terminology, or localization | [copy and language guidelines](./copy-language-guidelines.md) |
+| Touch UI copy, terminology, or localization | [copy and language guidelines](./copy-language-guidelines.md), [copy austerity principles](./copy-austerity-principles.md) |
 | Understand history or decisions | [devlog](./devlog/README.md) |
 
 ## Document Roles
@@ -47,6 +47,9 @@ matches who you are and what you are trying to do.
 - [agent-api](./agent-api.md): stable CLI / socket contract for agents.
 - [copy and language guidelines](./copy-language-guidelines.md): UI copy,
   terminology, and localization rules for Chinese and English.
+- [copy austerity principles](./copy-austerity-principles.md): the voice rules
+  for UI copy — a restrained, Wittgenstein-influenced austerity (how to say it,
+  paired with the terminology rules above).
 - [English copy draft](./english-copy-draft.md): review draft for native
   English UI copy before implementation.
 - [managed GA runtime](./managed-ga-runtime.md): design target for Galley's

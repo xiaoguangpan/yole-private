@@ -62,10 +62,10 @@ const zhCopy = {
     bundledNeedsModel: "内置 GA 还没有可用模型",
     openModelsForBundled: "打开 Models 配置内置 GA 模型",
     externalGA: "外部 GA",
-    usingExternalGA: "正在使用你接入的 GenericAgent",
+    usingExternalGA: "使用你接入的 GenericAgent",
     usingExternalGAAria: "正在使用外部 GA",
     connectExternalGA: "接入外部 GA",
-    chooseExistingGAFolder: "选择一个已有的 GenericAgent 目录",
+    chooseExistingGAFolder: "选择已有的 GenericAgent 目录",
     openRuntimeForExternal: "打开 Runtime 接入外部 GA",
     supervisorSop: "Supervisor SOP",
     supervisorSopTooltip: "复制 SOP，让外部 Agent 调度 Galley",
@@ -85,7 +85,7 @@ const zhCopy = {
     desktopPetAttached: "桌面宠物附着中",
     desktopPetAttachedTitle: "桌面宠物附着中 · 进入此对话可关闭",
     newReplyTitle: "有新回复",
-    emptySessions: "这里会出现你的 sessions。",
+    emptySessions: "你的对话会出现在这里。",
     bucketPinned: "置顶",
     bucketToday: "今天",
     bucketWeek: "本周",
@@ -124,10 +124,10 @@ const zhCopy = {
     wideWidthTitle: "切到宽松（1200px 阅读宽度）",
     compactLabel: "紧凑",
     wideLabel: "宽松",
-    yoloOn: "YOLO 模式已开启",
+    yoloOn: "YOLO 已开启",
     yoloTooltip: "YOLO 模式：跳过所有工具审批",
-    yoloView: "YOLO 模式已开启 · 点击查看",
-    yoloDetail: "所有工具调用跳过审批直接执行",
+    yoloView: "YOLO 已开启 · 点击查看",
+    yoloDetail: "工具调用不经审批直接执行",
     turnOffNow: "立即关闭",
     viewInSettings: "在设置中查看",
     browserControlPending: "浏览器控制 · 待连接",
@@ -234,6 +234,7 @@ const zhCopy = {
     askAnything: "问点什么…",
     continueConversation: "继续这个对话…",
     replyToContinue: "回复以继续，或选择上方候选",
+    byTheWay: "用 /btw 在一旁问一句，不打断它正在做的事",
     send: "发送",
     sendWithEnter: "发送 · Enter",
     stop: "停止",
@@ -244,14 +245,13 @@ const zhCopy = {
     configureModelBeforeSending: "先配置模型",
     willCreateIn: (projectName: string) => `将创建到 ${projectName}`,
   },
+  epigraph: {
+    regionLabel: "题词",
+  },
   empty: {
     globalPlaceholder: "今天交代什么？",
     projectPlaceholder: (projectName: string) =>
       `在 ${projectName} 里交代什么？`,
-    promptNews: "这两天有什么有趣的新闻？",
-    promptDownloads: "列出 Downloads 里面最大的 10 个文件",
-    promptMovie: "查电影《奥德赛》的最新资讯",
-    promptPhilosophy: "聊聊维特根斯坦与 LLM",
   },
   command: {
     label: "命令面板",
@@ -353,7 +353,7 @@ const zhCopy = {
     models: {
       subtitle: "为 Galley 配置模型提供商和模型",
       externalNotice:
-        "当前使用外部 GA。这里配置的模型只会在内置 GA 中使用，不会修改外部 GA。",
+        "当前使用外部 GA。这里的模型只用于内置 GA，不影响外部 GA。",
       connectedProviders: "已接入的模型提供商",
       noProviders: "还没有模型提供商。",
       addProvider: "添加",
@@ -379,7 +379,7 @@ const zhCopy = {
       signOutChatGPT: "退出登录",
       codexCliLoginTitle: "已有 Codex CLI 登录",
       importCodexCliLogin: "导入 Codex CLI 登录",
-      apiKey: "模型密钥",
+      apiKey: "API Key",
       apiUrl: "API 地址",
       model: "模型",
       fetchList: "读取模型列表",
@@ -402,14 +402,14 @@ const zhCopy = {
       connectionLatency: (message: string, latencyMs: number) =>
         `${message} · ${latencyMs} ms`,
       errorUnauthorized:
-        "401 未授权：模型密钥不正确，或没有访问这个模型的权限。",
-      errorForbidden: "403 权限不足：当前 Key 不能访问这个服务或模型。",
+        "401 未授权：API Key 不正确，或无权访问此模型。",
+      errorForbidden: "403 权限不足：此 Key 无权访问该服务或模型。",
       errorRateLimited: "429 请求过多：稍后重试，或检查额度和限流设置。",
       errorNotFound: "404 未找到：API 地址或模型名可能不匹配。",
       errorServer: (status: number) =>
-        `${status} 服务异常：模型服务暂时不可用，稍后再试。`,
-      errorTimeout: "连接超时：模型服务没有及时响应，请检查网络或代理。",
-      errorNetwork: "网络不可达：请检查 API 地址、网络连接或代理。",
+        `${status} 服务异常：服务暂时不可用，稍后再试。`,
+      errorTimeout: "连接超时：服务未及时响应，请检查网络或代理。",
+      errorNetwork: "网络不可达：请检查 API 地址、网络或代理。",
       errorUnknownWithDetail: (detail: string) => `连接失败：${detail}`,
       modelName: "模型名",
       modelNamePlaceholder: "例如 anthropic/claude-sonnet-4.5",
@@ -434,7 +434,7 @@ const zhCopy = {
       noEnabledModels: "还没有启用模型",
       sessionModelScopeTitle: "生效范围",
       sessionModelScopeHint:
-        "新模型会立即用于新对话；已启动的对话会在重启 Galley 后读取最新模型配置。",
+        "新模型立即用于新对话；已启动的对话重启 Galley 后生效。",
       defaultModel: "默认",
       defaultModelStatus: "默认模型",
       moveUp: (name: string) => `上移 ${name}`,
@@ -500,14 +500,14 @@ const zhCopy = {
       cannotUndo: "此操作无法撤销。",
     },
     approval: {
-      subtitle: "配置 Agent 操作的审批规则",
+      subtitle: "Agent 操作的审批规则",
       yoloMode: "YOLO 模式",
       yoloTooltip:
         "You Only Live Once · 跳过审批让 Agent 自主运行，适合在隔离环境完全信任 Agent 时使用",
       yoloDescription:
-        "跳过所有操作的审批，Agent 自主执行 — 适合完全信任 Agent 的沙盒环境",
+        "跳过所有审批，Agent 自主执行。适合完全信任 Agent 的沙盒环境",
       toggleYolo: "切换 YOLO 模式",
-      yoloEnabledTopbar: "YOLO 已启用 · 顶部栏显示状态",
+      yoloEnabledTopbar: "YOLO 已开启 · 顶部栏显示状态",
       turnOffNow: "立即关闭",
       yoloRulesPaused: "YOLO 已开启，下列规则当前不生效（关闭 YOLO 后恢复）。",
       yoloRulesTitle: "YOLO 已开启，下列规则当前不生效",
@@ -525,7 +525,7 @@ const zhCopy = {
       goodForText: "完全信任 Agent + 在沙盒环境工作（个人 repo / 临时虚拟机）",
       notForText: "生产代码 / 共享系统 / 不熟悉的 Agent / 敏感数据",
       yoloIndicatorNote:
-        "打开后顶部栏会显示闪电图标和 YOLO 标识，随时可一键关闭。",
+        "顶部栏会显示 YOLO 标识，随时可一键关闭。",
       understandRisk: "是的，我知道在做什么",
       filePatch: "file_patch（修改文件）",
       fileWrite: "file_write（写入文件）",
@@ -539,7 +539,7 @@ const zhCopy = {
       },
     },
     shortcuts: {
-      subtitle: "快捷键设置",
+      subtitle: "键盘快捷键",
       navigation: "Navigation",
       openCommandPalette: "打开命令面板",
       newConversation: "新建对话",
@@ -574,7 +574,7 @@ const zhCopy = {
       subtitle: "把 Galley 交给本地 Agent 调度",
       discoveryFile: "Discovery file",
       discoveryDescription:
-        "Galley 启动时把 CLI 二进制的绝对路径写到这个文件。Galley Supervisor SOP 第一步读它来定位 galley。",
+        "Galley 启动时把 CLI 的绝对路径写进这个文件。Galley Supervisor SOP 第一步读它来定位 galley。",
       agentSop: "Galley Supervisor SOP",
       sopDescription:
         "复制给你信任的本地 Agent，让它通过 Galley 调度 sessions。",
@@ -601,7 +601,7 @@ const zhCopy = {
       advanced: "高级选项",
       cliShortcut: "命令行快捷入口",
       cliDescription:
-        "可选。安装后，你和脚本都可以直接在终端使用 galley。Galley Supervisor SOP 不依赖它。",
+        "可选。安装后，你和脚本都能在终端直接用 galley。Galley Supervisor SOP 不依赖它。",
       pathInstallHintMac: "macOS 会请求一次系统权限。",
       pathUnsupportedWindows:
         "Windows 一键安装命令稍后支持。Galley Supervisor SOP 不依赖它。",
@@ -625,7 +625,7 @@ const zhCopy = {
         `没找到 galley 二进制（${searched}）。dev 模式可重启 pnpm tauri dev，或运行 cd core && cargo build -p galley-cli。`,
     },
     im: {
-      subtitle: "在常用聊天软件里和 Galley 对话",
+      subtitle: "在聊天软件里和 Galley 对话",
       wechatTitle: "微信",
       setupSteps: [
         "用手机微信扫描二维码完成接入。",
@@ -683,14 +683,14 @@ const zhCopy = {
     comingLater: "敬请期待",
     connectExisting: "接入已经安装的 GenericAgent",
     attachTrust:
-      "Galley 不会修改你的 GenericAgent。删除 Galley 后 GenericAgent 仍可独立运行。",
+      "Galley 不修改你的 GenericAgent。删除 Galley，它照常独立运行。",
     modelTitle: "为 Galley 配置模型",
     modelSubtitle: "选择提供商，填入密钥和模型。",
     connectExistingButton: "接入已有 GenericAgent",
     testAndStart: "测试并开始使用 Galley",
     startUsingGalley: "开始使用 Galley",
     attachTitle: "接入已经安装的 GenericAgent",
-    attachSubtitle: "指向你本地的 GA 安装目录 · Galley 会用它启动 GA。",
+    attachSubtitle: "指向本地 GA 目录 · Galley 用它启动 GA。",
     gaPathLabel: "GA 路径",
     foundGA: "找到 GA 安装",
     agentmainVisible: "agentmain.py 可见",
@@ -701,7 +701,7 @@ const zhCopy = {
     downloadGuide: "查看教程：下载 GA",
     folderGuide: "查看教程：选对 GA 目录",
     healthTitle: "检查 GA 运行环境",
-    healthSubtitle: "全部通过后才能进入主界面 · Galley 不会修改你的 GA。",
+    healthSubtitle: "全部通过后进入主界面 · Galley 不修改你的 GA。",
     rerunChecks: "重新检查",
     enterGalley: "进入 Galley",
     backToSettings: "返回设置",
@@ -800,8 +800,8 @@ const zhCopy = {
     deny: "拒绝",
     allowProject: (projectName: string) => `加入「${projectName}」白名单`,
     allowGlobal: "加入全局白名单",
-    highRiskNoGlobal: "高敏感工具不允许全局自动通过",
-    genericReason: "默认审批列表里的工具，需要你确认后才能执行",
+    highRiskNoGlobal: "高风险工具不能全局放行",
+    genericReason: "此工具需确认后才能执行",
     descriptions: {
       file_patch: "修改现有文件的内容",
       file_write: "写入或覆盖文件",
@@ -864,10 +864,10 @@ const zhCopy = {
     copiedDetails: "Copied",
     switchLLM: "切换 LLM",
     managedModelUnavailable:
-      "内置 GA 模型不可用。请在 Models 添加模型，或重新输入 API Key。",
+      "内置 GA 没有可用模型。在 Models 添加模型，或重填 API Key。",
     managedRuntimeInvalid: "Galley 内置运行时不完整。请重新安装或更新 Galley。",
     gaPathInvalid:
-      "接入的 GenericAgent 路径不可用。请到设置的 Runtime 页面重新选择 GA 目录。",
+      "接入的 GenericAgent 路径不可用。到 Settings → Runtime 重选 GA 目录。",
   },
   toasts: {
     conversationUpdated: "对话已更新",
@@ -878,12 +878,12 @@ const zhCopy = {
     removedFromAnyProject: "已从项目移除",
     switchedRuntime: (kind: "managed" | "external") =>
       kind === "managed" ? "已切换到内置 GA" : "已切换到外部 GA",
-    runtimeSwitchKept: "原来的对话已保留，可切回查看。",
+    runtimeSwitchKept: "原对话已保留，可切回查看。",
     savedPath: "已保存路径配置",
     restartForExisting: "重启 Galley 才能让现有对话生效",
     modelConfigSaved: "模型配置已保存",
     modelConfigSavedMessage:
-      "新对话会立即使用最新配置；已启动的对话重启 Galley 后生效。",
+      "新对话立即生效；已启动的对话重启 Galley 后生效。",
     modelConfigSavedChannelsMessage: "已启用 Channels 重启后使用新模型配置。",
     modelConfigSavedChannelsSuffix: "已启用 Channels 重启后使用新模型配置。",
     restartChannels: "重启 Channels",
@@ -893,7 +893,7 @@ const zhCopy = {
     channelsRestartNone: "没有已启用的 Channel。",
     modelSelectionChanged: "已切换到默认模型",
     modelSelectionChangedMessage:
-      "这个对话之前使用的模型已不可用，Galley 已改用当前默认模型。",
+      "此对话之前使用的模型已不可用，Galley 将改用默认模型。",
     updateReady: "更新已准备好",
     updateReadyMessage: "新版本已下载，重启 Galley 生效。",
     appUpdated: "Galley 已更新",
@@ -906,7 +906,7 @@ const zhCopy = {
     imageOpenFailedMessage: "Galley 没能打开这张图片。",
     toolsReinjected: "工具已重新注入",
     toolsReinjectedMessage: (count: number) =>
-      `已为本 session 注入 ${count} 条工具定义。`,
+      `已为本对话注入 ${count} 条工具定义。`,
     petStarted: "桌面宠物已启动",
     petStartedMessage: "宠物会实时显示本对话的进展。",
     petClosed: "桌面宠物已关闭",
@@ -1250,24 +1250,24 @@ const enCopy: AppCopy = {
     askAnything: "Ask anything...",
     continueConversation: "Continue this conversation...",
     replyToContinue: "Reply to continue, or choose an option above",
+    byTheWay: "Ask alongside with /btw — it won't interrupt the work",
     send: "Send",
     sendWithEnter: "Send · Enter",
     stop: "Stop",
-    enterHint: "Enter to send · Shift+Enter for a new line",
-    cannotSwitchRunning: "Cannot switch LLMs while a run is active",
+    enterHint: "Enter sends · Shift+Enter for a new line",
+    cannotSwitchRunning: "Can't switch LLMs while running",
     switchCurrent: (name) => `Switch LLM · Current: ${name}`,
     configureModels: "Configure models",
     configureModelBeforeSending: "Set up a model first",
     willCreateIn: (projectName) => `Will be created in ${projectName}`,
   },
+  epigraph: {
+    regionLabel: "Epigraph",
+  },
   empty: {
     globalPlaceholder: "What should Galley work on today?",
     projectPlaceholder: (projectName) =>
       `What should Galley do in ${projectName}?`,
-    promptNews: "What interesting news surfaced in the last couple of days?",
-    promptDownloads: "List the 10 largest files in Downloads",
-    promptMovie: "Find the latest on The Odyssey film",
-    promptPhilosophy: "Talk through Wittgenstein and LLMs",
   },
   command: {
     label: "Command palette",
@@ -1373,7 +1373,7 @@ const enCopy: AppCopy = {
     models: {
       subtitle: "Configure model providers and models for Galley",
       externalNotice:
-        "External GA is active. Models configured here are only used by bundled GA and will not change external GA.",
+        "External GA is active. Models here are only used by bundled GA; external GA is unaffected.",
       connectedProviders: "Connected model providers",
       noProviders: "No model providers yet.",
       addProvider: "Add",
@@ -1459,7 +1459,7 @@ const enCopy: AppCopy = {
       noEnabledModels: "No enabled models yet",
       sessionModelScopeTitle: "Scope",
       sessionModelScopeHint:
-        "New models are available to new conversations immediately; already-started conversations read the latest model config after restarting Galley.",
+        "New models apply to new conversations immediately; already-started conversations update after a Galley restart.",
       defaultModel: "Default",
       defaultModelStatus: "Default model",
       moveUp: (name) => `Move ${name} up`,
@@ -1526,7 +1526,7 @@ const enCopy: AppCopy = {
       cannotUndo: "This cannot be undone.",
     },
     approval: {
-      subtitle: "Configure approval rules for Agent actions",
+      subtitle: "Approval rules for Agent actions",
       yoloMode: "YOLO mode",
       yoloTooltip:
         "You Only Live Once · Let Agent run without approval. Use only in trusted, isolated workspaces.",
@@ -1605,7 +1605,7 @@ const enCopy: AppCopy = {
       subtitle: "Let a local Agent coordinate Galley",
       discoveryFile: "Discovery file",
       discoveryDescription:
-        "Galley writes the absolute CLI binary path here on startup. Galley Supervisor SOP reads it first to locate galley.",
+        "Galley writes the absolute CLI path here on startup. Galley Supervisor SOP reads it first to locate galley.",
       agentSop: "Galley Supervisor SOP",
       sopDescription:
         "Copy it to a local Agent you trust so it can coordinate Galley sessions.",
@@ -1632,7 +1632,7 @@ const enCopy: AppCopy = {
       advanced: "Advanced options",
       cliShortcut: "CLI shortcut",
       cliDescription:
-        "Optional. After installing it, you and your scripts can run galley directly from the terminal. Galley Supervisor SOP does not depend on it.",
+        "Optional. Once installed, you and your scripts can run galley from the terminal. Galley Supervisor SOP does not depend on it.",
       pathInstallHintMac: "macOS will ask for system permission once.",
       pathUnsupportedWindows:
         "One-click command installation on Windows is coming later. Galley Supervisor SOP does not depend on it.",
@@ -1715,15 +1715,15 @@ const enCopy: AppCopy = {
     comingLater: "Coming later",
     connectExisting: "Connect an existing GenericAgent",
     attachTrust:
-      "Galley will not modify your GenericAgent. If you remove Galley, GenericAgent can still run on its own.",
+      "Galley does not modify your GenericAgent. Remove Galley, and it still runs on its own.",
     modelTitle: "Set up a model for Galley",
-    modelSubtitle: "Choose a provider, then enter the API key and model.",
+    modelSubtitle: "Choose a provider, enter the API key and model.",
     connectExistingButton: "Connect existing GenericAgent",
     testAndStart: "Test and start using Galley",
     startUsingGalley: "Start using Galley",
     attachTitle: "Connect an existing GenericAgent",
     attachSubtitle:
-      "Point Galley to your local GA folder. Galley will use it to start GA.",
+      "Point Galley to your local GA folder · Galley starts GA from it.",
     gaPathLabel: "GA Folder",
     foundGA: "Found GA installation",
     agentmainVisible: "agentmain.py visible",
@@ -1735,7 +1735,7 @@ const enCopy: AppCopy = {
     folderGuide: "Open guide: choose the GA folder",
     healthTitle: "Check GA runtime",
     healthSubtitle:
-      "All checks must pass before entering Galley. Galley will not modify your GA.",
+      "All checks must pass first · Galley does not modify your GA.",
     rerunChecks: "Re-run checks",
     enterGalley: "Enter Galley",
     backToSettings: "Back to Settings",
@@ -1917,13 +1917,13 @@ const enCopy: AppCopy = {
     switchedRuntime: (kind) =>
       kind === "managed" ? "Switched to bundled GA" : "Switched to external GA",
     runtimeSwitchKept:
-      "Existing conversations are preserved; you can switch back to view them.",
+      "Existing conversations are kept; switch back anytime to view them.",
     savedPath: "Path settings saved",
     restartForExisting:
       "Restart Galley to apply this to existing conversations",
     modelConfigSaved: "Model config saved",
     modelConfigSavedMessage:
-      "New conversations use the latest config immediately; already-started conversations update after restarting Galley.",
+      "New conversations apply it immediately; running ones update after a Galley restart.",
     modelConfigSavedChannelsMessage:
       "Enabled Channels use the new model config after restart.",
     modelConfigSavedChannelsSuffix:
@@ -1936,7 +1936,7 @@ const enCopy: AppCopy = {
     channelsRestartNone: "No enabled Channel.",
     modelSelectionChanged: "Switched to the default model",
     modelSelectionChangedMessage:
-      "The model this conversation used is no longer available, so Galley is using the current default.",
+      "The model this conversation used is no longer available; Galley will switch to the default.",
     updateReady: "Update ready",
     updateReadyMessage:
       "The new version has been downloaded. Restart Galley to apply it.",
@@ -2062,6 +2062,8 @@ const enCopy: AppCopy = {
 
 const CopyContext = createContext<AppCopy>(zhCopy);
 
+const LanguageContext = createContext<ResolvedLanguage>("zh-CN");
+
 export function copyForLanguage(language: ResolvedLanguage): AppCopy {
   return language === "en-US" ? enCopy : zhCopy;
 }
@@ -2074,10 +2076,19 @@ export function CopyProvider({
   children: ReactNode;
 }) {
   return (
-    <CopyContext.Provider value={copyForLanguage(language)}>
-      {children}
-    </CopyContext.Provider>
+    <LanguageContext.Provider value={language}>
+      <CopyContext.Provider value={copyForLanguage(language)}>
+        {children}
+      </CopyContext.Provider>
+    </LanguageContext.Provider>
   );
+}
+
+/** Resolved UI language for the current subtree. Provided alongside
+ * copy by `CopyProvider`. Used by surfaces that need the language
+ * itself (not just translated copy), e.g. the epigraph resolver. */
+export function useLanguage(): ResolvedLanguage {
+  return useContext(LanguageContext);
 }
 
 export function useCopy(): AppCopy {

@@ -6,37 +6,13 @@ import {
   type ComposerHandle,
   type ComposerLLMOption,
 } from "@/components/conversation/Composer";
+import { Epigraph } from "@/components/screens/Epigraph";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-interface QuickPrompt {
-  label: string;
-  /** Optional explicit prompt text; defaults to label. */
-  prompt?: string;
-}
-
-/**
- * Empty-state prompt suggestions — each is a complete, runnable
- * showcase of GA's multi-step / multi-source capability. They span
- * four "task shapes" so a first-time user can pick whichever matches
- * their interest:
- *
- *   - 新闻：web scan across multiple sources
- *   - Downloads：local filesystem ops + analysis
- *   - 电影资讯：multi-source web research
- *   - 哲学 × LLM：pure-reasoning demo (no tools, shows GA is also a
- *     thoughtful conversational layer)
- *
- * Labels ARE the prompt — what the line says is what the agent
- * receives, no surprise.
- */
 export interface EmptyStateProps {
   llmDisplayName: string;
   onSubmit?: (text: string) => void;
-  /** Click handler for a prompt suggestion. Receives the prompt text
-   * (label by default; can be overridden per row via QuickPrompt.prompt). */
-  onQuickPrompt?: (prompt: string) => void;
-  prompts?: QuickPrompt[];
   /** LLM list for the Composer's inline picker. Drives the popover
    * under the model pill — see Composer's LLMPill. */
   llms?: ComposerLLMOption[];
@@ -60,9 +36,6 @@ export interface EmptyStateProps {
   conversationWidth?: "compact" | "wide";
   /** Active project context for the next lazily-created session. */
   projectName?: string;
-  /** Global showcase prompts are useful on the welcome surface, but
-   * noisy inside a project context where the user already has intent. */
-  showPromptSuggestions?: boolean;
   /** Bumped by the host when a navigation action should return focus here. */
   focusTick?: number;
 }
@@ -72,28 +45,17 @@ export interface EmptyStateProps {
  * (and any time no session is active). Per DESIGN.md §7.
  *
  * Minimalist Linear-style: no heading, Composer is the focal point.
- * Placeholder carries the invitation in product voice ("交代"
- * implies handing a task to an agent — more honest than "你想做什么？"
- * Q&A framing). When a project filter is active, the placeholder and
- * context line name that project so the right pane participates in
- * project navigation instead of leaving the signal hidden in Sidebar.
- *
- * On the global welcome surface, four prompt suggestions appear as
- * ambient italic-serif hints rather than chip-style buttons. The
- * visual weight is deliberately quiet — these are positioning signals
- * (Galley is built for web research / local-file ops / multi-source
- * comparison / reasoning), not call-to-action chips. In a project
- * context, App can hide them so the right pane stays focused on
- * creating work inside that project.
- *
- * Click any line → submits that prompt directly (still actionable,
- * just without button chrome).
+ * A quiet state-bound epigraph (Part A of philosophical-voice) sits
+ * directly above the Composer. Placeholder carries the invitation in
+ * product voice ("交代" implies handing a task to an agent — more
+ * honest than "你想做什么？" Q&A framing). When a project filter is
+ * active, the placeholder and context line name that project so the
+ * right pane participates in project navigation instead of leaving the
+ * signal hidden in Sidebar.
  */
 export function EmptyState({
   llmDisplayName,
   onSubmit,
-  onQuickPrompt,
-  prompts,
   llms,
   onSelectLLM,
   llmConfigHint,
@@ -102,22 +64,13 @@ export function EmptyState({
   onOpenLLMSwitcher,
   conversationWidth = "compact",
   projectName,
-  showPromptSuggestions = true,
   focusTick = 0,
 }: EmptyStateProps) {
   const copy = useCopy();
   const composerRef = useRef<ComposerHandle>(null);
-  const visiblePrompts = prompts ?? [
-    { label: copy.empty.promptNews },
-    { label: copy.empty.promptDownloads },
-    { label: copy.empty.promptMovie },
-    { label: copy.empty.promptPhilosophy },
-  ];
   const composerPlaceholder = projectName
     ? copy.empty.projectPlaceholder(projectName)
     : copy.empty.globalPlaceholder;
-  const shouldShowPromptSuggestions =
-    showPromptSuggestions && visiblePrompts.length > 0;
 
   useEffect(() => {
     if (focusTick > 0) composerRef.current?.focus();
@@ -131,6 +84,8 @@ export function EmptyState({
           conversationWidth === "wide" ? "max-w-[1200px]" : "max-w-[560px]",
         )}
       >
+        <Epigraph condition="fresh" className="mb-5" />
+
         <Composer
           ref={composerRef}
           llmDisplayName={llmDisplayName}
@@ -156,30 +111,6 @@ export function EmptyState({
               {copy.composer.willCreateIn(projectName)}
             </span>
           </div>
-        )}
-
-        {shouldShowPromptSuggestions && (
-          <ul
-            className={cn(
-              "flex flex-col items-center gap-2 text-center",
-              projectName ? "mt-5" : "mt-6",
-            )}
-          >
-            {visiblePrompts.map((p) => (
-              <li key={p.label}>
-                <button
-                  type="button"
-                  onClick={() => onQuickPrompt?.(p.prompt ?? p.label)}
-                  className={cn(
-                    "rounded-sm text-[12.5px] italic leading-[1.55] text-ink-muted",
-                    "transition-colors hover:text-ink",
-                  )}
-                >
-                  {p.label}
-                </button>
-              </li>
-            ))}
-          </ul>
         )}
 
         {/* Keyboard hints intentionally not shown here. Empty state
