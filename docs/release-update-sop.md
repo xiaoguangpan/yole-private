@@ -11,17 +11,18 @@ Release and update are two separate gates:
 
 1. `release.yml` builds installers and creates a **draft GitHub Release**.
 2. Human review and smoke test decide whether the Release is safe to publish.
-3. `promote-update-channel.yml` updates `updates/beta/latest.json` **only after
-   publish + smoke**.
+3. `promote-update-channel.yml` updates `updates/stable/latest.json` **only
+   after publish + smoke**. It also keeps `updates/beta/latest.json` as a
+   legacy alias for older installed builds.
 
 Do not point the update channel at a draft, untested, or failed build. The
 draft Release `latest.json` is a review artifact, not the live user channel.
 For tester / early-adopter alpha releases, publish for manual downloads only and
-skip the beta-channel promotion unless we explicitly decide to offer that alpha
-to all current update-channel users. Alpha releases normally stay marked as
-GitHub Pre-release; if we want the repo sidebar to show the alpha as GitHub
-Latest, GitHub requires removing the prerelease flag. This still does not
-promote the app update channel.
+skip update-channel promotion unless we explicitly decide to offer that alpha to
+all current update-channel users. Alpha releases normally stay marked as GitHub
+Pre-release; if we want the repo sidebar to show the alpha as GitHub Latest,
+GitHub requires removing the prerelease flag. This still does not promote the
+app update channel.
 
 ## Pre-Flight
 
@@ -53,7 +54,13 @@ Replace the example value before every release.
   - Variable: `GALLEY_UPDATER_PUBKEY`
   - Variable: `GALLEY_UPDATER_ENDPOINT`
 
-Expected beta endpoint:
+Expected default endpoint:
+
+```text
+https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
+```
+
+Legacy endpoint kept for older builds:
 
 ```text
 https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
@@ -291,21 +298,23 @@ After publish:
 Promote after publish + smoke:
 
 Skip this step for tester / early-adopter alpha releases unless we explicitly
-decide that all current beta-channel users should receive the alpha build.
+decide that all current update-channel users should receive the alpha build.
 
 ```bash
 gh workflow run promote-update-channel.yml \
   --repo wangjc683/galley \
   --ref main \
   -f tag="${RELEASE_TAG}" \
-  -f channel=beta
+  -f channel=stable
 
 gh run watch --repo wangjc683/galley --exit-status
 ```
 
 The workflow refuses draft releases. It regenerates `latest.json` from the
 published release artifacts and pushes it to the `galley-update-channel`
-branch.
+branch. Promoting `stable` also writes the same manifest to `updates/beta/` so
+older installed builds that were compiled with the legacy endpoint can still
+update.
 
 ### 8. Verify Live Update Channel
 
@@ -315,7 +324,7 @@ Run the live channel verifier:
 node scripts/check-update-channel.mjs \
   --repo wangjc683/galley \
   --tag "${RELEASE_TAG}" \
-  --channel beta \
+  --channel stable \
   --cache-bust
 ```
 
@@ -359,7 +368,7 @@ gh workflow run promote-update-channel.yml \
   --repo wangjc683/galley \
   --ref main \
   -f tag=<last-good-tag> \
-  -f channel=beta
+  -f channel=stable
 ```
 
 Then:
@@ -378,7 +387,7 @@ Then:
 | App says update channel not connected | Build lacks updater compile-time config | Expected in Dev; for release, inspect generated Tauri config |
 | Update downloads during active task | Protection regression | Stop release, fix before promotion |
 | Manifest URL points at wrong version | Wrong tag promoted | Promote the correct tag |
-| Live channel verifier returns 404 | Channel branch was not promoted or raw URL is wrong | Rerun promote, then verify `updates/beta/latest.json` on `galley-update-channel` |
+| Live channel verifier returns 404 | Channel branch was not promoted or raw URL is wrong | Rerun promote, then verify `updates/stable/latest.json` on `galley-update-channel`; for old builds, also verify the `updates/beta/latest.json` alias |
 | Live channel verifier reads previous version | GitHub raw CDN returned stale but valid manifest content | Use `--cache-bust`, keep validation inside verifier retries, and confirm the pushed file on `galley-update-channel` |
 
 ## Done Criteria

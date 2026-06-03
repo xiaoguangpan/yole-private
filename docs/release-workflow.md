@@ -7,7 +7,7 @@ Galley 发版 SOP。本文档定义 v0.2 起的正式发版流程，配合 `.git
 
 > **相关文档**
 > - Release day checklist: [`docs/release-update-sop.md`](./release-update-sop.md)
-> - 工作流文件: [`.github/workflows/release.yml`](../.github/workflows/release.yml) (tag 触发发版) / [`.github/workflows/promote-update-channel.yml`](../.github/workflows/promote-update-channel.yml) (手动更新 beta channel) / [`.github/workflows/check.yml`](../.github/workflows/check.yml) (PR 时三平台 build 验证)
+> - 工作流文件: [`.github/workflows/release.yml`](../.github/workflows/release.yml) (tag 触发发版) / [`.github/workflows/promote-update-channel.yml`](../.github/workflows/promote-update-channel.yml) (手动更新默认应用内更新通道) / [`.github/workflows/check.yml`](../.github/workflows/check.yml) (PR 时三平台 build 验证)
 > - Win 手动 build 指南: [`docs/windows-build-checklist.md`](./windows-build-checklist.md) — 当 CI 不可用、需要本地出一份 .exe 时参考
 
 ## 总览
@@ -32,7 +32,7 @@ ubuntu-latest 收集产物 + gh release create --draft
 点 publish → 用户可见 + 可下载
        ↓
 alpha 内测 / 尝鲜：停在这里，只供手动下载
-beta / stable：手动运行 Promote Update Channel → updates/beta/latest.json 指向该版本
+beta / stable：手动运行 Promote Update Channel → 默认更新通道 manifest 指向该版本
 ```
 
 构建时间预估：每个 platform job 4-7 min（缓存命中后），三个并行。全流程 push tag 到 draft release ready 大约 **10-12 min**。
@@ -199,15 +199,16 @@ b) **摘 prerelease flag + 标 Latest**：选信心最高的 release：
 
 ### Step 6. Promote update channel
 
-自动更新不要直接依赖 GitHub 的 `/releases/latest`。Galley beta channel 使用
-独立分支 `galley-update-channel` 上的静态 manifest：
+自动更新不要直接依赖 GitHub 的 `/releases/latest`。Galley 使用独立分支
+`galley-update-channel` 上的静态 manifest：
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
+https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
 ```
 
-`GALLEY_UPDATER_ENDPOINT` 应该配置成这个 URL。首次配置时这个 URL 可以还不存在；
-release publish 后跑 promote workflow 才会写入。
+`updates/beta/latest.json` 是旧客户端兼容别名。`GALLEY_UPDATER_ENDPOINT` 应该
+配置成 stable URL。首次配置时这个 URL 可以还不存在；release publish 后跑
+promote workflow 才会写入。
 
 内测 / 尝鲜用的 alpha 版本默认只发布 GitHub Pre-release 供手动下载，不跑
 Promote Update Channel。只有当我们明确决定让当前更新频道用户也收到这个
@@ -219,11 +220,12 @@ alpha 时，才把 alpha tag 填进 promote workflow。
 2. 打开 https://github.com/wangjc683/galley/actions/workflows/promote-update-channel.yml
 3. 点 **Run workflow**。
 4. `tag` 填刚发布的 tag，例如 `v0.2.0-beta.1`。
-5. `channel` 选 `beta`。
+5. `channel` 选 `stable`。
 
 workflow 会拒绝 draft release，下载该 release 的 artifacts，重新生成 Tauri
-`latest.json`，然后把 `updates/beta/latest.json` 推到
-`galley-update-channel` 分支。用户侧下一次后台检查会看到这个版本。
+`latest.json`，然后把 `updates/stable/latest.json` 推到
+`galley-update-channel` 分支；同时维护 `updates/beta/latest.json` 作为旧客户端
+兼容别名。用户侧下一次后台检查会看到这个版本。
 
 promote workflow 推送后会运行同一份 live channel verifier：
 
@@ -231,7 +233,7 @@ promote workflow 推送后会运行同一份 live channel verifier：
 node scripts/check-update-channel.mjs \
   --repo wangjc683/galley \
   --tag v0.2.0-beta.1 \
-  --channel beta \
+  --channel stable \
   --cache-bust
 ```
 
@@ -631,12 +633,15 @@ repo script。workflow 会上传 updater artifacts：
 - Windows: `Galley_<version>_Windows_x64-setup.exe` 和 `.sig`
 
 Release workflow 还会把 `latest.json` candidate 放进 draft Release，方便 review。
-真正对用户生效的 manifest 由 `promote-update-channel.yml` 手动发布到 beta
-channel：
+真正对用户生效的 manifest 由 `promote-update-channel.yml` 手动发布到默认
+应用内更新通道：
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
+https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
 ```
+
+`updates/beta/latest.json` 继续保留为 legacy alias，让旧版本安装包也能收到
+后续更新。
 
 manifest 规则：
 
@@ -644,9 +649,8 @@ manifest 规则：
 - manifest 里的 `url` 指向对应平台的 updater 包。
 - live channel 必须通过 `scripts/check-update-channel.mjs --cache-bust`
   验证后才算完成。
-- beta prerelease 不标记 GitHub Release 为 Latest，所以不要依赖
-  `/releases/latest/download/latest.json` 作为 beta channel；使用上面的显式
-  beta endpoint。
+- 不依赖 `/releases/latest/download/latest.json` 作为更新通道；使用上面的显式
+  `galley-update-channel` endpoint，避免 draft / prerelease / smoke 前版本泄漏。
 
 ### Linux 构建
 

@@ -16,7 +16,7 @@ if (args.help) {
 }
 
 const repo = args.repo ?? "wangjc683/galley";
-const channel = args.channel ?? "beta";
+const channel = args.channel ?? "stable";
 const tag = args.tag;
 const expectedVersion = args.version ?? (tag ? tag.replace(/^v/, "") : undefined);
 const manifestUrl =
@@ -225,7 +225,7 @@ function printUsage() {
   node scripts/check-update-channel.mjs \\
     --repo owner/repo \\
     --tag v0.2.0-beta.1 \\
-    --channel beta
+    --channel stable
 
 Options:
   --url <url>                Override the manifest URL.

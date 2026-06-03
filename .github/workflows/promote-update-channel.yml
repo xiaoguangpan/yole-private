@@ -10,9 +10,10 @@ on:
       channel:
         description: "Update channel to publish"
         required: true
-        default: beta
+        default: stable
         type: choice
         options:
+          - stable
           - beta
 
 permissions:
@@ -57,7 +58,7 @@ jobs:
             --artifacts artifacts \
             --repo "${{ github.repository }}" \
             --tag "${{ inputs.tag }}" \
-            --out update-channel/updates/${{ inputs.channel }}/latest.json
+            --out update-channel/latest.json
 
       - name: Publish update channel
         env:
@@ -80,11 +81,24 @@ jobs:
             git -C "$worktree_dir" rm -rf . >/dev/null 2>&1 || true
           fi
 
-          mkdir -p "$worktree_dir/updates/$CHANNEL"
-          cp "update-channel/updates/$CHANNEL/latest.json" "$worktree_dir/updates/$CHANNEL/latest.json"
-          printf "Galley %s update channel.\\n\\nCurrent tag: %s\\n" "$CHANNEL" "$TAG" > "$worktree_dir/updates/$CHANNEL/README.md"
+          channels=("$CHANNEL")
+          if [[ "$CHANNEL" == "stable" ]]; then
+            channels+=("beta")
+          fi
 
-          git -C "$worktree_dir" add "updates/$CHANNEL/latest.json" "updates/$CHANNEL/README.md"
+          for publish_channel in "${channels[@]}"; do
+            mkdir -p "$worktree_dir/updates/$publish_channel"
+            cp "update-channel/latest.json" "$worktree_dir/updates/$publish_channel/latest.json"
+            if [[ "$publish_channel" == "beta" && "$CHANNEL" == "stable" ]]; then
+              printf "Galley legacy beta update channel alias.\\n\\nCurrent tag: %s\\nPrimary channel: stable\\n" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
+            else
+              printf "Galley %s update channel.\\n\\nCurrent tag: %s\\n" "$publish_channel" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
+            fi
+          done
+
+          for publish_channel in "${channels[@]}"; do
+            git -C "$worktree_dir" add "updates/$publish_channel/latest.json" "updates/$publish_channel/README.md"
+          done
           if git -C "$worktree_dir" diff --cached --quiet; then
             echo "Update channel $CHANNEL already points at $TAG."
           else
@@ -101,3 +115,12 @@ jobs:
             --cache-bust \
             --retries 6 \
             --retry-delay-ms 10000
+          if [[ "${{ inputs.channel }}" == "stable" ]]; then
+            node scripts/check-update-channel.mjs \
+              --repo "${{ github.repository }}" \
+              --tag "${{ inputs.tag }}" \
+              --channel beta \
+              --cache-bust \
+              --retries 6 \
+              --retry-delay-ms 10000
+          fi

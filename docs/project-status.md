@@ -12,8 +12,8 @@ live in [refactor](./refactor/README.md).
 - Package version: `0.2.5`
 - Git tag / GitHub Release: `v0.2.5` is the current published GitHub Latest.
 - Agent API schema: `schemaVersion: 1`
-- Release tier: stable hotfix patch release; beta update channel points at
-  `v0.2.5`.
+- Release tier: stable hotfix patch release; default update channel points at
+  `v0.2.5`, with `beta` kept as a legacy alias for older builds.
 - Product shape: dual-native local agent team orchestrator
 
 Galley GUI and Galley CLI are peer frontends over Rust-side Galley Core. The
@@ -22,16 +22,17 @@ Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.2.5` is the current published stable hotfix, GitHub Latest, and beta
+`v0.2.5` is the current published stable hotfix, GitHub Latest, and default
 update-channel target. It fixes the ChatGPT / Codex provider shipped in
 `v0.2.4`: Codex backend request `input` is sent as a Responses list, streaming
 is forced for Codex, and unsupported `max_output_tokens` is omitted for the
 Codex backend. Dogfood confirmed Codex CLI import, model test, a conversation
 through the built-in GA runtime, and macOS DMG installation before publish.
 
-The beta update channel was promoted to `v0.2.5` after publish. The live channel
-verifier passed with cache-busting, and the `galley-update-channel` branch
-manifest reports version `0.2.5`.
+The default update channel was promoted to `v0.2.5` after publish. The live
+channel verifier passed with cache-busting, and the `galley-update-channel`
+branch manifest reports version `0.2.5`. `updates/beta/latest.json` is kept as
+a legacy alias for builds compiled before the stable endpoint rename.
 
 Post-promote follow-up:
 
@@ -51,7 +52,7 @@ Post-promote follow-up:
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
 | Managed GA runtime | Shipped in v0.2.0; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | v0.2.5 published as GitHub Latest and promoted to the beta update channel | [release / update SOP](./release-update-sop.md) |
+| Release path | v0.2.5 published as GitHub Latest and promoted to the default update channel | [release / update SOP](./release-update-sop.md) |
 | Windows | v0.2.5 Windows setup artifact is published through the release and updater manifest; monitor Windows reports | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 

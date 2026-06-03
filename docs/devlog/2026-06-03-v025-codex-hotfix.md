@@ -4,7 +4,7 @@
 
 - Date: 2026-06-03
 - Status: `v0.2.5` published as the stable GitHub Latest and promoted to the
-  beta update channel.
+  default update channel.
 - Related:
   - [Project status](../project-status.md)
   - [Release / update SOP](../release-update-sop.md)
@@ -23,8 +23,8 @@ The failures were sequential and useful: first `input` had to be a list, then
 After removing the incompatible parameter and forcing Codex streaming, local
 dogfood confirmed Codex CLI import, model test, and a managed-GA conversation.
 The macOS DMG was installed and smoke-tested before the GitHub Release was
-published. After publish, the beta update channel was promoted to `v0.2.5` and
-the live manifest verifier passed.
+published. After publish, the update channel was promoted to `v0.2.5` and the
+live manifest verifier passed.
 
 ## Decisions
 
@@ -52,9 +52,9 @@ the live manifest verifier passed.
   managed-GA conversation completed using the ChatGPT / Codex provider.
 - Manual install smoke: macOS DMG install completed without reported issues
   before publishing `v0.2.5`.
-- Update channel: `promote-update-channel.yml` completed for `v0.2.5` on the
-  beta channel, and `scripts/check-update-channel.mjs --cache-bust` confirmed
-  version `0.2.5` for macOS Apple Silicon, macOS Intel, and Windows x64.
+- Update channel: `promote-update-channel.yml` completed for `v0.2.5`, and
+  `scripts/check-update-channel.mjs --cache-bust` confirmed version `0.2.5` for
+  macOS Apple Silicon, macOS Intel, and Windows x64.
 
 ## Rejected alternatives
 
