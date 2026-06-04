@@ -59,6 +59,5 @@ respecting the boundary that Galley does not modify a user-owned GA checkout.
 
 ## Next
 
-Run the new bundled Python gate locally, keep it inside release CI through
-`bundle-python.sh`, and proceed to the release candidate only after the bundled
-runtime smoke passes.
+Keep the bundled Python gate in release CI and repeat it whenever managed GA,
+the GA baseline, or bundled runtime dependencies change.

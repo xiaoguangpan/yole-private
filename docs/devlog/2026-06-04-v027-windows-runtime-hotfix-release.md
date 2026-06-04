@@ -1,9 +1,10 @@
-# 2026-06-04 - v0.2.7 Windows runtime hotfix prep
+# 2026-06-04 - v0.2.7 Windows runtime hotfix release
 
 ## Date / Status / Related
 
 - Date: 2026-06-04
-- Status: `v0.2.7` patch candidate prepared locally; not yet published.
+- Status: `v0.2.7` published as stable GitHub Latest and promoted to the
+  default update channel.
 - Related:
   - [GitHub issue #9](https://github.com/wangjc683/galley/issues/9)
   - [Project status](../project-status.md)
@@ -52,7 +53,16 @@ can fail.
 - `.venv/bin/python -m mypy runner`
 - `.venv/bin/ruff check runner`
 - `node scripts/check-managed-ga-payload.mjs`
+- `./scripts/check-bundled-python-managed-ga.sh`
+- `./scripts/bundle-python.sh mac-x64`
 - `git diff --check`
+- GitHub Actions `release.yml` run `26930808664` passed for macOS arm64, macOS
+  x64, Windows x64, and draft Release creation.
+- GitHub Release `v0.2.7` is published, non-prerelease, and GitHub Latest.
+- `promote-update-channel.yml` run `26931705162` promoted `stable` and the
+  legacy `beta` alias.
+- `node scripts/check-update-channel.mjs --repo wangjc683/galley --tag v0.2.7 --channel stable --cache-bust --retries 6 --retry-delay-ms 10000`
+- `node scripts/check-update-channel.mjs --repo wangjc683/galley --tag v0.2.7 --channel beta --cache-bust --retries 6 --retry-delay-ms 10000`
 
 ## Rejected alternatives
 
@@ -77,7 +87,6 @@ can fail.
 
 ## Next
 
-Create the `v0.2.7` release commit, generate a draft GitHub Release, review the
-macOS / Windows artifacts, publish only after smoke, then promote `stable` and
-the legacy `beta` alias. Reply to issue #9 after the published release is
-available to users.
+Reply to issue #9 with the published `v0.2.7` fix and ask the reporter to
+retest on Windows. Keep image paste as a separate Galley-native multimodal
+thread instead of folding it into this hotfix.

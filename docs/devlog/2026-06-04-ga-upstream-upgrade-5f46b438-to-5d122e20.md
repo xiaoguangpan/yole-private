@@ -3,8 +3,8 @@
 **Date / Status / Related**
 
 - Date: 2026-06-04
-- Status: implemented locally; not yet released
-- Related: [GA baseline](../ga-baseline.md), [managed GA patch stack](../../managed-ga/patches/manifest.md), [v0.2.7 Windows runtime hotfix prep](./2026-06-04-v027-windows-runtime-hotfix-prep.md)
+- Status: shipped in `v0.2.7`
+- Related: [GA baseline](../ga-baseline.md), [managed GA patch stack](../../managed-ga/patches/manifest.md), [v0.2.7 Windows runtime hotfix release](./2026-06-04-v027-windows-runtime-hotfix-release.md)
 
 **Context**
 
@@ -54,5 +54,6 @@ Control recovery and ChatGPT / Codex backend behavior.
 
 **Next**
 
-Run the baseline verification set, commit the upgrade independently from the
-Windows hotfix commit, then continue the `v0.2.7` release draft review.
+Keep Browser Control and ChatGPT / Codex managed patches visible in the replay
+manifest, and remove them if upstream GenericAgent later provides equivalent
+extension seams.
