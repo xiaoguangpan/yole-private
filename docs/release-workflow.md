@@ -63,6 +63,10 @@ Semver 0.x.y，pre-1.0 阶段：
 - [ ] `main` 分支 CI 全绿（`check.yml` 三平台通过）
 - [ ] 本地 `pnpm typecheck` / `pnpm lint` / `cargo check` 干净
 - [ ] 本地 `pnpm tauri dev` smoke 跑通核心流程（新对话 / multi-step / 审批 / 切 LLM）
+- [ ] 如果包含 managed GA runtime / GA baseline / bundled dependency 变更：
+      `./scripts/bundle-python.sh <target-arch>` 通过，且
+      `./scripts/check-bundled-python-managed-ga.sh` 能用生成的 bundled Python
+      导入 `managed-ga/code`
 - [ ] 如果包含 managed GA runtime 变更：`node scripts/check-managed-ga-payload.mjs` 通过；本地成品包用 `node scripts/check-managed-ga-app-bundle.mjs <Galley.app>` 通过
 - [ ] 如果包含 GA upstream 升级：[upstream upgrade workflow](./ga-baseline.md#upgrade-procedure) 走完，external baseline 和 managed GA rebase 都验证过，devlog 写好
 

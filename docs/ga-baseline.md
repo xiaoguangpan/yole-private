@@ -139,15 +139,18 @@ GA_PATH=/tmp/galley-ga-upgrade \
   .venv/bin/python -m pytest runner/tests/ -m e2e
 ```
 
-7. Audit bundled Python dependencies and run a bundle import smoke:
+7. Audit bundled Python dependencies and run the bundled runtime smoke:
 
 ```bash
 ./scripts/bundle-python.sh mac-x64
+./scripts/check-bundled-python-managed-ga.sh
 ```
 
 If `[project.dependencies]` changed, update `scripts/bundle-python.sh` before
-running the bundle script. The bundle script must verify `managed-ga/code`, not
-`~/Documents/GenericAgent`.
+running the bundle script. `bundle-python.sh` already invokes the bundled
+managed-GA smoke; run `check-bundled-python-managed-ga.sh` again when checking an
+already-generated bundle without rebuilding it. The smoke must verify
+`managed-ga/code`, not `~/Documents/GenericAgent`.
 
 8. Start Galley dev mode and run a real multi-step task in both runtime modes
    when possible:
@@ -175,6 +178,9 @@ Every baseline upgrade must check GenericAgent `pyproject.toml`:
 
 - If `[project.dependencies]` changes, update `scripts/bundle-python.sh`.
 - Rebuild bundled Python for release targets.
+- Run `scripts/check-bundled-python-managed-ga.sh` against the generated
+  bundle. Managed GA must not depend on the maintainer's `.venv` or external
+  `~/Documents/GenericAgent` checkout.
 - `optional-dependencies` for GenericAgent UI/frontends are not automatically in
   Galley scope. Galley only bundles frontend deps when a managed product
   surface owns that frontend.

@@ -196,7 +196,9 @@ jobs:
       # v0.1.1+ Galley ships a bundled CPython 3.11 + GA core deps at
       # $RESOURCE/python/. `scripts/bundle-python.sh` downloads the
       # python-build-standalone tarball, strips non-essential stdlib,
-      # and pip-installs GA's four deps. Output lands in
+      # pip-installs Galley's audited GA runtime deps, and smoke-tests
+      # the vendored managed-ga/code payload against that interpreter.
+      # Output lands in
       # core/python-bundle/python/, which tauri.conf.json's
       # bundle.resources mapping copies into the .app / NSIS payload.
       #

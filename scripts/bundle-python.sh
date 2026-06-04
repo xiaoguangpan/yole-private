@@ -82,15 +82,6 @@ else
   PYTHON_BIN="${PYTHON_DIR}/bin/python3"
 fi
 
-python_host_path() {
-  local path="$1"
-  if [[ "$ARCH" == "win-x64" ]] && command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "$path"
-  else
-    printf '%s\n' "$path"
-  fi
-}
-
 echo "[bundle-python] stripping non-essential stdlib..."
 # Remove modules we never use, freeing ~10-15MB per bundle:
 #   - test/      CPython's own test suite (~10MB)
@@ -138,23 +129,8 @@ echo "[bundle-python] installing GA deps to bundle's site-packages..."
 # missing packaged dependencies.
 echo "[bundle-python] verifying bundle..."
 MANAGED_GA_PATH="${REPO_ROOT}/managed-ga/code"
-VERIFY_STATE_DIR="${OUT_DIR}/managed-import-state"
 if [[ -d "$MANAGED_GA_PATH" ]]; then
-  mkdir -p "$VERIFY_STATE_DIR"
-  VERIFY_GA_PATH="$(python_host_path "$MANAGED_GA_PATH")"
-  VERIFY_STATE_ROOT="$(python_host_path "$VERIFY_STATE_DIR")"
-  PYTHONDONTWRITEBYTECODE=1 GALLEY_GA_STATE_ROOT="$VERIFY_STATE_ROOT" GALLEY_VERIFY_GA_PATH="$VERIFY_GA_PATH" "$PYTHON_BIN" -c '
-import os
-import sys
-sys.path.insert(0, os.environ["GALLEY_VERIFY_GA_PATH"])
-import agentmain
-import qrcode
-import dotenv
-from Crypto.Cipher import AES
-import importlib.util
-assert importlib.util.find_spec("frontends.wechatapp") is not None
-print("  managed GA import OK (bundle is bridge-ready)")
-'
+  "${REPO_ROOT}/scripts/check-bundled-python-managed-ga.sh" "$PYTHON_BIN" "$MANAGED_GA_PATH"
 else
   "$PYTHON_BIN" -c '
 import aiohttp, requests, bs4, bottle, dotenv

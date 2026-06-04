@@ -52,6 +52,10 @@ Replace the example value before every release.
   - `pnpm --dir gui typecheck`
   - `pnpm --dir gui lint`
   - `cargo check --workspace` or the narrower Rust check justified by scope
+- [ ] If the release touches managed GA, the GA baseline, or bundled
+      dependencies, the bundled runtime gate passed:
+  - `./scripts/bundle-python.sh <target-arch>`
+  - `./scripts/check-bundled-python-managed-ga.sh`
 - [ ] `docs/devlog/` has the durable release narrative if this is more than a
       tiny hotfix.
 - [ ] Version is bumped consistently:

@@ -151,6 +151,20 @@ apps read.
 Since v0.1.1, Galley release builds embed CPython 3.11.15 plus GenericAgent core
 dependencies. Users do not need to configure Python or a venv for normal use.
 
+Runtime policy:
+
+- Managed / bundled GA must be open-and-run from Galley's own Python and
+  packaged dependencies. A release that needs the user's Python to start the
+  managed runtime is not release-ready.
+- Attach / external GA also defaults to Galley's bundled Python in release
+  builds. This gives user-owned GenericAgent checkouts the same baseline
+  dependencies without letting Galley modify the checkout, venv, PATH, or state.
+- External Python is an explicit escape hatch (`gaConfig.useExternalPython =
+  true`) for user-added dependencies, unsupported upstream frontends, or users
+  who deliberately want their own interpreter.
+- Dev mode uses external Python because `$RESOURCE` does not point at the final
+  bundle resource directory during `pnpm tauri dev`.
+
 Implementation notes:
 
 - Source: `python-build-standalone` install-only stripped builds.
@@ -160,9 +174,8 @@ Implementation notes:
 - Tauri aliases:
   - `python-bundled` for macOS / Linux (`bin/python3`)
   - `python-bundled-win` for Windows (`python.exe`)
-- User escape hatch: `gaConfig.useExternalPython = true`.
-- Dev mode uses external Python because `$RESOURCE` does not point at the final
-  bundle resource directory during `pnpm tauri dev`.
+- Release gate: `scripts/check-bundled-python-managed-ga.sh` verifies that the
+  generated bundle can import `managed-ga/code` and Galley-owned runtime deps.
 
 Bundled GenericAgent core deps are audited during baseline upgrades. See
 [GA baseline](./ga-baseline.md).
