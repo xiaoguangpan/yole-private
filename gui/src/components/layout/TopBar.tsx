@@ -794,31 +794,11 @@ function SessionTitleEditor({
 }
 
 /**
- * Conversation width toggle — icon + state label pill, visually a
- * sibling of YoloIndicator (below). Same geometry / icon size /
- * padding / weight; only the accent color differs (brand apricot for
- * "this toggle is on" instead of warning amber for "YOLO active").
+ * Conversation width toggle.
  *
- * Two reasons it's a labeled pill rather than a plain icon button:
- *
- *   1. Function legibility — "this button is about reading width"
- *      isn't obvious from arrow icons alone; the label "紧凑 / 宽松"
- *      removes the guesswork
- *   2. State legibility — without a label, the only signal for current
- *      state is which direction the arrow points (out vs in), which is
- *      too subtle at thin weight to scan at a glance
- *
- * Inactive (compact) state shares the pill GEOMETRY with the active
- * state — same padding / gap / icon size — but with transparent
- * background and muted ink, hovering to the standard chrome tint.
- * That makes the on/off transition a pure fill swap, not a layout
- * shift.
- *
- * Icon flips direction to reinforce the action verb (arrows-out when
- * compact = "click to expand"; arrows-in when wide = "click to
- * collapse"). Slight redundancy with the label is intentional —
- * function + state read at a glance from any one of the three cues
- * (icon direction / label text / bg fill).
+ * Icon direction expresses the action (expand while compact, collapse
+ * while wide). Tooltip and aria-label carry the text so this stays a
+ * light topbar tool instead of a status pill.
  */
 function WidthToggleButton({
   mode,
@@ -839,7 +819,7 @@ function WidthToggleButton({
         onClick={onToggle}
         aria-label={isWide ? copy.topbar.compactWidth : copy.topbar.wideWidth}
         className={cn(
-          "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium transition-colors",
+          "inline-flex size-7 items-center justify-center rounded-md transition-colors",
           isWide
             ? "border border-brand/30 bg-brand/10 text-brand-strong hover:bg-brand/20"
             : "border border-transparent text-ink-soft hover:bg-hover hover:text-ink",
@@ -850,7 +830,6 @@ function WidthToggleButton({
         ) : (
           <ArrowsOutLineHorizontal size={14} weight="thin" />
         )}
-        {isWide ? copy.topbar.wideLabel : copy.topbar.compactLabel}
       </button>
     </TooltipLabel>
   );
