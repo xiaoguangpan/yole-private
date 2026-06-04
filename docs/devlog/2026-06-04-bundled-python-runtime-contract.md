@@ -29,6 +29,10 @@ respecting the boundary that Galley does not modify a user-owned GA checkout.
 - Added `scripts/check-bundled-python-managed-ga.sh` as a reusable gate for an
   already-generated bundle. `scripts/bundle-python.sh` invokes it after pip
   installing the audited dependency set.
+- The bundled smoke imports a temporary copy of `managed-ga/code`, not the
+  working tree path directly. This lets Browser Control generate its ignored
+  `tmwd_cdp_bridge/config.js` during import without making release CI depend on
+  maintainer-local files or mutating the source payload.
 - Release and baseline docs now require the bundled Python smoke when touching
   managed GA, the GA baseline, or bundled runtime deps.
 

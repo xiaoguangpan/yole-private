@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_PYTHON_DIR="${REPO_ROOT}/core/python-bundle/python"
-MANAGED_GA_PATH="${2:-${REPO_ROOT}/managed-ga/code}"
+SOURCE_MANAGED_GA_PATH="${2:-${REPO_ROOT}/managed-ga/code}"
 PYTHON_BIN="${1:-}"
 
 if [[ -z "$PYTHON_BIN" ]]; then
@@ -26,14 +26,8 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-if [[ ! -d "$MANAGED_GA_PATH" ]]; then
-  echo "[bundled-python-managed-ga] missing managed GA payload: ${MANAGED_GA_PATH}" >&2
-  exit 1
-fi
-
-if [[ ! -f "${MANAGED_GA_PATH}/assets/tmwd_cdp_bridge/config.js" ]]; then
-  echo "[bundled-python-managed-ga] missing Browser Control config asset: ${MANAGED_GA_PATH}/assets/tmwd_cdp_bridge/config.js" >&2
-  echo "[bundled-python-managed-ga] managed GA import must not generate files inside managed-ga/code" >&2
+if [[ ! -d "$SOURCE_MANAGED_GA_PATH" ]]; then
+  echo "[bundled-python-managed-ga] missing managed GA payload: ${SOURCE_MANAGED_GA_PATH}" >&2
   exit 1
 fi
 
@@ -46,17 +40,22 @@ python_host_path() {
   fi
 }
 
-STATE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/galley-bundled-python-smoke.XXXXXX")"
+SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/galley-bundled-python-smoke.XXXXXX")"
 cleanup() {
-  rm -rf "$STATE_ROOT"
+  rm -rf "$SMOKE_ROOT"
 }
 trap cleanup EXIT
+
+STATE_ROOT="${SMOKE_ROOT}/state"
+MANAGED_GA_PATH="${SMOKE_ROOT}/code"
+mkdir -p "$STATE_ROOT"
+cp -R "$SOURCE_MANAGED_GA_PATH" "$MANAGED_GA_PATH"
 
 VERIFY_GA_PATH="$(python_host_path "$MANAGED_GA_PATH")"
 VERIFY_STATE_ROOT="$(python_host_path "$STATE_ROOT")"
 
 echo "[bundled-python-managed-ga] python: ${PYTHON_BIN}"
-echo "[bundled-python-managed-ga] managed GA: ${MANAGED_GA_PATH}"
+echo "[bundled-python-managed-ga] managed GA: ${SOURCE_MANAGED_GA_PATH}"
 
 PYTHONDONTWRITEBYTECODE=1 \
 GALLEY_GA_STATE_ROOT="$VERIFY_STATE_ROOT" \
