@@ -28,7 +28,12 @@ export type AppUpdateStatus =
     }
   | { kind: "downloading"; version?: string }
   | { kind: "ready"; currentVersion: string; version: string }
-  | { kind: "error"; message: string };
+  | {
+      kind: "error";
+      message: string;
+      detail: string;
+      manualDownloadUrl: string;
+    };
 
 interface CheckOptions {
   silent?: boolean;
@@ -49,6 +54,8 @@ const PREF_LAST_SEEN_VERSION = "app_update_last_seen_version";
 const PREF_PREPARED_VERSION = "app_update_prepared_version";
 const PREF_READY_TOAST_VERSION = "app_update_ready_toast_version";
 const PREF_COMPLETED_TOAST_VERSION = "app_update_completed_toast_version";
+const APP_UPDATE_MANUAL_DOWNLOAD_URL =
+  "https://github.com/wangjc683/galley/releases/latest";
 
 export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
   status: { kind: "idle" },
@@ -84,7 +91,7 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
       }
       console.warn("[updates] check failed", error);
       set({
-        status: { kind: "error", message: readableUpdateError(error, "check") },
+        status: { kind: "error", ...readableUpdateError(error, "check") },
       });
     }
   },
@@ -120,7 +127,7 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
       set({
         status: {
           kind: "error",
-          message: readableUpdateError(error, "install"),
+          ...readableUpdateError(error, "install"),
         },
       });
     }
@@ -301,7 +308,7 @@ type UpdateErrorPhase = "check" | "install";
 function readableUpdateError(
   error: unknown,
   phase: UpdateErrorPhase,
-): string {
+): { message: string; detail: string; manualDownloadUrl: string } {
   const copy = updateCopy();
   const raw =
     typeof error === "string"
@@ -311,31 +318,36 @@ function readableUpdateError(
         : (JSON.stringify(error) ?? String(error ?? ""));
 
   const normalized = raw.toLowerCase();
+  const makeError = (message: string) => ({
+    message,
+    detail: formatUpdateDiagnostic(raw),
+    manualDownloadUrl: APP_UPDATE_MANUAL_DOWNLOAD_URL,
+  });
 
   if (normalized.includes("no_update_available"))
-    return copy.updates.noUpdateAvailable;
+    return makeError(copy.updates.noUpdateAvailable);
   if (
     normalized.includes("invalid_updater_endpoint") ||
     normalized.includes("insecure transport protocol") ||
     normalized.includes("relative url without a base") ||
     normalized.includes("builder error")
   ) {
-    return copy.updates.invalidEndpoint;
+    return makeError(copy.updates.invalidEndpoint);
   }
   if (
     raw.includes("EmptyEndpoints") ||
     normalized.includes("does not have any endpoints")
   ) {
-    return copy.updates.devNoChannel;
+    return makeError(copy.updates.devNoChannel);
   }
   if (normalized.includes("could not fetch a valid release json")) {
-    return copy.updates.channelUnavailable;
+    return makeError(copy.updates.channelUnavailable);
   }
   if (
     normalized.includes("platform") &&
     normalized.includes("not found in the response")
   ) {
-    return copy.updates.platformUnavailable;
+    return makeError(copy.updates.platformUnavailable);
   }
   if (
     normalized.includes("invalid updater binary format") ||
@@ -345,7 +357,7 @@ function readableUpdateError(
     normalized.includes("invalid type") ||
     normalized.includes("missing field")
   ) {
-    return copy.updates.invalidManifest;
+    return makeError(copy.updates.invalidManifest);
   }
   if (
     normalized.includes("signature") ||
@@ -354,7 +366,7 @@ function readableUpdateError(
     normalized.includes("signatureutf8") ||
     normalized.includes("signature mismatch")
   ) {
-    return copy.updates.signatureInvalid;
+    return makeError(copy.updates.signatureInvalid);
   }
   if (
     normalized.includes("download request failed") ||
@@ -366,9 +378,11 @@ function readableUpdateError(
     normalized.includes("timed out") ||
     normalized.includes("timeout")
   ) {
-    return phase === "install"
-      ? copy.updates.downloadFailed
-      : copy.updates.networkUnavailable;
+    return makeError(
+      phase === "install"
+        ? copy.updates.downloadFailed
+        : copy.updates.networkUnavailable,
+    );
   }
   if (
     normalized.includes("failed to install") ||
@@ -377,10 +391,18 @@ function readableUpdateError(
     normalized.includes("failed to create temporary directory") ||
     normalized.includes("failed to determine updater package extract path")
   ) {
-    return copy.updates.installFailed;
+    return makeError(copy.updates.installFailed);
   }
   if (phase === "install") {
-    return copy.updates.installFailed;
+    return makeError(copy.updates.installFailed);
   }
-  return copy.updates.checkFailed;
+  return makeError(copy.updates.checkFailed);
+}
+
+function formatUpdateDiagnostic(raw: string): string {
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  if (!normalized) return "update_error: no detail";
+  const maxLength = 520;
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
 }

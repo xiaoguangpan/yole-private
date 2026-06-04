@@ -1,5 +1,6 @@
 import {
   ArrowClockwise,
+  ArrowSquareOut,
   CheckCircle,
   CircleNotch,
   Info,
@@ -126,7 +127,7 @@ function UpdateInlineStatus({
     <span
       role="status"
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 text-[11.5px] leading-[1.45]",
+        "inline-flex min-w-0 flex-wrap items-center gap-1.5 text-[11.5px] leading-[1.45]",
         view.className,
       )}
     >
@@ -136,6 +137,25 @@ function UpdateInlineStatus({
         className={cn("shrink-0", view.spin && "spin")}
       />
       <span className="min-w-0">{view.message}</span>
+      {status.kind === "error" && (
+        <>
+          <a
+            href={status.manualDownloadUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center gap-1 text-brand-strong underline decoration-brand-strong/35 underline-offset-[3px] hover:decoration-brand-strong"
+          >
+            <span>{copy.updates.manualDownload}</span>
+            <ArrowSquareOut size={10} weight="thin" />
+          </a>
+          <code
+            className="min-w-0 max-w-[min(34rem,100%)] truncate rounded-sm border border-line bg-surface px-1.5 py-0.5 font-mono text-[10.5px] leading-tight text-ink-muted select-text"
+            title={status.detail}
+          >
+            {copy.updates.diagnosticPrefix}: {status.detail}
+          </code>
+        </>
+      )}
     </span>
   );
 }

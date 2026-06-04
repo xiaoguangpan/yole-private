@@ -9,10 +9,11 @@ live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.2.6`
-- Git tag / GitHub Release: `v0.2.6` is the current published GitHub Latest.
+- Package version: `0.2.7` release candidate.
+- Git tag / GitHub Release: `v0.2.6` is the current published GitHub Latest;
+  `v0.2.7` is not yet published.
 - Agent API schema: `schemaVersion: 1`
-- Release tier: stable patch release; default update channel points at
+- Release tier: stable patch candidate; default update channel still points at
   `v0.2.6`, with `beta` kept as a legacy alias for older builds.
 - Product shape: dual-native local agent team orchestrator
 
@@ -22,18 +23,21 @@ Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.2.6` is the current published stable patch, GitHub Latest, and default
-update-channel target. It completes the bundled GA Memory/SOP seed repair,
-polishes Settings -> Models and conversation streaming progress, fixes Windows
-update file-lock handling, and lowers several transient UI affordances that
-were visually louder than their job required.
+`v0.2.7` is the current patch candidate. It targets the Windows issue #9
+runtime hotfix set: managed `code_run` now closes child-process stdin for
+non-interactive execution, and update-check failures now show a manual download
+fallback plus copyable phase / endpoint / detail diagnostics.
 
-The default update channel was promoted to `v0.2.6` after publish. The live
-channel verifier passed with cache-busting for both `stable` and the legacy
-`beta` alias, and the `galley-update-channel` branch manifest reports version
-`0.2.6`. `GALLEY_UPDATER_ENDPOINT` points at `updates/stable/latest.json`;
-`updates/beta/latest.json` is kept as a legacy alias for builds compiled before
-the stable endpoint rename.
+`v0.2.6` remains the current published stable patch, GitHub Latest, and default
+update-channel target until the `v0.2.7` draft release is reviewed, published,
+and promoted.
+
+The default update channel was last promoted to `v0.2.6` after publish. The
+live channel verifier passed with cache-busting for both `stable` and the
+legacy `beta` alias, and the `galley-update-channel` branch manifest reports
+version `0.2.6`. `GALLEY_UPDATER_ENDPOINT` points at
+`updates/stable/latest.json`; `updates/beta/latest.json` is kept as a legacy
+alias for builds compiled before the stable endpoint rename.
 
 Post-promote follow-up:
 
@@ -51,10 +55,10 @@ Post-promote follow-up:
 | Core architecture | Rust Galley Core is authoritative | [architecture demo](./architecture-demo.md) |
 | CLI / Agent API | Feature-complete for v0.2; schema frozen | [agent-api](./agent-api.md) |
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
-| Managed GA runtime | Shipped in v0.2.0; Memory/SOP seed repair shipped in v0.2.6; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
+| Managed GA runtime | Shipped in v0.2.0; Memory/SOP seed repair shipped in v0.2.6; v0.2.7 candidate closes non-interactive `code_run` stdin; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | v0.2.6 published as GitHub Latest and promoted to the default update channel | [release / update SOP](./release-update-sop.md) |
-| Windows | v0.2.6 Windows setup artifact is published through the release and updater manifest; monitor updater file-lock reports | [Windows checklist](./windows-build-checklist.md) |
+| Release path | v0.2.7 is a local patch candidate; v0.2.6 remains GitHub Latest and the live update-channel target | [release / update SOP](./release-update-sop.md) |
+| Windows | v0.2.7 candidate targets issue #9 `code_run` stdin and update-check diagnostics; v0.2.6 Windows setup remains the published artifact | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream commit | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline
@@ -78,7 +82,7 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Current package metadata uses `0.2.6`. For the next release, update:
+- Current package metadata uses `0.2.7`. For the next release, update:
   - `package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`

@@ -62,11 +62,13 @@ pub async fn install_app_update<R: Runtime>(
     let bytes = update
         .download(|_, _| {}, || {})
         .await
-        .map_err(format_update_error)?;
+        .map_err(|e| format_update_error_for_phase("download", e))?;
 
     stop_galley_child_processes(&app).await;
 
-    update.install(bytes).map_err(format_update_error)?;
+    update
+        .install(bytes)
+        .map_err(|e| format_update_error_for_phase("install", e))?;
 
     Ok(result)
 }
@@ -83,22 +85,25 @@ async fn stop_galley_child_processes<R: Runtime>(app: &AppHandle<R>) {
 }
 
 async fn check_available_update<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Update>, String> {
-    let Some((pubkey, endpoint)) = updater_inputs() else {
+    let Some((pubkey, endpoint_raw)) = updater_inputs() else {
         return Ok(None);
     };
 
-    let endpoint = endpoint
+    let endpoint = endpoint_raw
         .parse()
-        .map_err(|e| format!("invalid_updater_endpoint: {e}"))?;
+        .map_err(|e| format_invalid_update_endpoint(endpoint_raw, e))?;
     let updater = app
         .updater_builder()
         .pubkey(pubkey)
         .endpoints(vec![endpoint])
-        .map_err(format_update_error)?
+        .map_err(|e| format_update_error_with_endpoint("check", endpoint_raw, e))?
         .build()
-        .map_err(format_update_error)?;
+        .map_err(|e| format_update_error_with_endpoint("check", endpoint_raw, e))?;
 
-    updater.check().await.map_err(format_update_error)
+    updater
+        .check()
+        .await
+        .map_err(|e| format_update_error_with_endpoint("check", endpoint_raw, e))
 }
 
 fn updater_configured() -> bool {
@@ -119,6 +124,18 @@ fn app_version<R: Runtime>(app: &AppHandle<R>) -> String {
     app.package_info().version.to_string()
 }
 
-fn format_update_error(error: impl std::fmt::Display) -> String {
-    format!("update_error: {error}")
+fn format_update_error_for_phase(phase: &str, error: impl std::fmt::Display) -> String {
+    format!("update_error: phase={phase}; detail={error}")
+}
+
+fn format_update_error_with_endpoint(
+    phase: &str,
+    endpoint: &str,
+    error: impl std::fmt::Display,
+) -> String {
+    format!("update_error: phase={phase}; endpoint={endpoint}; detail={error}")
+}
+
+fn format_invalid_update_endpoint(endpoint: &str, error: impl std::fmt::Display) -> String {
+    format!("invalid_updater_endpoint: phase=check; endpoint={endpoint}; detail={error}")
 }

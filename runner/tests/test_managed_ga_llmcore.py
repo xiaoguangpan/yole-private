@@ -11,6 +11,8 @@ _MANAGED_GA_CODE = Path(__file__).resolve().parents[2] / "managed-ga" / "code"
 if str(_MANAGED_GA_CODE) not in sys.path:
     sys.path.insert(0, str(_MANAGED_GA_CODE))
 
+_PREVIOUS_DONT_WRITE_BYTECODE = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
 sys.modules.setdefault("requests", types.ModuleType("requests"))
 urllib3_stub = types.ModuleType("urllib3")
 urllib3_typed = cast(Any, urllib3_stub)
@@ -18,7 +20,10 @@ urllib3_typed.exceptions = types.SimpleNamespace(InsecureRequestWarning=Warning)
 urllib3_typed.disable_warnings = lambda *_args, **_kwargs: None
 sys.modules.setdefault("urllib3", urllib3_stub)
 
-import llmcore  # type: ignore[import-not-found]  # noqa: E402
+try:
+    import llmcore  # type: ignore[import-not-found]  # noqa: E402
+finally:
+    sys.dont_write_bytecode = _PREVIOUS_DONT_WRITE_BYTECODE
 
 
 def test_tryparse_repairs_raw_windows_path_backslashes() -> None:

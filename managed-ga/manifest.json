@@ -12,7 +12,8 @@
       "0001-managed-state-root.patch",
       "0002-repair-windows-path-tool-json.patch",
       "0003-normalize-asset-path-joins.patch",
-      "0004-managed-wechat-state-paths.patch"
+      "0004-managed-wechat-state-paths.patch",
+      "0005-code-run-noninteractive-stdin.patch"
     ]
   },
   "stateSchemaVersion": 1

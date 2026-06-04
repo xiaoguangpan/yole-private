@@ -66,11 +66,14 @@ provide both compile-time variables:
 - `GALLEY_UPDATER_PUBKEY`: Tauri updater public key embedded in the app.
 - `GALLEY_UPDATER_ENDPOINT`: HTTPS URL for the updater manifest.
 
-Current beta endpoint:
+Current stable endpoint:
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
+https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
 ```
+
+`updates/beta/latest.json` is kept as a legacy alias for builds compiled before
+the stable channel cutover.
 
 Without both values, the app reports that this build is not connected to an
 update channel and local development keeps working. This is intentional: Tauri
