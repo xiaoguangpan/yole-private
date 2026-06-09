@@ -394,7 +394,7 @@ async fn scenario_c3() -> anyhow::Result<()> {
 /// to avoid collisions when multiple test runs overlap.
 fn socket_path(scenario: &str) -> String {
     format!(
-        "/tmp/galley-bridge-owner-{scenario}-{}.sock",
+        "/tmp/yole-bridge-owner-{scenario}-{}.sock",
         std::process::id()
     )
 }

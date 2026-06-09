@@ -1,28 +1,28 @@
-//! Galley CLI discovery file writer.
+//! Yole CLI discovery file writer.
 //!
 //! Supervisor agents (GA bots, Claude Skills, user-written orchestrators)
-//! need to find the `galley` CLI binary's absolute path to drive Galley.
+//! need to find the `yole` CLI binary's absolute path to drive Yole.
 //! Hard-coding paths is brittle: bundle layouts shift between releases,
 //! dev vs production paths differ, Windows installs end up in
 //! `%ProgramFiles%` vs `%LOCALAPPDATA%` depending on installer choice.
 //!
-//! Galley's contract (PRD §12.2, agent-api.md §2A, supervisor SOP §1):
+//! Yole's contract (PRD §12.2, agent-api.md §2A, supervisor SOP §1):
 //! the GUI writes the absolute CLI binary path into a fixed per-user
 //! file once at startup. SOPs `cat` that file, parse line 1, invoke the
 //! resulting absolute path.
 //!
 //! ## Path
 //!
-//! - macOS / Linux: `~/.config/galley/cli-path`
+//! - macOS / Linux: `~/.config/yole/cli-path`
 //!   (XDG_CONFIG_HOME overrides `~/.config` if set, per the spec)
-//! - Windows: `%APPDATA%\galley\cli-path`
+//! - Windows: `%APPDATA%\yole\cli-path`
 //!
 //! ## File format
 //!
 //! Two-line plain text, LF newlines:
 //!
 //! ```text
-//! /absolute/path/to/galley
+//! /absolute/path/to/yole
 //! schema_version=1
 //! ```
 //!
@@ -34,17 +34,17 @@
 //!
 //! If the file already contains the exact same content, we skip the
 //! write entirely. This keeps the mtime stable across app restarts —
-//! file watchers (some IM bots tail the discovery file to detect Galley
+//! file watchers (some IM bots tail the discovery file to detect Yole
 //! upgrades) don't get spurious notifications when nothing actually
 //! changed.
 //!
 //! ## Non-fatal failure
 //!
-//! Discovery file write failures are **non-fatal**. Galley itself works
+//! Discovery file write failures are **non-fatal**. Yole itself works
 //! fine without it — only supervisor SOPs need it. If the CLI binary
 //! can't be located (likely in a not-yet-bundled dev build), or the
 //! config dir can't be created (permission issues), we log and move on.
-//! The user sees Galley start normally; SOPs see "discovery file not
+//! The user sees Yole start normally; SOPs see "discovery file not
 //! found, ask user to upgrade" per the supervisor SOP §1 fallback.
 
 use std::path::{Path, PathBuf};
@@ -56,18 +56,18 @@ const SCHEMA_VERSION: u32 = 1;
 const FILENAME: &str = "cli-path";
 
 /// Subdir under the platform config root.
-const APP_SUBDIR: &str = "galley";
+const APP_SUBDIR: &str = "yole";
 
-/// The binary name to look for next to Galley Core's `current_exe`.
-/// In dev: `target/debug/galley`. In a bundled .app:
-/// `Galley.app/Contents/MacOS/galley`.
+/// The binary name to look for next to Yole Core's `current_exe`.
+/// In dev: `target/debug/yole`. In a bundled .app:
+/// `Yole.app/Contents/MacOS/yole`.
 #[cfg(not(target_os = "windows"))]
-const CLI_BIN_NAME: &str = "galley";
+const CLI_BIN_NAME: &str = "yole";
 #[cfg(target_os = "windows")]
-const CLI_BIN_NAME: &str = "galley.exe";
+const CLI_BIN_NAME: &str = "yole.exe";
 
 /// Outcome of a discovery write attempt. Used by the setup-hook caller
-/// for logging only — Galley starts regardless of which branch we
+/// for logging only — Yole starts regardless of which branch we
 /// landed on.
 #[derive(Debug)]
 pub enum DiscoveryOutcome {
@@ -77,7 +77,7 @@ pub enum DiscoveryOutcome {
     /// to keep mtime stable for upstream watchers.
     NoOp { path: PathBuf },
     /// Couldn't find the CLI binary next to `current_exe`. Most likely
-    /// a dev build where `cargo build -p galley-cli` hasn't run yet,
+    /// a dev build where `cargo build -p yole-cli` hasn't run yet,
     /// or an incomplete production package. The setup hook surfaces
     /// this as a warning so the user knows SOPs will fail discovery.
     CliBinaryNotFound { searched: PathBuf },
@@ -90,14 +90,14 @@ pub enum DiscoveryOutcome {
     WriteFailed { path: PathBuf, reason: String },
 }
 
-/// Resolve the absolute path of the `galley` CLI binary next to
+/// Resolve the absolute path of the `yole` CLI binary next to
 /// `current_exe`. Returns `None` if the sibling doesn't exist.
 ///
-/// **Rationale**: `current_exe()` in Tauri returns Galley Core's main
-/// binary path (`galley-core` in dev, `Galley` in production after the
+/// **Rationale**: `current_exe()` in Tauri returns Yole Core's main
+/// binary path (`yole-core` in dev, `Yole` in production after the
 /// productName rename). The CLI is a sibling in both layouts:
-///   - dev: `target/debug/{galley-core, galley}`
-///   - bundled: `Galley.app/Contents/MacOS/{Galley, galley}`
+///   - dev: `target/debug/{yole-core, yole}`
+///   - bundled: `Yole.app/Contents/MacOS/{Yole, yole}`
 ///
 /// If a package is missing the sibling, we surface that as
 /// `CliBinaryNotFound` so the dogfood log flags it clearly.
@@ -122,7 +122,7 @@ pub fn locate_cli_binary() -> Option<PathBuf> {
 ///   XDG Base Directory Spec (which Linux respects + macOS treats as a
 ///   convention). We deliberately don't follow Apple's
 ///   `~/Library/Application Support` here — the agent-api contract
-///   names `~/.config/galley/cli-path` literally; macOS-on-CLI tools
+///   names `~/.config/yole/cli-path` literally; macOS-on-CLI tools
 ///   universally honour `~/.config` (homebrew, git, gh, etc.).
 /// - Windows: `%APPDATA%`. No XDG analogue.
 fn config_root() -> Result<PathBuf, String> {
@@ -219,8 +219,8 @@ mod tests {
 
     #[test]
     fn compose_body_includes_path_and_schema() {
-        let body = compose_body(Path::new("/some/path/galley"));
-        assert_eq!(body, "/some/path/galley\nschema_version=1\n");
+        let body = compose_body(Path::new("/some/path/yole"));
+        assert_eq!(body, "/some/path/yole\nschema_version=1\n");
     }
 
     #[test]

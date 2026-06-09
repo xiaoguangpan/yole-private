@@ -1,10 +1,13 @@
 import {
   ArrowSquareOut,
   CaretDown,
+  Check,
+  Copy,
   Cube,
   FileCode,
   FolderOpen,
   Info,
+  QrCode,
   Warning,
   X as XIcon,
 } from "@phosphor-icons/react";
@@ -13,6 +16,7 @@ import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { useCopy, type AppCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import type { YoleAccountStatus } from "@/lib/managed-models";
 import type {
   AppError,
   AppErrorHint,
@@ -32,7 +36,7 @@ export interface ErrorCardActions {
   onViewProject?: (projectId: string) => void;
   /** Restart enabled Channels from an actionable toast. */
   onRestartChannels?: () => void;
-  /** Restart Galley after an app update has been prepared. */
+  /** Restart Yole after an app update has been prepared. */
   onRestartAppUpdate?: () => void;
 }
 
@@ -45,6 +49,7 @@ interface ErrorCardProps extends ErrorCardActions {
    */
   variant?: "toast" | "inline" | "card";
   onDismiss?: () => void;
+  yoleAccount?: YoleAccountStatus | null;
 }
 
 /**
@@ -69,12 +74,17 @@ export function ErrorCard({
   onViewProject,
   onRestartChannels,
   onRestartAppUpdate,
+  yoleAccount,
 }: ErrorCardProps) {
   const copy = useCopy();
   const [open, setOpen] = useState(false);
+  const [copiedContact, setCopiedContact] = useState<"wechat" | "support" | null>(
+    null,
+  );
   const isInline = variant === "inline";
   const sev = SEVERITY_CONFIG[error.severity];
   const hintCfg = error.hint ? hintConfig(copy)[error.hint] : null;
+  const isYoleQuota = error.hint === "quota_exceeded" && Boolean(yoleAccount);
 
   // Title resolution order:
   //   1. error.title — explicit override (positive-feedback toasts
@@ -82,11 +92,20 @@ export function ErrorCard({
   //   2. hintCfg.title — tailored copy for known error hints
   //      (check_llm_config / network / quota_exceeded).
   //   3. defaultTitle(error) — category-flavored fallback.
-  const title = error.title ?? hintCfg?.title ?? defaultTitle(error, copy);
-  const brief = hintCfg?.brief ?? error.message;
+  const title =
+    error.title ??
+    (isYoleQuota ? "AI 余额不足" : hintCfg?.title) ??
+    defaultTitle(error, copy);
+  const brief = isYoleQuota
+    ? yoleAccount?.contact.topUpMessage ??
+      "AI 余额不足。联系客服可追加 50 美元体验额度。"
+    : hintCfg?.brief ?? error.message;
   const hasDetails = hasDiagnosticDetails(error);
   const isCompactInfoToast = variant === "toast" && error.severity === "info";
-  const actions = (hintCfg?.actions ?? defaultActions(error, copy)).filter(
+  const configuredActions = isYoleQuota
+    ? yoleQuotaActions(copy)
+    : (hintCfg?.actions ?? defaultActions(error, copy));
+  const actions = configuredActions.filter(
     (action) =>
       isActionAvailable(action, error, {
         onRetry,
@@ -98,6 +117,13 @@ export function ErrorCard({
         onRestartAppUpdate,
       }),
   );
+
+  const copyContactValue = (kind: "wechat" | "support", value: string) => {
+    void copyTextToClipboard(value).then(() => {
+      setCopiedContact(kind);
+      window.setTimeout(() => setCopiedContact(null), 1400);
+    });
+  };
 
   if (isCompactInfoToast) {
     return (
@@ -204,6 +230,14 @@ export function ErrorCard({
             />
           ))}
         </div>
+      )}
+
+      {isYoleQuota && yoleAccount && (
+        <YoleSupportPanel
+          account={yoleAccount}
+          copied={copiedContact}
+          onCopy={copyContactValue}
+        />
       )}
 
       {open && hasDetails && (
@@ -343,6 +377,98 @@ function hintConfig(copy: AppCopy): Record<AppErrorHint, HintConfig> {
     ],
   },
   };
+}
+
+function yoleQuotaActions(copy: AppCopy): ActionDef[] {
+  return [
+    {
+      id: "copy-details",
+      label: copy.errors.copyDetails,
+      kind: "ghost",
+      handler: "copyDetails",
+    },
+  ];
+}
+
+function YoleSupportPanel({
+  account,
+  copied,
+  onCopy,
+}: {
+  account: YoleAccountStatus;
+  copied: "wechat" | "support" | null;
+  onCopy: (kind: "wechat" | "support", value: string) => void;
+}) {
+  const wechatId = account.contact.wechatId?.trim();
+  const qrUrl = account.contact.wechatQrUrl?.trim();
+  const overseas = account.contact.overseas?.trim();
+
+  return (
+    <div className="mt-3 rounded-sm border border-line bg-app p-3">
+      <div className="space-y-2 text-[12px]">
+        {wechatId && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[11px] text-ink-muted">微信号</div>
+              <div className="truncate font-medium text-ink">{wechatId}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCopy("wechat", wechatId)}
+              className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+              aria-label="复制微信号"
+            >
+              {copied === "wechat" ? (
+                <Check size={13} weight="thin" />
+              ) : (
+                <Copy size={13} weight="thin" />
+              )}
+            </button>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[11px] text-ink-muted">支持ID</div>
+            <div className="truncate font-medium text-ink">
+              {account.supportId}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onCopy("support", account.supportId)}
+            className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+            aria-label="复制支持ID"
+          >
+            {copied === "support" ? (
+              <Check size={13} weight="thin" />
+            ) : (
+              <Copy size={13} weight="thin" />
+            )}
+          </button>
+        </div>
+        {overseas && (
+          <div>
+            <div className="text-[11px] text-ink-muted">海外联系方式</div>
+            <div className="break-all font-medium text-ink">{overseas}</div>
+          </div>
+        )}
+      </div>
+
+      {qrUrl && (
+        <div className="mt-3 rounded-sm border border-line bg-elevated p-2">
+          <div className="mb-2 flex items-center gap-1.5 text-[11.5px] text-ink-muted">
+            <QrCode size={13} weight="thin" />
+            微信客服二维码
+          </div>
+          <img
+            src={qrUrl}
+            alt="微信客服二维码"
+            className="mx-auto size-28 rounded-sm object-contain"
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function defaultTitle(error: AppError, copy: AppCopy): string {

@@ -79,7 +79,7 @@ Widened the deps to also watch `turns.length`, `pendingApprovals.length`, `pendi
 
 ### Streaming: flip `agent.verbose = True`
 
-Galley shipped with `agent.verbose = False` since day one. JC noticed responses arriving as whole blobs instead of streaming and asked why. Tracing: `agent.verbose = False` makes `agent_loop.py` drain the LLM client generator silently and yield the full response in one chunk at turn end — that's why long answers appeared all-at-once and why "思考中" sat for many seconds while the LLM was actively producing tokens we never saw.
+Yole shipped with `agent.verbose = False` since day one. JC noticed responses arriving as whole blobs instead of streaming and asked why. Tracing: `agent.verbose = False` makes `agent_loop.py` drain the LLM client generator silently and yield the full response in one chunk at turn end — that's why long answers appeared all-at-once and why "思考中" sat for many seconds while the LLM was actively producing tokens we never saw.
 
 **Decision** (`0126f76`): flip to `verbose=True`. The cost is decorative yields verbose adds for GA's terminal frontends — the multi-line `🛠️ Tool: ... 📥 args: ... ` block before each dispatch, and 5-backtick fences wrapping each tool's stdout. New cleanPartialContent strippers handle them (complete blocks + partial-truncation at chunk boundaries). The pre-existing strippers for the compact `🛠️ name(args)` marker stay as a backstop.
 
@@ -150,7 +150,7 @@ Mental model after: pet is a singleton that follows the user. Sidebar badge alwa
 
 ### Always-show seconds on the thinking placeholder
 
-Variant A from the elapsed-counter discussion: show "X 秒" from second 1. Rejected — feels mechanical and impatient for the common 2-5s wait. The 5-second delay before surfacing matches Galley's "low chrome until needed" register.
+Variant A from the elapsed-counter discussion: show "X 秒" from second 1. Rejected — feels mechanical and impatient for the common 2-5s wait. The 5-second delay before surfacing matches Yole's "low chrome until needed" register.
 
 Long-form reassurance text past 3 minutes (variant C, "任务较复杂，仍在运行") also rejected — the "已 X 分 Y 秒" wording already acknowledges the duration without spelling it out, and for thinking-model users 3+ minutes is routine.
 

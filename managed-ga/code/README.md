@@ -388,12 +388,6 @@ Thanks to the **LinuxDo** community for the support!
 
 [![LinuxDo](https://img.shields.io/badge/Community-LinuxDo-blue?style=for-the-badge)](https://linux.do/)
 
-**Community GUIs** *(independent open-source projects)*:
-
-- [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
-- [wangjc683/galley](https://github.com/wangjc683/galley)
-- [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
-
 ---
 
 ## 📄 License
@@ -761,12 +755,6 @@ GenericAgent 通过 **分层记忆 × 最小工具集 × 自主执行循环** �
 感谢 **LinuxDo** 社区的支持！
 
 [![LinuxDo](https://img.shields.io/badge/社区-LinuxDo-blue?style=for-the-badge)](https://linux.do/)
-
-**社区 GUI 客户端** *（独立开源项目）*：
-
-- [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
-- [wangjc683/galley](https://github.com/wangjc683/galley)
-- [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
 
 ---
 

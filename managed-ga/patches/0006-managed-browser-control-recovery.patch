@@ -193,7 +193,7 @@ index 61cf1ca..42c3af9 100644
  import simphtml
  driver = None
 +NO_BROWSER_TABS_MSG = "浏览器插件已连接，但没有可用网页。请在同一个 Chrome / Edge 里打开一个网页，然后重试。"
-+NO_BROWSER_CONNECTION_MSG = "浏览器当前没有连接。若已安装插件，请打开同一个 Chrome / Edge 的网页后重试；首次使用请先在 Galley 顶部的浏览器控制入口完成设置。"
++NO_BROWSER_CONNECTION_MSG = "浏览器当前没有连接。若已安装插件，请打开同一个 Chrome / Edge 的网页后重试；首次使用请先在 Yole 顶部的浏览器控制入口完成设置。"
 +
 +def browser_control_empty_msg():
 +    try:

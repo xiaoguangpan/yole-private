@@ -9,7 +9,7 @@
 - **Related**:
   - [project status](../project-status.md)
   - [agent-api](../agent-api.md)
-  - [Supervisor SOP](../integrations/galley-supervisor-sop.md)
+  - [Supervisor SOP](../integrations/yole-supervisor-sop.md)
   - [Session Close SOP](../session-close-sop.md)
 
 ## Context
@@ -29,15 +29,15 @@ command-line PATH copy, Agent API reference, and version positioning.
 2. **Settings section name is `AGENT`**, not `INTEGRATION`. The surface is
    for trusted agents first; command-line enthusiasts are supported but not the
    primary audience.
-3. **Supervisor SOP is copy-first**. Galley should not install SOP content into
+3. **Supervisor SOP is copy-first**. Yole should not install SOP content into
    GenericAgent memory. The user copies the SOP and gives it to a trusted
-   Agent, which can then help view, create, and manage Galley sessions.
-4. **CLI is public Agent API**. The `galley` command and discovery file are for
-   Agent / Supervisor automation over Galley Core, not a GUI-side SQLite
+   Agent, which can then help view, create, and manage Yole sessions.
+4. **CLI is public Agent API**. The `yole` command and discovery file are for
+   Agent / Supervisor automation over Yole Core, not a GUI-side SQLite
    shortcut.
-5. **GUI / CLI must route through Rust Galley Core**. A proposed direct SQLite
+5. **GUI / CLI must route through Rust Yole Core**. A proposed direct SQLite
    read for GUI recovery was rejected because it violates the architecture:
-   GUI / CLI frontends -> Galley Core -> Runner -> GA subprocesses.
+   GUI / CLI frontends -> Yole Core -> Runner -> GA subprocesses.
 6. **`CLAUDE.md` stays short**. Global rules and doc routing live there;
    detailed instructions move into focused docs and devlog.
 7. **Session close gets a durable SOP**. Future closeout trigger phrases such
@@ -61,12 +61,12 @@ command-line PATH copy, Agent API reference, and version positioning.
 
 ## Rejected alternatives
 
-- **Direct GUI SQLite recovery** — rejected because it bypasses Galley Core and
+- **Direct GUI SQLite recovery** — rejected because it bypasses Yole Core and
   would weaken the dual-frontend architecture.
 - **Installing SOP into GenericAgent memory** — rejected as too invasive and
   inconsistent with copy-first Agent integration.
 - **Treating command-line PATH as required for SOP** — rejected. The Agent SOP
-  uses the discovery file; installing the `galley` command is helpful but not
+  uses the discovery file; installing the `yole` command is helpful but not
   required for the SOP path.
 - **Proceeding after history replay timeout** — rejected after dogfood showed
   old sessions could still fail silently. Timeout now triggers bridge restart

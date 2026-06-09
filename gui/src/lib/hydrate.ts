@@ -38,6 +38,7 @@ import {
   deleteEmptyNewSessions,
   getPref,
 } from "@/lib/db";
+import { ensureYoleTrialModel } from "@/lib/managed-models";
 import { pushCloseHintCopy } from "@/lib/close-hint";
 import { useAppUpdateStore } from "@/stores/app-update";
 import { useManagedModelsStore } from "@/stores/managed-models";
@@ -46,6 +47,8 @@ import type { LLMOption } from "@/stores/runtime";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { useYoleAccountStore } from "@/stores/yole-account";
+import { makeAppError } from "@/types/app-error";
 import type { ManagedRuntimeDiagnostics } from "@/types/inspector";
 
 export async function hydrateApp(): Promise<void> {
@@ -59,7 +62,7 @@ export async function hydrateApp(): Promise<void> {
     realVersion = await getVersion();
     useRuntimeStore
       .getState()
-      .patchRuntimeInfo({ workbenchVersion: realVersion });
+      .patchRuntimeInfo({ yoleVersion: realVersion });
   } catch (e) {
     console.debug("[hydrate] app.getVersion failed.", e);
   }
@@ -71,7 +74,7 @@ export async function hydrateApp(): Promise<void> {
     void useAppUpdateStore.getState().noteAppLaunched(realVersion);
   }
 
-  // 2b. Push the background-mode close hint copy into Galley Core for
+  // 2b. Push the background-mode close hint copy into Yole Core for
   // the current language. The Rust close handler can't reach GUI i18n,
   // so we hand it the localized strings here. The seen flag is owned by
   // Rust (seeded at setup), so the GUI only carries copy. Fire-and-
@@ -79,7 +82,7 @@ export async function hydrateApp(): Promise<void> {
   void pushCloseHintCopy(usePrefsStore.getState().languagePreference);
 
   // 3. Managed runtime layout. This is intentionally safe to run on
-  // every cold start: it only creates missing Galley-owned directories.
+  // every cold start: it only creates missing Yole-owned directories.
   try {
     const managedRuntime = await invoke<ManagedRuntimeDiagnostics>(
       "ensure_managed_runtime_layout",
@@ -89,8 +92,25 @@ export async function hydrateApp(): Promise<void> {
     console.warn("[hydrate] managed runtime layout init failed.", e);
   }
 
-  // 4. Managed models. Startup reads only metadata and local credential
-  // presence, never the real API key values.
+  // 4. Managed models. If a Yole provisioner URL is configured, Rust Core
+  // may create the first managed model before this load returns. Without
+  // that config, the command is a no-op and the existing onboarding path
+  // remains available for developer builds.
+  const activeRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
+  if (activeRuntimeKind === "managed") {
+    try {
+      const result = await ensureYoleTrialModel();
+      if (result.account) {
+        useYoleAccountStore.getState().setStatus(result.account);
+      }
+    } catch (e) {
+      console.warn("[hydrate] Yole trial model provisioning failed.", e);
+      pushYoleProvisioningFailedToast(e);
+    }
+    void useYoleAccountStore.getState().refresh();
+  }
+  // Startup reads only metadata and local credential presence, never the
+  // real API key values.
   const managedConfig = await useManagedModelsStore.getState().load();
   const hasConfiguredManagedModel = managedConfig.models.length > 0;
 
@@ -125,7 +145,6 @@ export async function hydrateApp(): Promise<void> {
   }
 
   // 8. Branch on active runtime config.
-  const activeRuntimeKind = usePrefsStore.getState().activeRuntimeKind;
   const needsOnboarding =
     activeRuntimeKind === "managed" ? !hasConfiguredManagedModel : !hasGAConfig;
   if (needsOnboarding) {
@@ -134,6 +153,34 @@ export async function hydrateApp(): Promise<void> {
   }
   if (activeRuntimeKind === "external") {
     void useRuntimeStore.getState().warmupLLMList();
+  }
+}
+
+function pushYoleProvisioningFailedToast(error: unknown): void {
+  useUiStore.getState().pushToast(
+    makeAppError({
+      id: "yole-provisioning-failed",
+      category: "business",
+      severity: "error",
+      title: "Trial setup failed",
+      message:
+        "Yole could not get a trial token. Check the provisioner and NewAPI settings, then reopen the app.",
+      hint: null,
+      retryable: false,
+      context: "ensure_yole_trial_model",
+      traceback: extractErrorMessage(error),
+      autoDismissMs: 10_000,
+    }),
+  );
+}
+
+function extractErrorMessage(error: unknown): string | null {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.stack ?? error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
   }
 }
 

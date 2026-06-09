@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { IconTooltip, type TooltipSide } from "@/components/ui/tooltip";
 
 /**
- * Canonical button surface for Galley. Every new button should use
+ * Canonical button surface for Yole. Every new button should use
  * this component; existing buttons migrate organically as their
  * containing files are touched.
  *

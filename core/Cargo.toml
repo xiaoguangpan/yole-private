@@ -1,6 +1,6 @@
-# Workspace root for the Galley Rust side. Members:
-#   - .       (this crate, the Tauri app — `galley-core`)
-#   - ../cli  (the `galley-cli` binary, used by agents)
+# Workspace root for the Yole Rust side. Members:
+#   - .       (this crate, the Tauri app — `yole-core`)
+#   - ../cli  (the `yole-cli` binary, used by agents)
 # Workspace root being at `core/` (not the repo root) keeps `target/` under
 # `core/target/` so the existing CI cache key + tauri build paths are
 # unaffected by the B1 layout change. Cli's discovery hint lives in
@@ -9,18 +9,18 @@
 members = [".", "../cli"]
 
 [package]
-name = "galley-core"
-version = "0.2.7"
-description = "Galley Core — Rust authority layer (Tauri app + business logic)"
-authors = ["JC <wangjc683@github>"]
+name = "yole-core"
+version = "0.0.1"
+description = "Yole Desktop Core"
+authors = ["Yole"]
 edition = "2021"
-# Two `[[bin]]` exist (`galley-core` + `bridge-owner-experiment`). The
+# Two `[[bin]]` exist (`yole-core` + `bridge-owner-experiment`). The
 # second is gated by `required-features = ["experiments"]` and shouldn't
 # conflict, but `cargo run` (invoked by Tauri's DevCommand without a
 # `--bin` flag) errored `could not determine which binary to run` after
 # the B1 directory move. `default-run` makes the dev / build path
 # unambiguous.
-default-run = "galley-core"
+default-run = "yole-core"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -28,10 +28,11 @@ default-run = "galley-core"
 # The `_lib` suffix may seem redundant but it is necessary to make the
 # lib name unique so it doesn't conflict with the bin name. Only an issue
 # on Windows — see https://github.com/rust-lang/cargo/issues/8519.
-name = "galley_core_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+name = "yole_core_lib"
+crate-type = ["rlib"]
 
 [build-dependencies]
+embed-resource = "3.0"
 tauri-build = { version = "2", features = [] }
 
 # Test-only deps.
@@ -55,10 +56,10 @@ tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Galley Core API (B1 M2+): async trait methods.
+# Yole Core API (B1 M2+): async trait methods.
 async-trait = "0.1"
 
-# SQLite reads for `SqliteGalley` (B1 M3+). Version pinned to the same
+# SQLite reads for `SqliteYole` (B1 M3+). Version pinned to the same
 # sqlx that `tauri-plugin-sql 2.4.0` already pulls in transitively, so
 # both stacks share one `libsqlite3-sys 0.30.x` binding and one set of
 # SQLite-compiled symbols. Runtime tied to tokio (Tauri's executor).
@@ -66,7 +67,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 
 # Platform-specific config directory lookup for CLI processes that
 # don't have a Tauri context. `tauri-plugin-sql` resolves
-# `sqlite:workbench.db` against Tauri's app config dir, so the CLI must
+# `sqlite:yole.db` against Tauri's app config dir, so the CLI must
 # mirror that resolver exactly; see `app_paths.rs`.
 directories = "5"
 
@@ -88,12 +89,12 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "pr
 
 # Experiment-only deps that aren't part of the production runner_manager
 # code path. Currently just `anyhow` (prototype uses anyhow::Result;
-# production code uses hand-rolled error enums per GalleyError convention).
+# production code uses hand-rolled error enums per YoleError convention).
 anyhow = { version = "1", optional = true }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
-# Unsigned beta managed model API keys live in Galley's SQLite DB as
+# Unsigned beta managed model API keys live in Yole's SQLite DB as
 # encrypted local payloads. Signed builds can add a system credential-store
 # backend later without changing the public Provider/Model API.
 ring = "0.17"
@@ -111,7 +112,7 @@ base64 = "0.22"
 experiments = ["dep:anyhow"]
 
 # Windows-only: restore drop shadow when we run with native decorations off
-# (Galley's TopBar acts as custom chrome on Win; see lib.rs setup hook).
+# (Yole's TopBar acts as custom chrome on Win; see lib.rs setup hook).
 # Mac builds never fetch or compile this crate.
 [target.'cfg(target_os = "windows")'.dependencies]
 window-shadows-v2 = "0.1"

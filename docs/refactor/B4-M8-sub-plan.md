@@ -11,7 +11,7 @@
 
 playbook M8 写 "schema 010-014 + backup + dogfood"，今天 re-scope 后**真活儿只剩 backup**。理由：B2 M5 (mig 006/007) 已经把 supervisor / origin / created_via 字段全部 ship 进 schema，**v0.2 没新增 schema migration**。M8 实际工作 =
 
-1. **写入一次性 backup mechanism**（B4-I6 兑现）：startup-time 检测 on-disk migration version < code-side max → 备份 `~/Library/Application Support/app.galley/` 整目录到 `app.galley.backup.<timestamp>/` → 再让 tauri-plugin-sql 跑迁移
+1. **写入一次性 backup mechanism**（B4-I6 兑现）：startup-time 检测 on-disk migration version < code-side max → 备份 `~/Library/Application Support/app.yole/` 整目录到 `app.yole.backup.<timestamp>/` → 再让 tauri-plugin-sql 跑迁移
 2. **失败 = 拒启动**：backup 失败弹 dialog 指向数据目录 + 拒绝继续，**不**降级运行（dogfood 数据 6+ 月不允许丢）
 3. **dogfood T8.7 + rollback strategy T8.8**：JC 实测 + 写 release notes 备份指引
 
@@ -40,7 +40,7 @@ playbook 列的 "migration 010-014" 4 个 sub-task **全删**（schema 没要改
 
 ### 1.2 backup 触发条件再思考
 
-B4-I6 字面说 "Schema migration 010-014 在 Galley 内 hard-coded 备份步骤"。**字面读 = 仅当 migration 真要跑的时候备份**。
+B4-I6 字面说 "Schema migration 010-014 在 Yole 内 hard-coded 备份步骤"。**字面读 = 仅当 migration 真要跑的时候备份**。
 
 3 个候选 trigger policy（trade-off）：
 
@@ -60,15 +60,15 @@ B4-I6 字面说 "Schema migration 010-014 在 Galley 内 hard-coded 备份步骤
 
 ### 1.3 Backup 路径策略
 
-数据源：`{ProjectDirs::from("", "", "app.galley")}.data_dir()`
-- macOS: `~/Library/Application Support/app.galley/`
-- Linux: `~/.local/share/app.galley/`
-- Windows: `%APPDATA%\app.galley\data\`
+数据源：`{ProjectDirs::from("", "", "app.yole")}.data_dir()`
+- macOS: `~/Library/Application Support/app.yole/`
+- Linux: `~/.local/share/app.yole/`
+- Windows: `%APPDATA%\app.yole\data\`
 
-备份目标：**同 parent dir** 下加 sibling `app.galley.backup.<ISO-8601-UTC-timestamp>/`
-- 例：`~/Library/Application Support/app.galley.backup.20260520T140530Z/`
+备份目标：**同 parent dir** 下加 sibling `app.yole.backup.<ISO-8601-UTC-timestamp>/`
+- 例：`~/Library/Application Support/app.yole.backup.20260520T140530Z/`
 
-为什么不放 `Documents/Galley Backups/` 或别处？
+为什么不放 `Documents/Yole Backups/` 或别处？
 - ✅ 跟数据同 volume → `fs::rename` 可能可用（虽然实际用 `fs::copy_dir` 因为不能假定 inode 兼容）
 - ✅ 用户找数据时 sibling 立即可见
 - ✅ 不进 Documents 不污染用户文档区
@@ -90,19 +90,19 @@ B4-I6 说 "失败 → 拒启动 + 弹 Finder 到备份目录"。
 统一处理：**任何 backup 错误 = abort startup**。tauri-plugin-sql migration 不允许跑（数据库不被打开）。Tauri dialog 弹给用户：
 
 ```
-Galley 无法启动：备份失败。
+Yole 无法启动：备份失败。
 
 错误：{error message}
 
 你的原始数据安全在：
-~/Library/Application Support/app.galley/
+~/Library/Application Support/app.yole/
 
 请检查磁盘空间后重试，或联系 wangjc683@gmail.com。
 ```
 
 dialog 关闭后 process 退出（exit code 非 0，但 GUI 没有 exit channel；用 `std::process::exit(2)`）。
 
-部分备份目录留还是删？**保留**。理由：用户重启重试时不删除避免无限循环；下次成功时新 timestamp 不冲突。release notes 说明用户可手动清理 `app.galley.backup.*` 目录。
+部分备份目录留还是删？**保留**。理由：用户重启重试时不删除避免无限循环；下次成功时新 timestamp 不冲突。release notes 说明用户可手动清理 `app.yole.backup.*` 目录。
 
 ### 1.5 Tauri setup hook 顺序
 
@@ -218,9 +218,9 @@ dialog plugin 已在 `core/Cargo.toml:54`。用 `MessageDialogBuilder`：
 ```rust
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 app.dialog()
-    .message(format!("Galley 无法启动：备份失败。\n\n{}\n\n你的数据：{}", err, dir))
+    .message(format!("Yole 无法启动：备份失败。\n\n{}\n\n你的数据：{}", err, dir))
     .kind(MessageDialogKind::Error)
-    .title("Galley")
+    .title("Yole")
     .blocking_show();
 ```
 
@@ -269,7 +269,7 @@ pub enum BackupError {
 pub enum BackupOutcome {
     FreshInstall,                              // No data dir / no DB file → nothing to back up.
     UpToDate { current: i64 },                 // on-disk == latest, no migration pending.
-    NotApplicable { reason: String },           // e.g. on-disk > latest (user ran newer Galley).
+    NotApplicable { reason: String },           // e.g. on-disk > latest (user ran newer Yole).
     Backed { from: i64, to: i64, backup_path: PathBuf },
 }
 
@@ -322,7 +322,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> io::Result<()> {
 
 ### T8.3 · `ensure_backup_before_migrate` 主逻辑 + 集成测试
 
-测试用 `tempdir` + `GALLEY_DB_PATH` env var override:
+测试用 `tempdir` + `YOLE_DB_PATH` env var override:
 
 - `test_backup_fresh_install_data_dir_missing` · 整 dir 不存在 → FreshInstall
 - `test_backup_fresh_install_db_missing` · dir 在 db 不在 → FreshInstall
@@ -332,7 +332,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> io::Result<()> {
 - `test_backup_no_migrations_table` · DB 文件存在但无 `_sqlx_migrations` → 当 0 → Backed
 - `test_backup_disk_full_fails`（hard，用文件系统层 mock 难，**defer**，N1 标注）
 
-env override：测试用 `std::env::set_var("GALLEY_DB_PATH", ...)` + 自定义 data dir 函数（不能直接调 `db_path()` 因为它把整个 `~/Library/...` 写死；新增 helper `resolve_data_dir() -> Option<PathBuf>` 可被测试 mock）。
+env override：测试用 `std::env::set_var("YOLE_DB_PATH", ...)` + 自定义 data dir 函数（不能直接调 `db_path()` 因为它把整个 `~/Library/...` 写死；新增 helper `resolve_data_dir() -> Option<PathBuf>` 可被测试 mock）。
 
 > **G1**: 测试不能依赖真 `~/Library/Application Support/`。`migration_backup` 模块必须接受**注入的** data_dir 路径以做隔离测试。pub fn signature 调整为：
 >
@@ -357,7 +357,7 @@ env override：测试用 `std::env::set_var("GALLEY_DB_PATH", ...)` + 自定义 
         Err(e) => {
             use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
             let msg = format!(
-                "Galley 无法启动：备份失败。\n\n{e}\n\n你的数据安全在：\n{}\n\n请检查磁盘空间后重试。",
+                "Yole 无法启动：备份失败。\n\n{e}\n\n你的数据安全在：\n{}\n\n请检查磁盘空间后重试。",
                 migration_backup::resolve_data_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_else(|| "<unable to resolve>".into()),
@@ -365,7 +365,7 @@ env override：测试用 `std::env::set_var("GALLEY_DB_PATH", ...)` + 自定义 
             let _ = app.dialog()
                 .message(&msg)
                 .kind(MessageDialogKind::Error)
-                .title("Galley")
+                .title("Yole")
                 .blocking_show();
             std::process::exit(2);
         }
@@ -416,7 +416,7 @@ setup hook 闭包 capture `latest_version`。优雅，no const sync 问题。
 >
 > 1. JC 自己机器跑 `pnpm tauri dev`
 > 2. 临时手动 patch `LATEST_CODE_MIGRATION_VERSION` → 暂时 stub `_sqlx_migrations` 表把 max version 改到 5（模拟从更早版本升级）
-> 3. 启动 Galley → 看到 backup log → 验证 `app.galley.backup.<ts>/` 存在 + 内含 workbench.db + Python bundle 等 sibling 文件
+> 3. 启动 Yole → 看到 backup log → 验证 `app.yole.backup.<ts>/` 存在 + 内含 yole.db + Python bundle 等 sibling 文件
 > 4. revert stub，正常启动 → 看 UpToDate log
 >
 > 后续 v0.2.x 或 v0.6 加新 migration 时自然 dogfood。**T8.7 推到 v0.2 ship 后**作为 v0.6 prereq；M8 本身验收按 unit / integration test 走。
@@ -426,19 +426,19 @@ setup hook 闭包 capture `latest_version`。优雅，no const sync 问题。
 `docs/release-workflow.md` 新增 "Backup & Rollback" 段：
 
 ```
-v0.2 之后每次升级如果触发 migration（罕见），Galley 自动备份你的数据目录：
+v0.2 之后每次升级如果触发 migration（罕见），Yole 自动备份你的数据目录：
 
-macOS: ~/Library/Application Support/app.galley.backup.<timestamp>/
-Linux: ~/.local/share/app.galley.backup.<timestamp>/
-Windows: %APPDATA%\app.galley.backup.<timestamp>\
+macOS: ~/Library/Application Support/app.yole.backup.<timestamp>/
+Linux: ~/.local/share/app.yole.backup.<timestamp>/
+Windows: %APPDATA%\app.yole.backup.<timestamp>\
 
 如果新版本出问题，手动 rollback：
-1. 退出 Galley
-2. 重命名当前 app.galley → app.galley.bad
-3. 把 backup 目录改回 app.galley
+1. 退出 Yole
+2. 重命名当前 app.yole → app.yole.bad
+3. 把 backup 目录改回 app.yole
 4. 装回旧版 .dmg / .exe（GitHub Releases 历史 tag）
 
-⚠️ Galley 不提供官方 downgrade path。请只用 backup 做应急回退；正确做法是在 GitHub 报 bug。
+⚠️ Yole 不提供官方 downgrade path。请只用 backup 做应急回退；正确做法是在 GitHub 报 bug。
 ```
 
 文档 only，无代码。
@@ -497,14 +497,14 @@ grep -rn "migration_backup" core/src/ | grep -v 'migration_backup\.rs'
 ```
 
 ### V3 · backup smoke（手动）
-1. `cp -r ~/Library/Application\ Support/app.galley ~/tmp/galley-pre-m8/`（备份原数据）
+1. `cp -r ~/Library/Application\ Support/app.yole ~/tmp/yole-pre-m8/`（备份原数据）
 2. 手动改 SQLite `UPDATE _sqlx_migrations SET version=5 WHERE version=7`（模拟旧版本）
 3. 启动 dev mode
 4. 验证：
    - `eprintln` 输出 `[backup] Backed { from: 5, to: 7, backup_path: ... }`
-   - sibling `app.galley.backup.<ts>/` 真存在
-   - 内含 workbench.db + python-bundle/（如有）
-5. 启动后 Galley GUI 正常打开 → 数据没动
+   - sibling `app.yole.backup.<ts>/` 真存在
+   - 内含 yole.db + python-bundle/（如有）
+5. 启动后 Yole GUI 正常打开 → 数据没动
 6. revert SQLite 改动 + 删 backup dir
 
 ### V4 · backup failure smoke（手动）
@@ -515,9 +515,9 @@ grep -rn "migration_backup" core/src/ | grep -v 'migration_backup\.rs'
 5. `chmod 755` 恢复 + revert SQLite
 
 ### V5 · 不影响 fresh install
-1. 新 macOS user 第一次跑 Galley → 数据目录从无到有
+1. 新 macOS user 第一次跑 Yole → 数据目录从无到有
 2. 验证：`[backup] FreshInstall` log
-3. 验证：Galley 正常启动，无 dialog
+3. 验证：Yole 正常启动，无 dialog
 4. 验证：mig 1-7 跑完，无 backup 目录创建
 
 ---

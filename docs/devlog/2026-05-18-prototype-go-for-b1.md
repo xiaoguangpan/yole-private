@@ -12,7 +12,7 @@
 
 ## Context
 
-Vision pivot devlog 2026-05-15 拍板走路径 B（Galley Core 权威迁 Rust）。spec 当天落地，作为 B1 启动前的 go/no-go gate 提出了一个 2-3 天的 throwaway prototype，验证 Rust 持有 Python bridge subprocess 等价于现在 TS 持有的 latency / throughput / reliability。
+Vision pivot devlog 2026-05-15 拍板走路径 B（Yole Core 权威迁 Rust）。spec 当天落地，作为 B1 启动前的 go/no-go gate 提出了一个 2-3 天的 throwaway prototype，验证 Rust 持有 Python bridge subprocess 等价于现在 TS 持有的 latency / throughput / reliability。
 
 我跟 JC 2026-05-18 在同一个 session 把 prototype 从「未启动」一气推完。本来 spec 估 2-3 天工作量，实际是单一连续 session 跑完所有 17 个 checklist 验证项。
 

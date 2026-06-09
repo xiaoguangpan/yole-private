@@ -15,13 +15,13 @@ JC 选 "M8 data migration (sub-plan + 实施)" 接 N18 handoff 的 (b) 路径。
 
 ## Decisions
 
-1. **Trigger policy = Strategy A (migration-pending only)** —— sub-plan §1.2 列了三个候选 (A/B/C)。选 A 字面 honor B4-I6 "Schema migration ... 在 Galley 内 hard-coded 备份步骤"。v0.5 本身用户从 v0.1.1-alpha.X 升级**不触发** backup（on-disk version == code-side version == 7），是正确反映 "v0.5 没改 schema" 的事实。v0.5.x / v0.6 加 mig 008+ 时自然 forward-looking 触发。
-2. **Backup 路径 = sibling `app.galley.backup.<utc-timestamp>/`** —— 同 parent dir，timestamp 用 ISO-8601 compact 格式 `20260520T140530Z`（Windows 文件名安全无 `:`）。用户 Finder 找数据时立即可见。
+1. **Trigger policy = Strategy A (migration-pending only)** —— sub-plan §1.2 列了三个候选 (A/B/C)。选 A 字面 honor B4-I6 "Schema migration ... 在 Yole 内 hard-coded 备份步骤"。v0.5 本身用户从 v0.1.1-alpha.X 升级**不触发** backup（on-disk version == code-side version == 7），是正确反映 "v0.5 没改 schema" 的事实。v0.5.x / v0.6 加 mig 008+ 时自然 forward-looking 触发。
+2. **Backup 路径 = sibling `app.yole.backup.<utc-timestamp>/`** —— 同 parent dir，timestamp 用 ISO-8601 compact 格式 `20260520T140530Z`（Windows 文件名安全无 `:`）。用户 Finder 找数据时立即可见。
 3. **失败 = 拒启动 + Tauri error dialog + `std::process::exit(2)`** —— B4-I6 字面读。dialog 文案中文，指出数据安全位置 + 检查磁盘/权限建议。partial backup 目录**不**清理（用户重启重试时不删避免无限循环；下次成功时新 timestamp 不冲突）。
 4. **`LATEST_CODE_MIGRATION_VERSION` 从 migrations vec 推导**（sub-plan §1.6 + T8.6 优雅方案）—— `lib.rs:run()` 顶部 `migrations.iter().map(|m| m.version).max()` 之后 `move` 进 setup closure。**单一编辑站点** = 加 migration 不会忘 bump backup const。
 5. **Setup hook 顺序：backup → socket listener → discovery file** —— sub-plan §1.5 选位置 A（.setup() hook 开头）。`tauri-plugin-sql` 注册时只暂存 migration vec；真正连接 DB 是 JS-side `Database.load()` 在 webview ready 之后，那时 setup() 早已返回。所以 backup 同步跑在 setup() 内**保证先于 plugin 打开 DB**。
 6. **SQLite 探测用 sqlx read-only + `create_if_missing(false)`** —— 不留写入痕迹也不会因为路径错误意外创建空 DB 掩盖配置错误。`SELECT MAX(version) FROM _sqlx_migrations WHERE success = 1`，缺表当 0。
-7. **`copy_dir_all` 自己写 14 行递归 + 无新 deps** —— `std::fs` 没有 `copy_dir_all`，备选 `fs_extra` crate 但只为这一个调用引入依赖不值。symlinks **静默跳过**（Galley 数据目录正常不应有 symlinks；用户手动放的也不该跟随）。
+7. **`copy_dir_all` 自己写 14 行递归 + 无新 deps** —— `std::fs` 没有 `copy_dir_all`，备选 `fs_extra` crate 但只为这一个调用引入依赖不值。symlinks **静默跳过**（Yole 数据目录正常不应有 symlinks；用户手动放的也不该跟随）。
 8. **`chrono` 加 top-level dep，零 net 新 crate** —— `chrono 0.4.44` 已经通过 `sqlx` transitive 在 lock file。`default-features = false` + 只开 `clock` feature，无 serde/timezone DB 等额外编译开销。手算 Howard Hinnant date 算法 trade-off 不划算（chrono 既然已在 dep tree 就用它）。
 9. **Test-injectable signature**: `ensure_backup_before_migrate_in(data_dir: &Path, latest_version: i64)` 是测试入口，`ensure_backup_before_migrate(latest_version: i64)` 是生产入口（前者通过后者调用，data dir 用 `resolve_data_dir()` 查找）。所有 11 个 unit test 用 `tempfile::TempDir` 隔离真实 `~/Library/...`。
 10. **T8.7 dogfood real run 留 v0.6**（B4-I7 风险 R7 已知）—— v0.5 没 schema delta 触发不到 backup 路径，dogfood 无意义。等 v0.5.x / v0.6 第一次加 mig 008+ 时真跑。M8 acceptance 按 unit / integration test 通过 + manual smoke (V3/V4) ship。
@@ -32,7 +32,7 @@ JC 选 "M8 data migration (sub-plan + 实施)" 接 N18 handoff 的 (b) 路径。
 - **Strategy C (once-per-major-version + flag 文件)** —— 折衷但 JC 数据已经在 v0.1.1（== code-side mig 7）触发不了。多一层状态没收益。sub-plan §1.2 拒。
 - **v0.5 首次启动 force one snapshot（O1 备选）** —— sub-plan §1.2 列。倾向不加：(1) 无 schema 风险 (2) force backup 反而暗示 v0.5 出问题概率高 (3) Time Machine 兜底已经够 (4) release notes 一句 "升级前 finder 复制一份" 让用户自决。本 session 用 default = 不加。
 - **Backup retention cap N=3 代轮转（O2 备选）** —— sub-plan §1.3。倾向不限：(1) backup 触发是 rare event 不太可能积累 (2) 用户更怕"我之前 backup 突然没了"。固定永不自动删 backup，盘满交给用户决定。
-- **`thiserror` derive 错误类型** —— project 现有 [GalleyError](../../core/src/error.rs) 用 hand-rolled `impl Display`，保持一致。`thiserror` 没在 deps，引入只为一个新 enum 不值。
+- **`thiserror` derive 错误类型** —— project 现有 [YoleError](../../core/src/error.rs) 用 hand-rolled `impl Display`，保持一致。`thiserror` 没在 deps，引入只为一个新 enum 不值。
 - **`fs_extra::dir::copy` 替代手写 `copy_dir_all`** —— sub-plan §1.8 拒，避免单调用新依赖。14 行递归足够透明。
 - **常量 `LATEST_CODE_MIGRATION_VERSION` 硬编码 + assert_eq! 守护** —— sub-plan §1.6 第一稿提议但 §T8.6 升级到 "从 vec 推导"。assert 是运行时 check，从 vec 推导是编译时 + 单编辑站点 = 更优雅。
 - **Migration backup 写在 Rust 端 main() 之前** —— sub-plan §1.5 候选 C。比 setup hook 复杂（access app handle 不便），优势仅在 "更早执行"，但 setup hook 已经在 webview/plugin DB 打开之前，足够早。
@@ -42,11 +42,11 @@ JC 选 "M8 data migration (sub-plan + 实施)" 接 N18 handoff 的 (b) 路径。
 
 ## Open questions
 
-- **Q1**: backup 操作过程 SIGINT (用户 Cmd+C / 杀进程) 留 partial backup 目录怎么办？目前 = 留，下次启动新 timestamp 不冲突。**Decision**: 不主动清，release notes 提醒用户 `app.galley.backup.*` 目录可手动清理。
-- **Q2**: 用户从 v0.1 没装过 Galley 重装时数据目录刚好不存在但 sibling 有上次 backup 目录怎么办？`FreshInstall` 分支生效正常，下次 backup 不会冲突（新 timestamp）。已 covered。
+- **Q1**: backup 操作过程 SIGINT (用户 Cmd+C / 杀进程) 留 partial backup 目录怎么办？目前 = 留，下次启动新 timestamp 不冲突。**Decision**: 不主动清，release notes 提醒用户 `app.yole.backup.*` 目录可手动清理。
+- **Q2**: 用户从 v0.1 没装过 Yole 重装时数据目录刚好不存在但 sibling 有上次 backup 目录怎么办？`FreshInstall` 分支生效正常，下次 backup 不会冲突（新 timestamp）。已 covered。
 - **Q3**: macOS APFS clone 优化能不能用？`std::fs::copy` 不调 `clonefile` syscall。理论上 GB 级数据用 clone 可瞬时复制。**Defer 到 v0.6+**，目前几秒 OK。
 - **Q4**: Windows backup 是否要 `%APPDATA%\Roaming\` vs `%APPDATA%\Local\` 区分？`directories` crate 用 `data_dir()` = Roaming 默认。已经一致。
-- **Q5**: backup 目录在 Time Machine 排除规则下表现？macOS Time Machine 默认备份 `~/Library/Application Support/`，所以 Galley 自己的 backup 还会被 Time Machine 备一次（双备份）。Release notes 提醒高级用户可手动 exclude `app.galley.backup.*`。
+- **Q5**: backup 目录在 Time Machine 排除规则下表现？macOS Time Machine 默认备份 `~/Library/Application Support/`，所以 Yole 自己的 backup 还会被 Time Machine 备一次（双备份）。Release notes 提醒高级用户可手动 exclude `app.yole.backup.*`。
 
 ## Next
 
@@ -78,7 +78,7 @@ JC 选 "M8 data migration (sub-plan + 实施)" 接 N18 handoff 的 (b) 路径。
 ## Verification
 
 - `cargo test --workspace` — **180/180** (was 169; +11 from migration_backup::tests)
-- `cargo check --workspace` — clean (galley-core + galley-cli)
+- `cargo check --workspace` — clean (yole-core + yole-cli)
 - `pnpm typecheck` — clean
 - `pnpm lint` — clean (0 warnings)
 - ~~`cargo clippy --workspace -- -D warnings`~~ — 3 pre-existing lints unrelated to M8 (origin.rs doc list × 2 + socket_listener.rs unnecessary_cast)；clippy 不在 CI gate（check.yml 只跑 cargo check + cargo test），不阻 M8。新增代码 `cargo clippy` 通过。

@@ -1,8 +1,8 @@
-"""Galley-managed IM Supervisor launcher.
+"""Yole-managed IM Supervisor launcher.
 
 Phase 1 supports WeChat by wrapping GenericAgent's official iLink frontend,
 while keeping model config, prompt, state paths, and process lifetime owned by
-Galley.
+Yole.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from typing import IO, Any
 
 from runner import managed_runtime
 
-IM_SUPERVISOR_PROMPT_ENV = "GALLEY_IM_SUPERVISOR_PROMPT_TEXT"
+IM_SUPERVISOR_PROMPT_ENV = "YOLE_IM_SUPERVISOR_PROMPT_TEXT"
 
 
 def _capture_real_stdout() -> IO[str]:
@@ -68,9 +68,9 @@ def _run_wechat(args: argparse.Namespace, out: IO[str]) -> int:
             old_qr.unlink()
         except OSError:
             pass
-    os.environ["GALLEY_WECHAT_TOKEN_FILE"] = str(token_file)
-    os.environ["GALLEY_WECHAT_TEMP_DIR"] = str(temp_dir)
-    os.environ["GALLEY_WECHAT_QR_FILE"] = str(qr_file)
+    os.environ["YOLE_WECHAT_TOKEN_FILE"] = str(token_file)
+    os.environ["YOLE_WECHAT_TEMP_DIR"] = str(temp_dir)
+    os.environ["YOLE_WECHAT_QR_FILE"] = str(qr_file)
 
     _install_paths(args.ga_path)
     managed_runtime.install_managed_mykey_loader()
@@ -169,7 +169,7 @@ def _run_wechat(args: argparse.Namespace, out: IO[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Galley-managed IM Supervisor.")
+    parser = argparse.ArgumentParser(description="Run a Yole-managed IM Supervisor.")
     parser.add_argument("--platform", choices=["wechat"], required=True)
     parser.add_argument("--ga-path", required=True)
     parser.add_argument("--state-dir", required=True)

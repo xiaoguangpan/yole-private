@@ -16,8 +16,8 @@ use crate::api::{
 };
 use crate::codex_oauth;
 use crate::credential_store;
-use crate::db::SqliteGalley;
-use crate::error::{GalleyError, Result};
+use crate::db::SqliteYole;
+use crate::error::{YoleError, Result};
 
 const PROBE_TIMEOUT_SECS: u64 = 20;
 
@@ -39,20 +39,20 @@ pub async fn list_models(input: ManagedModelProbeInput) -> Result<ManagedModelLi
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(PROBE_TIMEOUT_SECS))
         .build()
-        .map_err(|e| GalleyError::Internal {
+        .map_err(|e| YoleError::Internal {
             message: format!("building HTTP client: {e}"),
         })?;
     let mut req = client.get(&endpoint);
     req = apply_auth_headers(req, input.protocol, &secret);
-    let resp = req.send().await.map_err(|e| GalleyError::RunnerError {
+    let resp = req.send().await.map_err(|e| YoleError::RunnerError {
         message: format!("model list request failed: {e}"),
     })?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
         message: format!("reading model list response failed: {e}"),
     })?;
     if !status.is_success() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: format!(
                 "无法获取模型列表，可手动添加（HTTP {}: {}）",
                 status.as_u16(),
@@ -60,7 +60,7 @@ pub async fn list_models(input: ManagedModelProbeInput) -> Result<ManagedModelLi
             ),
         });
     }
-    let json: Value = serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+    let json: Value = serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
         message: format!("model list response is not JSON: {e}"),
     })?;
     let mut models = extract_model_ids(&json);
@@ -110,21 +110,21 @@ async fn test_model(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(PROBE_TIMEOUT_SECS))
         .build()
-        .map_err(|e| GalleyError::Internal {
+        .map_err(|e| YoleError::Internal {
             message: format!("building HTTP client: {e}"),
         })?;
     let payload = probe_payload(input.protocol, &model);
     let mut req = client.post(&endpoint).json(&payload);
     req = apply_auth_headers(req, input.protocol, &secret);
-    let resp = req.send().await.map_err(|e| GalleyError::RunnerError {
+    let resp = req.send().await.map_err(|e| YoleError::RunnerError {
         message: format!("model test request failed: {e}"),
     })?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
         message: format!("reading model test response failed: {e}"),
     })?;
     if !status.is_success() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: format!(
                 "模型测试失败（HTTP {}: {}）",
                 status.as_u16(),
@@ -157,13 +157,13 @@ async fn resolve_secret(input: &ManagedModelProbeInput) -> Result<String> {
         .filter(|s| !s.is_empty())
         .is_some();
     if !has_id {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "API key is required before testing this provider".into(),
         });
     }
-    let galley = SqliteGalley::open().await?;
+    let yole = SqliteYole::open().await?;
     let api_key_ref = resolve_api_key_ref(input).await?;
-    credential_store::get_secret(&galley, &api_key_ref).await
+    credential_store::get_secret(&yole, &api_key_ref).await
 }
 
 async fn resolve_api_key_ref(input: &ManagedModelProbeInput) -> Result<String> {
@@ -173,17 +173,17 @@ async fn resolve_api_key_ref(input: &ManagedModelProbeInput) -> Result<String> {
         .or(input.id.as_deref())
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| GalleyError::InvalidArgs {
+        .ok_or_else(|| YoleError::InvalidArgs {
             message: "managed provider id is required before testing this provider".into(),
         })?;
-    let galley = SqliteGalley::open().await?;
-    galley
+    let yole = SqliteYole::open().await?;
+    yole
         .list_managed_model_providers()
         .await?
         .into_iter()
         .find(|provider| provider.id == id)
         .map(|provider| provider.api_key_ref)
-        .ok_or_else(|| GalleyError::InvalidArgs {
+        .ok_or_else(|| YoleError::InvalidArgs {
             message: format!("managed provider {id} not found"),
         })
 }
@@ -231,7 +231,7 @@ fn inference_endpoint(api_base: &str, protocol: ManagedModelProtocol) -> Result<
 fn provider_endpoint(api_base: &str, path: &str) -> Result<String> {
     let trimmed = api_base.trim().trim_end_matches('/');
     if trimmed.is_empty() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "Base URL is required".into(),
         });
     }

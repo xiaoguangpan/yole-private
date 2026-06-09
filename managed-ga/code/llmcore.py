@@ -405,9 +405,9 @@ def _codex_account_id_from_jwt(access_token):
     except Exception:
         return None
 
-def _galley_codex_access_token(sess):
-    ipc = getattr(sess, 'galley_credential_ipc', None)
-    api_key_ref = getattr(sess, 'galley_api_key_ref', '')
+def _yole_codex_access_token(sess):
+    ipc = getattr(sess, 'yole_credential_ipc', None)
+    api_key_ref = getattr(sess, 'yole_api_key_ref', '')
     if not isinstance(ipc, dict) or not api_key_ref:
         return sess.api_key, None
     req = json.dumps({"token": ipc.get("token", ""), "apiKeyRef": api_key_ref}, ensure_ascii=False).encode() + b"\n"
@@ -433,7 +433,7 @@ def _galley_codex_access_token(sess):
         if not token: raise RuntimeError("credential IPC response missing accessToken")
         return token, data.get("accountId")
     except Exception as e:
-        raise RuntimeError(f"Galley Codex credential refresh failed: {e}") from e
+        raise RuntimeError(f"Yole Codex credential refresh failed: {e}") from e
 
 def _openai_stream(sess, messages):
     model, api_mode = sess.model, sess.api_mode
@@ -444,10 +444,10 @@ def _openai_stream(sess, messages):
     api_key = sess.api_key
     account_id = None
     if getattr(sess, 'codex_backend', False):
-        api_key, account_id = _galley_codex_access_token(sess)
+        api_key, account_id = _yole_codex_access_token(sess)
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
     if getattr(sess, 'codex_backend', False):
-        headers.update({"User-Agent": "codex_cli_rs/0.0.0 (Galley)", "originator": "codex_cli_rs"})
+        headers.update({"User-Agent": "codex_cli_rs/0.0.0 (Yole)", "originator": "codex_cli_rs"})
         account_id = account_id or _codex_account_id_from_jwt(api_key)
         if account_id: headers["ChatGPT-Account-ID"] = account_id
     if api_mode == "responses":
@@ -571,9 +571,9 @@ class BaseSession:
         self.api_base = cfg['apibase'].rstrip('/')
         self.model = cfg.get('model', '')
         self.codex_backend = bool(cfg.get('codex_backend'))
-        self.galley_api_key_ref = cfg.get('galley_api_key_ref') or ''
-        ipc = cfg.get('galley_credential_ipc')
-        self.galley_credential_ipc = ipc if isinstance(ipc, dict) else None
+        self.yole_api_key_ref = cfg.get('yole_api_key_ref') or ''
+        ipc = cfg.get('yole_credential_ipc')
+        self.yole_credential_ipc = ipc if isinstance(ipc, dict) else None
         default_context_win = 30000
         if 'deepseek' in self.model.lower():
             default_context_win = 70000; self.cut_msg_interval = 25; self.trim_keep_rate = 0.3
@@ -964,7 +964,7 @@ def _ensure_text_block(blocks):
 
 def _write_llm_log(label, content, log_path=None):
     if not log_path:
-        state_root = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or os.path.dirname(os.path.abspath(__file__)))
+        state_root = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or os.path.dirname(os.path.abspath(__file__)))
         log_path = os.path.join(state_root, f'temp/model_responses/model_responses_{os.getpid()}.txt')
     os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

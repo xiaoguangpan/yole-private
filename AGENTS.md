@@ -1,19 +1,16 @@
-# Galley
+# Yole
 
 > This is the short startup constitution for AI coding agents working in this
 > repository. Keep it small. Put task-specific detail in `docs/` and link it
 > from here.
 
-> Galley started as a workbench for GenericAgent. The first two letters of our
-> name are a quiet bow to where we came from.
-
 ## Product Shape
 
-Galley is a local agent team orchestrator. Human and agent are both first-class
+Yole is a local agent team orchestrator. Human and agent are both first-class
 operators:
 
-- Galley GUI is for the human operator at the desktop.
-- Galley CLI is for trusted Agent / Supervisor automation on the same machine.
+- Yole GUI is for the human operator at the desktop.
+- Yole CLI is for trusted Agent / Supervisor automation on the same machine.
 
 Current target:
 
@@ -25,11 +22,11 @@ change every release and are intentionally not pinned here.
 
 ## Names And Terms
 
-- Use `Galley` in prose, docs, comments, and commit messages.
-- Use `Galley` for the product name in UI display too; do not introduce an
+- Use `Yole` in prose, docs, comments, and commit messages.
+- Use `Yole` for the product name in UI display too; do not introduce an
   all-caps product wordmark.
 - Use `GenericAgent` / `GA` for the upstream engine, never as a synonym for
-  Galley.
+  Yole.
 - `macOS` means the operating system; `Mac` means the hardware / user device.
 
 ## Non-Negotiable Rules
@@ -38,17 +35,17 @@ Violating any rule below breaks the core project contract.
 
 ### 1. GenericAgent Runtime Boundaries
 
-Galley has two GenericAgent runtime modes:
+Yole has two GenericAgent runtime modes:
 
-- **Attach / external GA**: user-owned GenericAgent. Galley wraps it.
-- **Managed / bundled GA**: Galley-owned runtime. Galley ships and maintains it.
+- **Attach / external GA**: user-owned GenericAgent. Yole wraps it.
+- **Managed / bundled GA**: Yole-owned runtime. Yole ships and maintains it.
 
-For attach / external GA, Galley must not modify GenericAgent state:
+For attach / external GA, Yole must not modify GenericAgent state:
 
 - Do not edit files under the user's GenericAgent checkout.
 - Do not write external GA `memory/`, SOP, skills, or other user state.
 - Do not overwrite external GA venv, PATH, or environment variables.
-- Do not inject Galley Persona or managed-runtime patches.
+- Do not inject Yole Persona or managed-runtime patches.
 - Do not monkey-patch `agent_runner_loop` or GA tool implementations.
 
 Allowed attach-mode integration points:
@@ -63,18 +60,18 @@ Reading GA internals is allowed only when read-only and documented as a coupling
 point. Anything that reads and then writes GA files counts as modification and
 is forbidden.
 
-Supervisor SOP is copy-first: Settings -> Agent provides "Copy SOP". Galley does
+Supervisor SOP is copy-first: Settings -> Agent provides "Copy SOP". Yole does
 not install SOP content into GA memory. Read
-[Supervisor SOP](./docs/integrations/galley-supervisor-sop.md).
+[Supervisor SOP](./docs/integrations/yole-supervisor-sop.md).
 
-For managed / bundled GA, Galley may patch and configure only its own managed
+For managed / bundled GA, Yole may patch and configure only its own managed
 runtime, under the managed-runtime rules in
 [managed GA runtime](./docs/managed-ga-runtime.md):
 
 - Keep patches minimal, isolated, documented, and replayable on top of upstream.
 - Prefer explicit extension seams over broad edits.
 - Do not fork GenericAgent into a divergent product.
-- If upstream GA provides the same capability, remove the Galley patch.
+- If upstream GA provides the same capability, remove the Yole patch.
 - Code is replaceable; user state is not. Runtime upgrades may replace managed
   GA code, but must not overwrite managed GA memory, SOP, skills, or other
   user state.
@@ -83,7 +80,7 @@ runtime, under the managed-runtime rules in
 
 ### 2. Localhost Only
 
-Galley Core listens only on AF_UNIX socket / Windows named pipe. It does not
+Yole Core listens only on AF_UNIX socket / Windows named pipe. It does not
 open TCP, expose HTTP, or hold remote auth tokens.
 
 Remote use cases belong to the external Supervisor transport layer, such as an
@@ -94,7 +91,7 @@ change this constitution.
 
 ### 3. CLI Surface Is Public Contract
 
-Galley CLI JSON is the stable contract for agents. Read
+Yole CLI JSON is the stable contract for agents. Read
 [agent-api](./docs/agent-api.md) before changing it.
 
 - `schemaVersion: 1` is frozen for `v0.2.x`.
@@ -107,17 +104,17 @@ Galley CLI JSON is the stable contract for agents. Read
 Changing the Agent API is riskier than changing GUI copy: a GUI change affects
 humans; schema drift breaks downstream agents and SOPs.
 
-### 4. Data Stays In Galley
+### 4. Data Stays In Yole
 
-Galley stores session data and supervisor action metadata. It does not store the
+Yole stores session data and supervisor action metadata. It does not store the
 conversation between a supervisor and the user in IM / Claude / another agent.
 
-Supervisor history belongs to the supervisor. Galley is an orchestrator, not a
+Supervisor history belongs to the supervisor. Yole is an orchestrator, not a
 chat platform.
 
 ### 5. Rust Core Is Authoritative
 
-Since v0.2, business authority lives in Rust Galley Core:
+Since v0.2, business authority lives in Rust Yole Core:
 
 - SQLite writes: Rust
 - Bridge subprocess ownership: Rust
@@ -130,17 +127,17 @@ ownership, or a new monolithic frontend state owner.
 ### 6. Tauri Identifier Is Data-Critical
 
 The Tauri identifier controls the user data directory. Do not change
-`app.galley` without a migration plan and dogfood. Read
+`app.yole` without a migration plan and dogfood. Read
 [desktop runtime](./docs/desktop-runtime.md).
 
 ## Repo Map
 
 ```text
 runner/      Python bridge into GenericAgent
-core/        Rust Galley Core + Tauri backend
-cli/         Rust `galley` command for agents
+core/        Rust Yole Core + Tauri backend
+cli/         Rust `yole` command for agents
 gui/         React / Tauri frontend
-managed-ga/  Galley-managed GenericAgent runtime (code, patches, manifest)
+managed-ga/  Yole-managed GenericAgent runtime (code, patches, manifest)
 scripts/     Build, bundle, and release / update-channel scripts
 docs/        Product, architecture, workflow, and history
 ```
@@ -153,10 +150,11 @@ docs/        Product, architecture, workflow, and history
 | Understand architecture | [architecture](./docs/architecture.md) |
 | Product or roadmap change | [PRD](./docs/PRD.md) |
 | CLI / Agent API change | [agent-api](./docs/agent-api.md) |
-| Supervisor / Agent integration | [Supervisor SOP](./docs/integrations/galley-supervisor-sop.md) |
+| Supervisor / Agent integration | [Supervisor SOP](./docs/integrations/yole-supervisor-sop.md) |
 | GenericAgent compatibility | [GA baseline](./docs/ga-baseline.md) |
 | Managed / bundled GA runtime | [managed GA runtime](./docs/managed-ga-runtime.md) |
 | Desktop packaging / runtime | [desktop runtime](./docs/desktop-runtime.md) |
+| Repository, upload, or VPS release paths | [repository / release topology](./docs/repository-and-release-topology.md) |
 | Rust core refactor / B-phase work | [refactor README](./docs/refactor/README.md) |
 | Architecture invariant proof | [architecture demo](./docs/architecture-demo.md) |
 | Release work | [release workflow](./docs/release-workflow.md) |

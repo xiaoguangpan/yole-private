@@ -20,7 +20,7 @@ interface YoloIntroDialogProps {
  * First-launch YOLO disclosure modal.
  *
  * Surfaces ONCE per device on the first post-onboarding MainView
- * entry. Discloses that Galley defaults to YOLO mode (every tool
+ * entry. Discloses that Yole defaults to YOLO mode (every tool
  * runs without approval) and offers a one-click revert.
  *
  * Why blocking instead of a banner:

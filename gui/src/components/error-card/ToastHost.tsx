@@ -5,6 +5,7 @@ import {
   type ErrorCardActions,
 } from "@/components/error-card/ErrorCard";
 import type { AppError } from "@/types/app-error";
+import type { YoleAccountStatus } from "@/lib/managed-models";
 
 interface ToastHostProps extends ErrorCardActions {
   /** Active toasts (typically AppErrors with category bridge / business). */
@@ -12,6 +13,8 @@ interface ToastHostProps extends ErrorCardActions {
   onDismiss: (id: string) => void;
   /** Auto-dismiss duration in ms. Default 6000. Set 0 to disable. */
   autoDismissMs?: number;
+  yoleAccount?: YoleAccountStatus | null;
+  isYoleManagedSession?: (sessionId?: string) => boolean;
 }
 
 /**
@@ -36,6 +39,8 @@ export function ToastHost({
   toasts,
   onDismiss,
   autoDismissMs = 6000,
+  yoleAccount,
+  isYoleManagedSession,
   ...actions
 }: ToastHostProps) {
   return (
@@ -46,6 +51,8 @@ export function ToastHost({
           toast={t}
           onDismiss={onDismiss}
           autoDismissMs={autoDismissMs}
+          yoleAccount={yoleAccount}
+          isYoleManagedSession={isYoleManagedSession}
           actions={actions}
         />
       ))}
@@ -57,11 +64,15 @@ function ToastFrame({
   toast,
   onDismiss,
   autoDismissMs,
+  yoleAccount,
+  isYoleManagedSession,
   actions,
 }: {
   toast: AppError;
   onDismiss: (id: string) => void;
   autoDismissMs: number;
+  yoleAccount?: YoleAccountStatus | null;
+  isYoleManagedSession?: (sessionId?: string) => boolean;
   actions: ErrorCardActions;
 }) {
   useEffect(() => {
@@ -76,6 +87,12 @@ function ToastFrame({
       <ErrorCard
         error={toast}
         variant="toast"
+        yoleAccount={
+          toast.hint === "quota_exceeded" &&
+          (isYoleManagedSession?.(toast.sessionId) ?? false)
+            ? yoleAccount
+            : null
+        }
         onDismiss={() => onDismiss(toast.id)}
         {...actions}
         onRestartChannels={

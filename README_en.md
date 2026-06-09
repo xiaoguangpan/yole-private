@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/galley-icon.png" alt="Galley logo" width="96" />
+  <img src="docs/assets/yole-icon.png" alt="Yole logo" width="96" />
 </p>
 
-<h1 align="center">Galley</h1>
+<h1 align="center">Yole</h1>
 
 <p align="center">
   <strong>Run, manage, and resume multiple AI agent sessions on your own computer</strong>
@@ -11,9 +11,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wangjc683/galley/releases"><strong>Download</strong></a>
+  <a href="https://na.itxgp.com/yole-downloads/windows/Yole_0.0.1_x64-setup.exe"><strong>Download</strong></a>
   ·
   <a href="#quick-start">Quick Start</a>
+  ·
+  <a href="https://github.com/xiaoguangpan/yole">GitHub</a>
   ·
   <a href="./docs/README.md">Docs</a>
   ·
@@ -22,26 +24,26 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://github.com/wangjc683/galley/releases"><img src="https://img.shields.io/github/v/release/wangjc683/galley?include_prereleases" alt="Latest Release" /></a>
-  <a href="https://github.com/wangjc683/galley/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue" alt="Platform" /></a>
-  <a href="https://github.com/wangjc683/galley/stargazers"><img src="https://img.shields.io/github/stars/wangjc683/galley?style=social" alt="Stars" /></a>
+  <a href="https://github.com/xiaoguangpan/yole/releases"><img src="https://img.shields.io/github/v/release/xiaoguangpan/yole?include_prereleases" alt="Latest Release" /></a>
+  <a href="https://github.com/xiaoguangpan/yole/releases"><img src="https://img.shields.io/badge/platform-Windows-blue" alt="Platform" /></a>
+  <a href="https://github.com/xiaoguangpan/yole/stargazers"><img src="https://img.shields.io/github/stars/xiaoguangpan/yole?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/screenshot_05.png" alt="Galley main conversation view" width="800" />
+  <img src="docs/screenshots/screenshot_05.png" alt="Yole main conversation view" width="800" />
 </p>
 
 ---
 
-## What Is Galley
+## What Is Yole
 
-Galley runs multiple AI agent sessions in parallel on your own computer. Humans use the GUI to watch progress, send instructions, and approve actions; Supervisor Agents use the CLI to orchestrate the same session team.
+Yole runs multiple AI agent sessions in parallel on your own computer. Humans use the GUI to watch progress, send instructions, and approve actions; Supervisor Agents use the CLI to orchestrate the same session team.
 
 | For Humans | For Agents | Ready By Default |
 |---|---|---|
-| Manage sessions, projects, tool timelines, and approvals in the GUI | The `galley` CLI is a stable contract for Supervisor Agents | Bundled GenericAgent runtime, CPython 3.11, runtime dependencies, and Browser Control setup assets |
+| Manage sessions, projects, tool timelines, and approvals in the GUI | The `yole` CLI is a stable contract for Supervisor Agents | Bundled GenericAgent runtime, CPython 3.11, runtime dependencies, and Browser Control setup assets |
 
-Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) environment? Connect it from **Settings -> Runtime**. Galley does not modify your external GA code, memory, SOP, or `mykey.py`.
+Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) environment? Connect it from **Settings -> Runtime**. Yole does not modify your external GA code, memory, SOP, or `mykey.py`.
 
 ---
 
@@ -50,7 +52,7 @@ Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) e
 | | |
 |---|---|
 | 📦 **Out of the box**<br/>Bundled GenericAgent runtime, CPython 3.11, and runtime dependencies. | 🪟 **Multi-session + Project orchestration**<br/>Run multiple tasks in parallel; complex goals can be split into one Project and synthesized by a Supervisor Agent. |
-| ⚙️ **GUI + CLI dual-native**<br/>Humans operate in the GUI; Supervisor Agents operate through the stable `galley` CLI. Both share the same sessions and history. | 💬 **Channels**<br/>Connect WeChat from **Settings -> Channels** by scanning a QR code; while Galley is running, you can message Galley from WeChat. More messaging apps can be added later. |
+| ⚙️ **GUI + CLI dual-native**<br/>Humans operate in the GUI; Supervisor Agents operate through the stable `yole` CLI. Both share the same sessions and history. | 💬 **Channels**<br/>Connect WeChat from **Settings -> Channels** by scanning a QR code; while Yole is running, you can message Yole from WeChat. More messaging apps can be added later. |
 | 🔒 **Localhost-only**<br/>Core listens only on a Unix socket / Windows named pipe; remote transport belongs to the Supervisor Agent. | 🔧 **Tool timeline + approvals**<br/>Tool calls, args, results, and timing are shown inline; risky actions can use approval, allowlists, or YOLO mode. |
 | 🌐 **Browser Control**<br/>After connecting Chrome / Edge / Chromium, the agent can operate your signed-in browser. There is a lot of room to explore. | 💾 **Persistence + search + background mode**<br/>Close the window, keep working via a Supervisor Agent, then come back to continue or search past sessions. |
 
@@ -60,23 +62,21 @@ Already have your own [GenericAgent](https://github.com/lsdefine/GenericAgent) e
 
 Prepare a usable LLM service first: API Key, Base URL, and model name.
 
-| 1. Download Galley | 2. Configure a model | 3. Start using it |
+| 1. Download Yole | 2. Configure a model | 3. Start using it |
 |---|---|---|
-| Download the macOS / Windows installer from [Releases](https://github.com/wangjc683/galley/releases). | On first launch, enter your API Key, Base URL, and model name. | Click "Test and start using Galley" to enter the main conversation view. |
+| Download the Windows installer from the [official download URL](https://na.itxgp.com/yole-downloads/windows/Yole_0.0.1_x64-setup.exe); [GitHub Releases](https://github.com/xiaoguangpan/yole/releases) is the backup entry. | First launch can provision trial credit automatically; you can also switch to your own model config in Settings. | Click "Test and start using Yole" to enter the main conversation view. |
 
 | Platform | Installer |
 |---|---|
-| macOS Apple Silicon | filename contains `macOS_aarch64.dmg` |
-| macOS Intel | filename contains `macOS_x64.dmg` |
-| Windows x64 | filename contains `Windows_x64-setup.exe` |
+| Windows x64 | `Yole_0.0.1_x64-setup.exe` |
 
 <details>
 <summary>Install notes</summary>
 
-Galley is not code-signed yet. If macOS blocks the first launch, run:
+Yole is not code-signed yet. If macOS blocks the first launch, run:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Yole.app
 ```
 
 On Windows, when SmartScreen says the publisher is unknown, choose "More info" -> "Run anyway".
@@ -93,44 +93,44 @@ In the running GUI, open **Settings -> Agent**:
 
 | Button | What it does |
 |---|---|
-| **Copy SOP** | Copies [`galley-supervisor-sop.md`](./docs/integrations/galley-supervisor-sop.md), so your Agent can choose between one session, an existing-session follow-up, or a Project-backed session group |
+| **Copy SOP** | Copies [`yole-supervisor-sop.md`](./docs/integrations/yole-supervisor-sop.md), so your Agent can choose between one session, an existing-session follow-up, or a Project-backed session group |
 | **Open Agent API docs** | Opens the full command reference, JSON schemas, and exit codes |
 
-You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Galley. Complex work does not become one giant prompt: the Supervisor SOP first chooses an orchestration mode, follows one session for simple requests, and uses a Project-backed group of sessions for independent work that needs synthesis. You can also connect WeChat from **Settings -> Channels**, scan the QR code, and message Galley from WeChat.
+You do not need to learn the CLI yourself. Tell your Supervisor Agent what you want in natural language, and let it decide how to operate Yole. Complex work does not become one giant prompt: the Supervisor SOP first chooses an orchestration mode, follows one session for simple requests, and uses a Project-backed group of sessions for independent work that needs synthesis. You can also connect WeChat from **Settings -> Channels**, scan the QR code, and message Yole from WeChat.
 
 <details>
 <summary>Show CLI examples</summary>
 
-When Galley is running, a Supervisor Agent on the same machine can dispatch tasks through `galley`:
+When Yole is running, a Supervisor Agent on the same machine can dispatch tasks through `yole`:
 
 ```bash
 # What's running right now?
-galley status
-galley sessions list
+yole status
+yole sessions list
 
 # Start a new session to follow up on a PR
-galley session new --project=proj_work \
+yole session new --project=proj_work \
   --supervisor=ga-claude-1 --reason="follow up on PR review" \
   "look at the feedback on #1234"
 
 # Complex goal: use one Project to hold a group of sessions
-galley project create "Release readiness review" \
+yole project create "Release readiness review" \
   --supervisor=ga-claude-1 --reason="parallel release-risk review"
 
-galley session new "Read-only check of app identity, data directory, SQLite migrations, and backup risks. Output risks with evidence." \
+yole session new "Read-only check of app identity, data directory, SQLite migrations, and backup risks. Output risks with evidence." \
   --project=proj_from_create --supervisor=ga-claude-1 --reason="check data safety"
 
-galley session new "Read-only check of packaging, release workflow, bundled resources, and version bumps. Output a release blocker checklist." \
+yole session new "Read-only check of packaging, release workflow, bundled resources, and version bumps. Output a release blocker checklist." \
   --project=proj_from_create --supervisor=ga-claude-1 --reason="check release packaging"
 
-galley project follow proj_from_create --tail=80 --until-idle --final-show
+yole project follow proj_from_create --tail=80 --until-idle --final-show
 
 # Watch one session's event stream
-galley session watch <id>
+yole session watch <id>
 
 # Switch model / archive / restart
-galley llm set <id> "another model name"
-galley session archive <id> --supervisor=ga-claude-1 --reason="done"
+yole llm set <id> "another model name"
+yole session archive <id> --supervisor=ga-claude-1 --reason="done"
 ```
 
 Every command carries an origin triple (`via=supervisor`, `supervisor=ga-claude-1`, `reason=...`). The GUI timeline annotates supervisor-issued work with "@ga-claude-1 · follow up on PR review · 2 min ago" so the human can see what happened at a glance.
@@ -147,12 +147,12 @@ Both GUI and CLI talk to the same Rust Core. Core owns session lifecycle, SQLite
 
 ```text
 +----------------+                  +----------------+
-|   Galley GUI   |---+          +---|   Galley CLI   |
+|   Yole GUI   |---+          +---|   Yole CLI   |
 |  Tauri/React   |   |          |   |      Rust      |
 +----------------+   |          |   +----------------+
                      v          v
               +------------------------+        localhost only
-              |      Galley Core       | <----  unix socket / named pipe
+              |      Yole Core       | <----  unix socket / named pipe
               |          Rust          |        0600 / no token / no TLS
               |  - session lifecycle   |
               |  - SQLite authority    |
@@ -169,9 +169,9 @@ Both GUI and CLI talk to the same Rust Core. Core owns session lifecycle, SQLite
              +------------+--------------+
                           v
               +------------------------+
-              |   Galley-managed GA    |
+              |   Yole-managed GA    |
               | - GenericAgent kernel  |
-              | - Galley prompt profile|
+              | - Yole prompt profile|
               | - bundled CPython 3.11 |
               | - bundled dependencies |
               +------------------------+
@@ -179,9 +179,9 @@ Both GUI and CLI talk to the same Rust Core. Core owns session lifecycle, SQLite
 
 1. GUI and CLI are **peer frontends**, not GUI wrapping CLI.
 2. **Rust Core is authoritative** for session state, SQLite writes, and runner lifecycle.
-3. The default path is **Galley-managed GA**: GenericAgent is the bundled agent kernel.
+3. The default path is **Yole-managed GA**: GenericAgent is the bundled agent kernel.
 
-**Tech stack:** Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4 / Rust (Galley Core + Galley CLI) / Python (runner, wraps GenericAgent) / SQLite + FTS5 trigram
+**Tech stack:** Tauri v2 + React 19 + TypeScript 5.8 + Tailwind v4 / Rust (Yole Core + Yole CLI) / Python (runner, wraps GenericAgent) / SQLite + FTS5 trigram
 
 More docs:
 [Architecture](./docs/architecture.md) ·
@@ -190,13 +190,11 @@ More docs:
 
 ---
 
-## Why "Galley"?
+## Why "Yole"?
 
-A ship's galley is both kitchen and workbench. Everyone comes there for a different reason, but **the table is the same table**.
+A ship's yole is both kitchen and yole. Everyone comes there for a different reason, but **the table is the same table**.
 
-Galley is that shared table: humans drive work from the GUI, while Supervisor Agents manage the team through the CLI. Both share the same sessions, history, and decision log instead of living in separate tabs.
-
-> *Galley started as a workbench for [GenericAgent](https://github.com/lsdefine/GenericAgent). The first two letters of our name are a quiet bow to where we came from.*
+Yole is that shared table: humans drive work from the GUI, while Supervisor Agents manage the team through the CLI. Both share the same sessions, history, and decision log instead of living in separate tabs.
 
 ## Screenshots
 
@@ -207,34 +205,20 @@ Galley is that shared table: humans drive work from the GUI, while Supervisor Ag
 
 <sub>*Some screenshots are from earlier versions while the interface is still moving quickly.*</sub>
 
-## Contributing / Building From Source
+## Feedback / Releases
 
-```bash
-git clone https://github.com/wangjc683/galley
-cd galley
+Yole uses the public repository for downloads, release notes, and user feedback:
 
-# Python runner tests
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest
-GA_PATH=/path/to/GenericAgent BRIDGE_PYTHON=/path/to/python .venv/bin/python -m pytest -m e2e
+- GitHub: [xiaoguangpan/yole](https://github.com/xiaoguangpan/yole)
+- Download: [Yole_0.0.1_x64-setup.exe](https://na.itxgp.com/yole-downloads/windows/Yole_0.0.1_x64-setup.exe)
+- Feedback: [Issues](https://github.com/xiaoguangpan/yole/issues)
 
-# Desktop app development / build
-cd gui
-pnpm install
-pnpm tauri dev
-pnpm tauri build
-
-# Galley CLI standalone build
-cd ../core
-cargo build --release -p galley-cli
-```
-
-See [docs/release-workflow.md](./docs/release-workflow.md) for the CI release flow and [docs/windows-build-checklist.md](./docs/windows-build-checklist.md) for manual Windows builds.
+The full source code is not public at this stage. The public repository is for
+product information, installers, roadmap, and feedback.
 
 ## Acknowledgments
 
-[**lsdefine/GenericAgent**](https://github.com/lsdefine/GenericAgent) is Galley's current agent kernel. Galley's bundled runtime is built on GenericAgent while preserving compatibility with external GA environments; Galley adds local orchestration, peer GUI / CLI frontends, session persistence, approvals, search, and an out-of-the-box packaged experience.
+[**lsdefine/GenericAgent**](https://github.com/lsdefine/GenericAgent) is Yole's current agent kernel. Yole's bundled runtime is built on GenericAgent while preserving compatibility with external GA environments; Yole adds local orchestration, peer GUI / CLI frontends, session persistence, approvals, search, and an out-of-the-box packaged experience.
 
 Paper: [GenericAgent: A Token-Efficient Self-Evolving LLM Agent via Contextual Information Density Maximization (arXiv:2604.17091)](https://arxiv.org/abs/2604.17091)
 

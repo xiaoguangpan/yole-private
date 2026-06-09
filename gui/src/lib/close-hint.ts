@@ -1,14 +1,14 @@
 /**
  * Background-mode close hint — GUI side.
  *
- * Galley hides to the background instead of quitting when the user
+ * Yole hides to the background instead of quitting when the user
  * closes the window (see core/src/lib.rs `CloseRequested`). The first
  * time that happens on a device, Rust shows a one-time native dialog
  * explaining where the window went and how to truly quit.
  *
  * That dialog fires synchronously inside the window-event callback, so
  * Rust can't reach into GUI i18n. This module's sole job is to push the
- * localized copy into Galley Core so the dialog has the right strings
+ * localized copy into Yole Core so the dialog has the right strings
  * ready before any close:
  *
  *   - `pushCloseHintCopy` runs once at hydrate and again whenever the
@@ -47,7 +47,7 @@ function resolveCopy(preference: LanguagePreference): {
 }
 
 /**
- * Push the current-language copy to Galley Core. Called at hydrate and
+ * Push the current-language copy to Yole Core. Called at hydrate and
  * on every UI language change so a hint shown later renders in the
  * active language. Best-effort: a failure only means the dialog falls
  * back to its English default.

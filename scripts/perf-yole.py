@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Galley perf measurement — P1 (first-token RTT) + P2 (streaming throughput).
+"""Yole perf measurement — P1 (first-token RTT) + P2 (streaming throughput).
 
 Usage:
-    python3 scripts/perf-galley.py p1 <session_id>      # short prompt, first-token RTT
-    python3 scripts/perf-galley.py p2 <session_id>      # long prompt, events/sec
-    python3 scripts/perf-galley.py both <session_id>    # P1 then P2 back-to-back
+    python3 scripts/perf-yole.py p1 <session_id>      # short prompt, first-token RTT
+    python3 scripts/perf-yole.py p2 <session_id>      # long prompt, events/sec
+    python3 scripts/perf-yole.py both <session_id>    # P1 then P2 back-to-back
 
-Prereqs: Galley GUI running (dev or prod) + session has alive bridge
-(check `pgrep -fl workbench_bridge`).
+Prereqs: Yole GUI running (dev or prod) + session has alive bridge
+(check `pgrep -fl yole_bridge`).
 
 Side effect: each run sends a real user message + consumes LLM tokens.
 """
@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 
-GALLEY = "./core/target/debug/galley"
+YOLE = "./core/target/debug/yole"
 TIMEOUT_S = 90
 SUPERVISOR = "jc"
 
@@ -30,7 +30,7 @@ def run_measurement(sid: str, prompt: str, label: str) -> dict:
     """Send prompt + watch stream + return timing dict."""
     # Start watch
     watch = subprocess.Popen(
-        [GALLEY, "session", "watch", sid],
+        [YOLE, "session", "watch", sid],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -45,7 +45,7 @@ def run_measurement(sid: str, prompt: str, label: str) -> dict:
     # Send
     t_invoke = time.perf_counter()
     send_proc = subprocess.run(
-        [GALLEY, "session", "send", sid, prompt,
+        [YOLE, "session", "send", sid, prompt,
          f"--supervisor={SUPERVISOR}", f"--reason=perf-{label}"],
         capture_output=True, text=True,
     )

@@ -1,4 +1,4 @@
-//! Integration tests for `SqliteGalley` write methods (B3 M4a).
+//! Integration tests for `SqliteYole` write methods (B3 M4a).
 //!
 //! Read tests live in [`db_test.rs`]; write tests are split out so the
 //! happy-path / error-path matrix per method has room to breathe.
@@ -7,18 +7,18 @@
 //! `tests/*.rs` as its own crate root — sharing across files needs a
 //! `tests/common/mod.rs` scaffold that adds noise for two test files.
 
-use galley_core_lib::api::{
-    CreateProjectInput, CreateSessionInput, GalleyApi, ManagedModelAuthKind,
+use yole_core_lib::api::{
+    CreateProjectInput, CreateSessionInput, YoleApi, ManagedModelAuthKind,
     ManagedModelCredentialStatus,
     ManagedModelProtocol, Origin, ProjectId, ProjectPatch, RuntimeKind, SessionFilter, SessionId,
     SessionStatus,
 };
-use galley_core_lib::credential_store;
-use galley_core_lib::db::{
-    SqliteGalley, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
+use yole_core_lib::credential_store;
+use yole_core_lib::db::{
+    SqliteYole, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
 };
-use galley_core_lib::error::GalleyError;
-use galley_core_lib::managed_runtime;
+use yole_core_lib::error::YoleError;
+use yole_core_lib::managed_runtime;
 use sqlx::SqlitePool;
 
 // Migration SQL — keep in sync with `core/src/lib.rs::run()`.
@@ -104,9 +104,9 @@ async fn seed_project(pool: &SqlitePool, id: &str, name: &str) {
 #[tokio::test]
 async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
+    let yole = SqliteYole::from_pool(pool.clone());
 
-    let provider = galley
+    let provider = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: "mp_test".into(),
             display_name: "Anthropic".into(),
@@ -123,7 +123,7 @@ async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
         ManagedModelCredentialStatus::Missing
     ));
 
-    let row = galley
+    let row = yole
         .upsert_managed_model_metadata(UpsertManagedModelMetadata {
             id: "mm_test".into(),
             provider_id: "mp_test".into(),
@@ -159,13 +159,13 @@ async fn managed_model_metadata_never_requires_plaintext_key_in_db() {
 #[tokio::test]
 async fn managed_model_secret_roundtrip_uses_encrypted_sqlite_rows() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
+    let yole = SqliteYole::from_pool(pool.clone());
     let api_key_ref = "managed-provider:mp_secret";
 
-    credential_store::set_secret(&galley, api_key_ref, "sk-test-secret")
+    credential_store::set_secret(&yole, api_key_ref, "sk-test-secret")
         .await
         .expect("store secret");
-    let provider = galley
+    let provider = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: "mp_secret".into(),
             display_name: "Secret Provider".into(),
@@ -181,7 +181,7 @@ async fn managed_model_secret_roundtrip_uses_encrypted_sqlite_rows() {
         ManagedModelCredentialStatus::Present
     ));
 
-    let restored = credential_store::get_secret(&galley, api_key_ref)
+    let restored = credential_store::get_secret(&yole, api_key_ref)
         .await
         .expect("get secret");
     assert_eq!(restored, "sk-test-secret");
@@ -194,21 +194,21 @@ async fn managed_model_secret_roundtrip_uses_encrypted_sqlite_rows() {
             .expect("read ciphertext");
     assert_ne!(raw.0, b"sk-test-secret".to_vec());
 
-    credential_store::delete_secret(&galley, api_key_ref)
+    credential_store::delete_secret(&yole, api_key_ref)
         .await
         .expect("delete secret");
-    let missing = credential_store::get_secret(&galley, api_key_ref)
+    let missing = credential_store::get_secret(&yole, api_key_ref)
         .await
         .expect_err("secret should be gone");
-    assert!(matches!(missing, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(missing, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn managed_model_order_drives_default_model() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
+    let yole = SqliteYole::from_pool(pool);
 
-    galley
+    yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: "mp_test".into(),
             display_name: "OpenAI".into(),
@@ -220,7 +220,7 @@ async fn managed_model_order_drives_default_model() {
         .await
         .expect("upsert managed provider metadata");
     for (idx, id) in ["mm_a", "mm_b", "mm_c"].iter().enumerate() {
-        galley
+        yole
             .upsert_managed_model_metadata(UpsertManagedModelMetadata {
                 id: (*id).into(),
                 provider_id: "mp_test".into(),
@@ -233,11 +233,11 @@ async fn managed_model_order_drives_default_model() {
             .expect("upsert managed model metadata");
     }
 
-    galley
+    yole
         .reorder_managed_models(vec!["mm_c".into(), "mm_a".into(), "mm_b".into()])
         .await
         .expect("reorder managed models");
-    let models = galley
+    let models = yole
         .list_managed_models()
         .await
         .expect("list managed models");
@@ -253,7 +253,7 @@ async fn managed_model_order_drives_default_model() {
     assert_eq!(models[1].sort_order, 1);
     assert_eq!(models[2].sort_order, 2);
 
-    galley
+    yole
         .upsert_managed_model_metadata(UpsertManagedModelMetadata {
             id: "mm_b".into(),
             provider_id: "mp_test".into(),
@@ -264,7 +264,7 @@ async fn managed_model_order_drives_default_model() {
         })
         .await
         .expect("set default managed model");
-    let models = galley
+    let models = yole
         .list_managed_models()
         .await
         .expect("list managed models after default");
@@ -281,8 +281,8 @@ async fn managed_model_order_drives_default_model() {
 #[tokio::test]
 async fn create_session_happy_path_persists_all_fields() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .create_session(
             CreateSessionInput {
                 id: "sess_new_1".into(),
@@ -319,8 +319,8 @@ async fn create_session_happy_path_persists_all_fields() {
 #[tokio::test]
 async fn create_session_can_snapshot_explicit_external_runtime() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .create_session(
             CreateSessionInput {
                 id: "sess_external_1".into(),
@@ -341,7 +341,7 @@ async fn create_session_can_snapshot_explicit_external_runtime() {
     assert!(matches!(brief.ga_runtime_kind, RuntimeKind::External));
     assert_eq!(brief.ga_runtime_id.as_deref(), Some("external-default"));
 
-    let managed = galley
+    let managed = yole
         .list_sessions(SessionFilter {
             runtime_kind: Some(RuntimeKind::Managed),
             ..Default::default()
@@ -350,7 +350,7 @@ async fn create_session_can_snapshot_explicit_external_runtime() {
         .expect("list managed");
     assert!(managed.is_empty());
 
-    let external = galley
+    let external = yole
         .list_sessions(SessionFilter {
             runtime_kind: Some(RuntimeKind::External),
             ..Default::default()
@@ -364,8 +364,8 @@ async fn create_session_can_snapshot_explicit_external_runtime() {
 #[tokio::test]
 async fn create_session_persists_origin_creation_triple() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
-    galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    yole
         .create_session(
             CreateSessionInput {
                 id: "sess_cli_1".into(),
@@ -398,8 +398,8 @@ async fn create_session_persists_origin_creation_triple() {
 #[tokio::test]
 async fn create_session_rejects_empty_title() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .create_session(
             CreateSessionInput {
                 id: "sess_x".into(),
@@ -416,15 +416,15 @@ async fn create_session_rejects_empty_title() {
         )
         .await
         .expect_err("empty title rejected");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn create_session_id_conflict_returns_invalid_args() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "sess_dup").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .create_session(
             CreateSessionInput {
                 id: "sess_dup".into(),
@@ -441,14 +441,14 @@ async fn create_session_id_conflict_returns_invalid_args() {
         )
         .await
         .expect_err("dup id rejected");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn create_session_with_missing_project_rejects() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .create_session(
             CreateSessionInput {
                 id: "sess_in_ghost".into(),
@@ -465,7 +465,7 @@ async fn create_session_with_missing_project_rejects() {
         )
         .await
         .expect_err("FK violation rejected");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 // ---------------- archive / unarchive ----------------
@@ -474,8 +474,8 @@ async fn create_session_with_missing_project_rejects() {
 async fn archive_session_flips_status() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .archive_session(sid("s1"), Origin::gui())
         .await
         .expect("archive");
@@ -485,24 +485,24 @@ async fn archive_session_flips_status() {
 #[tokio::test]
 async fn archive_session_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .archive_session(sid("nope"), Origin::gui())
         .await
         .expect_err("missing id");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 #[tokio::test]
 async fn unarchive_session_flips_back_to_idle() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    galley
+    let yole = SqliteYole::from_pool(pool);
+    yole
         .archive_session(sid("s1"), Origin::gui())
         .await
         .unwrap();
-    let brief = galley
+    let brief = yole
         .unarchive_session(sid("s1"), Origin::gui())
         .await
         .expect("unarchive");
@@ -513,10 +513,10 @@ async fn unarchive_session_flips_back_to_idle() {
 async fn unarchive_session_idle_is_noop_success() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
+    let yole = SqliteYole::from_pool(pool);
     // No-op on already-idle row: GUI shouldn't have to pre-check
     // status before calling. Returns brief unchanged.
-    let brief = galley
+    let brief = yole
         .unarchive_session(sid("s1"), Origin::gui())
         .await
         .expect("unarchive noop");
@@ -529,8 +529,8 @@ async fn unarchive_session_idle_is_noop_success() {
 async fn rename_session_persists_new_title() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .rename_session(sid("s1"), "renamed".into(), Origin::gui())
         .await
         .expect("rename");
@@ -541,8 +541,8 @@ async fn rename_session_persists_new_title() {
 async fn rename_session_empty_falls_back_to_default() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .rename_session(sid("s1"), "   ".into(), Origin::gui())
         .await
         .expect("rename empty");
@@ -552,12 +552,12 @@ async fn rename_session_empty_falls_back_to_default() {
 #[tokio::test]
 async fn rename_session_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .rename_session(sid("ghost"), "x".into(), Origin::gui())
         .await
         .expect_err("missing id");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- pin ----------------
@@ -566,13 +566,13 @@ async fn rename_session_not_found() {
 async fn set_session_pinned_toggles_flag() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let pinned = galley
+    let yole = SqliteYole::from_pool(pool);
+    let pinned = yole
         .set_session_pinned(sid("s1"), true, Origin::gui())
         .await
         .expect("pin");
     assert_eq!(pinned.pinned, Some(true));
-    let unpinned = galley
+    let unpinned = yole
         .set_session_pinned(sid("s1"), false, Origin::gui())
         .await
         .expect("unpin");
@@ -583,27 +583,27 @@ async fn set_session_pinned_toggles_flag() {
 async fn set_session_pinned_rejects_archived() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    galley
+    let yole = SqliteYole::from_pool(pool);
+    yole
         .archive_session(sid("s1"), Origin::gui())
         .await
         .unwrap();
-    let err = galley
+    let err = yole
         .set_session_pinned(sid("s1"), true, Origin::gui())
         .await
         .expect_err("pin archived rejected");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn set_session_pinned_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .set_session_pinned(sid("ghost"), true, Origin::gui())
         .await
         .expect_err("missing id");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- delete ----------------
@@ -612,8 +612,8 @@ async fn set_session_pinned_not_found() {
 async fn delete_session_removes_row() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool.clone());
-    galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    yole
         .delete_session(sid("s1"), Origin::gui())
         .await
         .expect("delete");
@@ -639,8 +639,8 @@ async fn delete_session_cascades_messages() {
     .execute(&pool)
     .await
     .unwrap();
-    let galley = SqliteGalley::from_pool(pool.clone());
-    galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    yole
         .delete_session(sid("s1"), Origin::gui())
         .await
         .expect("delete");
@@ -655,12 +655,12 @@ async fn delete_session_cascades_messages() {
 #[tokio::test]
 async fn delete_session_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .delete_session(sid("ghost"), Origin::gui())
         .await
         .expect_err("missing id");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- assign_session_to_project ----------------
@@ -670,8 +670,8 @@ async fn assign_session_to_project_attaches_id() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     seed_project(&pool, "proj_a", "Alpha").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .assign_session_to_project(sid("s1"), Some("proj_a".into()), Origin::gui())
         .await
         .expect("assign");
@@ -689,8 +689,8 @@ async fn assign_session_to_project_detach() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .assign_session_to_project(sid("s1"), None, Origin::gui())
         .await
         .expect("detach");
@@ -701,24 +701,24 @@ async fn assign_session_to_project_detach() {
 async fn assign_session_to_project_rejects_missing_project() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .assign_session_to_project(sid("s1"), Some("proj_ghost".into()), Origin::gui())
         .await
         .expect_err("FK violation");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn assign_session_to_project_not_found_session() {
     let pool = fresh_pool().await;
     seed_project(&pool, "proj_a", "A").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .assign_session_to_project(sid("ghost"), Some("proj_a".into()), Origin::gui())
         .await
         .expect_err("session missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- set_session_llm ----------------
@@ -727,8 +727,8 @@ async fn assign_session_to_project_not_found_session() {
 async fn set_session_llm_persists_choice() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .set_session_llm(
             sid("s1"),
             Some(3),
@@ -758,8 +758,8 @@ async fn set_session_llm_clear_with_none() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .set_session_llm(sid("s1"), None, None, None)
         .await
         .expect("clear");
@@ -771,12 +771,12 @@ async fn set_session_llm_clear_with_none() {
 #[tokio::test]
 async fn set_session_llm_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .set_session_llm(sid("ghost"), Some(1), Some("key".into()), Some("x".into()))
         .await
         .expect_err("missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- bump_session_after_turn ----------------
@@ -785,8 +785,8 @@ async fn set_session_llm_not_found() {
 async fn bump_session_after_turn_increments_turn_count_and_summary() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .bump_session_after_turn(sid("s1"), Some("did work".into()), Some(1), false)
         .await
         .expect("bump");
@@ -799,8 +799,8 @@ async fn bump_session_after_turn_increments_turn_count_and_summary() {
 async fn bump_session_after_turn_mark_unread_sets_flag() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .bump_session_after_turn(sid("s1"), Some("done".into()), Some(1), true)
         .await
         .expect("bump unread");
@@ -811,14 +811,14 @@ async fn bump_session_after_turn_mark_unread_sets_flag() {
 async fn bump_session_after_turn_empty_summary_keeps_previous() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    galley
+    let yole = SqliteYole::from_pool(pool);
+    yole
         .bump_session_after_turn(sid("s1"), Some("first recap".into()), Some(1), false)
         .await
         .unwrap();
     // Second bump with empty summary — turn_count goes up, summary
     // stays at "first recap".
-    let brief = galley
+    let brief = yole
         .bump_session_after_turn(sid("s1"), Some("   ".into()), Some(2), false)
         .await
         .expect("bump empty");
@@ -830,9 +830,9 @@ async fn bump_session_after_turn_empty_summary_keeps_previous() {
 async fn bump_session_after_turn_truncates_long_summary() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
+    let yole = SqliteYole::from_pool(pool);
     let long: String = "x".repeat(120);
-    let brief = galley
+    let brief = yole
         .bump_session_after_turn(sid("s1"), Some(long), Some(1), false)
         .await
         .expect("bump long");
@@ -845,12 +845,12 @@ async fn bump_session_after_turn_truncates_long_summary() {
 #[tokio::test]
 async fn bump_session_after_turn_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .bump_session_after_turn(sid("ghost"), Some("x".into()), Some(1), false)
         .await
         .expect_err("missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- clear_session_unread ----------------
@@ -864,12 +864,12 @@ async fn clear_session_unread_zeroes_flag() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    galley
+    let yole = SqliteYole::from_pool(pool);
+    yole
         .clear_session_unread(sid("s1"))
         .await
         .expect("clear unread");
-    let brief = galley.session_brief(sid("s1")).await.unwrap();
+    let brief = yole.session_brief(sid("s1")).await.unwrap();
     assert_eq!(brief.has_unread, Some(false));
 }
 
@@ -877,8 +877,8 @@ async fn clear_session_unread_zeroes_flag() {
 async fn clear_session_unread_already_zero_is_success() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
-    let galley = SqliteGalley::from_pool(pool);
-    galley
+    let yole = SqliteYole::from_pool(pool);
+    yole
         .clear_session_unread(sid("s1"))
         .await
         .expect("idempotent");
@@ -887,12 +887,12 @@ async fn clear_session_unread_already_zero_is_success() {
 #[tokio::test]
 async fn clear_session_unread_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .clear_session_unread(sid("ghost"))
         .await
         .expect_err("missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- bulk_archive / unarchive / delete ----------------
@@ -907,14 +907,14 @@ async fn bulk_archive_sessions_flips_only_active() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let n = galley
+    let yole = SqliteYole::from_pool(pool);
+    let n = yole
         .bulk_archive_sessions(vec![sid("a"), sid("b"), sid("c")], Origin::gui())
         .await
         .expect("bulk archive");
     // b was already archived → only a + c flipped.
     assert_eq!(n, 2);
-    let listed = galley
+    let listed = yole
         .list_sessions(SessionFilter {
             archived: Some(true),
             ..Default::default()
@@ -927,8 +927,8 @@ async fn bulk_archive_sessions_flips_only_active() {
 #[tokio::test]
 async fn bulk_archive_sessions_empty_returns_zero() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let n = galley
+    let yole = SqliteYole::from_pool(pool);
+    let n = yole
         .bulk_archive_sessions(vec![], Origin::gui())
         .await
         .expect("empty list");
@@ -945,8 +945,8 @@ async fn bulk_unarchive_sessions_flips_only_archived() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let n = galley
+    let yole = SqliteYole::from_pool(pool);
+    let n = yole
         .bulk_unarchive_sessions(vec![sid("a"), sid("b"), sid("c")], Origin::gui())
         .await
         .expect("bulk unarchive");
@@ -969,8 +969,8 @@ async fn bulk_delete_sessions_returns_count_and_cascades() {
     .execute(&pool)
     .await
     .unwrap();
-    let galley = SqliteGalley::from_pool(pool.clone());
-    let n = galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    let n = yole
         .bulk_delete_sessions(vec![sid("a"), sid("b")], Origin::gui())
         .await
         .expect("bulk delete");
@@ -986,8 +986,8 @@ async fn bulk_delete_sessions_returns_count_and_cascades() {
 async fn bulk_delete_sessions_skips_unknown_ids() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "a").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let n = galley
+    let yole = SqliteYole::from_pool(pool);
+    let n = yole
         .bulk_delete_sessions(vec![sid("a"), sid("ghost")], Origin::gui())
         .await
         .expect("bulk delete");
@@ -1059,8 +1059,8 @@ async fn list_projects_orders_pinned_then_content_recency() {
     .await
     .unwrap();
 
-    let galley = SqliteGalley::from_pool(pool);
-    let ps = galley.list_projects().await.expect("list projects");
+    let yole = SqliteYole::from_pool(pool);
+    let ps = yole.list_projects().await.expect("list projects");
     let ids: Vec<&str> = ps.iter().map(|p| p.id.as_str()).collect();
     // pinned first; unpinned projects use non-archived session activity,
     // with empty projects falling back to created_at.
@@ -1077,8 +1077,8 @@ async fn list_projects_orders_pinned_then_content_recency() {
 #[tokio::test]
 async fn create_project_happy_path() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let p = galley
+    let yole = SqliteYole::from_pool(pool);
+    let p = yole
         .create_project(
             CreateProjectInput {
                 id: "proj_1".into(),
@@ -1100,8 +1100,8 @@ async fn create_project_happy_path() {
 #[tokio::test]
 async fn create_project_empty_root_path_normalized_to_null() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let p = galley
+    let yole = SqliteYole::from_pool(pool);
+    let p = yole
         .create_project(
             CreateProjectInput {
                 id: "proj_2".into(),
@@ -1120,8 +1120,8 @@ async fn create_project_empty_root_path_normalized_to_null() {
 #[tokio::test]
 async fn create_project_rejects_empty_name() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .create_project(
             CreateProjectInput {
                 id: "proj_x".into(),
@@ -1134,15 +1134,15 @@ async fn create_project_rejects_empty_name() {
         )
         .await
         .expect_err("empty name");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn create_project_id_conflict_returns_invalid_args() {
     let pool = fresh_pool().await;
     seed_project(&pool, "proj_dup", "Dup").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .create_project(
             CreateProjectInput {
                 id: "proj_dup".into(),
@@ -1155,7 +1155,7 @@ async fn create_project_id_conflict_returns_invalid_args() {
         )
         .await
         .expect_err("dup id");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 // ---------------- update_project ----------------
@@ -1169,8 +1169,8 @@ async fn update_project_partial_name_only() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let p = galley
+    let yole = SqliteYole::from_pool(pool);
+    let p = yole
         .update_project(
             pid("proj_1"),
             ProjectPatch {
@@ -1194,8 +1194,8 @@ async fn update_project_clears_root_path_with_some_none() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool);
-    let p = galley
+    let yole = SqliteYole::from_pool(pool);
+    let p = yole
         .update_project(
             pid("proj_1"),
             ProjectPatch {
@@ -1213,8 +1213,8 @@ async fn update_project_clears_root_path_with_some_none() {
 async fn update_project_pinned_flag() {
     let pool = fresh_pool().await;
     seed_project(&pool, "proj_1", "X").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let p = galley
+    let yole = SqliteYole::from_pool(pool);
+    let p = yole
         .update_project(
             pid("proj_1"),
             ProjectPatch {
@@ -1232,8 +1232,8 @@ async fn update_project_pinned_flag() {
 async fn update_project_rejects_empty_name() {
     let pool = fresh_pool().await;
     seed_project(&pool, "proj_1", "X").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .update_project(
             pid("proj_1"),
             ProjectPatch {
@@ -1244,18 +1244,18 @@ async fn update_project_rejects_empty_name() {
         )
         .await
         .expect_err("empty");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }
 
 #[tokio::test]
 async fn update_project_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .update_project(pid("ghost"), ProjectPatch::default(), Origin::gui())
         .await
         .expect_err("missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ---------------- delete_project ----------------
@@ -1269,8 +1269,8 @@ async fn delete_project_detaches_sessions_via_fk() {
         .execute(&pool)
         .await
         .unwrap();
-    let galley = SqliteGalley::from_pool(pool.clone());
-    galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    yole
         .delete_project(pid("proj_1"), Origin::gui())
         .await
         .expect("delete project");
@@ -1286,12 +1286,12 @@ async fn delete_project_detaches_sessions_via_fk() {
 #[tokio::test]
 async fn delete_project_not_found() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .delete_project(pid("ghost"), Origin::gui())
         .await
         .expect_err("missing");
-    assert!(matches!(err, GalleyError::NotFound { .. }));
+    assert!(matches!(err, YoleError::NotFound { .. }));
 }
 
 // ============= B4 M1 · transaction-aware variant tests =============
@@ -1302,9 +1302,9 @@ async fn tx_commit_persists_both_session_and_message() {
     // (create_session_in_tx + send_message_in_tx) inside one tx, COMMIT,
     // both rows visible.
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
-    let mut tx = galley.begin_tx().await.expect("begin");
-    let session_brief = galley
+    let yole = SqliteYole::from_pool(pool.clone());
+    let mut tx = yole.begin_tx().await.expect("begin");
+    let session_brief = yole
         .create_session_in_tx(
             &mut tx,
             CreateSessionInput {
@@ -1323,7 +1323,7 @@ async fn tx_commit_persists_both_session_and_message() {
         .await
         .expect("create in tx");
     assert_eq!(session_brief.id.as_str(), "sess_tx_1");
-    let msg_brief = galley
+    let msg_brief = yole
         .send_message_in_tx(
             &mut tx,
             sid("sess_tx_1"),
@@ -1362,13 +1362,13 @@ async fn socket_user_message_ids_are_session_scoped() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "sess_msg_a").await;
     seed_session_idle(&pool, "sess_msg_b").await;
-    let galley = SqliteGalley::from_pool(pool.clone());
+    let yole = SqliteYole::from_pool(pool.clone());
 
-    let msg_a = galley
+    let msg_a = yole
         .send_message(sid("sess_msg_a"), "task A".into(), Origin::cli(None, None))
         .await
         .expect("send A");
-    let msg_b = galley
+    let msg_b = yole
         .send_message(sid("sess_msg_b"), "task B".into(), Origin::cli(None, None))
         .await
         .expect("send B");
@@ -1391,10 +1391,10 @@ async fn tx_drop_without_commit_rolls_back() {
     // no row in DB. This is what happens when the second in-tx call
     // fails and the socket handler returns early.
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
+    let yole = SqliteYole::from_pool(pool.clone());
     {
-        let mut tx = galley.begin_tx().await.expect("begin");
-        galley
+        let mut tx = yole.begin_tx().await.expect("begin");
+        yole
             .create_session_in_tx(
                 &mut tx,
                 CreateSessionInput {
@@ -1433,10 +1433,10 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
     // simulating any in-tx error). Caller drops tx without commit;
     // verify the created session is NOT in DB.
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool.clone());
+    let yole = SqliteYole::from_pool(pool.clone());
     {
-        let mut tx = galley.begin_tx().await.expect("begin");
-        galley
+        let mut tx = yole.begin_tx().await.expect("begin");
+        yole
             .create_session_in_tx(
                 &mut tx,
                 CreateSessionInput {
@@ -1454,7 +1454,7 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
             )
             .await
             .expect("create in tx");
-        let err = galley
+        let err = yole
             .send_message_in_tx(
                 &mut tx,
                 sid("nonexistent_session"),
@@ -1463,7 +1463,7 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
             )
             .await
             .expect_err("send to missing session");
-        assert!(matches!(err, GalleyError::NotFound { .. }));
+        assert!(matches!(err, YoleError::NotFound { .. }));
         // Drop tx without commit.
     }
     let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE id = ?")
@@ -1482,8 +1482,8 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
 #[tokio::test]
 async fn get_pref_json_returns_none_for_missing_key() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let v = galley
+    let yole = SqliteYole::from_pool(pool);
+    let v = yole
         .get_pref_json("never_written")
         .await
         .expect("get_pref ok");
@@ -1502,8 +1502,8 @@ async fn get_pref_json_round_trips_llm_list_shape() {
         .execute(&pool)
         .await
         .expect("seed pref");
-    let galley = SqliteGalley::from_pool(pool);
-    let v = galley
+    let yole = SqliteYole::from_pool(pool);
+    let v = yole
         .get_pref_json("llm_list")
         .await
         .expect("get_pref ok")
@@ -1524,10 +1524,10 @@ async fn get_pref_json_rejects_corrupt_value() {
         .execute(&pool)
         .await
         .expect("seed pref");
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .get_pref_json("broken")
         .await
         .expect_err("should reject");
-    assert!(matches!(err, GalleyError::InvalidArgs { .. }));
+    assert!(matches!(err, YoleError::InvalidArgs { .. }));
 }

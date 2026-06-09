@@ -12,11 +12,11 @@ import { cn } from "@/lib/utils";
  *
  * Per Win 11 Fluent: each button is 46px wide and full-height (44px
  * here to match TopBar; Win 11's own title bar is 32px, but a 44px
- * chrome bar reads as "Galley chrome with Win-flavored controls"
+ * chrome bar reads as "Yole chrome with Win-flavored controls"
  * which we prefer over centred 30px buttons floating in a taller bar).
  * Buttons touch each other with no gap.
  *
- * Hover: gray for min/max, red for close — Galley's `bg-danger` token
+ * Hover: gray for min/max, red for close — Yole's `bg-danger` token
  * rather than literal Win 11 red so the chrome stays inside our
  * design system. Close hover also swaps the icon to `bg-elevated`
  * (light) for contrast on the red fill.

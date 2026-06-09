@@ -1,4 +1,4 @@
-# Galley Core Refactor · 执行手册
+# Yole Core Refactor · 执行手册
 
 跨多 session 重构的中央调度器。**新开 session 第一件事：读本文件 → 找到当前 cursor → 进入对应 phase playbook → 读 cursor 指向的 sub-task**。
 
@@ -32,7 +32,7 @@ docs/refactor/
 ```
 Phase:    Prototype ✅ → B1 ✅ → B2 ✅ → B3 ✅ → B4 ✅ → v0.2.0 ✅
                                                                ↑ 现在在这里
-Status:   v0.2.0 shipped 2026-05-31 as the first stable Galley release.
+Status:   v0.2.0 shipped 2026-05-31 as the first stable Yole release.
           GitHub Release is public / non-prerelease / Latest, and the beta
           update channel points at 0.2.0 for installed users.
 Next:     Post-release feedback watch. Use v0.2.1 for focused P0 / P1

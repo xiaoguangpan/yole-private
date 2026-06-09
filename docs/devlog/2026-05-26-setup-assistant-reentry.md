@@ -27,7 +27,7 @@ Health Check.
   a configured model exposes `Continue with current model`; in external-GA
   mode, the saved GA path pre-fills the attach step.
 - Bundled model setup keeps connection validation separate from
-  `Start using Galley`. The test sends a minimal real model request, shows
+  `Start using Yole`. The test sends a minimal real model request, shows
   latency, and maps common HTTP / network failures to human-readable guidance.
   Settings -> Models uses the same probe feedback.
 - In Onboarding, the model connection test runs automatically after complete
@@ -74,4 +74,4 @@ Health Check.
 ## Next
 
 Dogfood both paths: managed configured -> continue with current model, and
-external configured -> attach step pre-filled -> Health Check -> Galley.
+external configured -> attach step pre-filled -> Health Check -> Yole.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the Galley CLI and copy it to the target-triple-suffixed filename
+# Build the Yole CLI and copy it to the target-triple-suffixed filename
 # Tauri expects for bundle.externalBin.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,7 +74,7 @@ fi
 CARGO_ARGS=(
   build
   --manifest-path "${REPO_ROOT}/core/Cargo.toml"
-  -p galley-cli
+  -p yole-cli
   --target "$TARGET"
 )
 
@@ -83,7 +83,7 @@ if [[ "$PROFILE" == "release" ]]; then
 fi
 
 DEST_DIR="${REPO_ROOT}/core/target/tauri-sidecars"
-DEST="${DEST_DIR}/galley-${TARGET}${BIN_EXT}"
+DEST="${DEST_DIR}/yole-${TARGET}${BIN_EXT}"
 PLACEHOLDER_CREATED=0
 
 cleanup_placeholder() {
@@ -95,7 +95,7 @@ cleanup_placeholder() {
 }
 trap cleanup_placeholder EXIT
 
-# Building galley-cli also builds galley-core, whose Tauri build script
+# Building yole-cli also builds yole-core, whose Tauri build script
 # validates bundle.externalBin before the CLI output exists. A temporary
 # placeholder breaks that bootstrap cycle; the real CLI overwrites it below.
 if [[ ! -f "$DEST" ]]; then
@@ -105,10 +105,10 @@ if [[ ! -f "$DEST" ]]; then
   PLACEHOLDER_CREATED=1
 fi
 
-echo "[prepare-cli-sidecar] building galley-cli profile=${PROFILE} target=${TARGET}"
+echo "[prepare-cli-sidecar] building yole-cli profile=${PROFILE} target=${TARGET}"
 cargo "${CARGO_ARGS[@]}"
 
-SOURCE="${REPO_ROOT}/core/target/${TARGET}/${PROFILE}/galley${BIN_EXT}"
+SOURCE="${REPO_ROOT}/core/target/${TARGET}/${PROFILE}/yole${BIN_EXT}"
 
 if [[ ! -f "$SOURCE" ]]; then
   echo "[prepare-cli-sidecar] missing built CLI: ${SOURCE}" >&2

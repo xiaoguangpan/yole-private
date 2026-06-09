@@ -12,7 +12,7 @@
 
 - `Cargo.toml` — own workspace, tauri v2 + tray-icon feature
 - `build.rs` — tauri_build::build()
-- `tauri.conf.json` — identifier `app.galley.m2spike` (isolated from production), frontendDist=`.`, bundle.active=false
+- `tauri.conf.json` — identifier `app.yole.m2spike` (isolated from production), frontendDist=`.`, bundle.active=false
 - `index.html` — heartbeat counter + hidden-time tracker + App Nap status row
 - `src/main.rs` — tray menu (Show / status / Quit) + `WindowEvent::CloseRequested → hide` + heartbeat thread (500ms tick via `std::thread::spawn`, native thread to avoid tokio runtime dep) + tray Quit → `app.exit(0)`
 - `icons/icon.png` — copied from `core/icons/128x128.png`
@@ -59,7 +59,7 @@ Then manually check the T1-T16 table below.
 | T | Platform | Test | Result |
 |---|---|---|---|
 | T1 | macOS | Tray icon renders in menubar on app launch. Visible right of system icons. Survives 5-min idle. | ⏳ |
-| T2 | macOS | Left-click tray opens menu. 3 items: Show Galley / "1 active · 0 idle" (disabled) / Quit Galley | ⏳ |
+| T2 | macOS | Left-click tray opens menu. 3 items: Show Yole / "1 active · 0 idle" (disabled) / Quit Yole | ⏳ |
 | T3 | Windows | (deferred — no Win machine) | ⏭ N/A this session |
 | T4 | Windows | (deferred) | ⏭ N/A this session |
 
@@ -76,14 +76,14 @@ Then manually check the T1-T16 table below.
 
 | T | Platform | Test | Result |
 |---|---|---|---|
-| T9 | macOS | Tray menu "Show Galley" → window appears AND comes to front | ⏳ |
+| T9 | macOS | Tray menu "Show Yole" → window appears AND comes to front | ⏳ |
 | T10 | Windows | (deferred) | ⏭ |
 
 ### Quit (true exit) (T11-T12)
 
 | T | Platform | Test | Result |
 |---|---|---|---|
-| T11 | macOS | Tray menu "Quit Galley" → `app.exit(0)` → process truly exits. `ps aux \| grep tray-mode-spike` empty within 2s | ⏳ |
+| T11 | macOS | Tray menu "Quit Yole" → `app.exit(0)` → process truly exits. `ps aux \| grep tray-mode-spike` empty within 2s | ⏳ |
 | T12 | Windows | (deferred) | ⏭ |
 
 ### WebView keep-alive while hidden (T13-T16)

@@ -3,59 +3,49 @@
 > Maintainer-facing document. For a user-facing overview, read
 > [README](../README.md). For architecture, read [architecture](./architecture.md).
 
-This document tracks the current working state of Galley. Long historical
+This document tracks the current working state of Yole. Long historical
 decision trails live in [devlog](./devlog/README.md); implementation playbooks
 live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.2.7`.
-- Git tag / GitHub Release: `v0.2.7` is the current published GitHub Latest.
+- Package version: `0.0.1`.
+- Git tag / GitHub Release: `v0.0.1` is not published yet; the current Windows
+  package is a local manual-test build.
 - Agent API schema: `schemaVersion: 1`
-- Release tier: stable patch; default update channel points at `v0.2.7`, with
-  `beta` kept as a legacy alias for older builds.
+- Release tier: local manual test; no update channel promotion yet.
 - Product shape: dual-native local agent team orchestrator
 
-Galley GUI and Galley CLI are peer frontends over Rust-side Galley Core. The
+Yole GUI and Yole CLI are peer frontends over Rust-side Yole Core. The
 GUI is for the human operator at the desk; the CLI is for trusted Agent /
 Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.2.7` is the current published stable patch, GitHub Latest, and default
-update-channel target. It shipped the Windows issue #9 runtime hotfix set:
-managed `code_run` now closes child-process stdin for non-interactive
-execution, update-check failures now show a manual download fallback plus
-copyable phase / endpoint / detail diagnostics, and the bundled GenericAgent
-baseline is refreshed to audited upstream `5d122e20`.
+`v0.0.1` is the current local manual-test package line. It is not published to
+GitHub and is not promoted to an app update channel. The Windows NSIS package is
+produced locally for hands-on validation before any public release process.
 
-The default update channel was promoted to `v0.2.7` after publish. The live
-channel verifier passed with cache-busting for both `stable` and the legacy
-`beta` alias, and the `galley-update-channel` branch manifest reports version
-`0.2.7`. `GALLEY_UPDATER_ENDPOINT` points at
-`updates/stable/latest.json`; `updates/beta/latest.json` is kept as a legacy
-alias for builds compiled before the stable endpoint rename.
+Current local-test focus:
 
-Post-promote follow-up:
-
-1. Dogfood update from an installed `v0.2.6` or older build if an older install
-   is still available.
-2. On Windows, smoke in-app update while Galley has loaded bundled Python, then
-   repeat manual overwrite install over a backgrounded Galley process.
-3. On a fresh bundled-GA state, confirm Memory/SOP seed files are present; on an
-   existing state, confirm user-edited memory files are not overwritten.
+1. Validate first-run Yole account provisioning through the VPS provisioner.
+2. Confirm the balance entry, balance refresh button, low-balance warning, and
+   QR/contact support flow in the chat surface.
+3. Confirm the new Yole app icon and Windows installer metadata.
+4. Decide the signed VPS-hosted update channel design before enabling automatic
+   client updates.
 
 ## Status Dashboard
 
 | Area | Status | Read More |
 |---|---|---|
-| Core architecture | Rust Galley Core is authoritative | [architecture demo](./architecture-demo.md) |
+| Core architecture | Rust Yole Core is authoritative | [architecture demo](./architecture-demo.md) |
 | CLI / Agent API | Feature-complete for v0.2; schema frozen | [agent-api](./agent-api.md) |
-| Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/galley-supervisor-sop.md) |
-| Managed GA runtime | Shipped in v0.2.0; Memory/SOP seed repair shipped in v0.2.6; v0.2.7 closes non-interactive `code_run` stdin and refreshes the bundled GA baseline to audited upstream `5d122e20`; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are the current baseline | [managed GA runtime](./managed-ga-runtime.md) |
+| Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/yole-supervisor-sop.md) |
+| Managed GA runtime | Bundled runtime remains the current baseline; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are active | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | v0.2.7 is published as GitHub Latest and the live update-channel target | [release / update SOP](./release-update-sop.md) |
-| Windows | v0.2.7 targets issue #9 `code_run` stdin and update-check diagnostics; Windows setup is published | [Windows checklist](./windows-build-checklist.md) |
+| Release path | v0.0.1 is local manual-test only; VPS-hosted updates are in the demand pool and not enabled yet | [release / update SOP](./release-update-sop.md), [demand pool](./demand-pool.md) |
+| Windows | v0.0.1 Windows NSIS package is built locally for manual testing | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream `5d122e20` | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline
@@ -63,7 +53,7 @@ Post-promote follow-up:
 | Phase | Status | Notes |
 |---|---|---|
 | Stage 0-2 | Complete | Infrastructure, bridge POC, desktop skeleton |
-| Stage 3 | Complete | v0.1 desktop workbench, multi-session, projects, polish |
+| Stage 3 | Complete | v0.1 desktop yole, multi-session, projects, polish |
 | v0.1.1 release path | Shipped | Bundled Python, macOS DMG, Windows NSIS artifact path |
 | Bridge-owner prototype | Complete | Validated Rust-side process ownership direction |
 | B1 | Complete | Rust core skeleton + read-only CLI |
@@ -79,7 +69,7 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Current package metadata uses `0.2.7`. For the next release, update:
+- Current package metadata uses `0.0.1`. For the next release, update:
   - `package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`

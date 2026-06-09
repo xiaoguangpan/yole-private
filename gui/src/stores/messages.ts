@@ -154,7 +154,7 @@ interface MessagesActions {
    * (`socket_listener::dispatch_session_send`). Skips the SQLite write
    * that `appendUserTurn` does because the row is already in DB.
    * Triggered by the `user-message-persisted` Tauri event whenever CLI
-   * / supervisor agents call `galley session send`.
+   * / supervisor agents call `yole session send`.
    *
    * Otherwise close to `appendUserTurn`: appends a UserTurn, sets
    * `agentRunning=true` only when the bridge has been dispatched, bumps

@@ -5,7 +5,7 @@ import type { ApprovalDecision } from "@/types/ipc";
 import type { RuntimeKind } from "@/types/session";
 
 /**
- * Thin GUI wrappers over Galley Core Tauri commands. The GUI does not
+ * Thin GUI wrappers over Yole Core Tauri commands. The GUI does not
  * hold a SQLite connection; Rust owns persistence so GUI and CLI share
  * the same authority path.
  */
@@ -14,7 +14,7 @@ import type { RuntimeKind } from "@/types/session";
 //
 // All session writes (create / archive / rename / pin / delete +
 // bulk variants + project CRUD) moved to sessionsStore in M4b
-// (2026-05-19). They invoke Rust Galley Core commands; the sweep
+// (2026-05-19). They invoke Rust Yole Core commands; the sweep
 // utilities below now do the same.
 
 /**
@@ -172,7 +172,7 @@ export async function searchMessages(
  * different shapes — keep the conversion out of this primitive.
  */
 /**
- * @deprecated B1 M3 — Rust port available at `galley_core_lib::db::SqliteGalley::session_messages`.
+ * @deprecated B1 M3 — Rust port available at `yole_core_lib::db::SqliteYole::session_messages`.
  * Migrate call sites to `invoke("session_messages", {...})` then delete this
  * once no callers remain. Kept alive in parallel per refactor/invariants.md §I1.
  */
@@ -309,7 +309,7 @@ export async function setPref<T>(key: string, value: T): Promise<void> {
 
 /**
  * Push the localized title / body for the background-mode close hint
- * into Galley Core. The Rust close handler fires synchronously inside
+ * into Yole Core. The Rust close handler fires synchronously inside
  * the window-event callback, so it can't reach GUI i18n — we push the
  * active-language copy here (during hydrate and again on language
  * change) and Rust parks it until a close happens.

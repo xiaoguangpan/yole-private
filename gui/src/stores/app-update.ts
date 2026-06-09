@@ -55,7 +55,7 @@ const PREF_PREPARED_VERSION = "app_update_prepared_version";
 const PREF_READY_TOAST_VERSION = "app_update_ready_toast_version";
 const PREF_COMPLETED_TOAST_VERSION = "app_update_completed_toast_version";
 const APP_UPDATE_MANUAL_DOWNLOAD_URL =
-  "https://github.com/wangjc683/galley/releases/latest";
+  "https://na.itxgp.com/yole-downloads/windows/Yole_0.0.1_x64-setup.exe";
 
 export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
   status: { kind: "idle" },

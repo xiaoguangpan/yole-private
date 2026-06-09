@@ -1,0 +1,33 @@
+services:
+  yole-provisioner:
+    build: .
+    container_name: yole-provisioner
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      YOLE_PROVISIONER_LISTEN: "0.0.0.0:8080"
+      YOLE_NEWAPI_BASE_URL: "https://na.itxgp.com"
+      YOLE_NEWAPI_ADMIN_USER_ID: "${YOLE_NEWAPI_ADMIN_USER_ID:-1}"
+      YOLE_NEWAPI_PUBLIC_V1_BASE_URL: "https://na.itxgp.com/v1"
+      YOLE_TRIAL_TOKEN_PREFIX: "yole"
+      YOLE_TRIAL_INITIAL_CREDIT_USD: "50"
+      YOLE_TRIAL_LOW_BALANCE_USD: "5"
+      YOLE_TRIAL_USER_GROUP: "yole"
+      YOLE_TRIAL_TOKEN_GROUP: "yole"
+      YOLE_TRIAL_DEFAULT_MODEL: "gpt-5.5"
+      YOLE_TRIAL_ALLOWED_MODELS: "gpt-5.5"
+      YOLE_CONTACT_WECHAT_ID: "${YOLE_CONTACT_WECHAT_ID:-}"
+      YOLE_CONTACT_WECHAT_QR_PATH: "/data/wechat-qr.png"
+      YOLE_CONTACT_OVERSEAS: "${YOLE_CONTACT_OVERSEAS:-}"
+      YOLE_ACCOUNT_STORE_PATH: "/data/accounts.json"
+      YOLE_RATE_LIMIT_PER_IP_PER_HOUR: "3"
+      YOLE_RATE_LIMIT_PER_IP_PER_DAY: "10"
+      YOLE_TRUST_PROXY_HEADERS: "true"
+      YOLE_CLIENT_IP_HEADER: "X-Forwarded-For"
+      YOLE_NEWAPI_ADMIN_TOKEN: "${YOLE_NEWAPI_ADMIN_TOKEN:?set in shell or .env}"
+    volumes:
+      - yole-provisioner-data:/data
+
+volumes:
+  yole-provisioner-data:

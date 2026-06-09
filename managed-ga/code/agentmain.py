@@ -14,7 +14,7 @@ except Exception: pass
 from ga import GenericAgentHandler, smart_format, get_global_memory, format_error, consume_file
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-state_dir = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or script_dir)
+state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):

@@ -1,4 +1,4 @@
--- 005_add_message_preamble.sql · Galley
+-- 005_add_message_preamble.sql · Yole
 -- Persist per-turn LLM preamble ("当前阶段：..." paragraph) on
 -- assistant message rows.
 --

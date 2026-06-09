@@ -11,7 +11,7 @@ function Icon({ name, size = 16, weight = 'thin', color, style = {} }) {
   );
 }
 
-function MacChrome({ width, height, title = 'GA Workbench', children, showTraffic = true, titleStyle = {} }) {
+function MacChrome({ width, height, title = 'Yole', children, showTraffic = true, titleStyle = {} }) {
   return (
     <div className="macwin" style={{ width, height }}>
       <div className="macwin-titlebar">

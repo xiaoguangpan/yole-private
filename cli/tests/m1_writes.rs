@@ -5,7 +5,7 @@
 //!
 //! Strategy mirrors the existing `cli_test.rs`:
 //!
-//! 1. Socket-backed write commands assert the cheap "Galley Core not
+//! 1. Socket-backed write commands assert the cheap "Yole Core not
 //!    running → exit 4 db_unavailable" path. Full happy-path coverage
 //!    for these would require spinning up a real socket server in-test
 //!    (no AppHandle available outside Tauri), and the underlying trait
@@ -139,30 +139,30 @@ async fn seed_pref(pool: &SqlitePool, key: &str, value_json: &str) {
 }
 
 /// Run the CLI with the socket path namespaced to a tempdir, so no live
-/// Galley Core on the developer's machine accidentally answers the
+/// Yole Core on the developer's machine accidentally answers the
 /// "no Core running" tests.
-fn run_galley_isolated(
+fn run_yole_isolated(
     db: &std::path::Path,
     tmp: &std::path::Path,
     args: &[&str],
 ) -> (String, Option<i32>) {
-    let bin = PathBuf::from(env!("CARGO_BIN_EXE_galley"));
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_yole"));
     let out = Command::new(&bin)
         .args(args)
-        .env("GALLEY_DB_PATH", db)
+        .env("YOLE_DB_PATH", db)
         .env("TMPDIR", tmp)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .expect("spawn galley");
+        .expect("spawn yole");
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     (stdout, out.status.code())
 }
 
 fn tempdir() -> TempDir {
     tempfile::Builder::new()
-        .prefix("galley-m1-test-")
+        .prefix("yole-m1-test-")
         .tempdir()
         .expect("create tempdir")
 }
@@ -174,7 +174,7 @@ async fn session_new_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["session", "new", "first task"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "new", "first task"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "db_unavailable");
@@ -188,7 +188,7 @@ async fn session_new_passes_through_optional_flags() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &[
@@ -215,7 +215,7 @@ async fn session_new_rejects_runtime_all() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &["session", "new", "investigate", "--runtime", "all"],
@@ -231,7 +231,7 @@ async fn session_btw_without_core_exits_4() {
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
     let (stdout, code) =
-        run_galley_isolated(&db, td.path(), &["session", "btw", "sess_x", "ping?"]);
+        run_yole_isolated(&db, td.path(), &["session", "btw", "sess_x", "ping?"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -240,7 +240,7 @@ async fn session_stop_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["session", "stop", "sess_x"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "stop", "sess_x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -249,7 +249,7 @@ async fn session_archive_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["session", "archive", "sess_x"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "archive", "sess_x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -258,7 +258,7 @@ async fn session_restore_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["session", "restore", "sess_x"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "restore", "sess_x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -271,7 +271,7 @@ async fn session_move_accepts_no_to_flag() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["session", "move", "sess_x"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "move", "sess_x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -280,7 +280,7 @@ async fn session_move_accepts_to_flag() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &["session", "move", "sess_x", "--to", "proj_demo"],
@@ -295,7 +295,7 @@ async fn project_create_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &["project", "create", "MyApp refactor", "--root-path", "/x"],
@@ -308,7 +308,7 @@ async fn project_delete_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "delete", "proj_demo"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "delete", "proj_demo"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -321,7 +321,7 @@ async fn project_list_happy_path_ndjson() {
     seed_project(&pool, "proj_b", "Beta", "2026-05-18T00:00:00Z").await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "list"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 2);
@@ -336,7 +336,7 @@ async fn project_list_empty_db_returns_empty_stdout() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "list"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert!(
         stdout.trim().is_empty(),
@@ -347,10 +347,10 @@ async fn project_list_empty_db_returns_empty_stdout() {
 #[tokio::test]
 async fn project_list_db_unavailable_exits_4() {
     let td = tempdir();
-    // Don't create the DB file. `project list` opens SqliteGalley
+    // Don't create the DB file. `project list` opens SqliteYole
     // directly (no socket), so a missing file surfaces as exit 4.
     let db = td.path().join("nonexistent.db");
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "list"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "db_unavailable");
@@ -391,7 +391,7 @@ async fn project_brief_counts_active_sessions_and_running_subset() {
     .await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "brief", "proj_batch"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "brief", "proj_batch"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["schemaVersion"], 1);
@@ -423,7 +423,7 @@ async fn project_show_includes_tail_messages_per_session() {
     seed_message(&pool, "m2", "s_review", 1, 0, "assistant", "second").await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &["project", "show", "proj_batch", "--tail", "1"],
@@ -457,7 +457,7 @@ async fn session_follow_without_core_emits_snapshot_and_clean_end() {
     seed_message(&pool, "m1", "s_review", 0, 0, "user", "inspect").await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &["session", "follow", "s_review", "--tail", "1"],
@@ -492,7 +492,7 @@ async fn project_follow_without_live_sessions_ends_after_snapshot() {
     .await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 2, "stdout: {stdout}");
@@ -527,7 +527,7 @@ async fn project_follow_until_idle_final_show_emits_final_snapshot() {
     seed_message(&pool, "m1", "s_idle", 0, 0, "user", "inspect").await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(
+    let (stdout, code) = run_yole_isolated(
         &db,
         td.path(),
         &[
@@ -584,7 +584,7 @@ async fn project_follow_running_session_without_core_marks_session_end() {
     .await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["project", "follow", "proj_batch"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 4, "stdout: {stdout}");
@@ -616,7 +616,7 @@ async fn llm_list_happy_path_ndjson() {
     .await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["llm", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["llm", "list"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 2);
@@ -632,7 +632,7 @@ async fn llm_list_empty_cache_returns_empty_stdout_exit_0() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["llm", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["llm", "list"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert!(
         stdout.trim().is_empty(),
@@ -652,7 +652,7 @@ async fn llm_list_corrupt_cache_shape_exits_2() {
     seed_pref(&pool, "llm_list", r#"{"oops":"not an array"}"#).await;
     drop(pool);
 
-    let (stdout, code) = run_galley_isolated(&db, td.path(), &["llm", "list"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["llm", "list"]);
     assert_eq!(code, Some(2), "stdout: {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "invalid_args");
@@ -664,6 +664,6 @@ async fn llm_set_without_core_exits_4() {
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
     let (stdout, code) =
-        run_galley_isolated(&db, td.path(), &["llm", "set", "sess_x", "glm-4.5-x"]);
+        run_yole_isolated(&db, td.path(), &["llm", "set", "sess_x", "glm-4.5-x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }

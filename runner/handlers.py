@@ -1,9 +1,9 @@
-"""WorkbenchHandler: extends GenericAgentHandler with approval interception.
+"""YoleHandler: extends GenericAgentHandler with approval interception.
 
 The approval gate sits in front of `super().dispatch()`. We keep GA's tool
-execution path as the authority, and only add Galley's approval + progress
+execution path as the authority, and only add Yole's approval + progress
 signals around it. GA upgrades can move internals around; this module uses
-runtime feature detection for the pieces Galley depends on.
+runtime feature detection for the pieces Yole depends on.
 
 This module imports GA modules (`agent_loop`, `ga`). The caller must put
 the GA installation path on sys.path before importing this module.
@@ -21,7 +21,7 @@ from ga import GenericAgentHandler
 
 # Upstream GA commit 3205f4a (post-cf65515 baseline) added a `tool_num`
 # kwarg to `BaseHandler.dispatch` so do_* tools can scale output length
-# by the number of parallel calls. Workbench's baseline is past that
+# by the number of parallel calls. Yole's baseline is past that
 # commit, but the user's local GA repo may not be — and we are
 # explicitly non-invasive (AGENTS.md "GA upgrade cadence is the user's
 # call"). So we detect support at import time and forward `tool_num`
@@ -44,8 +44,8 @@ def _base_dispatch_calls_tool_before_callback() -> bool:
 
 # Upstream GA commit 1a8abc4 (post-b063518 baseline) replaced the
 # BaseHandler.dispatch callback calls with plugins.hooks triggers.
-# Approval still happens in WorkbenchHandler.dispatch before super(),
-# but Galley's live turn_start signal used tool_before_callback as its
+# Approval still happens in YoleHandler.dispatch before super(),
+# but Yole's live turn_start signal used tool_before_callback as its
 # hook. Detect whether the loaded GA still calls it; if not, emit the
 # signal ourselves immediately before delegating to GA's dispatch.
 _BASE_DISPATCH_CALLS_TOOL_BEFORE_CALLBACK: bool = (
@@ -87,7 +87,7 @@ APPROVAL_REASONS: dict[str, str] = {
 ApprovalRequester = Callable[[str, dict[str, Any]], str]
 
 
-class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no stubs
+class YoleHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no stubs
     """GA handler that gates high-risk tool calls behind user approval."""
 
     def __init__(
@@ -127,11 +127,11 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
         # GA has no turn_start_callback extension point, so we synthesize
         # one around dispatch. Older GA called tool_before_callback
         # inside BaseHandler.dispatch. Newer GA switched to plugins.hooks,
-        # so WorkbenchHandler emits the same signal itself when feature
+        # so YoleHandler emits the same signal itself when feature
         # detection says the base dispatch no longer does. Dedupe
         # (multi-tool turn → single emit, plus coordination with the
         # bridge's predict-emit path) lives on the bridge side now —
-        # see workbench_bridge._emit_turn_start. The handler just passes
+        # see yole_bridge._emit_turn_start. The handler just passes
         # the current turn number through.
         self._turn_started_callback: Callable[[int], None] | None = (
             turn_started_callback
@@ -147,7 +147,7 @@ class WorkbenchHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no 
 
         Older GA baselines call this from `BaseHandler.dispatch` via
         `try_call_generator` before each tool dispatch. Newer baselines
-        no longer do; WorkbenchHandler.dispatch calls this method itself
+        no longer do; YoleHandler.dispatch calls this method itself
         when needed. In both cases, `agent_runner_loop` has already set
         `self.current_turn` to the current 1-based turn number.
 

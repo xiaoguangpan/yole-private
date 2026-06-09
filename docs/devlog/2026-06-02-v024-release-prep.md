@@ -18,7 +18,7 @@ After `v0.2.3` shipped, `main` accumulated enough user-facing changes to justify
 a new patch release rather than waiting for a larger feature train. The two
 release-driving changes are the ChatGPT / Codex managed model provider and
 Browser Control offline recovery. They improve first-run setup and browser task
-reliability, but both sit on paths where a failure feels like Galley itself is
+reliability, but both sit on paths where a failure feels like Yole itself is
 broken.
 
 The latest `main` check workflow was green across frontend checks, managed GA

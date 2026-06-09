@@ -26,6 +26,7 @@ export type AppErrorHint = NonNullable<IPCErrorEvent["hint"]>;
 export interface AppError {
   /** Stable id (for toast deduping / list keys). Generated client-side. */
   id: string;
+  sessionId?: string;
   category: AppErrorCategory;
   severity: AppErrorSeverity;
   /**
@@ -74,6 +75,7 @@ function genId(): string {
 export function fromIPCError(event: IPCErrorEvent): AppError {
   return {
     id: genId(),
+    sessionId: event.sessionId,
     category: event.category,
     severity: event.severity,
     message: event.message,

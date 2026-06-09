@@ -47,7 +47,7 @@ export interface BridgeSpawnArgs {
    */
   python?: string;
   /**
-   * v0.1.1+: when false (default), spawn the Galley-bundled Python
+   * v0.1.1+: when false (default), spawn the Yole-bundled Python
    * at `$RESOURCE/python/`. The Rust side now resolves the bundled
    * vs external decision the same way the old TS path did:
    * production build + `useExternalPython === false` → bundled;
@@ -65,14 +65,14 @@ export interface BridgeSpawnArgs {
   cwd?: string;
   /**
    * Working directory for the bridge process itself. Should be the
-   * Workbench repo root so `python -m runner.workbench_bridge`
+   * Yole repo root so `python -m runner.yole_bridge`
    * resolves the package.
    */
   bridgeCwd?: string;
   /** Initial LLM index (--llm-no). */
   llmIndex?: number;
   /** Stable LLM identity. External GA uses the raw `agent.list_llms()` name;
-   * managed GA uses the Galley managed model id. */
+   * managed GA uses the Yole managed model id. */
   llmKey?: string;
   /** Extra environment variables passed to the Python child. */
   env?: Record<string, string>;
@@ -472,7 +472,7 @@ function actionableInvokeError(tag: string): string | null {
     case "managed_model_not_configured":
       return "内置 GA 模型不可用。请在 Models 添加模型，或重新输入 API Key。";
     case "managed_runtime_invalid":
-      return "Galley 内置运行时不完整。请重新安装或更新 Galley。";
+      return "Yole 内置运行时不完整。请重新安装或更新 Yole。";
     case "ga_path_invalid":
       return "接入的 GenericAgent 路径不可用。请到设置的 Runtime 页面重新选择 GA 目录。";
     default:

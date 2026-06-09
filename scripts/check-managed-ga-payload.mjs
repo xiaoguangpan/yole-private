@@ -88,8 +88,8 @@ requireFile(path.join(codeRoot, "agentmain.py"));
 requireFile(path.join(codeRoot, "agent_loop.py"));
 requireFile(path.join(codeRoot, "llmcore.py"));
 requireFile(path.join(codeRoot, "frontends", "wechatapp.py"));
-if (fs.existsSync(path.join(managedRoot, "galley-prompts"))) {
-  fail("managed prompt profile is embedded in Core; remove managed-ga/galley-prompts");
+if (fs.existsSync(path.join(managedRoot, "yole-prompts"))) {
+  fail("managed prompt profile is embedded in Core; remove managed-ga/yole-prompts");
 }
 
 const tauriConfig = readJson(tauriConfigPath);
@@ -100,9 +100,9 @@ if (!resourceMap || resourceMap["../managed-ga"] !== "managed-ga") {
 const externalBin = tauriConfig?.bundle?.externalBin;
 if (
   !Array.isArray(externalBin) ||
-  !externalBin.includes("target/tauri-sidecars/galley")
+  !externalBin.includes("target/tauri-sidecars/yole")
 ) {
-  fail("core/tauri.conf.json must bundle the Galley CLI via target/tauri-sidecars/galley");
+  fail("core/tauri.conf.json must bundle the Yole CLI via target/tauri-sidecars/yole");
 }
 
 const manifest = readJson(manifestPath);

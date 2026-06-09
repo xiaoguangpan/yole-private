@@ -4,7 +4,7 @@ from urllib.parse import quote
 import requests, qrcode
 from Crypto.Cipher import AES
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_TEMP_DIR = os.environ.get('GALLEY_WECHAT_TEMP_DIR') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'temp')
+_TEMP_DIR = os.environ.get('YOLE_WECHAT_TEMP_DIR') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'temp')
 from agentmain import GeneraticAgent
 
 # ── AuthExpired (errcode -14 from getUpdates) ──
@@ -19,7 +19,7 @@ _task_aborted: dict = {}  # uid -> True  (set by /stop, read by _handle)
 for _k in ('HTTPS_PROXY', 'https_proxy'):
     os.environ.pop(_k, None)  # avoid inherited proxy breaking WeChat long-poll SSL
 API = 'https://ilinkai.weixin.qq.com'
-TOKEN_FILE = Path(os.environ.get('GALLEY_WECHAT_TOKEN_FILE') or (Path.home() / '.wxbot' / 'token.json'))
+TOKEN_FILE = Path(os.environ.get('YOLE_WECHAT_TOKEN_FILE') or (Path.home() / '.wxbot' / 'token.json'))
 TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
 VER, MSG_USER, MSG_BOT, ITEM_TEXT, STATE_FINISH = '2.1.10', 1, 2, 1, 2
 ILINK_APP_ID = 'bot'
@@ -69,7 +69,7 @@ class WxBotClient:
         qr_id, url = d['qrcode'], d.get('qrcode_img_content', '')
         print(f'[QR登录] ID: {qr_id}')
         if url:
-            img = Path(os.environ.get('GALLEY_WECHAT_QR_FILE') or (self._tf.parent / 'wx_qr.png'))
+            img = Path(os.environ.get('YOLE_WECHAT_QR_FILE') or (self._tf.parent / 'wx_qr.png'))
             img.parent.mkdir(parents=True, exist_ok=True)
             qrcode.make(url).save(str(img))  # 保存到文件，不弹浏览器
             qr = qrcode.QRCode(border=1); qr.add_data(url); qr.make(fit=True); qr.print_ascii(invert=True)

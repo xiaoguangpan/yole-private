@@ -40,6 +40,7 @@ import {
   managedModelsToLLMs,
 } from "@/lib/managed-model-options";
 import { bucketSession } from "@/lib/sessions";
+import { YOLE_SIMPLIFIED_UI } from "@/lib/yole";
 import { useAppUpdateStore } from "@/stores/app-update";
 import { useBrowserControlStore } from "@/stores/browser-control";
 import {
@@ -53,6 +54,7 @@ import { usePrefsStore } from "@/stores/prefs";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { useYoleAccountStore } from "@/stores/yole-account";
 import { hydrateApp } from "@/lib/hydrate";
 import { makeAppError } from "@/types/app-error";
 
@@ -76,6 +78,7 @@ function App() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("runtime");
+  const simplifiedUi = YOLE_SIMPLIFIED_UI;
   const browserControlStatus = useBrowserControlStore((s) => s.status);
   const browserControlSetupOpen = useBrowserControlStore((s) => s.setupOpen);
   const ensureBrowserControlLayout = useBrowserControlStore(
@@ -196,6 +199,12 @@ function App() {
   const toasts = useUiStore((s) => s.toasts);
   const pushToast = useUiStore((s) => s.pushToast);
   const dismissToast = useUiStore((s) => s.dismissToast);
+  const yoleAccount = useYoleAccountStore((s) => s.status);
+  const yoleAccountLoading = useYoleAccountStore((s) => s.loading);
+  const refreshYoleAccount = useYoleAccountStore((s) => s.refresh);
+  const notifyYoleLowBalance = useYoleAccountStore(
+    (s) => s.notifyLowBalanceInActiveChat,
+  );
   const checkForAppUpdate = useAppUpdateStore((s) => s.check);
   const restartAppUpdate = useAppUpdateStore((s) => s.restart);
   const [emptyComposerFocusTick, setEmptyComposerFocusTick] = useState(0);
@@ -255,14 +264,14 @@ function App() {
     activeRuntimeKind === "managed" && !hasConfiguredManagedModel;
   const sidebarRuntimeIndicator =
     activeRuntimeKind === "managed"
-      ? hasConfiguredManagedModel
+      ? simplifiedUi || hasConfiguredManagedModel
         ? "hidden"
         : "configure-models"
       : gaConfig.gaPath.trim() !== "" && gaConfig.python.trim() !== ""
         ? "external-ready"
         : "external-unconfigured";
   const openSettings = (tab: SettingsTab = "runtime") => {
-    setSettingsTab(tab);
+    setSettingsTab(normalizeSettingsTab(tab, simplifiedUi));
     setSettingsOpen(true);
   };
   const openModelsForMissingConfig = () => openSettings("models");
@@ -419,6 +428,18 @@ function App() {
   useEffect(() => {
     void hydrateApp();
   }, []);
+
+  useEffect(() => {
+    if (activeRuntimeKind !== "managed") return;
+    if (!activeSessionId) return;
+    if (!yoleAccount?.lowBalance) return;
+    notifyYoleLowBalance();
+  }, [
+    activeRuntimeKind,
+    activeSessionId,
+    yoleAccount?.lowBalance,
+    notifyYoleLowBalance,
+  ]);
 
   useEffect(() => subscribeSystemTheme(setSystemTheme), []);
 
@@ -587,7 +608,7 @@ function App() {
 
   // `user-message-persisted` listener: Rust core's socket_listener emits
   // this Tauri event whenever a user message is persisted via the socket
-  // transport (CLI `galley session send`, supervisor agents). The GUI's
+  // transport (CLI `yole session send`, supervisor agents). The GUI's
   // own Composer path skips this — it mutates the store synchronously
   // and emitting here would double-render.
   //
@@ -1058,6 +1079,11 @@ function App() {
                 ? () => openSettings("im")
                 : undefined
             }
+            yoleAccount={activeRuntimeKind === "managed" ? yoleAccount : null}
+            yoleAccountLoading={yoleAccountLoading}
+            onRefreshYoleAccount={() => {
+              void refreshYoleAccount();
+            }}
             conversationWidth={conversationWidth}
             onToggleConversationWidth={() => {
               void setConversationWidth(
@@ -1126,8 +1152,12 @@ function App() {
           <Sidebar
             runtimeIndicator={sidebarRuntimeIndicator}
             onOpenRuntimeSettings={() => openSettings("runtime")}
-            onOpenModelsSettings={() => openSettings("models")}
-            onOpenAgentSettings={() => openSettings("integration")}
+            onOpenModelsSettings={
+              simplifiedUi ? undefined : () => openSettings("models")
+            }
+            onOpenAgentSettings={
+              simplifiedUi ? undefined : () => openSettings("integration")
+            }
             sessions={visibleSessions}
             activeId={effectiveActiveId}
             onNewChat={() => {
@@ -1389,6 +1419,7 @@ function App() {
         sessions={visibleSessions}
         runtimeKind={activeRuntimeKind}
         llms={llms}
+        simplifiedUi={simplifiedUi}
         onNewChat={() => {
           setActiveProjectFilter(undefined);
           setActiveSession(undefined);
@@ -1467,7 +1498,7 @@ function App() {
           // Manual-typed GA path from Settings → Runtime. The
           // SettingsRuntime field has already validated and refuses to
           // call this on `not-found`; we trust it here. setGAConfig
-          // shows the same "重启 Galley 才能生效" toast as the picker
+          // shows the same "重启 Yole 才能生效" toast as the picker
           // flow, keeping both entry points symmetric.
           await setGAConfig({ gaPath: path });
         }}
@@ -1475,7 +1506,7 @@ function App() {
           // v0.1.1: persist the bundled-vs-external choice. Like
           // gaPath, takes effect on next bridge spawn (existing live
           // sessions keep their current Python). setGAConfig shows
-          // the same "重启 Galley" toast.
+          // the same "重启 Yole" toast.
           void setGAConfig({ useExternalPython: useExternal });
         }}
         onChangeRuntimeKind={(kind) => {
@@ -1536,6 +1567,7 @@ function App() {
         onChangeThemePreference={(preference) => {
           void setThemePreference(preference);
         }}
+        simplifiedUi={simplifiedUi}
       />
 
       <ArchivedDialog
@@ -1619,6 +1651,14 @@ function App() {
       <ToastHost
         toasts={toasts}
         onDismiss={dismissToast}
+        yoleAccount={yoleAccount}
+        isYoleManagedSession={(sessionId) => {
+          if (!sessionId) return activeRuntimeKind === "managed";
+          return (
+            sessions.find((session) => session.id === sessionId)
+              ?.gaRuntimeKind === "managed"
+          );
+        }}
         onViewProject={openProjectInSidebar}
         onRestartChannels={() => {
           void restartChannelsFromToast();
@@ -1639,6 +1679,16 @@ function App() {
 }
 
 export default App;
+
+function normalizeSettingsTab(tab: SettingsTab, simplifiedUi: boolean): SettingsTab {
+  if (
+    simplifiedUi &&
+    (tab === "models" || tab === "integration" || tab === "shortcuts")
+  ) {
+    return "runtime";
+  }
+  return tab;
+}
 
 // ---------------- Lazy session creation ----------------
 

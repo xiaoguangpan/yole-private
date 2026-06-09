@@ -1,4 +1,4 @@
-//! Galley IPC Protocol v0.1 — Rust mirror of `runner/ipc.py`.
+//! Yole IPC Protocol v0.1 — Rust mirror of `runner/ipc.py`.
 //!
 //! Source of truth for the wire format is [`docs/ipc-protocol.md`]. The Python
 //! side (`runner/ipc.py`) emits these as JSON Lines; we parse them here.
@@ -46,7 +46,7 @@ use serde_json::Value;
 /// `runner/ipc.py:PROTOCOL_VERSION`.
 pub const PROTOCOL_VERSION: &str = "0.1";
 
-// ---------------- Events (runner -> Galley Core) ----------------
+// ---------------- Events (runner -> Yole Core) ----------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -302,7 +302,7 @@ fn default_system_variant() -> String {
     "system".to_string()
 }
 
-// ---------------- Commands (Galley Core -> runner) ----------------
+// ---------------- Commands (Yole Core -> runner) ----------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

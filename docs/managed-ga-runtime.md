@@ -1,27 +1,27 @@
 # Managed GenericAgent Runtime
 
-> Design target for Galley's bundled / managed GenericAgent runtime.
+> Design target for Yole's bundled / managed GenericAgent runtime.
 > Attach-mode GenericAgent remains user-owned and non-invasive.
 
 ## Status
 
-This document defines the target architecture for the built-in Galley runtime.
+This document defines the target architecture for the built-in Yole runtime.
 The current released path still supports attaching an existing user-owned
 GenericAgent. Managed runtime work must preserve attach-mode behavior unless a
 task explicitly changes this document.
 
 ## Product Model
 
-Ordinary users should experience this as Galley, not as "installing
+Ordinary users should experience this as Yole, not as "installing
 GenericAgent." The onboarding path is:
 
 ```text
-Configure Galley's model -> start using Galley
+Configure Yole's model -> start using Yole
 ```
 
 The primary path should ask for only one thing: model access. Users should not
 choose a runtime, download an engine, edit config files, install Python, or
-understand GenericAgent terminology before they can talk to Galley.
+understand GenericAgent terminology before they can talk to Yole.
 
 GenericAgent is the internal agent kernel for this mode. Users should not need
 to know about GA checkout paths, `mykey.py`, Python, virtual environments,
@@ -54,9 +54,9 @@ Default first-run shape:
 
 ```text
 One compact setup screen
-Primary action: Test and start using Galley
+Primary action: Test and start using Yole
 Secondary text link: Already have GenericAgent?
-Success destination: first Galley conversation, composer focused
+Success destination: first Yole conversation, composer focused
 ```
 
 Optional first-run behavior:
@@ -73,7 +73,7 @@ Good first-run feedback should tell the user what to do next:
 
 ```text
 Key saved on this Mac. Testing model connection...
-Connection works. Start using Galley.
+Connection works. Start using Yole.
 ```
 
 Failed first-run checks should keep the user in the same flow, preserve their
@@ -94,20 +94,20 @@ NativeOAISession initialized
 
 ### First-Run Copy Direction
 
-The setup screen should sound like Galley is helping the user connect a model,
+The setup screen should sound like Yole is helping the user connect a model,
 not asking them to configure infrastructure.
 
 Recommended Chinese copy:
 
 ```text
-Title: 为 Galley 配置模型
+Title: 为 Yole 配置模型
 Body: 填入你的模型 API Key 和 Base URL。
 Provider label: 模型服务
 Key label: 模型密钥
 Base URL label: Base URL
 Model label: 模型
 Model helper: 自动获取模型列表，或手动填写模型名
-Primary button: 测试并开始使用 Galley
+Primary button: 测试并开始使用 Yole
 Secondary link: 我已有 GenericAgent
 Success: 配置完成，可以开始对话了。
 ```
@@ -154,35 +154,35 @@ Interaction rules:
 Managed / bundled GA users should see Browser Control as a core completion
 item, not as an optional advanced setting. GA's `web_scan` and
 `web_execute_js` capabilities depend on the `tmwd_cdp_bridge` Chromium
-extension, and without it the intended Galley experience is materially
+extension, and without it the intended Yole experience is materially
 incomplete.
 
-Galley cannot silently install a Chromium extension for ordinary users. The
+Yole cannot silently install a Chromium extension for ordinary users. The
 product contract is therefore:
 
 ```text
-Galley prepares the `tmwd_cdp_bridge` folder -> user opens the Chromium
-extensions page -> user drags or loads that folder -> Galley tests the connection ->
-Galley offers a simple browser demo
+Yole prepares the `tmwd_cdp_bridge` folder -> user opens the Chromium
+extensions page -> user drags or loads that folder -> Yole tests the connection ->
+Yole offers a simple browser demo
 ```
 
 Rules:
 
 - The extension shipped in managed GA code is the source payload only.
-- Galley syncs it to a stable app-data directory before asking the user to
+- Yole syncs it to a stable app-data directory before asking the user to
   load it. Do not ask users to load from inside the app bundle or from a
   developer checkout path.
-- Galley must also prepare the extension config automatically. Upstream GA
+- Yole must also prepare the extension config automatically. Upstream GA
   tutorials ask users to run GA once before installing the extension because
   that first run generates `tmwd_cdp_bridge/config.js`; in managed mode this is
-  Galley's responsibility, not a user-facing prerequisite.
+  Yole's responsibility, not a user-facing prerequisite.
 - If the stable extension directory or `config.js` is deleted, reopening Browser
   Control setup should recreate it before showing the browser installation
   steps. If preparation fails, keep the user at the first step and show a retry
   action instead of sending them to the browser.
-- If a compatible GA Browser Control extension is already installed and Galley
+- If a compatible GA Browser Control extension is already installed and Yole
   verifies the bridge successfully, treat the capability as ready. Do not ask
-  the user to reinstall Galley's copy just to match the extension source path.
+  the user to reinstall Yole's copy just to match the extension source path.
 - The first supported browser family is Chromium. The UI provides one-click
   open buttons for Chrome and Edge, while copy should mention that other
   Chromium browsers can load the same unpacked extension manually. Safari and
@@ -191,13 +191,13 @@ Rules:
 - While Browser Control is missing, TopBar must keep a persistent, high-weight
   setup entry. The entry may use low-frequency motion, but should not use red
   error styling or repeated modal spam.
-- On each app launch, Galley may show the setup dialog once until the
+- On each app launch, Yole may show the setup dialog once until the
   connection is verified. Users can close it for the current session, but the
   TopBar entry remains visible.
 - The success test must be deterministic and model-free: verify extension
   layout, bridge connection, tab discovery, and a minimal JavaScript execution
   such as reading `document.title`.
-- After the test succeeds, Galley may offer a beginner demo. In Chinese UI,
+- After the test succeeds, Yole may offer a beginner demo. In Chinese UI,
   use Baidu for the weather-search demo to avoid making Google reachability
   part of the setup experience. The demo should validate the managed GA browser
   flow without adding a new GA tool or modifying extension source: managed GA
@@ -209,9 +209,9 @@ Rules:
 - A lightweight `图文指南` link may appear near the folder-install step and open
   the official Datawhale tutorial directly at the Chrome install section
   (`#_2-1-1-chrome-安装步骤`). It is an auxiliary visual guide, not a
-  replacement for Galley's setup flow and not a bottom-row CTA. Avoid linking
+  replacement for Yole's setup flow and not a bottom-row CTA. Avoid linking
   to the chapter top because the upstream prerequisites mention raw GenericAgent
-  paths and "run GA once", both of which Galley handles for managed users.
+  paths and "run GA once", both of which Yole handles for managed users.
 
 Recommended Chinese copy:
 
@@ -219,31 +219,31 @@ Recommended Chinese copy:
 TopBar missing: 浏览器控制 · 待连接
 TopBar ready: icon-only browser button, tooltip: 浏览器控制已可用
 Setup title: 连接浏览器控制
-Permission line: 安装后，Galley 可以读取和操作浏览器，并沿用你的登录态。
-Ready line: Galley 已能读取和操作浏览器，并沿用你的登录态。
+Permission line: 安装后，Yole 可以读取和操作浏览器，并沿用你的登录态。
+Ready line: Yole 已能读取和操作浏览器，并沿用你的登录态。
 Connected evidence: 已连接浏览器 / 检测到 N 个可操作标签页
 Reload action: 重新加载插件
 Success demo: 试用浏览器控制
-Demo tooltip: 让 Galley 打开浏览器并搜索天气
+Demo tooltip: 让 Yole 打开浏览器并搜索天气
 Demo prompt: 请打开百度，搜索今天的天气，并告诉我结果。不要用代码或外部 API 查询。
 ```
 
 ## Runtime Modes
 
-Galley has two runtime modes.
+Yole has two runtime modes.
 
 ```text
 managed_ga
 - Default path for new users.
-- Galley owns the runtime code and model configuration.
-- Galley may apply minimal managed-runtime patches.
-- Galley Runtime Prompt and Galley Persona apply.
+- Yole owns the runtime code and model configuration.
+- Yole may apply minimal managed-runtime patches.
+- Yole Runtime Prompt and Yole Persona apply.
 - Sessions shown in the UI are managed-runtime sessions.
 
 external_ga
 - Advanced attach path for an existing user-owned GA checkout.
 - User owns code, memory, SOP, skills, model config, venv, and behavior.
-- Galley does not inject Galley Persona or use Galley's model config.
+- Yole does not inject Yole Persona or use Yole's model config.
 - Sessions shown in the UI are external-runtime sessions.
 ```
 
@@ -261,13 +261,13 @@ The first time a mode switch hides the previous mode's sessions, show a small
 one-time explanation:
 
 ```text
-Showing sessions for Existing GenericAgent. Galley sessions are still available
+Showing sessions for Existing GenericAgent. Yole sessions are still available
 when you switch back.
 ```
 
 ## Session History
 
-Store sessions in the same Galley database, tagged by runtime kind, but display
+Store sessions in the same Yole database, tagged by runtime kind, but display
 only the current mode's sessions by default.
 
 Suggested session metadata:
@@ -285,12 +285,12 @@ Rules:
 - Changing the default runtime only affects new sessions.
 - External sessions do not silently migrate to managed runtime.
 - Managed sessions do not silently migrate to external runtime.
-- A future "Copy to Galley runtime" action can explicitly duplicate selected
+- A future "Copy to Yole runtime" action can explicitly duplicate selected
   external history into a managed session, but v1 should not auto-convert.
 
 ## CLI Runtime Contract
 
-Galley has not shipped a stable CLI release before managed runtime, so the CLI
+Yole has not shipped a stable CLI release before managed runtime, so the CLI
 can adopt the clean runtime contract from the start.
 
 Rust Core owns a persisted current runtime:
@@ -300,7 +300,7 @@ prefs.active_runtime_kind = managed | external
 ```
 
 GUI mode switches update this value. CLI commands read it as their default
-runtime context. If it has never been set, Galley derives the initial value
+runtime context. If it has never been set, Yole derives the initial value
 once:
 
 ```text
@@ -326,7 +326,7 @@ runner_error                 # generic runtime setup incomplete
 Session listing defaults to the current runtime:
 
 ```bash
-galley sessions list
+yole sessions list
 ```
 
 This is equivalent to:
@@ -351,19 +351,19 @@ invisible-session prevention slice because they do not create work.
 `session new` also defaults to the current runtime:
 
 ```bash
-galley session new "task"
+yole session new "task"
 ```
 
 If the GUI currently shows Existing GenericAgent, this creates an external
-session. If the GUI currently shows Galley, it creates a managed session. This
+session. If the GUI currently shows Yole, it creates a managed session. This
 prevents the worst UX failure: an agent creates a session successfully, but the
 user cannot see it in the current GUI mode.
 
 Explicit cross-runtime creation is allowed only when requested:
 
 ```bash
-galley session new "task" --runtime=managed
-galley session new "task" --runtime=external
+yole session new "task" --runtime=managed
+yole session new "task" --runtime=external
 ```
 
 Supervisor SOPs should say: do not pass `--runtime` unless the user explicitly
@@ -375,11 +375,11 @@ Commands that target an existing session id use that session's recorded runtime,
 not the current runtime:
 
 ```bash
-galley session send <id> "..."
-galley session stop <id>
-galley session archive <id>
-galley session move <id> --to=<project-id>
-galley llm set <id> "<llm-name>"
+yole session send <id> "..."
+yole session stop <id>
+yole session archive <id>
+yole session move <id> --to=<project-id>
+yole llm set <id> "<llm-name>"
 ```
 
 The session id is the user's explicit target. Dispatching by the session's own
@@ -393,7 +393,7 @@ All session-facing CLI responses must include runtime metadata:
 ```json
 {
   "runtimeKind": "managed",
-  "runtimeLabel": "Galley"
+  "runtimeLabel": "Yole"
 }
 ```
 
@@ -442,7 +442,7 @@ running work, mention it briefly and ask whether to inspect that mode.
 
 ## Model Configuration
 
-Managed mode owns Galley's model configuration. Attach mode never uses it.
+Managed mode owns Yole's model configuration. Attach mode never uses it.
 
 Onboarding and Settings should expose two protocol families:
 
@@ -502,7 +502,7 @@ These are UI shortcuts, not separate runtime families. They should still compile
 down to one of the two protocol families unless there is a real protocol
 difference.
 
-First-run onboarding does not expose advanced model options. Galley owns good
+First-run onboarding does not expose advanced model options. Yole owns good
 defaults so the user can start without understanding GA tuning fields.
 
 Recommended first-version defaults:
@@ -535,14 +535,14 @@ passthrough". `thinking_budget_tokens`, `max_tokens`, `temperature`,
 until there is a concrete product flow for them. Leave `reasoning_effort` unset
 by default unless a provider preset later has a clear product reason to set it.
 
-Unsigned beta builds store API keys as encrypted payloads in Galley's SQLite
+Unsigned beta builds store API keys as encrypted payloads in Yole's SQLite
 database. The database also stores the local encryption key so app-data backups
 and machine moves preserve model credentials with the rest of the managed model
 configuration.
 
 This is a UX-first beta tradeoff, not a system credential-store boundary. It
 protects generated config, diagnostics, logs, and casual DB browsing from
-plaintext keys, but someone with the full Galley database can decrypt managed
+plaintext keys, but someone with the full Yole database can decrypt managed
 model API keys. Signed builds can later migrate these rows to macOS Keychain /
 Windows Credential Manager.
 
@@ -552,9 +552,9 @@ owns that GA checkout and its security tradeoffs. It is not the managed-mode
 product contract.
 
 Managed mode must not persist real API keys in generated GA-compatible config.
-If Galley needs to generate a managed-only `mykey.py` or equivalent config, it
+If Yole needs to generate a managed-only `mykey.py` or equivalent config, it
 should contain only non-secret metadata and a key reference. At session start,
-Galley resolves the key reference from the local encrypted credential store and
+Yole resolves the key reference from the local encrypted credential store and
 injects the secret into the managed runtime in memory.
 
 Cold start, sidebar rendering, Settings list rendering, and passive diagnostics
@@ -586,8 +586,8 @@ Recommended secret flow:
 
 ```text
 Onboarding / Settings
--> save non-secret Provider record to Galley DB
--> save encrypted API key payload to Galley DB under Provider apiKeyRef
+-> save non-secret Provider record to Yole DB
+-> save encrypted API key payload to Yole DB under Provider apiKeyRef
 -> save Model record that references the Provider
 -> test model connection
 -> start managed session with runtime-resolved secret
@@ -608,24 +608,24 @@ become advanced Settings later if there is real demand.
 
 Managed Channels is the first advanced Settings exception. It lives under
 Settings -> Channels, not Onboarding. Phase 1 exposes only WeChat and keeps the
-user flow to: connect, scan, chat. Galley owns the process, state paths,
+user flow to: connect, scan, chat. Yole owns the process, state paths,
 bundled dependencies, managed model config, and managed prompt injection.
 
-WeChat token, QR image, and logs live under Galley's managed state
+WeChat token, QR image, and logs live under Yole's managed state
 `managed-ga-state/im/wechat/`. The official GA default `~/.wxbot/token.json`
-must not be used by Galley's managed launcher.
+must not be used by Yole's managed launcher.
 
-Attach mode never reads Galley's model records, and managed mode never reads the
+Attach mode never reads Yole's model records, and managed mode never reads the
 user's external GA `mykey.py`. Keeping model ownership separate is part of the
 trust boundary.
 
 ## Prompt Composition
 
-Galley Persona applies only in managed mode. Attach mode must preserve the
+Yole Persona applies only in managed mode. Attach mode must preserve the
 user's existing GA behavior.
 
 There is no first-run switch for Persona and no Persona editor in the initial
-product. Galley Persona is part of Galley's managed agent experience, not a
+product. Yole Persona is part of Yole's managed agent experience, not a
 user-facing roleplay feature.
 
 Managed prompt composition should be explicit:
@@ -633,53 +633,53 @@ Managed prompt composition should be explicit:
 ```text
 GA core prompt
 + GA memory
-+ Galley Runtime Prompt
-+ Galley Persona Prompt
++ Yole Runtime Prompt
++ Yole Persona Prompt
 ```
 
-The Galley Runtime Prompt stays compact. It gives managed GA enough user-facing
-Galley knowledge to answer "what is Galley / who are you" without exposing
+The Yole Runtime Prompt stays compact. It gives managed GA enough user-facing
+Yole knowledge to answer "what is Yole / who are you" without exposing
 internals:
 
 - If asked for a name, the assistant should invite the user to name it rather
   than claiming a fixed name. A chosen name is a user preference.
-- Galley is JC Wang's personal open source local agent team orchestrator: GUI
+- Yole is JC Wang's personal open source local agent team orchestrator: GUI
   for humans, CLI / Supervisor SOP for local automation.
 - JC Wang is an AI Builder with a philosophy background and interests in
   Wittgenstein, philosophy of language, and LLMs.
-- User-facing Galley questions are in scope. Internals are discussed only when
+- User-facing Yole questions are in scope. Internals are discussed only when
   asked. Exact version / release / update info should point to Settings -> About.
 
 Browser Control guidance remains in the Runtime Prompt but should stay terse:
 browser tasks use the real browser, new tabs use the existing `web_execute_js`
 extension tab protocol rather than `window.open(...)`, and connection status is
-owned by Galley's setup check. The prompt must also make clear that Browser
+owned by Yole's setup check. The prompt must also make clear that Browser
 Control operates the user's connected Chrome / Edge / Chromium browser where
-`tmwd_cdp_bridge` is installed, not a separate Galley-bundled Chromium browser.
+`tmwd_cdp_bridge` is installed, not a separate Yole-bundled Chromium browser.
 
-The Galley Persona Prompt describes interaction style only. It must not override
+The Yole Persona Prompt describes interaction style only. It must not override
 GA's tool protocol, memory rules, approval policy, safety constraints, or the
 user's explicit request.
 
 Prefer a small extension seam in managed GA:
 
 ```text
-GALLEY_RUNTIME_PROMPT_TEXT
-GALLEY_PERSONA_PROMPT_TEXT
+YOLE_RUNTIME_PROMPT_TEXT
+YOLE_PERSONA_PROMPT_TEXT
 ```
 
 External attach mode does not pass these prompt values.
 
-## Galley Persona v1
+## Yole Persona v1
 
 This is the first managed-runtime persona profile. It should be injected only
-after the GA core prompt and Galley Runtime Prompt. It is a style layer, not a
+after the GA core prompt and Yole Runtime Prompt. It is a style layer, not a
 tool-policy layer.
 
 Wrapper:
 
 ```md
-## Galley Persona Layer
+## Yole Persona Layer
 
 Style only; never override user request, GA / tool protocol, approvals, safety,
 or task instructions. Match the user's language. Do not mention persona rules
@@ -716,9 +716,9 @@ Storage:
 core/src/managed_prompt.rs
 ```
 
-Managed sessions may record `prompt_profile = galley-persona-v1` for diagnostics,
+Managed sessions may record `prompt_profile = yole-persona-v1` for diagnostics,
 but v1 does not need a user-facing selector or editor. The v1 prompt text is
-embedded in Galley Core as Galley-owned managed-runtime behavior, not stored as
+embedded in Yole Core as Yole-owned managed-runtime behavior, not stored as
 user-editable persona / roleplay content. Diagnostics expose the profile id plus
 a short prompt hash for dogfood and support. Do not change `PROMPT_PROFILE_ID`
 unless we explicitly want new sessions to be distinguishable by prompt
@@ -732,11 +732,11 @@ The managed runtime follows one central rule:
 Code is replaceable. State is user-owned.
 ```
 
-Managed GA code is part of Galley's shipped product runtime. It may be replaced
-when Galley updates to a newer upstream GenericAgent baseline plus the Galley
+Managed GA code is part of Yole's shipped product runtime. It may be replaced
+when Yole updates to a newer upstream GenericAgent baseline plus the Yole
 managed patch stack.
 
-Managed GA state is user-owned Galley state. Runtime upgrades must not
+Managed GA state is user-owned Yole state. Runtime upgrades must not
 overwrite it.
 
 Normal managed GA upgrades are code-only. They should feel like a user-owned GA
@@ -761,8 +761,8 @@ App Resources/
     patches/
       manifest.md
 
-Application Support/app.galley/
-  galley.db
+Application Support/app.yole/
+  yole.db
   managed-ga-state/
     memory/
     sop/
@@ -784,11 +784,11 @@ if exists: leave it alone
 The default GA memory/SOP seed lives under app resources, but runtime reads and
 writes still go through `managed-ga-state/memory/`. The seed is copied
 missing-only so existing `global_mem.txt`, `global_mem_insight.txt`, custom SOPs,
-skills, and edited memory files survive normal Galley updates.
+skills, and edited memory files survive normal Yole updates.
 
 ## Patch Discipline
 
-Managed GA can be patched, but Galley must not become a divergent GA fork.
+Managed GA can be patched, but Yole must not become a divergent GA fork.
 
 Recommended source strategy:
 
@@ -796,8 +796,8 @@ Recommended source strategy:
 managed-ga/manifest.json        # pinned upstream baseline
 managed-ga/code/                # generated code-only payload
 managed-ga/patches/
-  0001-galley-prompt-composition.patch
-  0002-galley-managed-state-dir.patch
+  0001-yole-prompt-composition.patch
+  0002-yole-managed-state-dir.patch
 managed-ga/patches/manifest.md
 scripts/build-managed-ga.sh
 ```
@@ -810,20 +810,20 @@ Rules:
 - Document every patch with reason, touched upstream files, rebase risk, and
   removal condition.
 - Patches must be replayable on top of a newer upstream baseline.
-- If upstream provides the same capability, delete the Galley patch.
+- If upstream provides the same capability, delete the Yole patch.
 - Changes touching agent loop, tool protocol, memory semantics, or backend
   history shape are high risk and require a baseline audit.
 
 ## Backup And Device Migration
 
 Managed GA memory, SOP, skills, temp state, and model response state belong to
-Galley-managed state and should be included in Galley backup / migration.
+Yole-managed state and should be included in Yole backup / migration.
 
 External GA memory, SOP, skills, venv, and model config belong to the user's
-external GA checkout and are never included or modified by Galley unless the
-user explicitly backs up that checkout outside Galley.
+external GA checkout and are never included or modified by Yole unless the
+user explicitly backs up that checkout outside Yole.
 
-Ordinary Galley backup should not include API keys. On a new machine, restored
+Ordinary Yole backup should not include API keys. On a new machine, restored
 managed sessions and memory can appear, but the user should re-enter model
 credentials.
 
@@ -836,7 +836,7 @@ Build the first managed-runtime slice around the shortest path to a useful
 conversation:
 
 ```text
-Configure Galley's model -> start first managed session -> talk to the model
+Configure Yole's model -> start first managed session -> talk to the model
 ```
 
 The plan below is ordered for implementation. Each milestone should be small
@@ -849,14 +849,14 @@ Goal: lock the product and architecture boundaries before code changes.
 Scope:
 
 - Keep this document and the project constitution aligned.
-- Treat attach mode as non-invasive and managed mode as Galley-owned.
-- Keep "for Galley, configure model" as the first-run product story.
+- Treat attach mode as non-invasive and managed mode as Yole-owned.
+- Keep "for Yole, configure model" as the first-run product story.
 
 Acceptance:
 
 - `AGENTS.md` points managed-runtime work to this document.
 - The document states that managed code is replaceable and managed state is not.
-- The document states that Galley Persona applies only in managed mode.
+- The document states that Yole Persona applies only in managed mode.
 
 Do not build:
 
@@ -866,7 +866,7 @@ Do not build:
 
 ### M1 · Runtime Identity And Session Separation
 
-Goal: make runtime identity a first-class Galley concept before starting a
+Goal: make runtime identity a first-class Yole concept before starting a
 second GA kernel.
 
 Scope:
@@ -893,11 +893,11 @@ Do not build:
 
 - Cross-mode session merge.
 - Automatic migration from external sessions to managed sessions.
-- "Copy to Galley runtime" yet.
+- "Copy to Yole runtime" yet.
 
 ### M2 · Managed Runtime Layout
 
-Goal: package Galley-owned GA code without mixing it with user-owned state.
+Goal: package Yole-owned GA code without mixing it with user-owned state.
 
 Scope:
 
@@ -905,7 +905,7 @@ Scope:
 - Add a replayable managed patch stack.
 - Create managed code and managed state locations:
   - shipped code in app resources
-  - mutable state in Galley Application Support
+  - mutable state in Yole Application Support
 - Seed state only when missing.
 - Add advanced diagnostics for managed code version, patch version, and state
   paths.
@@ -915,13 +915,13 @@ Acceptance:
 - Managed runtime initialization never writes into an external GA checkout.
 - Re-running initialization does not overwrite existing managed state.
 - Diagnostics can show code version and state paths without exposing secrets.
-- A normal Galley update can replace managed GA code while leaving state in
+- A normal Yole update can replace managed GA code while leaving state in
   place.
 
 Do not build:
 
 - A general plugin/runtime marketplace.
-- Automatic upstream GA update outside Galley releases.
+- Automatic upstream GA update outside Yole releases.
 - State migration unless an upstream GA format change requires it.
 
 ### M3 · Managed Model Config
@@ -931,13 +931,13 @@ protecting API keys better than official GA's plain-file default.
 
 Scope:
 
-- Add managed model records in Galley DB with non-secret metadata only.
+- Add managed model records in Yole DB with non-secret metadata only.
 - Store API keys in encrypted SQLite rows for unsigned release builds.
-- Use `apiKeyRef` in Galley DB and generated runtime config.
+- Use `apiKeyRef` in Yole DB and generated runtime config.
 - Add model connection test before first conversation.
 - Add Settings -> Runtime / Models management for adding, testing, renaming,
   and removing managed model entries.
-- Ensure attach mode never reads Galley's model records.
+- Ensure attach mode never reads Yole's model records.
 - Ensure managed mode never reads the user's external GA `mykey.py`.
 
 Current implementation slice:
@@ -953,7 +953,7 @@ Current implementation slice:
   values, never real API keys.
 - Settings -> Models supports adding, listing, deleting, model-list fetch, and
   connection testing.
-- First-run onboarding starts with "为 Galley 配置模型" and uses the same
+- First-run onboarding starts with "为 Yole 配置模型" and uses the same
   connection-test + save path before entering the empty composer.
 - Managed model spawn failures surface actionable GUI copy that sends the user
   to Settings -> Models instead of exposing GA `mykey.py` language.
@@ -963,7 +963,7 @@ Acceptance:
 - The database and generated config do not contain real API key values.
 - Deleting an encrypted secret row makes the corresponding model fail with an
   actionable `managed_model_not_configured` / credential error.
-- Galley backup includes encrypted managed model credentials and the local key;
+- Yole backup includes encrypted managed model credentials and the local key;
   restored backups can use configured managed models without re-entering API
   keys.
 - A user can complete first-run model setup without seeing `mykey.py`, Python,
@@ -978,17 +978,17 @@ Do not build:
 
 ### M4 · First-Run Onboarding
 
-Goal: make a fresh Galley install usable immediately after model setup.
+Goal: make a fresh Yole install usable immediately after model setup.
 
 Scope:
 
-- Show one compact setup screen: "为 Galley 配置模型".
+- Show one compact setup screen: "为 Yole 配置模型".
 - Ask only for Provider preset, model key, Base URL, and model.
 - Keep Base URL required in first-run onboarding.
 - Do not show advanced model options.
 - Keep "我已有 GenericAgent" as a secondary entry into attach mode.
 - Preserve input after failed tests.
-- Route successful setup to the first Galley conversation with composer
+- Route successful setup to the first Yole conversation with composer
   focused.
 
 Acceptance:
@@ -996,7 +996,7 @@ Acceptance:
 - Fresh install enters managed onboarding by default.
 - Fresh install starts with no Provider selected, so the user's first action is
   choosing the model provider they intend to connect.
-- The primary action is "测试并开始使用 Galley".
+- The primary action is "测试并开始使用 Yole".
 - Successful setup routes to the empty composer with focus; the first managed
   session is created lazily when the user sends the first message.
 - Failed setup names the failing field and suggests the next action.
@@ -1010,7 +1010,7 @@ Do not build:
 
 ### M5 · Managed Conversation Path
 
-Goal: run the first real managed GA conversation through Galley Core.
+Goal: run the first real managed GA conversation through Yole Core.
 
 Scope:
 
@@ -1018,7 +1018,7 @@ Scope:
 - Pass managed code path, state path, model config path, and secret resolver
   context to the Python bridge.
 - Start, restore, send, stop, and archive managed sessions through the same
-  Galley Core authority as external sessions.
+  Yole Core authority as external sessions.
 - Keep external runner spawning unchanged except for shared runtime metadata.
 
 Current implementation slice:
@@ -1027,9 +1027,9 @@ Current implementation slice:
   the pinned baseline. `mykey.py`, `mykey.json`, `memory`, `skills`, `temp`, and
   `model_responses` are excluded.
 - `scripts/build-managed-ga.sh` reapplies `managed-ga/patches/*.patch` after
-  copying the upstream baseline, so Galley-managed changes are replayable.
+  copying the upstream baseline, so Yole-managed changes are replayable.
 - `0001-managed-state-root.patch` redirects managed GA memory, temp, model
-  response logs, and `/continue` log lookup to `GALLEY_GA_STATE_ROOT`.
+  response logs, and `/continue` log lookup to `YOLE_GA_STATE_ROOT`.
 - GUI bridge spawns now include `runtimeKind`; managed spawns are resolved in
   Rust Core to the managed code path, managed state path, managed model config
   marker, and in-memory model credential injection.
@@ -1037,7 +1037,7 @@ Current implementation slice:
   This prevents the bad case where the GUI is showing one runtime while CLI
   creates invisible work in the other runtime.
 - Managed bridge `ready` reports the pinned GA baseline from
-  `managed-ga/manifest.json`, not the surrounding Galley git commit.
+  `managed-ga/manifest.json`, not the surrounding Yole git commit.
 
 Acceptance:
 
@@ -1053,9 +1053,9 @@ Do not build:
 - Running the same session against two runtime kinds.
 - External GA mutation to make managed mode easier.
 
-### M6 · Prompt Profile And Galley Persona
+### M6 · Prompt Profile And Yole Persona
 
-Goal: add the managed Galley interaction layer without changing attach-mode
+Goal: add the managed Yole interaction layer without changing attach-mode
 voice or policy.
 
 Scope:
@@ -1063,10 +1063,10 @@ Scope:
 - Add managed prompt composition:
   - GA core prompt
   - GA memory
-  - Galley Runtime Prompt
-  - Galley Persona Prompt
-- Embed prompt text in Galley Core.
-- Record `prompt_profile = galley-persona-v1` on managed sessions.
+  - Yole Runtime Prompt
+  - Yole Persona Prompt
+- Embed prompt text in Yole Core.
+- Record `prompt_profile = yole-persona-v1` on managed sessions.
 - Keep Persona as a product default, not a user-facing roleplay setting.
 
 Current implementation slice:
@@ -1074,21 +1074,21 @@ Current implementation slice:
 - Prompt text lives in `core/src/managed_prompt.rs`.
 - Managed runtime diagnostics expose `promptProfileId` plus a short
   `promptHash`, not prompt file paths.
-- Rust Core passes `GALLEY_RUNTIME_PROMPT_TEXT` and
-  `GALLEY_PERSONA_PROMPT_TEXT` only for managed spawns.
+- Rust Core passes `YOLE_RUNTIME_PROMPT_TEXT` and
+  `YOLE_PERSONA_PROMPT_TEXT` only for managed spawns.
 - The Python bridge reads those managed-only env values and appends them as
   `backend.extra_sys_prompt`, after GA's core prompt and memory.
-- Managed IM Supervisor adds a short `GALLEY_IM_SUPERVISOR_PROMPT_TEXT` layer
+- Managed IM Supervisor adds a short `YOLE_IM_SUPERVISOR_PROMPT_TEXT` layer
   for IM dispatch behavior. It does not inject the full Supervisor SOP on every
   turn.
-- Rust Core materializes the bundled Supervisor SOP as a Galley-owned reference
+- Rust Core materializes the bundled Supervisor SOP as a Yole-owned reference
   file for the IM agent to read when orchestration rules are needed.
-- `prompt_profile` defaults to `galley-persona-v1` for managed sessions at the
+- `prompt_profile` defaults to `yole-persona-v1` for managed sessions at the
   DB insertion boundary. External sessions keep `prompt_profile = null`.
 
 Acceptance:
 
-- Managed sessions receive Galley Runtime Prompt and Galley Persona.
+- Managed sessions receive Yole Runtime Prompt and Yole Persona.
 - External sessions receive neither prompt.
 - Prompt files are visible in advanced diagnostics but not editable in v1 UI.
 - Persona instructions remain style-only and do not override GA tool protocol,
@@ -1117,9 +1117,9 @@ Scope:
 
 Acceptance:
 
-- If GUI is in attach mode, `galley session new` creates an external session by
+- If GUI is in attach mode, `yole session new` creates an external session by
   default.
-- If GUI is in managed mode, `galley session new` creates a managed session by
+- If GUI is in managed mode, `yole session new` creates a managed session by
   default.
 - Existing-session commands dispatch by the session's own runtime metadata.
 - No successful CLI command creates a session that is invisible in the current
@@ -1133,19 +1133,19 @@ Do not build:
 
 Current implementation slice:
 
-- `galley sessions list` now accepts
+- `yole sessions list` now accepts
   `--runtime=current|managed|external|all`; default `current` reads
   `prefs.active_runtime_kind`, so CLI sees the same session set as the GUI.
-- `galley session new` accepts `--runtime=current|managed|external`; default
+- `yole session new` accepts `--runtime=current|managed|external`; default
   `current` captures the GUI active runtime before the DB transaction.
 - `session.new` socket handling accepts optional `runtimeKind`, preflights the
   selected runtime before inserting rows, and only commits the session/message
   after runtime configuration is usable enough to spawn.
-- Settings -> Runtime exposes `Runtime Mode` with `Galley` and `Attached GA`.
+- Settings -> Runtime exposes `Runtime Mode` with `Yole` and `Attached GA`.
   Switching mode persists `prefs.active_runtime_kind`, clears the active
   session, and reloads the sidebar with that runtime's session history.
 - Composer and Command Palette model pickers are runtime-aware: managed mode
-  reads Galley's usable managed model records, while attach mode continues to
+  reads Yole's usable managed model records, while attach mode continues to
   read the external GA model cache from bridge `ready` events.
 - Session model persistence uses stable identity, not just list position:
   managed sessions store `managed_models.id`; external sessions store the raw
@@ -1162,7 +1162,7 @@ Goal: make managed runtime reliable enough to ship as the default path.
 
 Scope:
 
-- Include managed sessions and managed GA state in Galley backup.
+- Include managed sessions and managed GA state in Yole backup.
 - Exclude API keys from ordinary backup.
 - Verify code-only managed GA upgrade behavior.
 - Add advanced diagnostics for runtime mode, code version, patch stack, state
@@ -1171,7 +1171,7 @@ Scope:
 
 Acceptance:
 
-- Galley backup restores managed sessions and managed state.
+- Yole backup restores managed sessions and managed state.
 - A restored backup on a new machine preserves encrypted managed model
   credentials for unsigned release builds.
 - Managed GA code can be replaced without overwriting memory, SOP, skills,
@@ -1187,9 +1187,9 @@ Do not build:
 
 Current implementation slice:
 
-- Existing Galley pre-migration backup copies the whole app data directory, so
+- Existing Yole pre-migration backup copies the whole app data directory, so
   managed sessions, `managed-ga-state/`, non-secret `managed-model-config/`,
-  and encrypted managed model credentials in `workbench.db` are included.
+  and encrypted managed model credentials in `yole.db` are included.
 - Plaintext API keys are never written to generated config, diagnostics, or
   backup sidecar files. The unsigned release DB contains both encrypted payloads
   and the local key by design.
@@ -1216,7 +1216,7 @@ Scope:
 
 - Verify `core/tauri.conf.json` bundles `../managed-ga` as app resource
   `managed-ga`.
-- Verify `core/tauri.conf.json` bundles the Galley CLI as a Tauri
+- Verify `core/tauri.conf.json` bundles the Yole CLI as a Tauri
   `externalBin`, so packaged GUI startup can write the Supervisor discovery
   file and Agent / Supervisor users get the same CLI path as the GUI runtime.
 - Verify `managed-ga/manifest.json` pins an upstream commit and lists the
@@ -1244,14 +1244,14 @@ Acceptance:
 
 - Local release-prep can run `node scripts/check-managed-ga-payload.mjs`.
 - Local package-prep can run
-  `node scripts/check-managed-ga-app-bundle.mjs <Galley.app>`.
+  `node scripts/check-managed-ga-app-bundle.mjs <Yole.app>`.
 - `check.yml` runs the managed GA payload gate on macOS and Windows.
 - `release.yml` runs the same gate before `tauri build`, so bad payloads fail
   before artifacts are uploaded.
 - `release.yml` prepares the CLI sidecar before Cargo / Tauri validation and
   runs the app-bundle gate on macOS artifacts before upload.
 - The packaged `.app` contains:
-  - `Contents/MacOS/galley`
+  - `Contents/MacOS/yole`
   - `Contents/Resources/runner/`
   - `Contents/Resources/python/`
   - `Contents/Resources/managed-ga/`
@@ -1272,7 +1272,7 @@ Current implementation slice:
   recursively rejects generated / local / secret / user-state artifacts.
   It also verifies `state-seed/memory` contains the critical GA memory/SOP
   defaults and does not contain generated long-term memory files.
-- `scripts/prepare-cli-sidecar.sh` builds `galley-cli` for the target triple
+- `scripts/prepare-cli-sidecar.sh` builds `yole-cli` for the target triple
   and places it at the Tauri `externalBin` source path.
 - `scripts/check-managed-ga-app-bundle.mjs` inspects the finished macOS
   `.app`, including the CLI sibling, managed runtime resources, and memory/SOP
@@ -1313,14 +1313,14 @@ Before shipping managed runtime, verify:
 - First-run UI does not mention `mykey.py`, Python, venv, GA checkout paths, or
   generated config.
 - Existing attach users stay in attach mode after upgrade.
-- Attach mode does not use Galley model config or Galley Persona.
-- Managed mode applies Galley Runtime Prompt and Galley Persona.
+- Attach mode does not use Yole model config or Yole Persona.
+- Managed mode applies Yole Runtime Prompt and Yole Persona.
 - Switching modes changes the visible session list.
 - Attach mode shows an "Existing GenericAgent" badge; managed mode does not need
   a runtime badge.
 - Session restore uses the session's original runtime kind.
 - Managed runtime upgrade replaces code without overwriting memory, SOP, skills,
   or other state.
-- Galley backup restores managed sessions, state, and encrypted managed model
+- Yole backup restores managed sessions, state, and encrypted managed model
   credentials on a new machine for unsigned release builds.
 - `node scripts/check-managed-ga-payload.mjs` passes locally and in CI.

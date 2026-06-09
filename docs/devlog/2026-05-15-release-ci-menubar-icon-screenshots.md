@@ -36,13 +36,13 @@
 ### 3 · Mac menubar 全套，灰禁占位 V0.2 wiring 项
 
 ```
-Galley   About (native dialog w/ icon+version+links) / Settings ⌘, /
+Yole   About (native dialog w/ icon+version+links) / Settings ⌘, /
          Hide / Hide Others / Show All / Quit
 File     New Chat ⌘N / Close Window
 Edit     Undo/Redo/Cut/Copy/Paste/SelectAll / Find ⌘F (disabled)
 View     Toggle Sidebar ⌘\ (disabled) / Conversation Width > Compact|Wide
 Window   Minimize / Zoom / Bring All to Front
-Help     Galley on GitHub / Report a Bug
+Help     Yole on GitHub / Report a Bug
 ```
 
 - About 用 Tauri `PredefinedMenuItem::about` 弹原生 dialog（不是 in-app Settings → About）—— 利用我们的新 icon + version metadata，跟 macOS 惯例对齐
@@ -85,7 +85,7 @@ JC 截完 6 张图后 `git checkout HEAD -- desktop/src/stores/demo.ts desktop/s
 
 ### 7 · SSH remote 替代 OAuth PAT workflow scope
 
-push 包含 `.github/workflows/` 文件时，Claude Code 默认 HTTPS + OAuth token 缺 `workflow` scope，被 GitHub 拒。改 remote 到 `git@github.com:wangjc683/galley.git`，配 `~/.ssh/config` + `id_rsa.pem`，所有后续 push 走 SSH，没有 scope 限制。
+push 包含 `.github/workflows/` 文件时，Claude Code 默认 HTTPS + OAuth token 缺 `workflow` scope，被 GitHub 拒。改 remote 到 `git@github.com:wangjc683/yole.git`，配 `~/.ssh/config` + `id_rsa.pem`，所有后续 push 走 SSH，没有 scope 限制。
 
 JC 的 zsh 里有个 `_kaku_wrapped_ssh` 函数劫持 `ssh` 命令——影响 interactive shell 直接 ssh，但**不影响 git**（git 走 non-interactive subshell）。这个 zsh 问题暂未修，标记 future cleanup。
 
@@ -96,7 +96,7 @@ JC 的 zsh 里有个 `_kaku_wrapped_ssh` 函数劫持 `ssh` 命令——影响 i
 - **测试用 `v0.1.99-test` tag**：会污染 git 历史 + Releases 页堆 draft；`workflow_dispatch` 干净得多
 - **`ImageMagick` 切 icon 多尺寸**：Tauri CLI 自带 `pnpm tauri icon` 一键产 .icns / .ico / 多尺寸 PNG / iOS / Android，不用 ImageMagick
 - **icon v3 / v4 再用 AI 重生**：JC 手动 fine-tune 比再跑 AI 快、可控
-- **改 `~/Library/Application Support/app.galley/workbench.db` 让截图模式生效**：高风险（万一回不来 = 丢全部 dogfood 数据）；改内存 hydrate 钩子才是干净路径
+- **改 `~/Library/Application Support/app.yole/yole.db` 让截图模式生效**：高风险（万一回不来 = 丢全部 dogfood 数据）；改内存 hydrate 钩子才是干净路径
 - **代码签名 (Mac $99 / Win $200-400 年费)**：v0.1 不投入；用户首次启动 Gatekeeper / SmartScreen 警告 dogfood 阶段够用
 - **自动更新 (`tauri-plugin-updater`)**：v0.3 scope，需要签名才能验签
 

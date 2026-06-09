@@ -105,7 +105,7 @@ export interface MessageUserProps {
    * Audit origin for this user message (B4 M7). When `origin.via ===
    * "supervisor"`, a small robot provenance icon renders by the left
    * identity bar. Other via values (gui / cli / system) render no
-   * annotation — the default Galley-driven origin shouldn't interrupt
+   * annotation — the default Yole-driven origin shouldn't interrupt
    * the reading flow.
    */
   origin?: Origin;

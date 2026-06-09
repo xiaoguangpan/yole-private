@@ -46,6 +46,7 @@ export interface CommandPaletteProps {
   onReRunHealthCheck?: () => void;
   onOpenSettings?: () => void;
   onAttachGAFolder?: () => void;
+  simplifiedUi?: boolean;
 
   /** Called when the user presses Enter on an empty/no-match palette
    * (DESIGN.md §8 "Empty state") — typically: open new chat with this
@@ -179,6 +180,7 @@ export function CommandPalette(props: CommandPaletteProps) {
             onEnterSwitchLLM={() => setPage("switch-llm")}
             llmCount={props.llms?.length ?? 0}
             currentLLM={props.llms?.find((l) => l.isCurrent)?.displayName}
+            simplifiedUi={props.simplifiedUi ?? false}
             onReRunHealthCheck={() => {
               props.onReRunHealthCheck?.();
               close();
@@ -223,6 +225,7 @@ function RootPage({
   onEnterSwitchLLM,
   llmCount,
   currentLLM,
+  simplifiedUi,
   onReRunHealthCheck,
   onOpenSettings,
   onAttachGAFolder,
@@ -237,6 +240,7 @@ function RootPage({
   onEnterSwitchLLM: () => void;
   llmCount: number;
   currentLLM?: string;
+  simplifiedUi: boolean;
   onReRunHealthCheck: () => void;
   onOpenSettings: () => void;
   onAttachGAFolder: () => void;
@@ -310,27 +314,31 @@ function RootPage({
       )}
 
       {/* Actions */}
-      <Command.Item
-        value="switch llm 切换"
-        onSelect={onEnterSwitchLLM}
-        disabled={llmCount === 0}
-      >
-        <PaletteRow
-          Icon={Cube}
-          label={copy.command.switchLLM}
-          sub={currentLLM ? copy.command.current(currentLLM) : undefined}
-          shortcut="→"
-        />
-      </Command.Item>
-      <Command.Item
-        value="rerun health check 体检 健康检查"
-        onSelect={onReRunHealthCheck}
-      >
-        <PaletteRow
-          Icon={ArrowsClockwise}
-          label={copy.command.runHealthCheck}
-        />
-      </Command.Item>
+      {!simplifiedUi && (
+        <>
+          <Command.Item
+            value="switch llm 切换"
+            onSelect={onEnterSwitchLLM}
+            disabled={llmCount === 0}
+          >
+            <PaletteRow
+              Icon={Cube}
+              label={copy.command.switchLLM}
+              sub={currentLLM ? copy.command.current(currentLLM) : undefined}
+              shortcut="→"
+            />
+          </Command.Item>
+          <Command.Item
+            value="rerun health check 体检 健康检查"
+            onSelect={onReRunHealthCheck}
+          >
+            <PaletteRow
+              Icon={ArrowsClockwise}
+              label={copy.command.runHealthCheck}
+            />
+          </Command.Item>
+        </>
+      )}
       <Command.Item value="open settings 设置" onSelect={onOpenSettings}>
         <PaletteRow
           Icon={Gear}
@@ -338,12 +346,14 @@ function RootPage({
           shortcut={formatShortcutReadable("Mod+,")}
         />
       </Command.Item>
-      <Command.Item
-        value="attach ga folder 切换 GA 路径"
-        onSelect={onAttachGAFolder}
-      >
-        <PaletteRow Icon={FolderOpen} label={copy.command.changeGAFolder} />
-      </Command.Item>
+      {!simplifiedUi && (
+        <Command.Item
+          value="attach ga folder 切换 GA 路径"
+          onSelect={onAttachGAFolder}
+        >
+          <PaletteRow Icon={FolderOpen} label={copy.command.changeGAFolder} />
+        </Command.Item>
+      )}
     </>
   );
 }

@@ -2,11 +2,11 @@
 
 **Date:** 2026-05-27  
 **Status:** Implemented  
-**Related:** `cli/src/main.rs`, `docs/agent-api.md`, `docs/integrations/galley-supervisor-sop.md`
+**Related:** `cli/src/main.rs`, `docs/agent-api.md`, `docs/integrations/yole-supervisor-sop.md`
 
 ## Context
 
-Dogfooding the Settings -> Agent example "use Galley to plan a Shanghai to
+Dogfooding the Settings -> Agent example "use Yole to plan a Shanghai to
 Hangzhou weekend trip" proved that Project-based batch orchestration works:
 one Supervisor can create a Project, split the task into traffic / lodging /
 itinerary sessions, and synthesize the results.
@@ -26,7 +26,7 @@ synthesizing.
 - Add `followState` to Project follow snapshots. This makes an initially
   `idle` persisted status less misleading by saying the command is still
   checking live events.
-- Keep automatic synthesis out of the CLI. Galley should provide reliable
+- Keep automatic synthesis out of the CLI. Yole should provide reliable
   monitoring and context; the Supervisor Agent should merge results.
 
 ## Rejected Alternatives

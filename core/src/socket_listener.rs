@@ -1,11 +1,11 @@
-//! Galley Core's local socket transport (Unix domain socket on macOS/Linux,
+//! Yole Core's local socket transport (Unix domain socket on macOS/Linux,
 //! Windows named pipe on Windows).
 //!
 //! ## Purpose
 //!
-//! The transport that lets CLI clients talk to a running Galley Core process.
-//! From B2 M4 onward, `galley session send <id> "..."` opens this socket and
-//! sends a typed command; Rust dispatches via [`crate::api::GalleyApi`]
+//! The transport that lets CLI clients talk to a running Yole Core process.
+//! From B2 M4 onward, `yole session send <id> "..."` opens this socket and
+//! sends a typed command; Rust dispatches via [`crate::api::YoleApi`]
 //! (same trait Tauri commands use, per [invariants.md §I5]).
 //!
 //! For B2 M3 only the read commands (B1 surface) are wired through — write
@@ -13,12 +13,12 @@
 //!
 //! ## Localhost only
 //!
-//! Per [AGENTS.md § Localhost Only](../../AGENTS.md), Galley Core never
+//! Per [AGENTS.md § Localhost Only](../../AGENTS.md), Yole Core never
 //! binds TCP. Filesystem permissions on the socket file (0600 on Unix,
 //! user-scoped pipe namespace on Windows) are the only access control —
 //! no tokens, no TLS, no auth layer. Remote access (e.g. supervisor agents
 //! on the same machine) goes through this localhost socket; cross-machine
-//! access goes through GA's IM frontends + Galley CLI on the host machine.
+//! access goes through GA's IM frontends + Yole CLI on the host machine.
 //!
 //! ## Protocol
 //!
@@ -41,7 +41,7 @@
 //! ## Race detection at startup
 //!
 //! Two cases:
-//!   - **another Galley instance running**: try-connect succeeds → log a
+//!   - **another Yole instance running**: try-connect succeeds → log a
 //!     diagnostic + return without binding. The other instance owns the
 //!     socket; we don't fight it.
 //!   - **stale socket file** (previous process crashed before cleanup):
@@ -55,10 +55,10 @@ use crate::api::message::MessageBrief;
 use crate::api::project::{CreateProjectInput, ProjectBrief, ProjectId};
 use crate::api::session::{CreateSessionInput, SessionBrief};
 use crate::api::{
-    GalleyApi, ManagedModelCredentialStatus, Origin, OriginVia, RuntimeKind, SessionFilter,
+    YoleApi, ManagedModelCredentialStatus, Origin, OriginVia, RuntimeKind, SessionFilter,
     SessionId,
 };
-use crate::db::SqliteGalley;
+use crate::db::SqliteYole;
 use crate::ipc::{IpcCommand, SetLlmCommand, UserMessageCommand};
 use crate::managed_runtime;
 use crate::runner_commands::{
@@ -173,38 +173,38 @@ fn origin_from_args(supervisor: Option<String>, reason: Option<String>) -> Origi
     }
 }
 
-/// Map a [`GalleyError`] onto the wire `SocketResponse` envelope.
+/// Map a [`YoleError`] onto the wire `SocketResponse` envelope.
 /// Each variant gets its own stable `error` discriminant string so
 /// `cli/src/main.rs::map_error_tag` can round-trip back to a typed
 /// error (and `exit_code_for` lands on the right exit category).
-fn map_galley_err(request_id: Option<String>, err: crate::error::GalleyError) -> SocketResponse {
-    use crate::error::GalleyError;
+fn map_yole_err(request_id: Option<String>, err: crate::error::YoleError) -> SocketResponse {
+    use crate::error::YoleError;
     match err {
-        GalleyError::NotFound { message } => SocketResponse::err(request_id, "not_found", message),
-        GalleyError::InvalidArgs { message } => {
+        YoleError::NotFound { message } => SocketResponse::err(request_id, "not_found", message),
+        YoleError::InvalidArgs { message } => {
             SocketResponse::err(request_id, "invalid_args", message)
         }
-        GalleyError::DbUnavailable { message } => {
+        YoleError::DbUnavailable { message } => {
             SocketResponse::err(request_id, "db_unavailable", message)
         }
-        GalleyError::RunnerError { message } => {
+        YoleError::RunnerError { message } => {
             SocketResponse::err(request_id, "runner_error", message)
         }
-        GalleyError::Internal { message } => SocketResponse::err(request_id, "internal", message),
+        YoleError::Internal { message } => SocketResponse::err(request_id, "internal", message),
     }
 }
 
 /// Resolve the per-user socket path.
 ///
-/// - macOS/Linux: `${TMPDIR:-/tmp}/galley-${UID}.sock`
-/// - Windows: `\\.\pipe\galley-${USERNAME}`
+/// - macOS/Linux: `${TMPDIR:-/tmp}/yole-${UID}.sock`
+/// - Windows: `\\.\pipe\yole-${USERNAME}`
 pub fn socket_path() -> PathBuf {
     #[cfg(unix)]
     {
         let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
         // SAFETY: getuid is always safe — POSIX guarantees it can't fail.
         let uid = unsafe { libc_getuid() };
-        PathBuf::from(format!("{}/galley-{}.sock", tmp.trim_end_matches('/'), uid))
+        PathBuf::from(format!("{}/yole-{}.sock", tmp.trim_end_matches('/'), uid))
     }
     #[cfg(windows)]
     {
@@ -213,7 +213,7 @@ pub fn socket_path() -> PathBuf {
             .unwrap_or_else(|_| "unknown".to_string());
         // Sanitize: Windows named-pipe names can't contain '\\' or '/'.
         let safe = user.replace(['\\', '/'], "_");
-        PathBuf::from(format!(r"\\.\pipe\galley-{}", safe))
+        PathBuf::from(format!(r"\\.\pipe\yole-{}", safe))
     }
 }
 
@@ -228,7 +228,7 @@ extern "C" {
 }
 
 /// Start the listener. Spawns a tokio task that owns the listener for the
-/// app's lifetime. Idempotent at startup boundary — if another Galley
+/// app's lifetime. Idempotent at startup boundary — if another Yole
 /// instance is already bound, logs + returns without crashing.
 ///
 /// `manager`: shared reference to the RunnerManager. Cloned into the
@@ -254,7 +254,7 @@ pub async fn start(
             match timeout(Duration::from_millis(200), UnixStream::connect(&path)).await {
                 Ok(Ok(_)) => {
                     eprintln!(
-                        "[socket] another Galley instance is bound to {} — \
+                        "[socket] another Yole instance is bound to {} — \
                          not starting a second listener",
                         path.display()
                     );
@@ -301,9 +301,9 @@ pub async fn start(
                 path.display(),
                 e
             );
-            // We don't error here — bind failure shouldn't kill Galley
+            // We don't error here — bind failure shouldn't kill Yole
             // Core. The CLI will just see a connection refusal and
-            // report exit 4 (db_unavailable / "Galley Core not running").
+            // report exit 4 (db_unavailable / "Yole Core not running").
             Ok(SocketGuard::dormant())
         }
     }
@@ -642,7 +642,7 @@ struct SessionWatchArgs {
 }
 
 /// Tauri event payload broadcast to the GUI whenever a user message is
-/// persisted via the socket path (CLI `galley session send` / supervisor
+/// persisted via the socket path (CLI `yole session send` / supervisor
 /// agents). GUI's listener calls `appendUserTurnExternal` to mirror the
 /// row into the in-memory store so the conversation view renders the
 /// message even though it wasn't typed in the Composer.
@@ -690,7 +690,7 @@ async fn dispatch_session_send(
         }
     };
     // 1. Open DB + write message row with origin = cli/supervisor
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
@@ -698,17 +698,17 @@ async fn dispatch_session_send(
     };
     let origin = origin_from_args(parsed.supervisor.clone(), parsed.reason.clone());
     let session_id = SessionId(parsed.session_id.clone());
-    let brief = match galley
+    let brief = match yole
         .send_message(session_id, parsed.content.clone(), origin)
         .await
     {
         Ok(b) => b,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
 
     // 2. Best-effort dispatch to runner. If the session's runner isn't
     // alive (LRU evicted, never spawned, crashed), the message is still
-    // persisted in the DB — caller can `galley session watch` and wait
+    // persisted in the DB — caller can `yole session watch` and wait
     // for a future spawn / replay path. We surface the runner result in
     // the response so callers know whether the message reached the
     // subprocess this turn.
@@ -776,8 +776,8 @@ async fn dispatch_session_watch(
 //
 // All six new handlers share the same shape:
 //   1. parse args (camelCase JSON from CLI / supervisor)
-//   2. open SqliteGalley (db_unavailable on connect fail)
-//   3. validate / execute via GalleyApi trait
+//   2. open SqliteYole (db_unavailable on connect fail)
+//   3. validate / execute via YoleApi trait
 //   4. on side-effecting state changes, emit a Tauri event so the GUI
 //      can mirror the row into its in-memory stores without polling
 //
@@ -785,7 +785,7 @@ async fn dispatch_session_watch(
 // SQLite transaction (create + first message commit together, then a
 // runner is spawned for true delegation). `session.btw` and `session.stop`
 // drive the runner but don't persist anything new. `session.archive`,
-// `session.restore`, `session.move` are thin GalleyApi wrappers.
+// `session.restore`, `session.move` are thin YoleApi wrappers.
 
 /// Tauri event payload broadcast when a CLI / supervisor creates a new
 /// session via `session.new`. GUI's sidebar listener inserts the row
@@ -830,7 +830,7 @@ struct GaConfigPref {
 }
 
 async fn spawn_args_for_session_new(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     app: Option<&AppHandle>,
     session_id: &str,
     llm_index: Option<u32>,
@@ -840,7 +840,7 @@ async fn spawn_args_for_session_new(
     if runtime_kind == RuntimeKind::Managed {
         let app = app.ok_or_else(|| {
             SocketResponseLite::runner_error(
-                "managed runtime is unavailable without a Galley app handle",
+                "managed runtime is unavailable without a Yole app handle",
             )
         })?;
         let args = SpawnArgs {
@@ -858,13 +858,13 @@ async fn spawn_args_for_session_new(
             .map_err(SocketResponseLite::runner_spawn_error);
     }
 
-    let raw = galley
+    let raw = yole
         .get_pref_json("ga_config")
         .await
         .map_err(SocketResponseLite::from_err)?
         .ok_or_else(|| {
             SocketResponseLite::runner_error(
-                "session.new runner config is missing; open Galley Settings once to save runtime paths",
+                "session.new runner config is missing; open Yole Settings once to save runtime paths",
             )
         })?;
     let config: GaConfigPref = serde_json::from_value(raw).map_err(|e| {
@@ -906,7 +906,7 @@ fn resolve_bridge_cwd(
 ) -> Result<PathBuf, SocketResponseLite> {
     if let Some(app) = app {
         return managed_runtime::bridge_cwd_for_app(app).map_err(|e| {
-            SocketResponseLite::runner_error(format!("resolving Galley bridge cwd failed: {e}"))
+            SocketResponseLite::runner_error(format!("resolving Yole bridge cwd failed: {e}"))
         });
     }
     let bridge_cwd = PathBuf::from(non_empty_pref(config.bridge_cwd.as_deref(), "bridgeCwd")?);
@@ -1037,16 +1037,16 @@ async fn dispatch_session_new(
         return SocketResponse::err(request_id, "invalid_args", "session.new: task is empty");
     }
 
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
 
-    let active_runtime_kind = match galley.active_runtime_kind().await {
+    let active_runtime_kind = match yole.active_runtime_kind().await {
         Ok(kind) => kind,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
     let target_runtime_kind = parsed.runtime_kind.unwrap_or(active_runtime_kind);
     let runtime_warning = parsed
@@ -1062,17 +1062,17 @@ async fn dispatch_session_new(
         });
 
     // Resolve --llm=<name> against the selected runtime's current model
-    // source. Managed runtime resolves Galley model records; external
+    // source. Managed runtime resolves Yole model records; external
     // runtime resolves the cached raw GA LLM list.
     let llm_selection =
-        match resolve_llm_selection(&galley, parsed.llm_name, target_runtime_kind).await {
+        match resolve_llm_selection(&yole, parsed.llm_name, target_runtime_kind).await {
             Ok(selection) => selection,
             Err(resp) => return resp.with_request_id(request_id),
         };
 
     let id = mint_session_id();
     let spawn_args = match spawn_args_for_session_new(
-        &galley,
+        &yole,
         app,
         &id,
         llm_selection.index,
@@ -1099,23 +1099,23 @@ async fn dispatch_session_new(
     let origin = origin_from_args(parsed.supervisor.clone(), parsed.reason.clone());
 
     // BEGIN — create + send_message in one transaction (sub-plan O1).
-    let mut tx = match galley.begin_tx().await {
+    let mut tx = match yole.begin_tx().await {
         Ok(t) => t,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
-    let brief = match galley
+    let brief = match yole
         .create_session_in_tx(&mut tx, input, origin.clone())
         .await
     {
         Ok(b) => b,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
-    let msg = match galley
+    let msg = match yole
         .send_message_in_tx(&mut tx, SessionId(brief.id.0.clone()), task.clone(), origin)
         .await
     {
         Ok(m) => m,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
     if let Err(e) = tx.commit().await {
         return SocketResponse::err(request_id, "internal", format!("session.new commit: {e}"));
@@ -1239,23 +1239,23 @@ async fn dispatch_session_btw(
 
     // Validate session exists so a typo'd id surfaces as `not_found`
     // rather than silently failing through `send_command -> ProcessGone`.
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
-    if let Err(e) = galley
+    if let Err(e) = yole
         .session_brief(SessionId(parsed.session_id.clone()))
         .await
     {
-        return map_galley_err(request_id, e);
+        return map_yole_err(request_id, e);
     }
 
-    // Drop the implicit reference to galley so we can drop the
-    // borrowed pool before the runner await. (galley is owned, so the
+    // Drop the implicit reference to yole so we can drop the
+    // borrowed pool before the runner await. (yole is owned, so the
     // explicit drop is cosmetic — but it keeps the boundary obvious.)
-    drop(galley);
+    drop(yole);
 
     let cmd = IpcCommand::UserMessage(UserMessageCommand {
         text: format!("/btw {question}"),
@@ -1312,19 +1312,19 @@ async fn dispatch_session_stop(
     // Validate the session row exists so callers get `not_found` for
     // typos rather than `already_stopped` (which would silently swallow
     // the typo). The runner liveness check is separate.
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
-    if let Err(e) = galley
+    if let Err(e) = yole
         .session_brief(SessionId(parsed.session_id.clone()))
         .await
     {
-        return map_galley_err(request_id, e);
+        return map_yole_err(request_id, e);
     }
-    drop(galley);
+    drop(yole);
 
     if !manager.agent_running(&parsed.session_id).await {
         return SocketResponse::ok(
@@ -1373,14 +1373,14 @@ async fn dispatch_session_archive(
             );
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
     let origin = origin_from_args(parsed.supervisor, parsed.reason);
-    match galley
+    match yole
         .archive_session(SessionId(parsed.session_id), origin)
         .await
     {
@@ -1396,7 +1396,7 @@ async fn dispatch_session_archive(
             }
             SocketResponse::ok(request_id, serde_json::json!({ "session": brief }))
         }
-        Err(e) => map_galley_err(request_id, e),
+        Err(e) => map_yole_err(request_id, e),
     }
 }
 
@@ -1416,14 +1416,14 @@ async fn dispatch_session_restore(
             );
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
     let origin = origin_from_args(parsed.supervisor, parsed.reason);
-    match galley
+    match yole
         .unarchive_session(SessionId(parsed.session_id), origin)
         .await
     {
@@ -1439,7 +1439,7 @@ async fn dispatch_session_restore(
             }
             SocketResponse::ok(request_id, serde_json::json!({ "session": brief }))
         }
-        Err(e) => map_galley_err(request_id, e),
+        Err(e) => map_yole_err(request_id, e),
     }
 }
 
@@ -1472,14 +1472,14 @@ async fn dispatch_session_move(
             );
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
     let origin = origin_from_args(parsed.supervisor, parsed.reason);
-    match galley
+    match yole
         .assign_session_to_project(SessionId(parsed.session_id), parsed.to, origin)
         .await
     {
@@ -1495,7 +1495,7 @@ async fn dispatch_session_move(
             }
             SocketResponse::ok(request_id, serde_json::json!({ "session": brief }))
         }
-        Err(e) => map_galley_err(request_id, e),
+        Err(e) => map_yole_err(request_id, e),
     }
 }
 
@@ -1506,13 +1506,13 @@ struct ResolvedLlmSelection {
 }
 
 async fn resolve_llm_selection(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     name: Option<String>,
     runtime_kind: RuntimeKind,
 ) -> Result<ResolvedLlmSelection, SocketResponseLite> {
     match runtime_kind {
-        RuntimeKind::Managed => resolve_managed_llm_name(galley, name).await,
-        RuntimeKind::External => resolve_external_llm_name(galley, name).await,
+        RuntimeKind::Managed => resolve_managed_llm_name(yole, name).await,
+        RuntimeKind::External => resolve_external_llm_name(yole, name).await,
     }
 }
 
@@ -1520,7 +1520,7 @@ async fn resolve_llm_selection(
 /// pref. The stable key is the raw GA LLM name, falling back to display name
 /// for old cache entries.
 async fn resolve_external_llm_name(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     name: Option<String>,
 ) -> Result<ResolvedLlmSelection, SocketResponseLite> {
     let Some(name) = name else {
@@ -1530,7 +1530,7 @@ async fn resolve_external_llm_name(
             display_name: None,
         });
     };
-    let cached = match galley.get_pref_json("llm_list").await {
+    let cached = match yole.get_pref_json("llm_list").await {
         Ok(v) => v,
         Err(e) => return Err(SocketResponseLite::from_err(e)),
     };
@@ -1547,7 +1547,7 @@ async fn resolve_external_llm_name(
     };
     if entries.is_empty() {
         return Err(SocketResponseLite::invalid_args(
-            "llm cache empty; open Galley GUI once to warmup",
+            "llm cache empty; open Yole GUI once to warmup",
         ));
     }
     let target = name.to_lowercase();
@@ -1559,7 +1559,7 @@ async fn resolve_external_llm_name(
         })
     } else {
         Err(SocketResponseLite::invalid_args(format!(
-            "unknown llm '{name}'; try `galley llm list` to see available"
+            "unknown llm '{name}'; try `yole llm list` to see available"
         )))
     }
 }
@@ -1574,7 +1574,7 @@ struct LlmListEntry {
 }
 
 async fn resolve_managed_llm_name(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     name: Option<String>,
 ) -> Result<ResolvedLlmSelection, SocketResponseLite> {
     let Some(name) = name else {
@@ -1584,7 +1584,7 @@ async fn resolve_managed_llm_name(
             display_name: None,
         });
     };
-    let models = match galley.list_managed_models().await {
+    let models = match yole.list_managed_models().await {
         Ok(models) => models,
         Err(e) => return Err(SocketResponseLite::from_err(e)),
     };
@@ -1641,14 +1641,14 @@ impl SocketResponseLite {
     fn runner_spawn_error(e: RunnerSpawnError) -> Self {
         SocketResponseLite::RunnerSpawnError(e)
     }
-    fn from_err(e: crate::error::GalleyError) -> Self {
-        use crate::error::GalleyError;
+    fn from_err(e: crate::error::YoleError) -> Self {
+        use crate::error::YoleError;
         match e {
-            GalleyError::NotFound { message } => SocketResponseLite::NotFound(message),
-            GalleyError::InvalidArgs { message } => SocketResponseLite::InvalidArgs(message),
-            GalleyError::DbUnavailable { message } => SocketResponseLite::DbUnavailable(message),
-            GalleyError::RunnerError { message } => SocketResponseLite::RunnerError(message),
-            GalleyError::Internal { message } => SocketResponseLite::Internal(message),
+            YoleError::NotFound { message } => SocketResponseLite::NotFound(message),
+            YoleError::InvalidArgs { message } => SocketResponseLite::InvalidArgs(message),
+            YoleError::DbUnavailable { message } => SocketResponseLite::DbUnavailable(message),
+            YoleError::RunnerError { message } => SocketResponseLite::RunnerError(message),
+            YoleError::Internal { message } => SocketResponseLite::Internal(message),
         }
     }
     fn with_request_id(self, request_id: Option<String>) -> SocketResponse {
@@ -1685,7 +1685,7 @@ fn runner_spawn_error_tag(e: &RunnerSpawnError) -> &'static str {
 }
 
 /// Mint a session id matching the GUI's `s-<base36-time>-<base36-rand>`
-/// shape. Kept here (rather than in `db::SqliteGalley`) because
+/// shape. Kept here (rather than in `db::SqliteYole`) because
 /// id-minting is a caller concern — `create_session_in_tx` accepts a
 /// caller-supplied id and validates the row insert.
 fn mint_session_id() -> String {
@@ -1790,7 +1790,7 @@ async fn dispatch_project_create(
     if name.is_empty() {
         return SocketResponse::err(request_id, "invalid_args", "project.create: name is empty");
     }
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
@@ -1813,7 +1813,7 @@ async fn dispatch_project_create(
     };
     let origin = origin_from_args(parsed.supervisor, parsed.reason);
 
-    match galley.create_project(input, origin).await {
+    match yole.create_project(input, origin).await {
         Ok(brief) => {
             if let Some(app) = app {
                 let _ = app.emit(
@@ -1826,7 +1826,7 @@ async fn dispatch_project_create(
             }
             SocketResponse::ok(request_id, serde_json::json!({ "project": brief }))
         }
-        Err(e) => map_galley_err(request_id, e),
+        Err(e) => map_yole_err(request_id, e),
     }
 }
 
@@ -1861,7 +1861,7 @@ async fn dispatch_project_delete(
             );
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
@@ -1873,7 +1873,7 @@ async fn dispatch_project_delete(
     // is atomic with the row drop, so a list-then-delete sequence races
     // against concurrent GUI writes only by the few ms between the two
     // queries — acceptable for a count meant for human-readable feedback.
-    let detached_ids: Vec<String> = match galley
+    let detached_ids: Vec<String> = match yole
         .list_sessions(SessionFilter {
             project_id: Some(parsed.project_id.clone()),
             status: None,
@@ -1883,15 +1883,15 @@ async fn dispatch_project_delete(
         .await
     {
         Ok(rows) => rows.into_iter().map(|s| s.id.0).collect(),
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
 
     let origin = origin_from_args(parsed.supervisor, parsed.reason);
-    if let Err(e) = galley
+    if let Err(e) = yole
         .delete_project(ProjectId(parsed.project_id.clone()), origin)
         .await
     {
-        return map_galley_err(request_id, e);
+        return map_yole_err(request_id, e);
     }
 
     let payload = ProjectDeletedPayload {
@@ -1936,7 +1936,7 @@ async fn dispatch_llm_set(
             return SocketResponse::err(request_id, "invalid_args", format!("llm.set args: {e}"));
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
@@ -1946,12 +1946,12 @@ async fn dispatch_llm_set(
     // 1. Validate the session exists and use its runtime mode to resolve the
     //    display name against the correct model source.
     let sid = SessionId(parsed.session_id.clone());
-    let session = match galley.session_brief(sid.clone()).await {
+    let session = match yole.session_brief(sid.clone()).await {
         Ok(session) => session,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
     let selection = match resolve_llm_selection(
-        &galley,
+        &yole,
         Some(parsed.llm_name.clone()),
         session.ga_runtime_kind,
     )
@@ -1969,7 +1969,7 @@ async fn dispatch_llm_set(
         );
     };
 
-    let brief = match galley
+    let brief = match yole
         .set_session_llm(
             sid,
             Some(index),
@@ -1979,13 +1979,13 @@ async fn dispatch_llm_set(
         .await
     {
         Ok(b) => b,
-        Err(e) => return map_galley_err(request_id, e),
+        Err(e) => return map_yole_err(request_id, e),
     };
 
     // 3. Best-effort: tell any live runner the new pick. Drop the
-    //    galley handle first so the manager's lock acquisition doesn't
-    //    serialize against an unrelated SqliteGalley reference.
-    drop(galley);
+    //    yole handle first so the manager's lock acquisition doesn't
+    //    serialize against an unrelated SqliteYole reference.
+    drop(yole);
     let dispatch_status = match manager
         .send_command(
             &parsed.session_id,
@@ -2057,13 +2057,13 @@ async fn dispatch_sessions_list(request_id: Option<String>, args: Value) -> Sock
             );
         }
     };
-    let galley = match SqliteGalley::open().await {
+    let yole = match SqliteYole::open().await {
         Ok(g) => g,
         Err(e) => {
             return SocketResponse::err(request_id, "db_unavailable", format!("open: {e}"));
         }
     };
-    match galley.list_sessions(filter).await {
+    match yole.list_sessions(filter).await {
         Ok(sessions) => {
             let value = serde_json::to_value(&sessions).unwrap_or(Value::Null);
             SocketResponse::ok(request_id, value)
@@ -2132,7 +2132,7 @@ mod tests {
             }
             let path = socket_path();
             let s = path.to_string_lossy();
-            assert!(s.starts_with("/tmp/test-socket-path/galley-"));
+            assert!(s.starts_with("/tmp/test-socket-path/yole-"));
             assert!(s.ends_with(".sock"));
             // Restore
             unsafe {
@@ -2150,7 +2150,7 @@ mod tests {
         {
             let path = socket_path();
             let s = path.to_string_lossy();
-            assert!(s.starts_with(r"\\.\pipe\galley-"));
+            assert!(s.starts_with(r"\\.\pipe\yole-"));
         }
     }
 

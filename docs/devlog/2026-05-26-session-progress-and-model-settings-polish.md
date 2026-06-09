@@ -51,7 +51,7 @@ provider config changes could make an old session point at the wrong model.
 - OpenAI and Anthropic provider picker entries explicitly mention official API
   or compatible endpoint. This matches real usage where many third-party
   endpoints speak those protocols.
-- Fetched model selection uses Galley's custom dropdown, not the browser native
+- Fetched model selection uses Yole's custom dropdown, not the browser native
   select. Add / added states share the same row slot and visual weight so a
   long fetched list does not become a wall of buttons.
 - Existing provider edit opens in place under that provider. New-provider

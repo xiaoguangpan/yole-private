@@ -19,7 +19,7 @@ function EmptyState() {
             fontFamily: 'var(--font-serif)',
             fontSize: 16, fontWeight: 500,
             color: 'var(--text-primary)',
-          }}>GA Workbench</div>
+          }}>Yole</div>
           <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-secondary)' }}>
             <span className="dot healthy" />
             <span>Runtime · healthy</span>

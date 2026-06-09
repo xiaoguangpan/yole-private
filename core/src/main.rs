@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    galley_core_lib::run()
+    yole_core_lib::run()
 }

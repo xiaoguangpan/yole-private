@@ -61,10 +61,10 @@ type SessionBriefMut = {
 
 | Rust 触发点 | 发什么 |
 |---|---|
-| `GalleyApi::create_session` 成功 | `{kind: "added", session}` |
-| `GalleyApi::archive_session` / `rename_session` / `toggle_pin_session` / `update_session_last_activity` 成功 | `{kind: "patched", id, fields}` |
-| `GalleyApi::delete_session_permanently` 成功 | `{kind: "removed", id}` |
-| `GalleyApi::archive_sessions_bulk` / `unarchive_sessions_bulk` / `delete_sessions_permanently_bulk` 成功 | `{kind: "bulk_patched", ids, fields}` (single emit，避免 N 次刷屏) |
+| `YoleApi::create_session` 成功 | `{kind: "added", session}` |
+| `YoleApi::archive_session` / `rename_session` / `toggle_pin_session` / `update_session_last_activity` 成功 | `{kind: "patched", id, fields}` |
+| `YoleApi::delete_session_permanently` 成功 | `{kind: "removed", id}` |
+| `YoleApi::archive_sessions_bulk` / `unarchive_sessions_bulk` / `delete_sessions_permanently_bulk` 成功 | `{kind: "bulk_patched", ids, fields}` (single emit，避免 N 次刷屏) |
 | RunnerManager 收到 `IpcEvent::TurnEnd` 持久化后 | `{kind: "patched", id, fields: {turn_count, last_activity_at, summary, status: "idle"}}` |
 | RunnerManager 收到 `IpcEvent::AskUser` 后 | `{kind: "patched", id, fields: {has_pending_ask_user: true}}` |
 | messagesStore 写入清除 askUser（user reply 发回）后 | `{kind: "patched", id, fields: {has_pending_ask_user: false}}` |
@@ -73,7 +73,7 @@ type SessionBriefMut = {
 
 ```rust
 // core/src/api.rs
-trait GalleyApi {
+trait YoleApi {
     // B2 已有: list_sessions / list_messages / send_message / ...
     async fn create_session(&self, args: CreateSessionArgs) -> Result<SessionBrief>;
     async fn archive_session(&self, id: &str) -> Result<()>;
@@ -135,8 +135,8 @@ type MessagesAppended = { sessionId: string } & (
 
 | Rust 触发点 | 发什么 |
 |---|---|
-| `GalleyApi::send_message` 持久化 user message 后 | `{kind: "turn", turn: <UserTurn>}` + `{kind: "user_submit_tick"}` + `{kind: "agent_running", value: true}` |
-| `GalleyApi::send_side_question_message`（B3 加） | `{kind: "turn", turn: <UserTurn transient>}` + `{kind: "user_submit_tick"}`（不 set agent_running） |
+| `YoleApi::send_message` 持久化 user message 后 | `{kind: "turn", turn: <UserTurn>}` + `{kind: "user_submit_tick"}` + `{kind: "agent_running", value: true}` |
+| `YoleApi::send_side_question_message`（B3 加） | `{kind: "turn", turn: <UserTurn transient>}` + `{kind: "user_submit_tick"}`（不 set agent_running） |
 | IpcEvent::TurnStart | `{kind: "current_turn_index", index}` |
 | IpcEvent::Progress | `{kind: "in_flight_delta", delta}` (16ms batched) |
 | IpcEvent::TurnEnd 持久化 assistant row 后 | `{kind: "turn", turn: <AgentTurn>}` + `{kind: "in_flight_clear"}` + `{kind: "current_turn_index", index: null}` |
@@ -146,7 +146,7 @@ type MessagesAppended = { sessionId: string } & (
 | IpcEvent::AskUser | `{kind: "ask_user", askUser}` |
 | GUI/CLI 写 askUser reply | `{kind: "ask_user", askUser: null}` |
 | IpcEvent::SystemMessage（/btw response） | `{kind: "turn", turn: <SystemTurn>}` |
-| `GalleyApi::restore_session_turns` 完成 | `{kind: "restored", turns}` |
+| `YoleApi::restore_session_turns` 完成 | `{kind: "restored", turns}` |
 | `clear_conversation` 命令 | `{kind: "conversation_cleared"}` |
 
 **Batching for `in_flight_delta`**：
@@ -197,12 +197,12 @@ type ProjectBriefMut = {
 }
 ```
 
-**Trigger**：`GalleyApi::create_project` / `update_project` / `delete_project` 各对应 add / patched / removed。
+**Trigger**：`YoleApi::create_project` / `update_project` / `delete_project` 各对应 add / patched / removed。
 
 **Trait method 新增** (M4 T4.6 / G5)：
 
 ```rust
-trait GalleyApi {
+trait YoleApi {
     // ...
     async fn create_project(&self, input: CreateProjectInput) -> Result<ProjectBrief>;
     async fn update_project(&self, id: &str, partial: UpdateProjectInput) -> Result<()>;
@@ -214,7 +214,7 @@ trait GalleyApi {
 ```json
 {
   "kind": "added",
-  "project": { "id": "proj_xyz", "name": "Galley", "root_path": null, "pinned": false }
+  "project": { "id": "proj_xyz", "name": "Yole", "root_path": null, "pinned": false }
 }
 ```
 
@@ -233,14 +233,14 @@ type PrefsUpdated = {
 }
 ```
 
-**Trigger**：每次 `GalleyApi::set_pref(key, value)` 成功后 emit。
+**Trigger**：每次 `YoleApi::set_pref(key, value)` 成功后 emit。
 
 **特殊副作用 (AD-08)**：当 `key == "ga_config"` 且 `python` / `gaPath` / `useExternalPython` 任一变了时，runtimeStore 的 listener 检测后 reset 私有 `_warmupComplete: false` 并触发新的 warmup —— 这是 prefs → runtime 唯一 cross-slice listener（[AD-09 DAG](./b3-slice-adr.md#ad-09--slice-dependency-dagt18) hot edge）。
 
 **Trait method 新增** (M6 T6.2)：
 
 ```rust
-trait GalleyApi {
+trait YoleApi {
     // ...
     async fn set_pref(&self, key: &str, value: serde_json::Value) -> Result<()>;
     async fn get_pref(&self, key: &str) -> Result<Option<serde_json::Value>>;
@@ -362,7 +362,7 @@ async function initSessionsStore() {
 ```rust
 #[tokio::test]
 async fn turn_end_emits_sessions_updated_with_last_activity() {
-    let (api, _harness) = setup_in_memory_galley().await;
+    let (api, _harness) = setup_in_memory_yole().await;
     let mut events = subscribe::<SessionsUpdated>("sessions-updated");
     let sid = api.create_session(...).await.unwrap();
     emit_turn_end(&api, &sid, ...).await;

@@ -1,19 +1,19 @@
 //! Typed errors for the runner_manager surface.
 //!
-//! Style matches [`crate::error::GalleyError`]: hand-rolled `Display` +
+//! Style matches [`crate::error::YoleError`]: hand-rolled `Display` +
 //! `std::error::Error`, no `thiserror`. Each variant is a stable identifier
 //! that downstream callers (Tauri commands, socket protocol) pattern-match
 //! on. The string `Display` form is what gets surfaced to logs / UI.
 //!
-//! ## Why a separate error type from `GalleyError`
+//! ## Why a separate error type from `YoleError`
 //!
 //! Runner errors are operational (subprocess didn't start, write failed,
-//! shutdown timed out) — different category from `GalleyError` which models
+//! shutdown timed out) — different category from `YoleError` which models
 //! API-surface failures (not found, invalid args, db unavailable). Mixing
 //! the two would force every CLI / Tauri command handler to know about
-//! both shapes. Instead, the trait layer (when [`crate::api::GalleyApi`]
+//! both shapes. Instead, the trait layer (when [`crate::api::YoleApi`]
 //! starts having write methods in B2 M4) translates `Send/Shutdown` errors
-//! into appropriate `GalleyError` variants at the boundary.
+//! into appropriate `YoleError` variants at the boundary.
 
 use serde::Serialize;
 use std::fmt;
@@ -31,7 +31,7 @@ pub enum RunnerSpawnError {
     /// validate exhaustively here — Python `import agentmain` will be the
     /// authoritative check — but the path itself has to be a directory.
     GaPathInvalid { detail: String },
-    /// Galley's managed GA code/state layout is incomplete or inconsistent.
+    /// Yole's managed GA code/state layout is incomplete or inconsistent.
     ManagedRuntimeInvalid { detail: String },
     /// Managed runtime was selected but no model credential can be used.
     ManagedModelNotConfigured { detail: String },

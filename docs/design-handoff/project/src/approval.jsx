@@ -54,7 +54,7 @@ function ApprovalCardShowcase() {
           Generator 暂停
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          <span className="mono" style={{ fontSize: 11 }}>WorkbenchHandler.dispatch</span> yield 后阻塞，收到决策才恢复。GA agent_runner_loop 不需要修改。
+          <span className="mono" style={{ fontSize: 11 }}>YoleHandler.dispatch</span> yield 后阻塞，收到决策才恢复。GA agent_runner_loop 不需要修改。
         </div>
 
         <hr style={{ border: 0, borderTop: '1px solid var(--border-default)', margin: '20px 0' }} />

@@ -53,7 +53,7 @@ export interface GAConfig {
   gaPath: string;
   bridgeCwd: string;
   /**
-   * v0.1.1+: Galley ships its own Python interpreter at
+   * v0.1.1+: Yole ships its own Python interpreter at
    * `$RESOURCE/python/` (see scripts/bundle-python.sh + tauri.conf
    * bundle.resources). The default is to spawn that bundle. Flip
    * this to `true` from Settings → Runtime → advanced to fall back
@@ -68,7 +68,7 @@ interface PrefsState {
   /**
    * GA subprocess spawn config. `python` + `gaPath` are user-editable
    * via Settings → Runtime path pickers; `bridgeCwd` is internal
-   * (workbench repo root in dev / app bundle resources dir in
+   * (yole repo root in dev / app bundle resources dir in
    * production — set by the macOS bundle Task).
    *
    * Falls back to DEFAULT_GA_CONFIG on first launch before the user
@@ -90,7 +90,7 @@ interface PrefsState {
    * (sticky across launches). Global, not per-session — flipping
    * this notifies every alive bridge.
    *
-   * Default `true` for v0.1 — Galley's first-batch users are GA
+   * Default `true` for v0.1 — Yole's first-batch users are GA
    * heavy users who run agents without approval. The first-launch
    * `YoloIntroDialog` discloses this state and offers a one-click
    * revert to approval mode for those who want it.
@@ -361,7 +361,7 @@ export const usePrefsStore = create<PrefsStore>((set, get) => ({
       );
       // Retrigger warmup with the new gaConfig so the LLM picker
       // reflects mykey.py from the new GA install without requiring
-      // a Workbench restart.
+      // a Yole restart.
       void useRuntimeStore.getState().warmupLLMList();
     }
   },

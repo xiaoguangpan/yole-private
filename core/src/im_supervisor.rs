@@ -1,10 +1,10 @@
-//! Galley-managed IM Supervisor process management.
+//! Yole-managed IM Supervisor process management.
 //!
-//! Phase 1 supports WeChat. The process is Galley-owned managed runtime state,
+//! Phase 1 supports WeChat. The process is Yole-owned managed runtime state,
 //! not an external GenericAgent checkout.
 
-use crate::api::GalleyApi;
-use crate::db::SqliteGalley;
+use crate::api::YoleApi;
+use crate::db::SqliteYole;
 use crate::managed_model_config;
 use crate::managed_prompt;
 use crate::managed_runtime;
@@ -179,11 +179,11 @@ impl ImSupervisorManager {
         let mut env = context.env;
         let sop_path_str = sop_path.to_string_lossy().into_owned();
         env.push((
-            "GALLEY_IM_SUPERVISOR_PROMPT_TEXT".into(),
+            "YOLE_IM_SUPERVISOR_PROMPT_TEXT".into(),
             managed_prompt::im_supervisor_prompt(&sop_path_str),
         ));
-        env.push(("GALLEY_SUPERVISOR_SOP_PATH".into(), sop_path_str));
-        env.push(("GALLEY_IM_PLATFORM".into(), platform.into()));
+        env.push(("YOLE_SUPERVISOR_SOP_PATH".into(), sop_path_str));
+        env.push(("YOLE_IM_PLATFORM".into(), platform.into()));
 
         let python = managed_python_for_app(&app)?;
         let code_root = context.diagnostics.paths.code_root.clone();
@@ -640,32 +640,32 @@ fn normalize_platform(platform: &str) -> Result<&'static str, String> {
 }
 
 async fn read_pref(platform: &str) -> ImSupervisorPref {
-    let Ok(galley) = SqliteGalley::open().await else {
+    let Ok(yole) = SqliteYole::open().await else {
         return ImSupervisorPref::default();
     };
     let Some(key) = pref_key(platform) else {
         return ImSupervisorPref::default();
     };
-    let Ok(Some(value)) = galley.get_pref_json(key).await else {
+    let Ok(Some(value)) = yole.get_pref_json(key).await else {
         return ImSupervisorPref::default();
     };
     serde_json::from_value(value).unwrap_or_default()
 }
 
 async fn write_pref(platform: &str, pref: ImSupervisorPref) -> Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(|e| e.to_string())?;
+    let yole = SqliteYole::open().await.map_err(|e| e.to_string())?;
     let key = pref_key(platform).ok_or_else(|| format!("unsupported IM platform: {platform}"))?;
-    galley
+    yole
         .set_pref_json(key, json!(pref))
         .await
         .map_err(|e| e.to_string())
 }
 
 async fn read_model_config_revision() -> Option<String> {
-    let Ok(galley) = SqliteGalley::open().await else {
+    let Ok(yole) = SqliteYole::open().await else {
         return None;
     };
-    let Ok(Some(value)) = galley
+    let Ok(Some(value)) = yole
         .get_pref_json(managed_model_config::REVISION_PREF_KEY)
         .await
     else {
@@ -692,7 +692,7 @@ fn pref_key(platform: &str) -> Option<&'static str> {
 fn materialize_sop_reference(state_root: &Path) -> std::io::Result<PathBuf> {
     let dir = state_root.join("im").join("reference");
     std::fs::create_dir_all(&dir)?;
-    let path = dir.join("galley-supervisor-sop.md");
+    let path = dir.join("yole-supervisor-sop.md");
     std::fs::write(&path, crate::sop_install::sop_body())?;
     Ok(path)
 }
@@ -740,11 +740,11 @@ mod tests {
     }
 
     #[test]
-    fn materialize_sop_reference_writes_galley_owned_copy() {
+    fn materialize_sop_reference_writes_yole_owned_copy() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let path = materialize_sop_reference(tmp.path()).expect("write sop reference");
-        assert!(path.ends_with("im/reference/galley-supervisor-sop.md"));
+        assert!(path.ends_with("im/reference/yole-supervisor-sop.md"));
         let body = std::fs::read_to_string(path).expect("read sop");
-        assert!(body.contains("Galley Supervisor SOP"));
+        assert!(body.contains("Yole Supervisor SOP"));
     }
 }

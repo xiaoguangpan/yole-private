@@ -23,6 +23,7 @@ import { usePrefsStore } from "@/stores/prefs";
 import { useRuntimeStore } from "@/stores/runtime";
 import { useSessionsStore } from "@/stores/sessions";
 import { useUiStore } from "@/stores/ui";
+import { useYoleAccountStore } from "@/stores/yole-account";
 
 type HistoryReplayState = {
   promise: Promise<boolean>;
@@ -112,7 +113,7 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       useRuntimeStore.getState().setBridgeStatus(event.sessionId, "connected");
       // Sync the user's actual GA HEAD into runtimeInfo so the
       // Settings → Runtime panel shows "GA 版本: cf65515 · 2026-05-11"
-      // alongside the workbench-tested baseline. gaCommit/Date are
+      // alongside the yole-tested baseline. gaCommit/Date are
       // the same across every bridge (they all run against the same
       // ga_path), so writing on every `ready` is safe — N-active
       // background bridges don't conflict.
@@ -177,6 +178,19 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       if (event.context === "load_history") {
         finishHistoryReplay(event.sessionId, false);
       }
+      if (
+        event.hint === "quota_exceeded" &&
+        isManagedRuntimeSession(event.sessionId)
+      ) {
+        const accountStore = useYoleAccountStore.getState();
+        if (accountStore.status) {
+          accountStore.notifyQuotaExceeded(event.sessionId);
+        } else {
+          void accountStore.refresh().then(() => {
+            useYoleAccountStore.getState().notifyQuotaExceeded(event.sessionId);
+          });
+        }
+      }
       useUiStore.getState().pushToast(fromIPCError(event));
       // Bridge errors usually mean turn_end won't arrive — clear the
       // running flag so the thinking placeholder + Stop-mode Composer
@@ -185,6 +199,9 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       messages.setAgentRunning(event.sessionId, false);
       messages.setCurrentTurnIndex(event.sessionId, null);
       messages.clearInFlightContent(event.sessionId);
+      if (isManagedRuntimeSession(event.sessionId)) {
+        void useYoleAccountStore.getState().refresh();
+      }
       return;
     }
 
@@ -279,6 +296,9 @@ export function dispatchIPCEvent(event: IPCEvent): void {
       messages.setAgentRunning(event.sessionId, false);
       messages.setCurrentTurnIndex(event.sessionId, null);
       messages.clearInFlightContent(event.sessionId);
+      if (isManagedRuntimeSession(event.sessionId)) {
+        void useYoleAccountStore.getState().refresh();
+      }
       return;
     }
 
@@ -445,6 +465,13 @@ export function dispatchIPCEvent(event: IPCEvent): void {
 
 // ---------------- Turn-end → AgentTurn ----------------
 
+function isManagedRuntimeSession(sessionId: string): boolean {
+  const session = useSessionsStore
+    .getState()
+    .sessions.find((item) => item.id === sessionId);
+  return session?.gaRuntimeKind === "managed";
+}
+
 function turnFromTurnEnd(event: {
   turnIndex: number;
   summary: string;
@@ -581,7 +608,7 @@ const TOOL_DISPATCH_MARKER_PARTIAL = /🛠️?\s+\w+\(/;
 
 /**
  * Verbose-mode tool dispatch marker — emitted by `agent_loop.py:72`
- * when GA runs with `verbose=True` (which Galley's bridge sets so
+ * when GA runs with `verbose=True` (which Yole's bridge sets so
  * the LLM streams per-token). Format:
  *
  *   🛠️ Tool: `tool_name`  📥 args:
@@ -592,7 +619,7 @@ const TOOL_DISPATCH_MARKER_PARTIAL = /🛠️?\s+\w+\(/;
  * Different shape from the compact form (above) — multi-line, with
  * a 4-backtick fenced args block. Same role though: this is GA's
  * terminal-frontend chrome, not content the user should read in
- * Galley's document register. ToolCallout renders the structured
+ * Yole's document register. ToolCallout renders the structured
  * version on turn_end.
  */
 const TOOL_DISPATCH_VERBOSE_BLOCK =
@@ -728,7 +755,7 @@ export function cleanPartialContent(text: string): string {
   out = out.replace(LLM_RUNNING_MARKER, "");
 
   // 1c. Strip GA's compact `🛠️ tool_name(args)` dispatch markers.
-  //     Emitted by `agent_loop.py:73` in verbose=False mode. Galley
+  //     Emitted by `agent_loop.py:73` in verbose=False mode. Yole
   //     now runs verbose=True so these don't appear in practice, but
   //     the stripper stays as backstop in case the user runs against
   //     an older GA baseline where the bridge still falls back.
@@ -973,7 +1000,7 @@ async function persistTurnEndToMessages(event: {
  * GA backend via `load_history` IPC. Called from the `ready` event
  * handler when `session.turnCount > 0` indicates prior conversation.
  *
- * GA's `_load_history` (bridge/workbench_bridge.py L739) wraps the
+ * GA's `_load_history` (bridge/yole_bridge.py L739) wraps the
  * `{role, content: string}` shape into NativeClaudeSession's native
  * blocks format. The assistant `content` column we wrote on turn_end
  * is GA's raw `responseContent` (with <thinking>/<tool_use> tags

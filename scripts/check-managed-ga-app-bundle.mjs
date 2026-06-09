@@ -16,7 +16,7 @@ const appPath =
     "release",
     "bundle",
     "macos",
-    "Galley.app",
+    "Yole.app",
   );
 const macOsRoot = path.join(appPath, "Contents", "MacOS");
 const resourcesRoot = path.join(appPath, "Contents", "Resources");
@@ -102,10 +102,10 @@ function walk(dir) {
 
 requireDir(appPath);
 requireDir(macOsRoot);
-requireExecutableFile(path.join(macOsRoot, "galley"));
+requireExecutableFile(path.join(macOsRoot, "yole"));
 requireDir(resourcesRoot);
 requireDir(path.join(resourcesRoot, "runner"));
-requireFile(path.join(resourcesRoot, "runner", "workbench_bridge.py"));
+requireFile(path.join(resourcesRoot, "runner", "yole_bridge.py"));
 requireDir(path.join(resourcesRoot, "python"));
 requireDir(managedRoot);
 requireDir(codeRoot);
@@ -115,8 +115,8 @@ requireFile(path.join(managedRoot, "patches", "manifest.md"));
 requireFile(path.join(codeRoot, "agentmain.py"));
 requireFile(path.join(codeRoot, "agent_loop.py"));
 requireFile(path.join(codeRoot, "llmcore.py"));
-if (fs.existsSync(path.join(managedRoot, "galley-prompts"))) {
-  fail("managed prompt profile is embedded in Core; app bundle must not ship managed-ga/galley-prompts");
+if (fs.existsSync(path.join(managedRoot, "yole-prompts"))) {
+  fail("managed prompt profile is embedded in Core; app bundle must not ship managed-ga/yole-prompts");
 }
 
 const manifest = fs.existsSync(manifestPath) ? readJson(manifestPath) : null;

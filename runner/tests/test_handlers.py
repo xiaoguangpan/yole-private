@@ -1,4 +1,4 @@
-"""Unit tests for WorkbenchHandler.
+"""Unit tests for YoleHandler.
 
 These tests exercise the dispatch gate without running real LLM calls.
 A FakeHandler subclass provides minimal `do_<tool>` methods so we can
@@ -18,7 +18,7 @@ import pytest
 # conftest runs before test collection.
 from runner.handlers import (
     DEFAULT_APPROVAL_TOOLS,
-    WorkbenchHandler,
+    YoleHandler,
 )
 
 
@@ -32,7 +32,7 @@ def _drain(gen: Any) -> tuple[list[Any], Any]:
         return yielded, e.value
 
 
-class _FakeHandler(WorkbenchHandler):
+class _FakeHandler(YoleHandler):
     """Provides fake do_<tool> methods so super().dispatch() has something to call."""
 
     def do_test_tool(self, args: dict[str, Any], response: Any) -> Any:
@@ -92,11 +92,11 @@ def test_approval_tool_calls_request_approval(fake_parent: MagicMock) -> None:
 
 
 def test_turn_started_callback_fires_for_loaded_ga_dispatch(fake_parent: MagicMock) -> None:
-    """Galley must keep live step progress across GA dispatch internals.
+    """Yole must keep live step progress across GA dispatch internals.
 
-    Older GA calls WorkbenchHandler.tool_before_callback from
+    Older GA calls YoleHandler.tool_before_callback from
     BaseHandler.dispatch. Newer GA switched BaseHandler.dispatch to
-    plugins.hooks, so WorkbenchHandler emits this signal itself when
+    plugins.hooks, so YoleHandler emits this signal itself when
     feature detection says the base dispatch will not.
     """
     seen: list[int] = []

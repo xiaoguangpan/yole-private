@@ -1,6 +1,6 @@
 -- 011_managed_model_sort_order.sql · managed GA model display order
 --
--- The managed model list has user-owned order: it drives Galley's model
+-- The managed model list has user-owned order: it drives Yole's model
 -- picker order, and the first model is the default model.
 
 ALTER TABLE managed_models

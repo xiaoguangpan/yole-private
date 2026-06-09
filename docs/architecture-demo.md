@@ -1,4 +1,4 @@
-# Galley 架构原则 · code-level demo
+# Yole 架构原则 · code-level demo
 
 > Verification-facing document. For the readable architecture overview, start
 > with [architecture](./architecture.md).
@@ -12,17 +12,17 @@
 
 ## 1. Localhost only
 
-> Galley Core 永远只 listen on AF_UNIX socket / named pipe，不开 TCP，不持有 token。
-> 远程访问通过 Supervisor Agent 在外部传输层完成，**不是 Galley 的责任**。
+> Yole Core 永远只 listen on AF_UNIX socket / named pipe，不开 TCP，不持有 token。
+> 远程访问通过 Supervisor Agent 在外部传输层完成，**不是 Yole 的责任**。
 
 ### Code references
 
-- **macOS / Linux**: AF_UNIX socket at `$TMPDIR/galley-$UID.sock` with hand-rolled `getuid` syscall — [`core/src/socket_listener.rs:196-220`](../core/src/socket_listener.rs)
+- **macOS / Linux**: AF_UNIX socket at `$TMPDIR/yole-$UID.sock` with hand-rolled `getuid` syscall — [`core/src/socket_listener.rs:196-220`](../core/src/socket_listener.rs)
   ```rust
   // SAFETY: getuid is always safe — POSIX guarantees it can't fail.
   let uid = unsafe { libc_getuid() };
   ```
-- **Windows**: Named pipe at `\\.\pipe\galley-$USERNAME` — same file (function-level `#[cfg(target_os = "windows")]`)
+- **Windows**: Named pipe at `\\.\pipe\yole-$USERNAME` — same file (function-level `#[cfg(target_os = "windows")]`)
 - **Socket permission 0600** — applied via `set_permissions(0o600)` on Unix; Windows named pipe auto-scopes to creator
 - **Race detection**: 200ms try-connect probe + stale unlink — single-instance enforcement without locks
 
@@ -48,7 +48,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 
 ## 2. CLI surface 是公开契约面
 
-> Galley CLI 的 JSON 输出 schema 是 Galley 对 agent 生态的公开承诺。
+> Yole CLI 的 JSON 输出 schema 是 Yole 对 agent 生态的公开承诺。
 > schema_version 内 additive-only；breaking 强制 bump；exit code 5 类稳定；error enum stable。
 
 ### Code references
@@ -60,9 +60,9 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
   - 1 = internal
   - 2 = invalid_args (includes schema mismatch)
   - 3 = not_found
-  - 4 = db_unavailable (Galley Core not running)
+  - 4 = db_unavailable (Yole Core not running)
   - 5 = runner_error (B4 M1 — bridge unreachable / IPC dispatch failure)
-- **Error enum stable identifiers** — [`core/src/error.rs:12-28`](../core/src/error.rs) `GalleyError` 5 variants with stable snake_case tag via serde `#[serde(tag = "error", rename_all = "snake_case")]`
+- **Error enum stable identifiers** — [`core/src/error.rs:12-28`](../core/src/error.rs) `YoleError` 5 variants with stable snake_case tag via serde `#[serde(tag = "error", rename_all = "snake_case")]`
 - **Origin enum stable** — [`core/src/api/origin.rs`](../core/src/api/origin.rs) `OriginVia { Gui, Cli, Supervisor, System }` SQL CHECK constraint pinned
 
 ### Document references
@@ -78,10 +78,10 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
 
 ---
 
-## 3. 数据不离开 Galley
+## 3. 数据不离开 Yole
 
-> Galley 不存 Supervisor ↔ human 的对话内容。
-> Supervisor 通过 CLI 发的命令、命令的 `--reason` 标注存进 Galley（per-session 行动日志），但 supervisor 跟 user 在 IM 里聊的对话不存。
+> Yole 不存 Supervisor ↔ human 的对话内容。
+> Supervisor 通过 CLI 发的命令、命令的 `--reason` 标注存进 Yole（per-session 行动日志），但 supervisor 跟 user 在 IM 里聊的对话不存。
 
 ### Code references — 存的（per-action origin triple）
 
@@ -100,7 +100,7 @@ grep -rin "jwt\|oauth\|api[_-]key\|bearer" core/src/ | grep -v "//\|test"
   # 006_messages_origin.sql 007_sessions_origin.sql
   ```
   None of these create supervisor-conversation storage.
-- **No Galley → supervisor pull** — Galley CLI / socket has zero command that fetches supervisor-side state (Claude session / GA conversation history / IM messages)
+- **No Yole → supervisor pull** — Yole CLI / socket has zero command that fetches supervisor-side state (Claude session / GA conversation history / IM messages)
 
 ### Grep gates (all should return 0)
 
@@ -111,20 +111,20 @@ grep -rn "supervisor_chat\|conversation_log\|supervisor_history\|im_messages" co
 
 ### Document references
 
-- [`docs/agent-api.md`](./agent-api.md) §6A — Origin fields per-via semantics: only what supervisor SENDS to Galley is persisted, never what they receive externally
-- [`docs/integrations/galley-supervisor-sop.md`](./integrations/galley-supervisor-sop.md) §6 Origin convention — SOP explicitly tells supervisor bots to pass identity + reason via CLI flags, not push conversation logs
+- [`docs/agent-api.md`](./agent-api.md) §6A — Origin fields per-via semantics: only what supervisor SENDS to Yole is persisted, never what they receive externally
+- [`docs/integrations/yole-supervisor-sop.md`](./integrations/yole-supervisor-sop.md) §6 Origin convention — SOP explicitly tells supervisor bots to pass identity + reason via CLI flags, not push conversation logs
 
 ---
 
 ## 4. 路径 B 不可逆迁移
 
-> v0.2 起，业务逻辑权威全部在 Rust 端 Galley Core：SQLite 写 / Bridge subprocess ownership / Session 生命周期 / 命令调度。
+> v0.2 起，业务逻辑权威全部在 Rust 端 Yole Core：SQLite 写 / Bridge subprocess ownership / Session 生命周期 / 命令调度。
 > 前端（GUI / CLI / 未来扩展）：stateless presenter，订阅 event + invoke 命令。
 
 ### Code references — Rust 持有权威
 
-- **SQLite writes via trait** — [`core/src/api.rs`](../core/src/api.rs) `GalleyApi` trait with 17 trait methods spanning sessions / messages / projects / origin
-- **Trait impl** — [`core/src/db.rs`](../core/src/db.rs) `SqliteGalley` is the only writer with `SqlitePool` connection
+- **SQLite writes via trait** — [`core/src/api.rs`](../core/src/api.rs) `YoleApi` trait with 17 trait methods spanning sessions / messages / projects / origin
+- **Trait impl** — [`core/src/db.rs`](../core/src/db.rs) `SqliteYole` is the only writer with `SqlitePool` connection
 - **Bridge subprocess ownership** — [`core/src/runner_manager/manager.rs`](../core/src/runner_manager/manager.rs) `RunnerManager` owns `tokio::process::Child` handles; B2 prototype pattern productionized
 - **Session lifecycle** — [`core/src/runner_manager/process.rs`](../core/src/runner_manager/process.rs) `BridgeProcess` Drop sends SIGKILL on unwind panic (B2 invariant I11)
 - **Command dispatch** — [`core/src/socket_listener.rs`](../core/src/socket_listener.rs) routes CLI commands to same trait surface as Tauri commands ([`core/src/lib.rs:400-433`](../core/src/lib.rs))
@@ -134,7 +134,7 @@ grep -rn "supervisor_chat\|conversation_log\|supervisor_history\|im_messages" co
 - **GUI store slices** — [`gui/src/stores/`](../gui/src/stores) — ui / runtime / sessions / messages / prefs slices; **no direct SQL** writes since B3 M4 / M5
 - **`useAppStore.ts` deleted entirely** — B3 M6 (2026-05-20). The TS-side authoritative state pre-B3 era no longer exists
 - **bridge.ts thin shim** — [`gui/src/lib/bridge.ts`](../gui/src/lib/bridge.ts) all functions `invoke()` Tauri commands; **0 direct Python subprocess spawn**
-- **CLI uses same trait** — [`cli/src/main.rs`](../cli/src/main.rs) opens `SqliteGalley` directly for reads + routes writes through socket (which calls trait); never opens Python subprocess
+- **CLI uses same trait** — [`cli/src/main.rs`](../cli/src/main.rs) opens `SqliteYole` directly for reads + routes writes through socket (which calls trait); never opens Python subprocess
 - **Event subscription pattern** — GUI listens to Tauri `runner-event` / `user-message-persisted` / `runner-closed` events; receives state updates without managing state
 
 ### Grep gates (all should return 0)
@@ -146,7 +146,7 @@ grep -rn "supervisor_chat\|conversation_log\|supervisor_history\|im_messages" co
 grep -rn "execute.*UPDATE\|execute.*INSERT\|execute.*DELETE" gui/src/stores/ gui/src/components/
 
 # No GUI-side Python subprocess
-grep -rn "Command::new.*python\|spawn.*workbench_bridge" gui/src/ | grep -v "//\|test"
+grep -rn "Command::new.*python\|spawn.*yole_bridge" gui/src/ | grep -v "//\|test"
 
 # No GUI-side authoritative state (useAppStore.ts removed)
 test ! -f gui/src/stores/useAppStore.ts || echo "FAIL: useAppStore.ts still exists"

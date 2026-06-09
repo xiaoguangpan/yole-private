@@ -5,9 +5,9 @@
 
 ## Context
 
-Galley used to have only attach mode, so a GenericAgent baseline upgrade mostly
-meant auditing whether a user-owned GA checkout still worked with Galley's
-bridge. Managed GA changes that risk model: Galley now ships a patched
+Yole used to have only attach mode, so a GenericAgent baseline upgrade mostly
+meant auditing whether a user-owned GA checkout still worked with Yole's
+bridge. Managed GA changes that risk model: Yole now ships a patched
 GenericAgent payload, so upstream upgrades must also prove that the managed
 patch stack can be replayed and packaged without user state or local checkout
 artifacts.
@@ -32,15 +32,15 @@ That commit is `chore: update WeChat group 19 QR code image (#492)`.
    now refuses a dirty source checkout and tells maintainers to use a clean
    temporary clone.
 
-3. **Map Galley's `connect_timeout` to GA's new `timeout` key**
+3. **Map Yole's `connect_timeout` to GA's new `timeout` key**
    Upstream `llmcore.BaseSession` now reads `timeout` for connection timeout.
-   Galley keeps `connect_timeout` in managed model records and emits `timeout`
+   Yole keeps `connect_timeout` in managed model records and emits `timeout`
    during managed config injection so existing model settings do not silently
    lose their connection timeout.
 
 4. **Bundle `aiohttp` and verify the vendored managed payload**
    GenericAgent's core `pyproject.toml` already listed `aiohttp>=3.9`, but
-   Galley's bundled Python list omitted it. `scripts/bundle-python.sh` now pins
+   Yole's bundled Python list omitted it. `scripts/bundle-python.sh` now pins
    `aiohttp==3.13.5` and verifies by importing `managed-ga/code`, not the local
    external GA checkout.
 
@@ -49,7 +49,7 @@ That commit is `chore: update WeChat group 19 QR code image (#492)`.
 | Surface | Change | Verdict |
 |---|---|---|
 | `agent_loop.py` | No relevant diff; `BaseHandler.dispatch(..., tool_num=1)` and hook trigger shape unchanged | Safe |
-| `ga.py` | Windows shell execution prefers `pwsh` and forces UTF-8; `_turn_end_hooks` iteration wraps `values()` with `list()` | Safe; hook change is favorable for Galley |
+| `ga.py` | Windows shell execution prefers `pwsh` and forces UTF-8; `_turn_end_hooks` iteration wraps `values()` with `list()` | Safe; hook change is favorable for Yole |
 | `llmcore.py` | `reload_mykeys()` catches load errors; connection timeout config key changed from `connect_timeout` to `timeout` | Managed adapter added |
 | `pyproject.toml` | Optional UI deps add `prompt_toolkit`, `rich`, `pillow`; core deps unchanged from previous upstream baseline | No optional frontend bundle change |
 | Managed patch stack | `0001-managed-state-root.patch` applied cleanly to `agentmain.py`, `ga.py`, `llmcore.py`, and `frontends/continue_cmd.py` | Safe after semantic state-path scan |
@@ -61,7 +61,7 @@ That commit is `chore: update WeChat group 19 QR code image (#492)`.
 - Payload gates catch generated artifacts well: an import smoke created
   `managed-ga/code/__pycache__`, and `check-managed-ga-payload.mjs` failed as
   intended.
-- Bundle verification must import Galley's vendored managed payload. Importing
+- Bundle verification must import Yole's vendored managed payload. Importing
   `~/Documents/GenericAgent` can hide a missing packaged dependency.
 - The old workflow language treated baseline and managed runtime as separate
   release preflight items. The real process is one upstream upgrade gate with
@@ -70,14 +70,14 @@ That commit is `chore: update WeChat group 19 QR code image (#492)`.
 ## Verification
 
 ```text
-GA_PATH=/private/tmp/galley-ga-upgrade-1c9f141.2PkyF1/GenericAgent \
+GA_PATH=/private/tmp/yole-ga-upgrade-1c9f141.2PkyF1/GenericAgent \
   .venv/bin/python -m pytest runner/tests/ -m 'not e2e'
 => 95 passed, 6 deselected
 
 node scripts/check-managed-ga-payload.mjs
 => [managed-ga-payload] OK
 
-PYTHONDONTWRITEBYTECODE=1 GALLEY_GA_STATE_ROOT=/private/tmp/galley-managed-import-smoke \
+PYTHONDONTWRITEBYTECODE=1 YOLE_GA_STATE_ROOT=/private/tmp/yole-managed-import-smoke \
   python3 -c "import sys; sys.path.insert(0, 'managed-ga/code'); import agentmain, llmcore"
 => managed import OK
 

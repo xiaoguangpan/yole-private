@@ -13,7 +13,7 @@
  *     fallback when no per-session LLM list is known yet (e.g. the
  *     onboarding picker before any bridge has connected).
  *   - `DEFAULT_RUNTIME_INFO` — `runtime.ts` initial state. The
- *     `workbenchVersion` field is overwritten by `hydrate.ts` via
+ *     `yoleVersion` field is overwritten by `hydrate.ts` via
  *     `@tauri-apps/api/app.getVersion()`; the empty-string sentinel
  *     here renders as `v` if the hydrate call ever fails, which is
  *     a louder signal than silently displaying a stale literal.
@@ -25,7 +25,7 @@ import type { RuntimeInfo } from "@/types/inspector";
 
 /**
  * Initial `gaConfig` for the prefs store. `python` is the alias used
- * when `useExternalPython === true`; v0.1.1+ defaults to the Galley-
+ * when `useExternalPython === true`; v0.1.1+ defaults to the Yole-
  * bundled interpreter, so the alias is just the escape-hatch target
  * for users on a custom GA fork or venv. `gaPath` / `bridgeCwd` are
  * placeholders — the user picks the real paths in onboarding.
@@ -74,5 +74,5 @@ export const DEFAULT_RUNTIME_INFO: RuntimeInfo = {
   gaBaseline: "5d122e20ea7e9dfd7941998acb902fbac4a2bc9a",
   // Empty string is the honest "not yet known" sentinel — `hydrate.ts`
   // overwrites with the real value from `getVersion()` during app boot.
-  workbenchVersion: "",
+  yoleVersion: "",
 };

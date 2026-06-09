@@ -20,7 +20,7 @@
 After `v0.2.5`, the next dogfood pass found one product-critical gap and a
 cluster of interaction polish issues. The bundled GA runtime had the code entry
 points for GenericAgent memory, but the upstream tracked `memory/` seed was not
-present in Galley's managed state. That made the bundled runtime weaker than
+present in Yole's managed state. That made the bundled runtime weaker than
 the external GA baseline in exactly the place agents depend on for long-term
 use: Memory and SOP.
 
@@ -35,8 +35,8 @@ dialog close tooltips were technically helpful but visually too loud.
 
 - Release `v0.2.6` as a stable patch because the bundled GA Memory/SOP repair
   materially affects agent capability.
-- Seed upstream tracked `memory/` files into Galley's managed runtime as
-  missing-only state, not as replaceable code and not as a separate Galley SOP
+- Seed upstream tracked `memory/` files into Yole's managed runtime as
+  missing-only state, not as replaceable code and not as a separate Yole SOP
   directory.
 - Preserve user state across bundled GA upgrades: runtime code can be replaced,
   but managed memory, custom SOP, skills, and user edits must not be
@@ -49,7 +49,7 @@ dialog close tooltips were technically helpful but visually too loud.
 - Treat small transient UI affordances as supporting controls: selection copy is
   icon-only, and close tooltips do not appear just because a modal opened.
 - Include the Windows updater file-lock fix in this stable patch so installed
-  Windows users can receive future patches without being blocked by Galley's own
+  Windows users can receive future patches without being blocked by Yole's own
   bundled Python processes.
 
 ## Verification
@@ -77,8 +77,8 @@ dialog close tooltips were technically helpful but visually too loud.
 ## Rejected alternatives
 
 - Seeding Memory/SOP by writing into external GA checkouts: violates the attach
-  boundary and would make Galley responsible for user-owned GenericAgent state.
-- Treating SOP as a new Galley-owned `managed-ga-state/sop/` directory: changes
+  boundary and would make Yole responsible for user-owned GenericAgent state.
+- Treating SOP as a new Yole-owned `managed-ga-state/sop/` directory: changes
   upstream GenericAgent semantics and creates a second source of truth.
 - Turning the model editor into a modal or detached floating card: it would hide
   the provider/model relationship that users are trying to edit.

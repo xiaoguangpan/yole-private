@@ -7,14 +7,14 @@
 ## Context
 
 This session moved "managed / bundled GA" from product architecture discussion
-into an end-to-end implementation path. The original attach-only Galley model
+into an end-to-end implementation path. The original attach-only Yole model
 was too high-friction for ordinary users: they had to understand GA checkout,
 Python, `mykey.py`, model config, and runtime ownership before a first chat.
 
-The new product direction: for new users, Galley is the product. First launch
-should say "为 Galley 配置模型", collect model credentials, and start a
+The new product direction: for new users, Yole is the product. First launch
+should say "为 Yole 配置模型", collect model credentials, and start a
 conversation. Existing attach users keep their own GA untouched. Managed GA is
-Galley-owned, but still must preserve upstream upgradability and never mix code
+Yole-owned, but still must preserve upstream upgradability and never mix code
 with user state.
 
 Late dogfood exposed two release-quality issues: packaged builds could run the
@@ -26,17 +26,17 @@ list paths probed secure storage.
 
 ### 1. Runtime boundary split became the core rule
 
-- Attach / external GA remains non-invasive: no Galley Persona injection, no GA
+- Attach / external GA remains non-invasive: no Yole Persona injection, no GA
   code edits, no writes to user-owned GA state.
-- Managed / bundled GA may carry minimal Galley patches and prompt profiles,
-  because it is part of Galley. The boundary is still strict: code is
+- Managed / bundled GA may carry minimal Yole patches and prompt profiles,
+  because it is part of Yole. The boundary is still strict: code is
   replaceable, user state is not.
 - Managed GA upgrades replace code only; `memory/`, SOP, skills, temp state,
-  and model responses stay in Galley-owned state paths.
+  and model responses stay in Yole-owned state paths.
 
 ### 2. First-run model setup is the mainstream path
 
-- Onboarding copy centers "为 Galley 配置模型", not "download/install GA".
+- Onboarding copy centers "为 Yole 配置模型", not "download/install GA".
 - Users provide Provider protocol, API key, Base URL, and model name. Advanced
   options stay out of first-run flow.
 - Attach existing GenericAgent stays as a secondary path for advanced users.
@@ -56,7 +56,7 @@ list paths probed secure storage.
 
 - API keys remain in the OS credential store; SQLite and generated config only
   store non-secret metadata and `apiKeyRef`.
-- Galley must not read Keychain during cold start, sidebar rendering, Settings
+- Yole must not read Keychain during cold start, sidebar rendering, Settings
   list rendering, or passive diagnostics.
 - Passive list APIs return credential status `unknown`; UI renders this as
   "Key 已保存" instead of "Key 缺失".
@@ -68,8 +68,8 @@ list paths probed secure storage.
 
 - `managed-ga/` source payload gate rejects generated, local, secret, and
   user-state artifacts.
-- Tauri now bundles the Galley CLI as an `externalBin`, so production
-  `Galley.app/Contents/MacOS/galley` exists beside `galley-core`.
+- Tauri now bundles the Yole CLI as an `externalBin`, so production
+  `Yole.app/Contents/MacOS/yole` exists beside `yole-core`.
 - A new app-bundle gate inspects the finished macOS `.app` for CLI, runner,
   bundled Python, managed GA code, runtime/persona prompts, and patch manifest.
 - Release workflow prepares the CLI sidecar before Cargo / Tauri validation and
@@ -78,8 +78,8 @@ list paths probed secure storage.
 ## Rejected alternatives
 
 - **Make users manage bundled GA as an install step**: too much cognitive load.
-  Users should configure a model and talk to Galley.
-- **Expose Galley Persona as a user setting**: not needed for the first
+  Users should configure a model and talk to Yole.
+- **Expose Yole Persona as a user setting**: not needed for the first
   product shape; it would turn a carefully designed assistant voice into yet
   another option.
 - **Mix attach and managed session history**: cheaper technically, but worse
@@ -108,7 +108,7 @@ list paths probed secure storage.
 
 Start next session by running dev dogfood on the current managed runtime:
 
-1. Open Galley normally and confirm no Keychain prompt appears on startup.
+1. Open Yole normally and confirm no Keychain prompt appears on startup.
 2. Re-save the managed Provider key in Settings -> Models.
 3. Test connection / fetch model list, then send one managed-mode message.
 4. Run attach-mode smoke once to confirm the runtime boundary stayed intact.

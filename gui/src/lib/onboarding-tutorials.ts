@@ -4,10 +4,10 @@
  * "查看教程" on a failed/warning row in StepAttach or StepHealth.
  *
  * Why hand-written instead of bundling upstream Hello GA markdown:
- *   - Galley-specific context ("完成后回到这里点 选择" / "重新检查")
+ *   - Yole-specific context ("完成后回到这里点 选择" / "重新检查")
  *     can't live in upstream
  *   - 50-150 word focused snippets read faster than full chapter sections
- *   - Maintenance: one file in Galley vs. tracking upstream drift
+ *   - Maintenance: one file in Yole vs. tracking upstream drift
  *
  * Each entry links to the corresponding Hello GA chapter for the full
  * authoritative treatment. The upstream URL is the Datawhale tutorial
@@ -61,7 +61,7 @@ export const TUTORIALS: Record<TutorialId, Tutorial> = {
 git clone https://github.com/lsdefine/GenericAgent.git
 \`\`\`
 
-完成后回到 Galley，点 **选择** 按钮重新指向 GA 的根目录。`,
+完成后回到 Yole，点 **选择** 按钮重新指向 GA 的根目录。`,
     upstreamUrl: HELLO_GA_BASE,
     upstreamLabel: "查看 §1.2 下载项目（Datawhale Hello GA）",
   },
@@ -85,7 +85,7 @@ GA 仓库根目录应该有这些文件：
 - 选成了下载的压缩包父目录而不是解压出来的 GA 文件夹
 - 选成了同名但里面是别的内容的目录
 
-回到 Galley 点 **选择**，确保选的是包含 \`agentmain.py\` 的那一层。
+回到 Yole 点 **选择**，确保选的是包含 \`agentmain.py\` 的那一层。
 
 如果你压根没下载过 GA，先按下载教程操作。`,
     upstreamUrl: HELLO_GA_BASE,
@@ -95,7 +95,7 @@ GA 仓库根目录应该有这些文件：
   "mykey-setup": {
     id: "mykey-setup",
     title: "配置 API 密钥（mykey.py）",
-    body: `GA 需要一个 \`mykey.py\` 文件告诉它用哪个大模型、怎么连。这个文件你需要自己创建——Galley 不会替你写。
+    body: `GA 需要一个 \`mykey.py\` 文件告诉它用哪个大模型、怎么连。这个文件你需要自己创建——Yole 不会替你写。
 
 **第 1 步：复制模板**
 
@@ -112,7 +112,7 @@ GA 仓库根目录应该有这些文件：
 
 把 \`apikey\` 和 \`apibase\` 改成你自己的。记得把这一整段最前面的 \`#\` 注释符删掉——有 \`#\` 的行不生效。
 
-**第 3 步：保存并回到 Galley**
+**第 3 步：保存并回到 Yole**
 
 保存后回到这里点 **重新检查**。
 
@@ -150,7 +150,7 @@ git pull          # 拉最新
   "python-missing-anthropic": {
     id: "python-missing-anthropic",
     title: "Python 加载 GA 失败",
-    body: `Galley 在常见路径上都没找到能 \`import agentmain\` 的 Python——通常意味着 GA 的依赖（\`requests\` / \`beautifulsoup4\` / \`bottle\` 等）没装到这些解释器上。
+    body: `Yole 在常见路径上都没找到能 \`import agentmain\` 的 Python——通常意味着 GA 的依赖（\`requests\` / \`beautifulsoup4\` / \`bottle\` 等）没装到这些解释器上。
 
 **推荐方案：在 GA 目录创建专用 venv**
 
@@ -161,7 +161,7 @@ source .venv/bin/activate
 pip install -e .
 \`\`\`
 
-\`pip install -e .\` 会按 \`pyproject.toml\` 装好 GA 的核心依赖。完成后回到 Galley 点 **重新检查** —— 我们会优先识别 GA 目录下的 \`.venv/bin/python\`，Windows 下是 \`.venv\\Scripts\\python.exe\`。
+\`pip install -e .\` 会按 \`pyproject.toml\` 装好 GA 的核心依赖。完成后回到 Yole 点 **重新检查** —— 我们会优先识别 GA 目录下的 \`.venv/bin/python\`，Windows 下是 \`.venv\\Scripts\\python.exe\`。
 
 **如果你想用系统 Python**
 
@@ -172,7 +172,7 @@ pip install -e .
 /Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pip install -e ${EXAMPLE_GA_PATH}
 \`\`\`
 
-> 为什么不直接用你终端的 \`python3\`？打包后的 Galley 从 Finder 启动时 PATH 跟你终端不一样，找不到 pyenv / uv / conda / asdf 管理的 Python。V0.2 会支持自定义路径。`,
+> 为什么不直接用你终端的 \`python3\`？打包后的 Yole 从 Finder 启动时 PATH 跟你终端不一样，找不到 pyenv / uv / conda / asdf 管理的 Python。V0.2 会支持自定义路径。`,
   },
 
   "memory-info": {
@@ -180,7 +180,7 @@ pip install -e .
     title: "memory/ 会自动创建",
     body: `这个警告**可以忽略**——GA 首次启动时会自动在根目录创建 \`memory/\` 文件夹，用于存储四层记忆（L1 工作记忆 / L2 章节记忆 / L3 长期记忆 / L4 元记忆）。
 
-只要其他检查都通过，直接 **继续** 进入 Galley 就行。GA 第一次跑起来后这个目录就在了。
+只要其他检查都通过，直接 **继续** 进入 Yole 就行。GA 第一次跑起来后这个目录就在了。
 
 > 如果你不想等，也可以手动创建（任选其一）：
 >
@@ -215,7 +215,7 @@ const TUTORIALS_EN: Record<TutorialId, Tutorial> = {
 git clone https://github.com/lsdefine/GenericAgent.git
 \`\`\`
 
-After that, come back to Galley and choose the GA repository root.`,
+After that, come back to Yole and choose the GA repository root.`,
     upstreamUrl: HELLO_GA_BASE,
     upstreamLabel: "Open §1.2 Download project (Datawhale Hello GA)",
   },
@@ -223,7 +223,7 @@ After that, come back to Galley and choose the GA repository root.`,
   "wrong-directory": {
     id: "wrong-directory",
     title: "Choose the GA folder",
-    body: `This path exists, but Galley cannot find \`agentmain.py\` inside it. That usually means this is not the GA repository root.
+    body: `This path exists, but Yole cannot find \`agentmain.py\` inside it. That usually means this is not the GA repository root.
 
 The GA root should include files and folders like:
 
@@ -239,7 +239,7 @@ Common mistakes:
 - Choosing the parent folder of a downloaded ZIP instead of the unzipped GA folder
 - Choosing another folder with a similar name
 
-Go back to Galley and choose the folder that directly contains \`agentmain.py\`.`,
+Go back to Yole and choose the folder that directly contains \`agentmain.py\`.`,
     upstreamUrl: HELLO_GA_BASE,
     upstreamLabel: "Open §1.2 Download project (Datawhale Hello GA)",
   },
@@ -247,7 +247,7 @@ Go back to Galley and choose the folder that directly contains \`agentmain.py\`.
   "mykey-setup": {
     id: "mykey-setup",
     title: "Configure API key (mykey.py)",
-    body: `GA needs a \`mykey.py\` file that tells it which model provider to use. You create this file yourself; Galley does not write it into your GA checkout.
+    body: `GA needs a \`mykey.py\` file that tells it which model provider to use. You create this file yourself; Yole does not write it into your GA checkout.
 
 **Step 1: Copy the template**
 
@@ -266,7 +266,7 @@ Set \`apikey\` and \`apibase\` to your own values. Remove the leading \`#\` comm
 
 **Step 3: Save and come back**
 
-Return to Galley and run the Health Check again.`,
+Return to Yole and run the Health Check again.`,
     upstreamUrl: HELLO_GA_BASE,
     upstreamLabel: "Open §1.4 Configure API key (Datawhale Hello GA)",
   },
@@ -292,7 +292,7 @@ git status
 git pull
 \`\`\`
 
-After fixing it, come back to Galley and run the Health Check again.`,
+After fixing it, come back to Yole and run the Health Check again.`,
     upstreamUrl: HELLO_GA_BASE,
     upstreamLabel: "Open §1.2 Download project (Datawhale Hello GA)",
   },
@@ -300,7 +300,7 @@ After fixing it, come back to Galley and run the Health Check again.`,
   "python-missing-anthropic": {
     id: "python-missing-anthropic",
     title: "Python cannot load GA",
-    body: `Galley could not find a Python interpreter that can \`import agentmain\`. Usually the GA dependencies, such as \`requests\`, \`beautifulsoup4\`, or \`bottle\`, are not installed into the interpreter Galley can see.
+    body: `Yole could not find a Python interpreter that can \`import agentmain\`. Usually the GA dependencies, such as \`requests\`, \`beautifulsoup4\`, or \`bottle\`, are not installed into the interpreter Yole can see.
 
 **Recommended: create a venv inside the GA folder**
 
@@ -311,11 +311,11 @@ source .venv/bin/activate
 pip install -e .
 \`\`\`
 
-\`pip install -e .\` installs GA's core dependencies from \`pyproject.toml\`. After it finishes, come back to Galley and run the Health Check again. Galley checks \`.venv/bin/python\` first, or \`.venv\\Scripts\\python.exe\` on Windows.
+\`pip install -e .\` installs GA's core dependencies from \`pyproject.toml\`. After it finishes, come back to Yole and run the Health Check again. Yole checks \`.venv/bin/python\` first, or \`.venv\\Scripts\\python.exe\` on Windows.
 
 **Why not just use terminal \`python3\`?**
 
-When the packaged Galley app starts from Finder, its PATH is not the same as your terminal PATH. It may not see Python managed by pyenv, uv, conda, or asdf.`,
+When the packaged Yole app starts from Finder, its PATH is not the same as your terminal PATH. It may not see Python managed by pyenv, uv, conda, or asdf.`,
   },
 
   "memory-info": {
@@ -323,7 +323,7 @@ When the packaged Galley app starts from Finder, its PATH is not the same as you
     title: "memory/ will be created automatically",
     body: `You can ignore this warning for a fresh GA install. GA creates the \`memory/\` folder on first run and uses it for L1-L4 memory storage.
 
-If every other check passes, you can continue into Galley. The folder will appear after GA runs once.
+If every other check passes, you can continue into Yole. The folder will appear after GA runs once.
 
 You can also create it manually:
 

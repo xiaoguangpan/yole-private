@@ -1,11 +1,11 @@
-//! Install / uninstall the `galley` CLI as `/usr/local/bin/galley`
+//! Install / uninstall the `yole` CLI as `/usr/local/bin/yole`
 //! (macOS only in v0.2).
 //!
 //! ## Scope
 //!
 //! Per PRD §12.3, this is the *human escape hatch* — supervisors don't
 //! need it (they use the discovery file from
-//! [`crate::discovery`]). Humans who like typing `galley` in a terminal
+//! [`crate::discovery`]). Humans who like typing `yole` in a terminal
 //! benefit from a PATH symlink.
 //!
 //! macOS is the v0.2 target. Windows lands separately: it needs HKCU
@@ -24,28 +24,29 @@
 //! prompt — all three branches map to typed outcomes the GUI can show
 //! without parsing osascript stderr.
 //!
-//! The symlink is **always** absolute: `ln -sf <abs CLI path> /usr/local/bin/galley`.
+//! The symlink is **always** absolute: `ln -sf <abs CLI path> /usr/local/bin/yole`.
 //! `ln -sf` replaces an existing symlink atomically; we use the same
-//! command for first-install and re-install (after a Galley app move).
+//! command for first-install and re-install (after a Yole app move).
 //!
 //! ## Status check (no elevation)
 //!
-//! `lstat(/usr/local/bin/galley)` + `readlink` are unprivileged. The
+//! `lstat(/usr/local/bin/yole)` + `readlink` are unprivileged. The
 //! GUI's "current state" indicator should be live and free of sudo
 //! prompts, so [`check_status`] does both reads without shelling out.
 //!
 //! ## Uninstall
 //!
 //! Removing the symlink also needs root. Same osascript pattern as
-//! install but with `rm /usr/local/bin/galley`.
+//! install but with `rm /usr/local/bin/yole`.
 
+#[cfg(target_os = "macos")]
 use std::path::PathBuf;
 
 use serde::Serialize;
 
 /// Canonical target path. Stable; documented in PRD §12.3.
 #[cfg(target_os = "macos")]
-const SYMLINK_PATH: &str = "/usr/local/bin/galley";
+const SYMLINK_PATH: &str = "/usr/local/bin/yole";
 
 /// Result of [`check_status`]. Three real states + one "we can't even
 /// look" branch for non-macOS.
@@ -58,7 +59,7 @@ pub enum PathInstallStatus {
     /// Symlink doesn't exist.
     NotInstalled,
     /// Symlink exists but points somewhere unexpected (custom user
-    /// install? leftover from a prior Galley install in a different
+    /// install? leftover from a prior Yole install in a different
     /// location?). `actual` is the resolved target. The GUI should
     /// avoid silently overwriting — explain what's there so the user
     /// decides.
@@ -113,14 +114,14 @@ pub fn check_status() -> PathInstallStatus {
     let path = PathBuf::from(SYMLINK_PATH);
     // `symlink_metadata` (lstat) returns metadata about the link itself
     // rather than following it, so a broken symlink still resolves
-    // here. Useful: if `/usr/local/bin/galley` points at an app the
+    // here. Useful: if `/usr/local/bin/yole` points at an app the
     // user later deleted, we want to report OtherTarget (so they can
     // see the stale state), not NotInstalled.
     let Ok(meta) = std::fs::symlink_metadata(&path) else {
         return PathInstallStatus::NotInstalled;
     };
     if !meta.file_type().is_symlink() {
-        // Someone put a regular file at /usr/local/bin/galley.
+        // Someone put a regular file at /usr/local/bin/yole.
         // Surface as OtherTarget — we don't claim "Installed" since
         // it's not our symlink; the install button can offer to
         // replace it.

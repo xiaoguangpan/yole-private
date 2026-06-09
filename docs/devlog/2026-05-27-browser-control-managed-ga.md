@@ -8,12 +8,12 @@
 
 GA's real-browser capabilities (`web_scan` / `web_execute_js`) are a key part
 of the intended experience. Attach-mode users historically handled the
-Chromium extension themselves, but managed / bundled GA is now Galley's
-recommended path. That makes Browser Control a Galley onboarding problem, not
+Chromium extension themselves, but managed / bundled GA is now Yole's
+recommended path. That makes Browser Control a Yole onboarding problem, not
 an upstream tutorial footnote.
 
 The upstream tutorial asks users to load `tmwd_cdp_bridge` and then try a
-browser task such as searching Baidu weather. We decided Galley should not just
+browser task such as searching Baidu weather. We decided Yole should not just
 link that tutorial. It should prepare the `tmwd_cdp_bridge` folder, guide the
 user through opening the Chromium extensions page and dragging / loading that
 folder, test the connection, and then offer a simple demo.
@@ -28,10 +28,10 @@ folder, test the connection, and then offer a simple demo.
   get one-click extension-page buttons; other Chromium browsers can manually
   load the same unpacked extension folder. Safari / Firefox stay out of scope
   because the bridge is CDP / Chrome extension based.
-- Galley syncs the shipped extension into a stable app-data directory. Users do
-  not load the extension from inside `Galley.app/Contents/Resources` or from a
+- Yole syncs the shipped extension into a stable app-data directory. Users do
+  not load the extension from inside `Yole.app/Contents/Resources` or from a
   developer checkout path.
-- Galley owns the upstream "run GA once before installing" prerequisite in
+- Yole owns the upstream "run GA once before installing" prerequisite in
   managed mode. It prepares missing `tmwd_cdp_bridge/config.js` automatically;
   if that preparation fails, setup remains on step 1 with a retry action.
 - Setup steps should keep opening the extensions page and installing the folder
@@ -42,20 +42,20 @@ folder, test the connection, and then offer a simple demo.
   so setup can include a lightweight `图文指南` link near the folder-install
   step. It should be an auxiliary visual guide rather than the primary CTA, and
   should link directly to the Chrome install anchor instead of the chapter top
-  so Galley users do not first see upstream-only prerequisites.
-- Extension-page buttons use Galley's backend platform opener instead of the
+  so Yole users do not first see upstream-only prerequisites.
+- Extension-page buttons use Yole's backend platform opener instead of the
   generic Tauri opener: `chrome://` / `edge://` are browser-internal pages, not
   ordinary web URLs. macOS uses browser bundle IDs, Windows checks standard
   Chrome / Edge install paths and falls back to `cmd /C start`, and direct
   browser binary launches must not wait for the browser process to exit.
-- On each launch, if Browser Control is not connected, Galley can show the setup
+- On each launch, if Browser Control is not connected, Yole can show the setup
   dialog once. Closing it suppresses only the modal for that launch; TopBar
   remains in the missing state.
 - The connection test is deterministic and model-free: extension layout,
   TMWebDriver connection, tab discovery, and minimal JS execution.
 - If a user already installed a compatible GA browser extension, a successful
-  Galley probe counts as ready. The UI should not force reinstalling from the
-  Galley-managed folder; that folder is the repair / install source.
+  Yole probe counts as ready. The UI should not force reinstalling from the
+  Yole-managed folder; that folder is the repair / install source.
 - Once Browser Control is verified, the TopBar entry becomes quiet: icon-only
   with no status dot and no motion. Use a `PuzzlePiece` icon rather than a
   browser/window icon so the entry reads as extension capability instead of an
@@ -69,7 +69,7 @@ folder, test the connection, and then offer a simple demo.
   row.
 - The post-success demo is explicit and Chinese-safe: use Baidu rather than
   Google search, avoiding network reachability confusion for mainland users.
-  The demo should prove the model can drive the browser: Galley checks that the
+  The demo should prove the model can drive the browser: Yole checks that the
   extension is connected, then asks managed GA to open Baidu through Browser
   Control. Managed GA must use the existing `web_execute_js` extension protocol
   (`tabs.create`) for new tabs, not page-level `window.open`, and must not fall
@@ -83,20 +83,20 @@ folder, test the connection, and then offer a simple demo.
   managed GA experience.
 - **Rely on scenario-triggered Composer interception first** — higher coupling
   to prompt submission, pending prompt recovery, and tool-failure explanation.
-  TopBar strong guidance is lighter and matches Galley's chrome-led product
+  TopBar strong guidance is lighter and matches Yole's chrome-led product
   philosophy.
 - **Repeated modal spam / flashing alert** — it would force attention but make
-  Galley feel out of control. The chosen design is persistent and intentionally
+  Yole feel out of control. The chosen design is persistent and intentionally
   unfinished, not hostile.
 - **Silent automatic extension install** — not a normal-user Chromium path.
-  Enterprise policy can force-install extensions, but Galley cannot rely on
+  Enterprise policy can force-install extensions, but Yole cannot rely on
   that for ordinary desktop users.
 - **Use Google for the beginner demo** — reachable for many users but brittle
   for mainland China. The demo's job is to show Browser Control, not test search
   engine access.
 - **Patch the extension or add a new GA tool for tab opening now** — heavier
   than needed for the first pass. The shipped extension already exposes a
-  `tabs.create` protocol through `web_execute_js`, so Galley can first steer the
+  `tabs.create` protocol through `web_execute_js`, so Yole can first steer the
   managed prompt and demo through that existing path.
 
 ## Dogfood Evidence

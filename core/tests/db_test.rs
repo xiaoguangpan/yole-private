@@ -1,13 +1,13 @@
-//! Integration tests for `SqliteGalley` reads.
+//! Integration tests for `SqliteYole` reads.
 //!
 //! Tests use an in-memory SQLite DB seeded with the same migration SQL
 //! the GUI runs in production. Each test sets up its own DB to keep
 //! cases isolated.
 
-use galley_core_lib::api::{
-    GalleyApi, OriginVia, RuntimeKind, SearchScope, SessionFilter, SessionId, SessionStatus,
+use yole_core_lib::api::{
+    YoleApi, OriginVia, RuntimeKind, SearchScope, SessionFilter, SessionId, SessionStatus,
 };
-use galley_core_lib::db::SqliteGalley;
+use yole_core_lib::db::SqliteYole;
 use sqlx::SqlitePool;
 
 // Migration SQL — same files Tauri's tauri-plugin-sql runs in
@@ -191,11 +191,11 @@ async fn list_sessions_default_filter_returns_all_in_recency_order() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
+    let yole = SqliteYole::from_pool(pool);
     // Default SessionFilter has archived=None → no filter (active +
     // archived both returned). Matches the legacy `loadSessions()`
     // TS behaviour the GUI hydrate path depends on.
-    let rows = galley
+    let rows = yole
         .list_sessions(SessionFilter::default())
         .await
         .expect("list_sessions");
@@ -218,8 +218,8 @@ async fn list_sessions_archived_false_excludes_archived() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let rows = galley
+    let yole = SqliteYole::from_pool(pool);
+    let rows = yole
         .list_sessions(SessionFilter {
             archived: Some(false),
             ..Default::default()
@@ -244,8 +244,8 @@ async fn list_sessions_with_archived_true_returns_only_archived() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let rows = galley
+    let yole = SqliteYole::from_pool(pool);
+    let rows = yole
         .list_sessions(SessionFilter {
             archived: Some(true),
             ..Default::default()
@@ -264,8 +264,8 @@ async fn list_sessions_status_filter_matches_exact() {
     seed_session(&pool, "sess_a", "a", "idle", "2026-05-18T00:00:00Z").await;
     seed_session(&pool, "sess_b", "b", "completed", "2026-05-17T00:00:00Z").await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let rows = galley
+    let yole = SqliteYole::from_pool(pool);
+    let rows = yole
         .list_sessions(SessionFilter {
             status: Some(SessionStatus::Completed),
             ..Default::default()
@@ -280,13 +280,13 @@ async fn list_sessions_status_filter_matches_exact() {
 #[tokio::test]
 async fn session_brief_not_found_errors() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let err = galley
+    let yole = SqliteYole::from_pool(pool);
+    let err = yole
         .session_brief(SessionId("sess_missing".into()))
         .await
         .expect_err("expected NotFound");
     match err {
-        galley_core_lib::error::GalleyError::NotFound { .. } => {}
+        yole_core_lib::error::YoleError::NotFound { .. } => {}
         other => panic!("expected NotFound, got {other:?}"),
     }
 }
@@ -295,8 +295,8 @@ async fn session_brief_not_found_errors() {
 async fn session_brief_returns_one_row() {
     let pool = fresh_pool().await;
     seed_session(&pool, "sess_x", "Hello", "idle", "2026-05-18T00:00:00Z").await;
-    let galley = SqliteGalley::from_pool(pool);
-    let brief = galley
+    let yole = SqliteYole::from_pool(pool);
+    let brief = yole
         .session_brief(SessionId("sess_x".into()))
         .await
         .expect("session_brief");
@@ -343,8 +343,8 @@ async fn session_messages_returns_chronological_order() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let msgs = galley
+    let yole = SqliteYole::from_pool(pool);
+    let msgs = yole
         .session_messages(SessionId("sess_x".into()), None)
         .await
         .expect("session_messages");
@@ -376,8 +376,8 @@ async fn session_messages_projects_origin_metadata() {
     .await
     .expect("update origin");
 
-    let galley = SqliteGalley::from_pool(pool);
-    let msgs = galley
+    let yole = SqliteYole::from_pool(pool);
+    let msgs = yole
         .session_messages(SessionId("sess_x".into()), None)
         .await
         .expect("session_messages");
@@ -406,8 +406,8 @@ async fn session_messages_tail_returns_last_n_in_order() {
         .await;
     }
 
-    let galley = SqliteGalley::from_pool(pool);
-    let msgs = galley
+    let yole = SqliteYole::from_pool(pool);
+    let msgs = yole
         .session_messages(SessionId("sess_x".into()), Some(2))
         .await
         .expect("session_messages tail");
@@ -431,8 +431,8 @@ async fn search_messages_short_query_returns_empty() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    assert!(galley
+    let yole = SqliteYole::from_pool(pool);
+    assert!(yole
         .search_messages("a".into(), SearchScope::default(), None)
         .await
         .expect("search 1-char")
@@ -483,8 +483,8 @@ async fn search_messages_runtime_filter_limits_fts_and_like() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let managed_hits = galley
+    let yole = SqliteYole::from_pool(pool);
+    let managed_hits = yole
         .search_messages(
             "sharedtoken".into(),
             SearchScope::Active,
@@ -495,7 +495,7 @@ async fn search_messages_runtime_filter_limits_fts_and_like() {
     assert_eq!(managed_hits.len(), 1);
     assert_eq!(managed_hits[0].session_id.0, "sess_managed");
 
-    let external_hits = galley
+    let external_hits = yole
         .search_messages(
             "sharedtoken".into(),
             SearchScope::Active,
@@ -506,13 +506,13 @@ async fn search_messages_runtime_filter_limits_fts_and_like() {
     assert_eq!(external_hits.len(), 1);
     assert_eq!(external_hits[0].session_id.0, "sess_external");
 
-    let all_runtime_hits = galley
+    let all_runtime_hits = yole
         .search_messages("sharedtoken".into(), SearchScope::Active, None)
         .await
         .expect("all-runtime fts search");
     assert_eq!(all_runtime_hits.len(), 2);
 
-    let managed_like_hits = galley
+    let managed_like_hits = yole
         .search_messages(
             "兔子".into(),
             SearchScope::Active,
@@ -551,8 +551,8 @@ async fn search_messages_fts_finds_hit() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let hits = galley
+    let yole = SqliteYole::from_pool(pool);
+    let hits = yole
         .search_messages("quick".into(), SearchScope::default(), None)
         .await
         .expect("search");
@@ -607,28 +607,28 @@ async fn gui_search_message_hits_runtime_filter_limits_fts_and_like() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let managed_hits = galley
+    let yole = SqliteYole::from_pool(pool);
+    let managed_hits = yole
         .search_message_hits("guitoken".into(), 20, Some(RuntimeKind::Managed))
         .await
         .expect("managed gui fts search");
     assert_eq!(managed_hits.len(), 1);
     assert_eq!(managed_hits[0].session_id, "sess_managed");
 
-    let external_hits = galley
+    let external_hits = yole
         .search_message_hits("guitoken".into(), 20, Some(RuntimeKind::External))
         .await
         .expect("external gui fts search");
     assert_eq!(external_hits.len(), 1);
     assert_eq!(external_hits[0].session_id, "sess_external");
 
-    let all_runtime_hits = galley
+    let all_runtime_hits = yole
         .search_message_hits("guitoken".into(), 20, None)
         .await
         .expect("all-runtime gui fts search");
     assert_eq!(all_runtime_hits.len(), 2);
 
-    let managed_like_hits = galley
+    let managed_like_hits = yole
         .search_message_hits("猫猫".into(), 20, Some(RuntimeKind::Managed))
         .await
         .expect("managed gui like search");
@@ -671,15 +671,15 @@ async fn search_messages_active_scope_excludes_archived() {
     )
     .await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let active_hits = galley
+    let yole = SqliteYole::from_pool(pool);
+    let active_hits = yole
         .search_messages("needle".into(), SearchScope::Active, None)
         .await
         .expect("search active");
     assert_eq!(active_hits.len(), 1);
     assert_eq!(active_hits[0].message_id.0, "m1");
 
-    let all_hits = galley
+    let all_hits = yole
         .search_messages("needle".into(), SearchScope::All, None)
         .await
         .expect("search all");
@@ -694,8 +694,8 @@ async fn status_counts_non_archived_sessions() {
     seed_session(&pool, "c", "c", "completed", "2026-05-18T00:00:02Z").await;
     seed_session(&pool, "d", "d", "archived", "2026-05-18T00:00:03Z").await;
 
-    let galley = SqliteGalley::from_pool(pool);
-    let s = galley.status().await.expect("status");
+    let yole = SqliteYole::from_pool(pool);
+    let s = yole.status().await.expect("status");
     assert_eq!(s.total, 3);
     assert_eq!(s.running, 1);
     assert_eq!(s.waiting_input, 0);
@@ -705,8 +705,8 @@ async fn status_counts_non_archived_sessions() {
 #[tokio::test]
 async fn health_reports_db_readable_and_deferred_probes() {
     let pool = fresh_pool().await;
-    let galley = SqliteGalley::from_pool(pool);
-    let report = galley.health().await.expect("health");
+    let yole = SqliteYole::from_pool(pool);
+    let report = yole.health().await.expect("health");
     // 5 check ids, exact list depends on env. Just assert presence
     // of the SQLite-checkable ones + deferred B4 markers.
     let ids: Vec<&str> = report.checks.iter().map(|c| c.id.as_str()).collect();

@@ -6,7 +6,7 @@
 
 ## Context
 
-This session started as a visual consistency pass for Galley: fonts, button
+This session started as a visual consistency pass for Yole: fonts, button
 styles, Settings buttons, sidebar affordances, and conversation controls. The
 largest product decision emerged around Projects.
 
@@ -84,7 +84,7 @@ worked while project count was small, but it created several UX problems:
   future users read it as "expanded," the visual language may need a subtler
   secondary indicator.
 - Project Review transition timing may need one more tuning pass after daily
-  use; current timing favors a quiet workbench over a pronounced page-change
+  use; current timing favors a quiet yole over a pronounced page-change
   animation.
 - If projects grow into dozens or hundreds, Older Projects may need search
   inside Project Review rather than a separate dialog.

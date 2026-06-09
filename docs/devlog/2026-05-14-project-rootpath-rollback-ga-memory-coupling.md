@@ -3,7 +3,7 @@
 **Date**: 2026-05-14
 **Status**: 决策对齐 · 代码层方案 3 已落地
 **Related**:
-- [bridge/workbench_bridge.py:358-365](../../bridge/workbench_bridge.py#L358) `_setup_ga` 的 `os.chdir` 分支
+- [bridge/yole_bridge.py:358-365](../../bridge/yole_bridge.py#L358) `_setup_ga` 的 `os.chdir` 分支
 - [useAppStore.ts:1406](../../desktop/src/stores/useAppStore.ts#L1406) cwd 注入点（本次改动核心）
 - [CLAUDE.md "Projects V0.1"](../../CLAUDE.md) Stage 3.5 行
 - [docs/devlog/2026-05-13-project-cwd-copy-and-live-sync-deferred.md](./2026-05-13-project-cwd-copy-and-live-sync-deferred.md) —— rootPath 时代最后一次设计 entry，本 entry 把它收掉
@@ -11,9 +11,9 @@
 
 ## Context
 
-在讨论「GA 闲时自主行动」要不要复刻到 Galley 时，顺着 `请阅读自动化sop` 这条线追到 GA 用相对路径 `./memory/...` 读自己的 SOP 文件。开始审计 Galley 桥接层 spawn GA 时实际的 CWD 是怎么决定的。
+在讨论「GA 闲时自主行动」要不要复刻到 Yole 时，顺着 `请阅读自动化sop` 这条线追到 GA 用相对路径 `./memory/...` 读自己的 SOP 文件。开始审计 Yole 桥接层 spawn GA 时实际的 CWD 是怎么决定的。
 
-**结论令人不安**：今天 Galley 的 cwd 行为是这样：
+**结论令人不安**：今天 Yole 的 cwd 行为是这样：
 
 | Session 类型 | bridge 传入 `--cwd` | bridge 实际 `getcwd()` | GA `memory/` 可达 |
 |---|---|---|---|
@@ -101,7 +101,7 @@ Stage 3.5 行末追加一个 strikethrough note，标注 rootPath / CWD binding 
 
 - **将来如果要回来做 cwd 绑定，正确路径是 IPC `set_cwd`**（参见 [2026-05-13 deferred entry](./2026-05-13-project-cwd-copy-and-live-sync-deferred.md) 里写的方案）。本次 rollback 不挡这条路——DB column 还在、类型字段还在，加 IPC 就能 wire 回来。
 - **GA 闲时自主功能**：依赖 GA SOP 文件可达，现在解决了。但 V0.1 还是按上一轮讨论的结论 deferred 到 V0.2（YOLO 已就绪不再是 blocker，但 demand 信号还没强到要做）。
-- **CLAUDE.md 项目宪法读取分级章节** 没有再次受影响——这次改的是 Galley 自己的代码，没有触碰 GA。
+- **CLAUDE.md 项目宪法读取分级章节** 没有再次受影响——这次改的是 Yole 自己的代码，没有触碰 GA。
 
 ## Next
 

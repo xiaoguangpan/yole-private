@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum HealthStatus {
     /// Pass.
     Ok,
-    /// Warning — degraded but Galley can fall back.
+    /// Warning — degraded but Yole can fall back.
     Warn,
     /// Hard failure — the probed dependency is unavailable.
     Fail,

@@ -11,7 +11,7 @@
 
 ## Why we need this prototype
 
-B4 M2 introduces menubar daemon mode — close window → hide (not exit), Cmd+Q → real quit, Galley Core stays alive in menubar so CLI write commands can reach a running socket listener. This is **the highest-risk technical assumption in B4** because:
+B4 M2 introduces menubar daemon mode — close window → hide (not exit), Cmd+Q → real quit, Yole Core stays alive in menubar so CLI write commands can reach a running socket listener. This is **the highest-risk technical assumption in B4** because:
 
 1. **Tauri v2 tray API is new** (rewrite from v1's `tauri-plugin-system-tray`) and cross-platform behavior reports are mixed
 2. **macOS App Nap** can throttle backgrounded Tauri WebView JavaScript by 10-100×, which would make CLI write commands feel "frozen" to the supervisor agent. PRD §13.1 implicitly assumes responsiveness stays — needs validation
@@ -25,7 +25,7 @@ This prototype answers these in 1 day **before** committing 2-3 weeks to B4 M2-M
 
 To keep scope tight:
 
-- ❌ Do not integrate with Galley Core / runner_manager / SQLite — spike runs in a standalone Tauri shell
+- ❌ Do not integrate with Yole Core / runner_manager / SQLite — spike runs in a standalone Tauri shell
 - ❌ Do not implement full menubar menu (just enough items to validate click-to-menu-item callback wiring)
 - ❌ Do not implement CLI socket → window action — instead, simulate "CLI writes while window hidden" with a Rust `tokio::spawn` timer that emits a Tauri event every 500ms and a JS-side `listen()` that increments a counter (visible when window is re-shown)
 - ❌ Do not pretty-print the WebView UI — a plain HTML page with `<h1>Hidden time: Xs / events received: N</h1>` is enough
@@ -38,7 +38,7 @@ This experiment is **throwaway**. Code lives in `core/experiments/tray-mode/` an
 
 ```
                           ┌────────────────────────────┐
-                          │  Galley Tauri process      │
+                          │  Yole Tauri process      │
                           │  (Rust + WebView)          │
                           │                            │
    macOS menubar icon  ←──┤  TrayIconBuilder          │
@@ -74,7 +74,7 @@ Each item is **pass / fail / unknown**. Sections grouped by capability. **All mu
 ### Tray registration (T1-T4)
 
 - [ ] **T1 (macOS)**: Tray icon renders in the menubar on app launch. Visible right of system icons (volume, wifi, etc.). Survives 5-minute idle.
-- [ ] **T2 (macOS)**: Tray icon **left-click** opens the menu. Menu shows 3 items: "Show Galley", "1 active · 0 idle" (disabled / status display), "Quit Galley".
+- [ ] **T2 (macOS)**: Tray icon **left-click** opens the menu. Menu shows 3 items: "Show Yole", "1 active · 0 idle" (disabled / status display), "Quit Yole".
 - [ ] **T3 (Windows)**: Tray icon renders in the system tray (bottom-right notification area). Visible after Windows boot + after wake-from-sleep cycle.
 - [ ] **T4 (Windows)**: Tray icon **left-click** opens the menu (or **right-click** if Windows convention dictates — note which one the spike implements + document Tauri default).
 
@@ -87,13 +87,13 @@ Each item is **pass / fail / unknown**. Sections grouped by capability. **All mu
 
 ### Show-window from tray (T9-T10)
 
-- [ ] **T9 (macOS)**: Tray menu "Show Galley" → `window.show() + window.set_focus()` → window appears AND comes to front (in front of other apps that gained focus during hide). If "show but stays behind other windows" — that's a partial fail, note it.
+- [ ] **T9 (macOS)**: Tray menu "Show Yole" → `window.show() + window.set_focus()` → window appears AND comes to front (in front of other apps that gained focus during hide). If "show but stays behind other windows" — that's a partial fail, note it.
 - [ ] **T10 (Windows)**: Same — tray Show → window in front. (Windows has more aggressive focus-stealing prevention; might need `window.set_always_on_top(true)` momentarily as workaround.)
 
 ### Quit (true exit) (T11-T12)
 
-- [ ] **T11 (macOS)**: Tray menu "Quit Galley" → `app.exit(0)` → process truly exits. `ps aux | grep tray-mode-experiment` returns empty within 2s. Dock icon disappears.
-- [ ] **T12 (Windows)**: Tray menu "Quit Galley" → process truly exits. Task Manager shows process gone within 2s.
+- [ ] **T11 (macOS)**: Tray menu "Quit Yole" → `app.exit(0)` → process truly exits. `ps aux | grep tray-mode-experiment` returns empty within 2s. Dock icon disappears.
+- [ ] **T12 (Windows)**: Tray menu "Quit Yole" → process truly exits. Task Manager shows process gone within 2s.
 
 ### WebView keep-alive while hidden (T13-T16)
 
@@ -108,7 +108,7 @@ Each item is **pass / fail / unknown**. Sections grouped by capability. **All mu
 
 ### macOS App Nap defeat (T17-T19)
 
-App Nap throttles CPU + delays timers for backgrounded apps. Galley needs **Latency-Critical** activity assertion via `NSProcessInfo` to stay responsive.
+App Nap throttles CPU + delays timers for backgrounded apps. Yole needs **Latency-Critical** activity assertion via `NSProcessInfo` to stay responsive.
 
 - [ ] **T17 (macOS only)**: WITHOUT App Nap defeat, hide window for 5 minutes, then trigger a Rust→JS event burst. Measure first-event latency. Document the **un-defeated baseline** (might be 5-30 seconds delay if Nap engaged).
 - [ ] **T18 (macOS only)**: WITH App Nap defeat (`NSProcessInfo.beginActivity` with `.userInitiated | .latencyCritical` options held via Rust `objc2-foundation` or `cocoa` crate), repeat T17 measurement. First-event latency should be **< 100ms** consistently (matches active-window baseline).
@@ -168,10 +168,10 @@ async fn main() {
     tauri::Builder::default()
         .setup(|app| {
             // --- Build tray menu ---
-            let show = MenuItem::with_id(app, "show", "Show Galley", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show Yole", true, None::<&str>)?;
             let status = MenuItem::with_id(app, "status", "1 active · 0 idle", false, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit Galley", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit Yole", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &status, &separator, &quit])?;
 
             // --- Register tray icon ---
@@ -215,7 +215,7 @@ async fn main() {
             // --- macOS App Nap defeat ---
             #[cfg(target_os = "macos")]
             {
-                let _activity = app_nap::begin_latency_critical_activity("Galley CLI responsiveness");
+                let _activity = app_nap::begin_latency_critical_activity("Yole CLI responsiveness");
                 // _activity is leaked intentionally — lives for app lifetime
                 std::mem::forget(_activity);
             }
@@ -388,4 +388,4 @@ If no-go:
 - **Pre-run TODO**:
   - [ ] Verify `tauri` crate version in `core/Cargo.toml` matches v2 (already v2 per existing code; double-check `TrayIconBuilder` is the correct API path)
   - [ ] Confirm `objc2-foundation` version compatible with existing Rust toolchain
-  - [ ] Decide tray icon placeholder — use Galley app icon scaled down, or solid placeholder
+  - [ ] Decide tray icon placeholder — use Yole app icon scaled down, or solid placeholder

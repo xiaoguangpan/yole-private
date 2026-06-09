@@ -2,11 +2,11 @@
 
 **Date**: 2026-05-15
 **Status**: 代码层完成；Windows prep 推到下次 session
-**Related**: PRD §6.1 #4 / §11.5 / [Conversation marathon devlog](2026-05-14-conversation-streaming-and-btw-marathon.md) / commits [72ce4d3](https://github.com/wangjc683/galley/commit/72ce4d3) [143f44c](https://github.com/wangjc683/galley/commit/143f44c)
+**Related**: PRD §6.1 #4 / §11.5 / [Conversation marathon devlog](2026-05-14-conversation-streaming-and-btw-marathon.md) / commits [72ce4d3](https://github.com/wangjc683/yole/commit/72ce4d3) [143f44c](https://github.com/wangjc683/yole/commit/143f44c)
 
 ## Context
 
-接 2026-05-14 conversation 改完后的延续。今天一整天围绕**用户第一次接触 Galley 的几个屏面**做系统打磨：
+接 2026-05-14 conversation 改完后的延续。今天一整天围绕**用户第一次接触 Yole 的几个屏面**做系统打磨：
 
 - 长任务多步骤 conversation 的步骤显示（前一日延续，preamble + ticker + tool pill 双区）
 - Onboarding 三步流程的失败路径（接入 GA / 健康检查每一项失败时 → 提供针对性教程）
@@ -57,9 +57,9 @@
 - **删**：3 条 bullet（多对话并行 / 审批 / 历史）+ 底部 footer trust 文案 + 「开始」按钮
 - **加**：两个 ModeCard
   - Mode 1（灰）：「帮我安装 GenericAgent · 敬请期待」（disabled + Prohibit icon）—— 未来路径显式占位，v0.1 不实现
-  - Mode 2（active）：「接入已经安装的 GenericAgent · Galley 不会修改你的 GenericAgent。删除 Galley 后 GenericAgent 仍可独立运行。」—— 原 footer trust 文案搬进卡片 body，因为这句话是 Attach 路径的 value prop，不是 app 全局事实
+  - Mode 2（active）：「接入已经安装的 GenericAgent · Yole 不会修改你的 GenericAgent。删除 Yole 后 GenericAgent 仍可独立运行。」—— 原 footer trust 文案搬进卡片 body，因为这句话是 Attach 路径的 value prop，不是 app 全局事实
 - 卡片整张可点击，无需「继续」按钮——一次点击 = 决策 + 跳转
-- 标题保持 sentence-case `Galley`（per CLAUDE.md brand wordmark rule：large hero 用 sentence case 软语气，small wordmark 才用 GALLEY uppercase logotype）
+- 标题保持 sentence-case `Yole`（per CLAUDE.md brand wordmark rule：large hero 用 sentence case 软语气，small wordmark 才用 YOLE uppercase logotype）
 - 副标题「GenericAgent 的本地桌面工作台」（去句号）跟 SettingsAbout 同步对齐
 
 ### 4. Empty State 重塑
@@ -90,7 +90,7 @@
 
 ### 6. YOLO 默认 ON + 首次声明 modal
 
-讨论起点：JC 提出「GA 的设计哲学就是没有审批，我们第一批用户是 GA 重度用户，YOLO 应该默认开」。但 PRD §6.1 #4 把审批写进了 Galley value-add，全静默默认 ON 等于把审批降级成「opt-in 功能」。
+讨论起点：JC 提出「GA 的设计哲学就是没有审批，我们第一批用户是 GA 重度用户，YOLO 应该默认开」。但 PRD §6.1 #4 把审批写进了 Yole value-add，全静默默认 ON 等于把审批降级成「opt-in 功能」。
 
 - **决策**：v0.1 YOLO 默认 ON，但**第一次进 MainView 强制弹声明 modal**，让用户知道当前状态 + 提供「改回审批模式」一键退出
 - **不放 Onboarding**：approval 是抽象概念，新用户没见过 agent 跑就让他选 Y/N 是无效决策。也会 bloat onboarding 步数
@@ -110,7 +110,7 @@ Audit 通过 Explore agent 跑了一遍，发现 4 个系统问题：
 **A 路径（轻量）落地**：
 
 - **`components/ui/button.tsx`** 新 Button 组件，5 个 variant（primary / secondary / ghost / destructive / destructive-soft）× 3 个 size（sm / md / lg）。详细 JSDoc 作为系统规约
-- **Primary canonical color 选 `bg-ink`**：克制、跟"文人 workbench"气质一致；JC 觉得 brand-strong 过于强调品牌色，过于 marketing 感
+- **Primary canonical color 选 `bg-ink`**：克制、跟"文人 yole"气质一致；JC 觉得 brand-strong 过于强调品牌色，过于 marketing 感
 - **不强制全代码库迁移**：只改最显眼的 4 个 primary site（CreateProjectDialog / EditProjectDialog / Sidebar empty-project CTA / YoloIntroDialog），其余在自然 touch 时迁移
 - **副产品**：EditProjectDialog「删除项目」入口顺便迁成 `variant="destructive-soft" size="sm"`，跟 ConfirmDeleteProjectDialog 的 `variant="destructive"` 形成「软入口 → 硬确认」两级语义
 
@@ -126,12 +126,12 @@ Audit 通过 Explore agent 跑了一遍，发现 4 个系统问题：
 ## Rejected alternatives
 
 - **TurnMarker 整行自动展开当前步**（JC 提的"过程感最强"方向）：12 步任务每步开始就展开、结束就折回，24 次自动 reflow 视觉很跳，用户眼睛被牵着走反而难安心扫读 summary 时间线。改方案：保持默认折叠 + 增加 streaming TurnTicker 单独承担"过程实时可见"
-- **`<thinking>` 单独 callout vs 并入 DetailPanel**：原本 ThinkingSummary 是独立 bordered 块；新设计并入 DetailPanel 跟 preamble 同源。理由：thinking 在 Galley 罕见出现（多数 LLM 不主动写），分两层暴露反而增加视觉层数
-- **第一性原理删 4 个 chip**：JC 提出「直接删掉，让 Composer 当唯一主角」。否决——Empty State 是产品门面，删完后用户坐下看空白 Composer 容易输入单轮 Q&A，错过 Galley 的多步骤定位声明。改方向：视觉权重大幅降级，保留作为 positioning statement
+- **`<thinking>` 单独 callout vs 并入 DetailPanel**：原本 ThinkingSummary 是独立 bordered 块；新设计并入 DetailPanel 跟 preamble 同源。理由：thinking 在 Yole 罕见出现（多数 LLM 不主动写），分两层暴露反而增加视觉层数
+- **第一性原理删 4 个 chip**：JC 提出「直接删掉，让 Composer 当唯一主角」。否决——Empty State 是产品门面，删完后用户坐下看空白 Composer 容易输入单轮 Q&A，错过 Yole 的多步骤定位声明。改方向：视觉权重大幅降级，保留作为 positioning statement
 - **Onboarding 加 YOLO 偏好选择步**：让用户在 onboarding 第 4 步选「要 / 不要审批」。否决——approval 是抽象概念，新用户没见过 agent 运行就要选偏好是无效决策；onboarding 角色是装起来，不夹带偏好设置
 - **YOLO 声明走 banner 而非阻塞 modal**：banner 太软容易被忽略，YOLO 是安全状态披露值得一次 explicit 停顿
 - **按钮全代码库迁移（B 重型路径）**：~15-20 文件改动，半天-一天工作量，回归风险中等。v0.1 dogfood 阶段目标是「用户感觉一致」不是「代码 perfect」。改 4 个最刺眼的就解决 70% 视觉违和（per audit 数据）
-- **Primary 用 `bg-brand-strong`**：杏色品牌色拉满，但偏 marketing 感。bg-ink 跟产品克制、文人 workbench 气质一致
+- **Primary 用 `bg-brand-strong`**：杏色品牌色拉满，但偏 marketing 感。bg-ink 跟产品克制、文人 yole 气质一致
 - **EmptyState chip 用 prefill 模板**（点击填 placeholder，等用户补语境）：会让新用户面对半完整 prompt 不知道怎么补；完整可跑 demo 直接揭示"按一下真的开始干活"的 wow moment 更有价值
 - **Mac-side prep 路径用 `joinPath` 改 Tauri path API**：`/` 在 Windows 大部分 fs API 也工作，强行替换 introduce 不必要 churn。降级为「nice to have」
 - **借 Windows 机器今晚通宵 build**：JC 自己决定先收工，节奏不被「机器借期」绑架。健康节奏

@@ -115,6 +115,39 @@ export interface TimedManagedModelConnectionResult
   latencyMs: number;
 }
 
+export interface YoleProvisioningResult {
+  kind: "unconfigured" | "skippedExistingModel" | "provisioned";
+  provider?: ManagedModelProviderRecord;
+  model?: ManagedModelRecord;
+  expiresAt?: string | null;
+  account?: YoleAccountStatus;
+}
+
+export interface YoleContactInfo {
+  wechatId?: string | null;
+  wechatQrUrl?: string | null;
+  overseas?: string | null;
+  topUpMessage?: string | null;
+}
+
+export interface YoleAccountStatus {
+  supportId: string;
+  userId: number;
+  username: string;
+  balanceUsd: number;
+  quotaPoints: number;
+  lowBalance: boolean;
+  contact: YoleContactInfo;
+}
+
+export async function ensureYoleTrialModel(): Promise<YoleProvisioningResult> {
+  return invoke<YoleProvisioningResult>("ensure_yole_trial_model");
+}
+
+export async function getYoleAccountStatus(): Promise<YoleAccountStatus | null> {
+  return invoke<YoleAccountStatus | null>("get_yole_account_status");
+}
+
 export async function testManagedModelConnectionWithLatency(
   input: ManagedModelProbeInput,
 ): Promise<TimedManagedModelConnectionResult> {

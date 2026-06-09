@@ -3,7 +3,7 @@ Pure functions + one `install(cls)` monkey-patch entry. No side effects at impor
 """
 import ast, glob, json, os, re, time
 _CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_STATE_ROOT = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or _CODE_ROOT)
+_STATE_ROOT = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or _CODE_ROOT)
 _LOG_DIR = os.path.join(_STATE_ROOT, 'temp', 'model_responses')
 _LOG_GLOB = os.path.join(_LOG_DIR, 'model_responses_*.txt')
 _BLOCK_RE = re.compile(r'^=== (Prompt|Response) ===.*?\n(.*?)(?=^=== (?:Prompt|Response) ===|\Z)',

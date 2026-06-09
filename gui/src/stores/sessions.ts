@@ -28,7 +28,7 @@ import type {
 /**
  * B3 M4b · sessionsStore — authoritative session/project list slice.
  *
- * Writes go through the Rust `GalleyApi` trait via Tauri invoke (see
+ * Writes go through the Rust `YoleApi` trait via Tauri invoke (see
  * `core/src/api.rs`); the front-end keeps an in-memory mirror so the
  * sidebar / TopBar / Composer can render synchronously. The slice
  * intentionally optimistic-updates low-risk organization changes:
@@ -100,7 +100,7 @@ interface ProjectBriefWire {
 // system writes (B4) build their own. Created at module top so every
 // invoke can share the same instance.
 const GUI_ORIGIN = { via: "gui" } as const;
-const MANAGED_PROMPT_PROFILE = "galley-persona-v1";
+const MANAGED_PROMPT_PROFILE = "yole-persona-v1";
 
 function currentCopy() {
   return copyForLanguage(
@@ -374,7 +374,7 @@ interface SessionsActions {
 
   // ---- B4 M1 · external mirror entry points ----
   //
-  // CLI / supervisor writes go through Galley Core's socket transport,
+  // CLI / supervisor writes go through Yole Core's socket transport,
   // which writes the SQLite row and then emits a Tauri event to notify
   // the GUI. These actions are the listener-side mirrors: they update
   // in-memory state to match the row that's already on disk, **without**

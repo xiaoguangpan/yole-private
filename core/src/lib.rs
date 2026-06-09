@@ -21,16 +21,21 @@ pub mod runner_commands;
 pub mod runner_manager;
 pub mod socket_listener;
 pub mod sop_install;
+pub mod yole_provisioning;
+
+#[cfg(all(test, target_os = "windows", target_env = "msvc"))]
+#[link(name = "yole_test_common_controls", kind = "static")]
+extern "C" {}
 
 use api::{
-    CreateProjectInput, CreateSessionInput, GalleyApi, ManagedModelAuthKind,
+    CreateProjectInput, CreateSessionInput, YoleApi, ManagedModelAuthKind,
     ManagedModelProbeInput, Origin, ProjectBrief, ProjectId, ProjectPatch,
     ReorderManagedModelsInput, RuntimeKind, SaveManagedModelInput, SaveManagedProviderInput,
     SessionBrief, SessionFilter, SessionId,
 };
 use db::{
     MessageSearchHit, PersistAssistantMessage, PersistToolEventPending, PersistedMessageRow,
-    SqliteGalley, ToolEventRow, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
+    SqliteYole, ToolEventRow, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
 };
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,19 +45,19 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// SQLite filename. Resolved by tauri-plugin-sql relative to the
 /// platform's app-data directory:
 ///
-///   macOS:  ~/Library/Application Support/app.galley/
+///   macOS:  ~/Library/Application Support/app.yole/
 ///
 /// Schema lives in core/migrations/001_init.sql; tauri-plugin-sql
 /// runs Up migrations in version order on first connect.
-const DB_URL: &str = "sqlite:workbench.db";
+const DB_URL: &str = "sqlite:yole.db";
 const MAIN_WINDOW_LABEL: &str = "main";
-const TRAY_SHOW_GALLEY_LABEL: &str = "Open Galley";
-const TRAY_HIDE_GALLEY_LABEL: &str = "Hide Galley";
+const TRAY_SHOW_YOLE_LABEL: &str = "Open Yole";
+const TRAY_HIDE_YOLE_LABEL: &str = "Hide Yole";
 
 static QUIT_REQUEST_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static ALLOW_APP_EXIT: AtomicBool = AtomicBool::new(false);
 
-/// Pref key recording whether the one-time "Galley keeps running in the
+/// Pref key recording whether the one-time "Yole keeps running in the
 /// background after you close the window" hint has been shown on this
 /// device. Written by the close handler the first time the window is
 /// hidden to background (see `CloseRequested`). Mirrors the
@@ -86,9 +91,9 @@ struct CloseHintCopy {
 impl Default for CloseHintCopy {
     fn default() -> Self {
         Self {
-            title: Mutex::new("Galley is still running".to_string()),
+            title: Mutex::new("Yole is still running".to_string()),
             body: Mutex::new(
-                "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the menu bar / tray."
+                "Closing the window only hides Yole. Background tasks and connected channels keep running. To quit completely, choose Quit Yole from the menu bar / tray."
                     .to_string(),
             ),
         }
@@ -101,9 +106,9 @@ fn set_tray_window_visible(app: &tauri::AppHandle<tauri::Wry>, visible: bool) {
         return;
     };
     let label = if visible {
-        TRAY_HIDE_GALLEY_LABEL
+        TRAY_HIDE_YOLE_LABEL
     } else {
-        TRAY_SHOW_GALLEY_LABEL
+        TRAY_SHOW_YOLE_LABEL
     };
     let _ = tray_menu.toggle_window_item.set_text(label);
 }
@@ -131,7 +136,7 @@ fn toggle_main_window(app: &tauri::AppHandle<tauri::Wry>) {
     }
 }
 
-/// One-time disclosure that closing the window hides Galley to the
+/// One-time disclosure that closing the window hides Yole to the
 /// background rather than quitting. Fires the first time the window is
 /// hidden via `CloseRequested` on macOS / Windows. Subsequent closes
 /// (and returning users who already dismissed it) skip silently.
@@ -160,8 +165,8 @@ fn maybe_show_background_hint(app: &tauri::AppHandle<tauri::Wry>) {
     // a write failure only means the hint may show once more, never an
     // exit-path regression.
     tauri::async_runtime::spawn(async move {
-        if let Ok(galley) = SqliteGalley::open().await {
-            let _ = galley
+        if let Ok(yole) = SqliteYole::open().await {
+            let _ = yole
                 .set_pref_json(CLOSE_HINT_SEEN_PREF, serde_json::json!(true))
                 .await;
         }
@@ -173,19 +178,19 @@ fn maybe_show_background_hint(app: &tauri::AppHandle<tauri::Wry>) {
                 .title
                 .lock()
                 .map(|g| g.clone())
-                .unwrap_or_else(|_| "Galley is still running".to_string());
+                .unwrap_or_else(|_| "Yole is still running".to_string());
             let body = copy
                 .body
                 .lock()
                 .map(|g| g.clone())
                 .unwrap_or_else(|_| {
-                    "Closing the window only hides Galley. To quit completely, choose Quit Galley from the menu bar / tray.".to_string()
+                    "Closing the window only hides Yole. To quit completely, choose Quit Yole from the menu bar / tray.".to_string()
                 });
             (title, body)
         }
         None => (
-            "Galley is still running".to_string(),
-            "Closing the window only hides Galley. To quit completely, choose Quit Galley from the menu bar / tray.".to_string(),
+            "Yole is still running".to_string(),
+            "Closing the window only hides Yole. To quit completely, choose Quit Yole from the menu bar / tray.".to_string(),
         ),
     };
 
@@ -234,12 +239,12 @@ fn request_true_quit<R: tauri::Runtime>(app: tauri::AppHandle<R>, confirm_if_bus
             dialog_app
                 .dialog()
                 .message(
-                    "Galley has a task still running. Quit Galley will stop the app and interrupt any active Agent work.",
+                    "Yole has a task still running. Quit Yole will stop the app and interrupt any active Agent work.",
                 )
-                .title("Quit Galley?")
+                .title("Quit Yole?")
                 .kind(MessageDialogKind::Warning)
                 .buttons(MessageDialogButtons::OkCancelCustom(
-                    "Quit Galley".to_string(),
+                    "Quit Yole".to_string(),
                     "Cancel".to_string(),
                 ))
                 .show(move |confirmed| {
@@ -280,7 +285,7 @@ fn tray_icon_image() -> tauri::Result<tauri::image::Image<'static>> {
 /// as "path does not exist", which is technically wrong and
 /// operationally a dead-end (no app-visible way to widen the scope).
 ///
-/// Galley is a trusted desktop tool: the dist is statically bundled,
+/// Yole is a trusted desktop tool: the dist is statically bundled,
 /// loads no remote content, and the only paths it ever inspects come
 /// from a user-driven OS picker or input box. The web-sandbox threat
 /// model doesn't apply. Rather than widening `fs:scope` to `**` (and
@@ -295,7 +300,7 @@ fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
 
-/// Return the bundled Galley Supervisor SOP for copy / preview surfaces.
+/// Return the bundled Yole Supervisor SOP for copy / preview surfaces.
 /// The GUI deliberately copies this text to the clipboard instead of
 /// writing into GenericAgent `memory/`; the user decides which agent
 /// receives the SOP.
@@ -304,7 +309,7 @@ fn get_supervisor_sop() -> String {
     sop_install::sop_body().to_string()
 }
 
-/// B4 M3 T3.3 — query whether `/usr/local/bin/galley` exists and
+/// B4 M3 T3.3 — query whether `/usr/local/bin/yole` exists and
 /// matches the CLI binary we'd install. No elevation required.
 /// Wrapper over [`path_install::check_status`].
 #[tauri::command]
@@ -312,20 +317,20 @@ fn check_path_install_status() -> path_install::PathInstallStatus {
     path_install::check_status()
 }
 
-/// B4 M3 T3.3 — create `/usr/local/bin/galley → <CLI absolute path>`
+/// B4 M3 T3.3 — create `/usr/local/bin/yole → <CLI absolute path>`
 /// via an `osascript` admin-privileges shell-script call. The macOS
 /// auth dialog appears synchronously; if the user cancels, the
 /// outcome is `UserCancelled` (not an error). Wrapper over
 /// [`path_install::install_to_path`].
 #[tauri::command]
-fn install_galley_to_path() -> path_install::PathInstallOutcome {
+fn install_yole_to_path() -> path_install::PathInstallOutcome {
     path_install::install_to_path()
 }
 
-/// B4 M3 T3.3 — remove `/usr/local/bin/galley` via the same elevated
+/// B4 M3 T3.3 — remove `/usr/local/bin/yole` via the same elevated
 /// `osascript` path. Wrapper over [`path_install::uninstall_from_path`].
 #[tauri::command]
-fn uninstall_galley_from_path() -> path_install::PathUninstallOutcome {
+fn uninstall_yole_from_path() -> path_install::PathUninstallOutcome {
     path_install::uninstall_from_path()
 }
 
@@ -419,8 +424,8 @@ async fn restart_enabled_im_supervisors(
 #[tauri::command]
 async fn list_managed_model_providers(
 ) -> std::result::Result<Vec<api::ManagedModelProviderRecord>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .list_managed_model_providers()
         .await
         .map_err(stringify_error)
@@ -428,8 +433,8 @@ async fn list_managed_model_providers(
 
 #[tauri::command]
 async fn list_managed_models() -> std::result::Result<Vec<api::ManagedModelRecord>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.list_managed_models().await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.list_managed_models().await.map_err(stringify_error)
 }
 
 #[tauri::command]
@@ -437,7 +442,7 @@ async fn save_managed_model_provider(
     app: tauri::AppHandle,
     input: SaveManagedProviderInput,
 ) -> std::result::Result<api::ManagedModelProviderRecord, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
     let id = input
         .id
         .as_deref()
@@ -445,7 +450,7 @@ async fn save_managed_model_provider(
         .filter(|s| !s.is_empty())
         .map(ToOwned::to_owned)
         .unwrap_or_else(new_managed_provider_id);
-    let existing_api_key_ref = galley
+    let existing_api_key_ref = yole
         .list_managed_model_providers()
         .await
         .map_err(stringify_error)?
@@ -462,11 +467,11 @@ async fn save_managed_model_provider(
         .map(str::trim)
         .filter(|s| !s.is_empty());
     if let Some(api_key) = api_key {
-        credential_store::set_secret(&galley, &api_key_ref, api_key)
+        credential_store::set_secret(&yole, &api_key_ref, api_key)
             .await
             .map_err(stringify_error)?;
     } else if !is_existing_provider && auth_kind == ManagedModelAuthKind::ApiKey {
-        return Err(stringify_error(error::GalleyError::InvalidArgs {
+        return Err(stringify_error(error::YoleError::InvalidArgs {
             message: "managed provider API key is required".into(),
         }));
     }
@@ -478,7 +483,7 @@ async fn save_managed_model_provider(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| input.api_base.trim())
         .to_string();
-    let saved = galley
+    let saved = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id,
             display_name,
@@ -489,7 +494,7 @@ async fn save_managed_model_provider(
         })
         .await
         .map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(saved)
 }
 
@@ -498,23 +503,23 @@ async fn delete_managed_model_provider(
     app: tauri::AppHandle,
     id: String,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
     let id = id.trim();
     if id.is_empty() {
-        return Err(stringify_error(error::GalleyError::InvalidArgs {
+        return Err(stringify_error(error::YoleError::InvalidArgs {
             message: "managed provider id must not be empty".into(),
         }));
     }
-    if let Some(api_key_ref) = galley
+    if let Some(api_key_ref) = yole
         .delete_managed_model_provider_metadata(id)
         .await
         .map_err(stringify_error)?
     {
-        credential_store::delete_secret(&galley, &api_key_ref)
+        credential_store::delete_secret(&yole, &api_key_ref)
             .await
             .map_err(stringify_error)?;
     }
-    sync_managed_model_config(&app, &galley).await?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(())
 }
 
@@ -523,7 +528,7 @@ async fn save_managed_model(
     app: tauri::AppHandle,
     input: SaveManagedModelInput,
 ) -> std::result::Result<api::ManagedModelRecord, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
     let id = input
         .id
         .as_deref()
@@ -531,7 +536,7 @@ async fn save_managed_model(
         .filter(|s| !s.is_empty())
         .map(ToOwned::to_owned)
         .unwrap_or_else(new_managed_model_id);
-    let providers = galley
+    let providers = yole
         .list_managed_model_providers()
         .await
         .map_err(stringify_error)?;
@@ -539,7 +544,7 @@ async fn save_managed_model(
         .iter()
         .find(|provider| provider.id == input.provider_id)
         .ok_or_else(|| {
-            stringify_error(error::GalleyError::InvalidArgs {
+            stringify_error(error::YoleError::InvalidArgs {
                 message: format!("managed provider {} not found", input.provider_id),
             })
         })?;
@@ -550,7 +555,7 @@ async fn save_managed_model(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| input.model.trim())
         .to_string();
-    let saved = galley
+    let saved = yole
         .upsert_managed_model_metadata(UpsertManagedModelMetadata {
             id,
             provider_id: input.provider_id,
@@ -563,7 +568,7 @@ async fn save_managed_model(
         })
         .await
         .map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(saved)
 }
 
@@ -572,18 +577,18 @@ async fn delete_managed_model(
     app: tauri::AppHandle,
     id: String,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
     let id = id.trim();
     if id.is_empty() {
-        return Err(stringify_error(error::GalleyError::InvalidArgs {
+        return Err(stringify_error(error::YoleError::InvalidArgs {
             message: "managed model id must not be empty".into(),
         }));
     }
-    galley
+    yole
         .delete_managed_model_metadata(id)
         .await
         .map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(())
 }
 
@@ -592,12 +597,12 @@ async fn reorder_managed_models(
     app: tauri::AppHandle,
     input: ReorderManagedModelsInput,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .reorder_managed_models(input.model_ids)
         .await
         .map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(())
 }
 
@@ -635,8 +640,8 @@ async fn complete_chatgpt_codex_login(
     let result = codex_oauth::complete_device_login(input)
         .await
         .map_err(stringify_error)?;
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(result)
 }
 
@@ -647,8 +652,8 @@ async fn import_chatgpt_codex_cli_login(
     let result = codex_oauth::import_cli_login()
         .await
         .map_err(stringify_error)?;
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await?;
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    sync_managed_model_config(&app, &yole).await?;
     Ok(result)
 }
 
@@ -660,16 +665,41 @@ async fn logout_chatgpt_codex_provider(
     codex_oauth::logout_provider(input)
         .await
         .map_err(stringify_error)?;
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    sync_managed_model_config(&app, &galley).await
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    sync_managed_model_config(&app, &yole).await
+}
+
+#[tauri::command]
+async fn ensure_yole_trial_model(
+    app: tauri::AppHandle,
+) -> std::result::Result<yole_provisioning::YoleProvisioningResult, String> {
+    let result = yole_provisioning::ensure_trial_model(&app)
+        .await
+        .map_err(stringify_error)?;
+    if matches!(
+        result,
+        yole_provisioning::YoleProvisioningResult::Provisioned { .. }
+    ) {
+        let yole = SqliteYole::open().await.map_err(stringify_error)?;
+        sync_managed_model_config(&app, &yole).await?;
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_yole_account_status(
+) -> std::result::Result<Option<yole_provisioning::YoleAccountStatus>, String> {
+    yole_provisioning::get_account_status()
+        .await
+        .map_err(stringify_error)
 }
 
 async fn sync_managed_model_config(
     app: &tauri::AppHandle,
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
 ) -> std::result::Result<(), String> {
     let diagnostics = managed_runtime::ensure_for_app(app).map_err(|e| e.to_string())?;
-    let models = galley
+    let models = yole
         .list_managed_models()
         .await
         .map_err(stringify_error)?;
@@ -679,7 +709,7 @@ async fn sync_managed_model_config(
     )
     .map_err(stringify_error)?;
     let revision = managed_model_config::new_revision();
-    galley
+    yole
         .set_pref_json(
             managed_model_config::REVISION_PREF_KEY,
             serde_json::json!(revision),
@@ -725,36 +755,36 @@ fn managed_model_advanced_defaults(protocol: api::ManagedModelProtocol) -> serde
     }
 }
 
-/// Stringify a [`crate::error::GalleyError`] for the Tauri invoke wire.
+/// Stringify a [`crate::error::YoleError`] for the Tauri invoke wire.
 /// JSON-encoded so the front-end can `JSON.parse` and discriminate on
 /// the `error: <category>` field (matches agent-api.md envelope).
-fn stringify_error(e: crate::error::GalleyError) -> String {
+fn stringify_error(e: crate::error::YoleError) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
 }
 
-/// B1 M3 read — first GalleyApi method exposed through the Tauri
+/// B1 M3 read — first YoleApi method exposed through the Tauri
 /// invoke transport. Validates the end-to-end path
 /// (GUI → Tauri invoke → Rust core → SQLite). Used as the migration
 /// template for B2/B3 (gui/src/lib/db.ts `loadSessions` → `loadSessionsViaCore`).
 ///
 /// Returns `(SessionBrief[])` on success and a JSON-stringified
-/// [`crate::error::GalleyError`] on failure. The error shape matches
+/// [`crate::error::YoleError`] on failure. The error shape matches
 /// the CLI agent-api.md schema (B1 M5) so all transports surface the
 /// same `error: <category>` discriminant.
 #[tauri::command]
 async fn list_sessions(filter: SessionFilter) -> std::result::Result<Vec<SessionBrief>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.list_sessions(filter).await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.list_sessions(filter).await.map_err(stringify_error)
 }
 
 // ============= B3 M4a · session/project CRUD Tauri commands =============
 //
-// Each command is a thin wrapper around the matching `GalleyApi` trait
+// Each command is a thin wrapper around the matching `YoleApi` trait
 // method:
-//   1. open the Sqlite pool (lazy — `SqliteGalley::open` is cheap; the
+//   1. open the Sqlite pool (lazy — `SqliteYole::open` is cheap; the
 //      pool is internally Arc-shared and re-used);
 //   2. forward the args;
-//   3. stringify the `GalleyError` envelope for the invoke wire.
+//   3. stringify the `YoleError` envelope for the invoke wire.
 //
 // The GUI routes through these commands instead of opening SQLite
 // directly; CLI/socket transports wrap the same Core layer.
@@ -764,8 +794,8 @@ async fn create_session(
     input: CreateSessionInput,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .create_session(input, origin)
         .await
         .map_err(stringify_error)
@@ -776,8 +806,8 @@ async fn archive_session(
     id: SessionId,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .archive_session(id, origin)
         .await
         .map_err(stringify_error)
@@ -788,8 +818,8 @@ async fn unarchive_session(
     id: SessionId,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .unarchive_session(id, origin)
         .await
         .map_err(stringify_error)
@@ -801,8 +831,8 @@ async fn rename_session(
     title: String,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .rename_session(id, title, origin)
         .await
         .map_err(stringify_error)
@@ -814,8 +844,8 @@ async fn set_session_pinned(
     pinned: bool,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .set_session_pinned(id, pinned, origin)
         .await
         .map_err(stringify_error)
@@ -823,8 +853,8 @@ async fn set_session_pinned(
 
 #[tauri::command]
 async fn delete_session(id: SessionId, origin: Origin) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .delete_session(id, origin)
         .await
         .map_err(stringify_error)
@@ -836,8 +866,8 @@ async fn assign_session_to_project(
     project_id: Option<String>,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .assign_session_to_project(session_id, project_id, origin)
         .await
         .map_err(stringify_error)
@@ -850,8 +880,8 @@ async fn set_session_llm(
     key: Option<String>,
     display_name: Option<String>,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .set_session_llm(id, index, key, display_name)
         .await
         .map_err(stringify_error)
@@ -864,8 +894,8 @@ async fn bump_session_after_turn(
     step_number: Option<u32>,
     mark_unread: bool,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .bump_session_after_turn(id, summary, step_number, mark_unread)
         .await
         .map_err(stringify_error)
@@ -873,8 +903,8 @@ async fn bump_session_after_turn(
 
 #[tauri::command]
 async fn clear_session_unread(id: SessionId) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .clear_session_unread(id)
         .await
         .map_err(stringify_error)
@@ -884,8 +914,8 @@ async fn clear_session_unread(id: SessionId) -> std::result::Result<(), String> 
 async fn session_message_rows(
     session_id: SessionId,
 ) -> std::result::Result<Vec<PersistedMessageRow>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .persisted_message_rows(&session_id)
         .await
         .map_err(stringify_error)
@@ -898,8 +928,8 @@ async fn persist_user_message(
     content: String,
     origin: Origin,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .persist_gui_user_message(session_id, turn_index, content, origin)
         .await
         .map_err(stringify_error)
@@ -923,8 +953,8 @@ struct PersistAssistantMessageInput {
 async fn persist_assistant_message(
     input: PersistAssistantMessageInput,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .persist_gui_assistant_message(PersistAssistantMessage {
             session_id: input.session_id,
             turn_index: input.turn_index,
@@ -942,8 +972,8 @@ async fn persist_assistant_message(
 
 #[tauri::command]
 async fn delete_empty_new_sessions() -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .delete_empty_new_sessions()
         .await
         .map_err(stringify_error)
@@ -951,14 +981,14 @@ async fn delete_empty_new_sessions() -> std::result::Result<u32, String> {
 
 #[tauri::command]
 async fn delete_demo_sessions() -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.delete_demo_sessions().await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.delete_demo_sessions().await.map_err(stringify_error)
 }
 
 #[tauri::command]
 async fn backfill_fts_if_empty() -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .backfill_fts_if_empty()
         .await
         .map_err(stringify_error)
@@ -970,8 +1000,8 @@ async fn search_messages(
     limit: u32,
     runtime_kind: Option<RuntimeKind>,
 ) -> std::result::Result<Vec<MessageSearchHit>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .search_message_hits(query, limit, runtime_kind)
         .await
         .map_err(stringify_error)
@@ -994,8 +1024,8 @@ struct PersistToolEventPendingInput {
 async fn persist_tool_event_pending(
     input: PersistToolEventPendingInput,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .persist_tool_event_pending(PersistToolEventPending {
             approval_id: input.approval_id,
             session_id: input.session_id,
@@ -1016,8 +1046,8 @@ async fn persist_tool_event_approval_decision(
     decision: String,
     decided_at: String,
 ) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .persist_tool_event_approval_decision(&approval_id, &decision, &decided_at)
         .await
         .map_err(stringify_error)
@@ -1027,8 +1057,8 @@ async fn persist_tool_event_approval_decision(
 async fn load_tool_events_by_session(
     session_id: SessionId,
 ) -> std::result::Result<Vec<ToolEventRow>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .tool_event_rows_by_session(&session_id)
         .await
         .map_err(stringify_error)
@@ -1036,14 +1066,14 @@ async fn load_tool_events_by_session(
 
 #[tauri::command]
 async fn get_pref_json(key: String) -> std::result::Result<Option<serde_json::Value>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.get_pref_json(&key).await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.get_pref_json(&key).await.map_err(stringify_error)
 }
 
 #[tauri::command]
 async fn set_pref_json(key: String, value: serde_json::Value) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .set_pref_json(&key, value)
         .await
         .map_err(stringify_error)
@@ -1075,8 +1105,8 @@ async fn bulk_archive_sessions(
     ids: Vec<SessionId>,
     origin: Origin,
 ) -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .bulk_archive_sessions(ids, origin)
         .await
         .map_err(stringify_error)
@@ -1087,8 +1117,8 @@ async fn bulk_unarchive_sessions(
     ids: Vec<SessionId>,
     origin: Origin,
 ) -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .bulk_unarchive_sessions(ids, origin)
         .await
         .map_err(stringify_error)
@@ -1099,8 +1129,8 @@ async fn bulk_delete_sessions(
     ids: Vec<SessionId>,
     origin: Origin,
 ) -> std::result::Result<u32, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .bulk_delete_sessions(ids, origin)
         .await
         .map_err(stringify_error)
@@ -1108,8 +1138,8 @@ async fn bulk_delete_sessions(
 
 #[tauri::command]
 async fn list_projects() -> std::result::Result<Vec<ProjectBrief>, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.list_projects().await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.list_projects().await.map_err(stringify_error)
 }
 
 #[tauri::command]
@@ -1117,8 +1147,8 @@ async fn create_project(
     input: CreateProjectInput,
     origin: Origin,
 ) -> std::result::Result<ProjectBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .create_project(input, origin)
         .await
         .map_err(stringify_error)
@@ -1130,8 +1160,8 @@ async fn update_project(
     patch: ProjectPatch,
     origin: Origin,
 ) -> std::result::Result<ProjectBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .update_project(id, patch, origin)
         .await
         .map_err(stringify_error)
@@ -1139,8 +1169,8 @@ async fn update_project(
 
 #[tauri::command]
 async fn delete_project(id: ProjectId, origin: Origin) -> std::result::Result<(), String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole
         .delete_project(id, origin)
         .await
         .map_err(stringify_error)
@@ -1273,8 +1303,8 @@ pub fn run() {
             conversation_image::save_conversation_image,
             conversation_image::open_conversation_image,
             check_path_install_status,
-            install_galley_to_path,
-            uninstall_galley_from_path,
+            install_yole_to_path,
+            uninstall_yole_from_path,
             ensure_managed_runtime_layout,
             ensure_browser_control_layout,
             probe_browser_control,
@@ -1298,6 +1328,8 @@ pub fn run() {
             complete_chatgpt_codex_login,
             import_chatgpt_codex_cli_login,
             logout_chatgpt_codex_provider,
+            ensure_yole_trial_model,
+            get_yole_account_status,
             list_sessions,
             // B3 M4a session writes
             create_session,
@@ -1347,7 +1379,7 @@ pub fn run() {
             // preload then runs pending migrations. If the on-disk
             // schema is older than the latest we know about, we copy the
             // entire data dir to a sibling
-            // `app.galley.backup.<utc-timestamp>/` first. A failure here
+            // `app.yole.backup.<utc-timestamp>/` first. A failure here
             // aborts startup — we'd rather refuse to open than attempt a
             // migration with no safety net.
             match migration_backup::ensure_backup_before_migrate(latest_migration_version) {
@@ -1360,14 +1392,14 @@ pub fn run() {
                         .map(|p| p.display().to_string())
                         .unwrap_or_else(|| "<unable to resolve app data dir>".into());
                     let msg = format!(
-                        "Galley 无法启动：备份失败。\n\n{e}\n\n你的原始数据安全在：\n{data_dir}\n\n请检查磁盘空间或目录权限后重试。"
+                        "Yole cannot start because the migration backup failed.\n\n{e}\n\nYour original data is still at:\n{data_dir}\n\nPlease check disk space or directory permissions, then try again."
                     );
                     eprintln!("[backup] FATAL: {e}");
                     let _ = _app
                         .dialog()
                         .message(&msg)
                         .kind(MessageDialogKind::Error)
-                        .title("Galley")
+                        .title("Yole")
                         .blocking_show();
                     std::process::exit(2);
                 }
@@ -1376,8 +1408,8 @@ pub fn run() {
             // Register the SQL plugin only after the backup gate. The
             // plugin is configured with `plugins.sql.preload` in
             // tauri.conf.json, so registration immediately opens
-            // `workbench.db` and runs pending migrations. GUI code no
-            // longer calls the SQL plugin directly; Galley Core owns all
+            // `yole.db` and runs pending migrations. GUI code no
+            // longer calls the SQL plugin directly; Yole Core owns all
             // DB reads/writes, while this Rust-side plugin registration
             // remains the migration runner.
             _app.handle().plugin(
@@ -1402,8 +1434,8 @@ pub fn run() {
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
                 let seen = tauri::async_runtime::block_on(async {
-                    let galley = SqliteGalley::open().await.ok()?;
-                    let value = galley.get_pref_json(CLOSE_HINT_SEEN_PREF).await.ok()?;
+                    let yole = SqliteYole::open().await.ok()?;
+                    let value = yole.get_pref_json(CLOSE_HINT_SEEN_PREF).await.ok()?;
                     value.and_then(|v| v.as_bool())
                 });
                 if seen == Some(true) {
@@ -1416,7 +1448,7 @@ pub fn run() {
             // send write commands + watch event streams from B2 M4 onward.
             // Per AGENTS.md § Localhost Only: fs-perm
             // auth, no TCP / token. If bind fails or another instance
-            // owns the socket, start() returns a dormant guard and Galley
+            // owns the socket, start() returns a dormant guard and Yole
             // Core keeps running — CLI clients will see exit 4 in that case.
             //
             // The guard is managed in app state so its Drop runs at app
@@ -1445,9 +1477,9 @@ pub fn run() {
             }
 
             // Discovery file write (B4 M3 T3.1). Supervisor SOPs read
-            // `~/.config/galley/cli-path` (macOS/Linux) or
-            // `%APPDATA%\galley\cli-path` (Windows) to find the CLI
-            // binary's absolute path. All branches non-fatal — Galley
+            // `~/.config/yole/cli-path` (macOS/Linux) or
+            // `%APPDATA%\yole\cli-path` (Windows) to find the CLI
+            // binary's absolute path. All branches non-fatal — Yole
             // works without it; only SOPs are affected.
             {
                 use crate::discovery::{write_discovery_file, DiscoveryOutcome};
@@ -1464,7 +1496,7 @@ pub fn run() {
                     }
                     DiscoveryOutcome::CliBinaryNotFound { searched } => {
                         eprintln!(
-                            "[discovery] CLI binary not found at {} — supervisor SOPs will fail discovery; package or dev build is missing the galley CLI sibling",
+                            "[discovery] CLI binary not found at {} — supervisor SOPs will fail discovery; package or dev build is missing the yole CLI sibling",
                             searched.display()
                         );
                     }
@@ -1523,10 +1555,10 @@ pub fn run() {
                 set_shadows(_app, true);
             }
 
-            // Background Mode. macOS shows the Galley status item in
+            // Background Mode. macOS shows the Yole status item in
             // the right-side menu bar; Windows shows the same menu in
             // the system tray. Closing the window hides it instead of
-            // tearing down Galley Core, so CLI / Supervisor / IM
+            // tearing down Yole Core, so CLI / Supervisor / IM
             // actions keep reaching the local socket.
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
@@ -1537,7 +1569,7 @@ pub fn run() {
                 let tray_toggle = MenuItem::with_id(
                     _app,
                     "tray_toggle_window",
-                    TRAY_HIDE_GALLEY_LABEL,
+                    TRAY_HIDE_YOLE_LABEL,
                     true,
                     None::<&str>,
                 )?;
@@ -1556,7 +1588,7 @@ pub fn run() {
                     None::<&str>,
                 )?;
                 let tray_quit =
-                    MenuItem::with_id(_app, "tray_quit", "Quit Galley", true, None::<&str>)?;
+                    MenuItem::with_id(_app, "tray_quit", "Quit Yole", true, None::<&str>)?;
                 let tray_primary_separator = PredefinedMenuItem::separator(_app)?;
                 let tray_quit_separator = PredefinedMenuItem::separator(_app)?;
                 let tray_menu = Menu::with_items(
@@ -1584,7 +1616,7 @@ pub fn run() {
                 let mut tray_builder = TrayIconBuilder::new()
                     .icon(tray_icon)
                     .menu(&tray_menu)
-                    .tooltip("Galley")
+                    .tooltip("Yole")
                     .on_tray_icon_event(|tray, event| {
                         if let TrayIconEvent::Click {
                             button,
@@ -1635,7 +1667,7 @@ pub fn run() {
                         // window went and how to truly quit.
                         api.prevent_close();
                         let _ = window_for_close.hide();
-                        let _ = tray_toggle_for_close.set_text(TRAY_SHOW_GALLEY_LABEL);
+                        let _ = tray_toggle_for_close.set_text(TRAY_SHOW_YOLE_LABEL);
                         maybe_show_background_hint(window_for_close.app_handle());
                     }
                 });
@@ -1646,17 +1678,17 @@ pub fn run() {
                     match event.id.0.as_str() {
                         "settings" | "tray_settings" => {
                             show_main_window(app);
-                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_GALLEY_LABEL);
+                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_YOLE_LABEL);
                             let _ = app.emit("menu:settings", ());
                         }
                         "check_updates" | "tray_check_updates" => {
                             show_main_window(app);
-                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_GALLEY_LABEL);
+                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_YOLE_LABEL);
                             let _ = app.emit("menu:check_updates", ());
                         }
                         "new_chat" | "tray_new_chat" => {
                             show_main_window(app);
-                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_GALLEY_LABEL);
+                            let _ = tray_toggle_for_menu.set_text(TRAY_HIDE_YOLE_LABEL);
                             let _ = app.emit("menu:new_chat", ());
                         }
                         "width_compact" => {
@@ -1668,20 +1700,13 @@ pub fn run() {
                         "tray_toggle_window" => {
                             toggle_main_window(app);
                         }
-                        "quit_galley" | "tray_quit" => {
+                        "quit_yole" | "tray_quit" => {
                             request_true_quit(app.clone(), true);
                         }
-                        "github" => {
-                            let _ = app.opener().open_url(
-                                "https://github.com/wangjc683/galley",
-                                None::<&str>,
-                            );
-                        }
-                        "issues" => {
-                            let _ = app.opener().open_url(
-                                "https://github.com/wangjc683/galley/issues",
-                                None::<&str>,
-                            );
+                        "website" => {
+                            let _ = app
+                                .opener()
+                                .open_url("https://na.itxgp.com", None::<&str>);
                         }
                         _ => {}
                     }
@@ -1690,7 +1715,7 @@ pub fn run() {
 
             // macOS-only top menu bar. On macOS apps that don't install
             // a menu look "half-native" — the menu bar shows generic
-            // Tauri default entries. We install a Galley-specific menu
+            // Tauri default entries. We install a Yole-specific menu
             // that mirrors the in-app actions (Settings / New Chat /
             // Check for Updates / Conversation Width) plus standard
             // system items (Hide / Quit / Cut / Copy / Paste /
@@ -1714,17 +1739,17 @@ pub fn run() {
                 };
 
                 let about_metadata = AboutMetadataBuilder::new()
-                    .name(Some("Galley"))
+                    .name(Some("Yole"))
                     .version(Some(env!("CARGO_PKG_VERSION")))
-                    .credits(Some("Made by JC Wang".to_string()))
-                    .website(Some("https://github.com/wangjc683/galley".to_string()))
-                    .website_label(Some("GitHub".to_string()))
+                    .credits(Some("Yole".to_string()))
+                    .website(Some("https://na.itxgp.com".to_string()))
+                    .website_label(Some("Website".to_string()))
                     .build();
 
-                let app_submenu = SubmenuBuilder::new(_app, "Galley")
+                let app_submenu = SubmenuBuilder::new(_app, "Yole")
                     .item(&PredefinedMenuItem::about(
                         _app,
-                        Some("About Galley"),
+                        Some("About Yole"),
                         Some(about_metadata),
                     )?)
                     .item(
@@ -1745,8 +1770,8 @@ pub fn run() {
                     .item(&PredefinedMenuItem::show_all(_app, None)?)
                     .separator()
                     .item(
-                        &MenuItemBuilder::new("Quit Galley")
-                            .id("quit_galley")
+                        &MenuItemBuilder::new("Quit Yole")
+                            .id("quit_yole")
                             .accelerator("Cmd+Q")
                             .build(_app)?,
                     )
@@ -1820,7 +1845,7 @@ pub fn run() {
 
                 let help_submenu = SubmenuBuilder::new(_app, "Help")
                     .item(
-                        &MenuItemBuilder::new("Galley on GitHub")
+                        &MenuItemBuilder::new("Yole on GitHub")
                             .id("github")
                             .build(_app)?,
                     )

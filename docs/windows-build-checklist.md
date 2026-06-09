@@ -1,12 +1,12 @@
 # Windows build checklist
 
-> Status: **draft**. Tracks what's needed to produce a Galley `.exe` installer on Windows manually and the smoke tests to run on Win release artifacts.
+> Status: **draft**. Tracks what's needed to produce a Yole `.exe` installer on Windows manually and the smoke tests to run on Win release artifacts.
 >
-> Galley v0.2+ release path is **CI-driven** — see [release-workflow.md](./release-workflow.md). This document is the **fallback / offline build path** and Windows smoke checklist: use it when CI is unavailable, when smoke-testing a CI-produced `.exe`, or when validating a local change on a Win machine before pushing.
+> Yole v0.2+ release path is **CI-driven** — see [release-workflow.md](./release-workflow.md). This document is the **fallback / offline build path** and Windows smoke checklist: use it when CI is unavailable, when smoke-testing a CI-produced `.exe`, or when validating a local change on a Win machine before pushing.
 
 ## 1 · Prerequisites
 
-Install in this order on a clean Windows 10 / 11 machine. Versions reflect what Galley's tooling expects as of 2026-05.
+Install in this order on a clean Windows 10 / 11 machine. Versions reflect what Yole's tooling expects as of 2026-05.
 
 | # | Tool | Min version | Notes |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Install in this order on a clean Windows 10 / 11 machine. Versions reflect what 
 | 3 | **pnpm** | 9.x | `npm install -g pnpm` after Node installs. |
 | 4 | **Rust toolchain** | stable 1.78+ | Install via `rustup-init.exe` from rustup.rs. Pick the `x86_64-pc-windows-msvc` host triple (default on Win). |
 | 5 | **MSVC Build Tools** | 2022 | Required by Rust for native compilation. Install "Desktop development with C++" workload via Visual Studio Build Tools standalone installer. |
-| 6 | **WebView2 Runtime** | Evergreen | Already shipped with Win 11. On Win 10 it's usually present via Edge — verify under Settings → Apps → "Microsoft Edge WebView2 Runtime". The Galley installer also includes a bootstrapper that pulls it if absent (`webviewInstallMode: downloadBootstrapper` in `tauri.conf.json`). |
+| 6 | **WebView2 Runtime** | Evergreen | Already shipped with Win 11. On Win 10 it's usually present via Edge — verify under Settings → Apps → "Microsoft Edge WebView2 Runtime". The Yole installer also includes a bootstrapper that pulls it if absent (`webviewInstallMode: downloadBootstrapper` in `tauri.conf.json`). |
 
 Verification (PowerShell):
 
@@ -32,22 +32,22 @@ If `cargo` errors with "missing linker", re-run the MSVC Build Tools installer a
 ## 2 · Build
 
 ```powershell
-git clone https://github.com/wangjc683/galley.git
-cd galley
+git clone https://github.com/xiaoguangpan/yole-private.git yole
+cd yole
 pnpm install
 pnpm tauri build
 ```
 
 Artifacts land in `core\target\release\bundle\`:
 
-- `nsis\Galley_<version>_x64-setup.exe` — installer
-- `msi\Galley_<version>_x64_en-US.msi` — only if `"msi"` is added to bundle targets (not default)
+- `nsis\Yole_<version>_x64-setup.exe` — installer
+- `msi\Yole_<version>_x64_en-US.msi` — only if `"msi"` is added to bundle targets (not default)
 
 ## 3 · Install + first run
 
-1. Double-click `Galley_<version>_x64-setup.exe`
+1. Double-click `Yole_<version>_x64-setup.exe`
 2. NSIS installer runs in current-user mode (no UAC prompt — see `bundle.windows.nsis.installMode: "currentUser"`)
-3. Galley appears in Start Menu under "Galley"
+3. Yole appears in Start Menu under "Yole"
 4. First launch: Onboarding flow should appear
 
 ## 4 · Smoke test checklist
@@ -71,8 +71,8 @@ Items to verify on the Win machine. Hand back to Mac for any failures.
 - [ ] **Drag TopBar** → window moves
 - [ ] **Drag TopBar while maximized** → window restores then drags (Win convention)
 - [ ] **Resize from any edge** → window resizes (invisible resize handles work)
-- [ ] **Click another window** → Galley controls desaturate (focus lost)
-- [ ] **Click back on Galley** → controls re-saturate
+- [ ] **Click another window** → Yole controls desaturate (focus lost)
+- [ ] **Click back on Yole** → controls re-saturate
 - [ ] Win + Arrow keys snap window left / right / fullscreen (handled by OS, should just work)
 
 ### Keyboard shortcuts

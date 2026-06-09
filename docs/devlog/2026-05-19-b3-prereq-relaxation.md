@@ -40,7 +40,7 @@ JC 选了「改 playbook 再续 T1.1」（option 2），落 devlog 记录决策 
 ## Open questions
 
 - **dogfood scenarios 列表覆盖度定义**：v0.1 七件事 + B2 新加（CLI session send/watch / 内置 Python / origin tracking）必 cover；其它 polished UX（dot rail / msg collapse / /btw / pet / Desktop Pet）算可选还是必选？预计列表 25-40 条
-- **perf baseline 测法**：first-token RTT 用 `galley session send` + watch 第一个 turn_progress 时间戳？streaming throughput 用 100+ token 任务 events/sec？详 prototype baseline 文档对齐（[B2 devlog Open Questions §Performance gate](./2026-05-19-b2-bridge-ownership-complete.md#open-questions)）
+- **perf baseline 测法**：first-token RTT 用 `yole session send` + watch 第一个 turn_progress 时间戳？streaming throughput 用 100+ token 任务 events/sec？详 prototype baseline 文档对齐（[B2 devlog Open Questions §Performance gate](./2026-05-19-b2-bridge-ownership-complete.md#open-questions)）
 - **M2 启动门触发后 M1 设计是否要 revise**：B3 N2+ running note 追踪
 
 ## Next

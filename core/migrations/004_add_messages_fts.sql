@@ -1,4 +1,4 @@
--- 004_add_messages_fts.sql · GA Workbench v0.1
+-- 004_add_messages_fts.sql · Yole v0.1
 -- Full-text search index over message bodies. Powers the
 -- CommandPalette "Matches in conversations" section so the user
 -- can find old turns by content, not just session title.

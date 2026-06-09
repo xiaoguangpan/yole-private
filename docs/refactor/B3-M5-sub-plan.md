@@ -562,7 +562,7 @@ Commit body 列：
 - [ ] toolCalls + toolResults JSON 反序列正常 → tool callout 渲染
 
 ### Cluster 7 · Bridge crash recovery (Inheritance #1 重点)
-- [ ] 起 session → 发 message → `pkill -9 workbench_bridge` → onClose triggers → toast 显示 + agentRunning false + currentTurnIndex null + inFlightContent ""
+- [ ] 起 session → 发 message → `pkill -9 yole_bridge` → onClose triggers → toast 显示 + agentRunning false + currentTurnIndex null + inFlightContent ""
 - [ ] 切到该 session → bridgeStatus closed → 再发 message → spawnBridge respawn → history replay → 继续
 - [ ] LRU evict 触发（开 6 个 session）→ idle 旧 session 被 closed → agentRunning 检查正确（不 evict 正在跑的）
 

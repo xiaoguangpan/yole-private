@@ -2,7 +2,7 @@ import type { LLMOption } from "@/stores/runtime";
 import type { ManagedModelRecord } from "@/types/managed-models";
 
 /**
- * Build the Composer/Palette model list for Galley-managed runtime.
+ * Build the Composer/Palette model list for Yole-managed runtime.
  *
  * Startup and ordinary list paths expose local credential presence without
  * decrypting real API key values. Rust still filters by real credential

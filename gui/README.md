@@ -1,4 +1,4 @@
-# Galley Desktop
+# Yole Desktop
 
 Tauri v2 + React 19 + TypeScript + Tailwind v4. macOS-first.
 
@@ -26,7 +26,7 @@ pnpm tauri build    # 打 .app / .dmg
 
 `src/styles/globals.css` 的 `@theme` block 是 light theme 基线；
 `html[data-theme="dark"]` 覆盖同一套语义 token。主题偏好走
-`prefs.theme_preference`，并同步 `localStorage.galley_theme_preference`
+`prefs.theme_preference`，并同步 `localStorage.yole_theme_preference`
 给首屏防闪白脚本使用。
 
 ## Managed models + Channels

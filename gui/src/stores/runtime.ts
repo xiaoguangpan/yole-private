@@ -152,7 +152,7 @@ interface RuntimeActions {
   spawnBridge: (args: BridgeSpawnArgs) => Promise<void>;
   /**
    * Attach JS listeners to a runner spawned by the socket transport
-   * (`galley session new`). The process already exists in Rust; this
+   * (`yole session new`). The process already exists in Rust; this
    * action just registers event handlers and tracks the client locally.
    */
   attachExternalBridge: (sessionId: string, pid: number) => Promise<void>;
@@ -324,13 +324,13 @@ function missingBridgeMessage(
   if (bridgeError) return bridgeError;
   switch (status) {
     case "spawning":
-      return "Galley 运行时还没有启动完成，请稍后重试。";
+      return "Yole 运行时还没有启动完成，请稍后重试。";
     case "error":
-      return "Galley 运行时启动失败。";
+      return "Yole 运行时启动失败。";
     case "closed":
-      return "Galley 运行时已关闭，请重新发送这条消息。";
+      return "Yole 运行时已关闭，请重新发送这条消息。";
     default:
-      return "Galley 运行时未启动，请重新发送这条消息。";
+      return "Yole 运行时未启动，请重新发送这条消息。";
   }
 }
 
@@ -466,7 +466,7 @@ function makeBridgeHandlers(sessionId: string): BridgeHandlers {
       const rawMessage = tail.length
         ? tail.slice(-3).join("\n")
         : code === null
-          ? "Galley 运行时意外退出，未返回退出码。"
+          ? "Yole 运行时意外退出，未返回退出码。"
           : `Bridge exited with code ${code}`;
       const message = abnormalClose
         ? actionableBridgeCrashMessage(rawMessage)
@@ -574,7 +574,7 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
     // Cache external GA's LLM list to prefs so future cold-starts (before any
     // bridge has spawned) can show the real model names instead
     // of the DEFAULT_LLMS seed. Managed model options come from
-    // Galley's model store instead; caching them here would leak one
+    // Yole's model store instead; caching them here would leak one
     // runtime's model list into the other runtime's empty state.
     if (shouldCache) {
       void setPref("llm_list", llms).catch((e) => {

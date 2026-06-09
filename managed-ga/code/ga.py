@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from agent_loop import BaseHandler, StepOutcome, json_default
 script_dir = os.path.dirname(os.path.abspath(__file__))
-state_dir = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or script_dir)
+state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):
@@ -112,7 +112,7 @@ def ask_user(question, candidates=None):
 import simphtml
 driver = None
 NO_BROWSER_TABS_MSG = "浏览器插件已连接，但没有可用网页。请在同一个 Chrome / Edge 里打开一个网页，然后重试。"
-NO_BROWSER_CONNECTION_MSG = "浏览器当前没有连接。若已安装插件，请打开同一个 Chrome / Edge 的网页后重试；首次使用请先在 Galley 顶部的浏览器控制入口完成设置。"
+NO_BROWSER_CONNECTION_MSG = "浏览器当前没有连接。若已安装插件，请打开同一个 Chrome / Edge 的网页后重试；首次使用请先在 Yole 顶部的浏览器控制入口完成设置。"
 
 def browser_control_empty_msg():
     try:

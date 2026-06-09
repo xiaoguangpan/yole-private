@@ -50,20 +50,20 @@ type PathUninstallOutcome =
 
 /**
  * Settings → Agent tab. PRD §12 / B4 M3 surface — the screen
- * agents route through to wire Galley into their world.
+ * agents route through to wire Yole into their world.
  *
  * The default surface is the ordinary handoff path:
  *
- * 1. **Galley Supervisor SOP** — copy the bundled
- *    `galley-supervisor-sop.md` so the user can paste it into
+ * 1. **Yole Supervisor SOP** — copy the bundled
+ *    `yole-supervisor-sop.md` so the user can paste it into
  *    whichever external agent they trust as Supervisor.
- *    Galley no longer writes this into GenericAgent `memory/`.
+ *    Yole no longer writes this into GenericAgent `memory/`.
  *
  * 2. **Try prompts** — example user messages for the external Agent
  *    that just received the SOP.
  *
  * Implementation details live under Advanced options: discovery file,
- * optional `galley` command shortcut, and Agent API reference.
+ * optional `yole` command shortcut, and Agent API reference.
  */
 export function SettingsIntegration() {
   const copy = useCopy();
@@ -90,8 +90,8 @@ export function SettingsIntegration() {
       ? "Windows"
       : "Linux";
   const discoveryFilePath = isWindows
-    ? "%APPDATA%\\galley\\cli-path"
-    : "~/.config/galley/cli-path";
+    ? "%APPDATA%\\yole\\cli-path"
+    : "~/.config/yole/cli-path";
 
   // Load command-shortcut install status when the tab mounts. Status check is
   // unprivileged (lstat + readlink), so this is safe to fire eagerly.
@@ -166,7 +166,7 @@ export function SettingsIntegration() {
     setPathBusy(true);
     setPathError(null);
     try {
-      const result = await invoke<PathInstallOutcome>("install_galley_to_path");
+      const result = await invoke<PathInstallOutcome>("install_yole_to_path");
       switch (result.outcome) {
         case "installed":
         case "user_cancelled":
@@ -194,7 +194,7 @@ export function SettingsIntegration() {
     setPathError(null);
     try {
       const result = await invoke<PathUninstallOutcome>(
-        "uninstall_galley_from_path",
+        "uninstall_yole_from_path",
       );
       switch (result.outcome) {
         case "uninstalled":
@@ -250,7 +250,7 @@ export function SettingsIntegration() {
         subtitle={agentCopy.subtitle}
       />
 
-      {/* Galley Supervisor SOP copy. Galley no longer writes into GenericAgent
+      {/* Yole Supervisor SOP copy. Yole no longer writes into GenericAgent
           memory; the user copies this document and gives it to the
           external agent they want to empower as Supervisor. */}
       <section>
@@ -354,7 +354,7 @@ export function SettingsIntegration() {
         {advancedOpen && (
           <div className="mt-3 space-y-6">
             {/* Discovery file row. Informational, not interactive — the
-                file is written automatically at Galley startup (B4 M3
+                file is written automatically at Yole startup (B4 M3
                 T3.1) and supervisors read it without needing user
                 input. Kept under Advanced because it is implementation
                 detail, not part of the ordinary user handoff path. */}
@@ -371,9 +371,9 @@ export function SettingsIntegration() {
               </dl>
             </div>
 
-            {/* Optional `galley` command shortcut (T3.3). Supervisors do
+            {/* Optional `yole` command shortcut (T3.3). Supervisors do
                 not need this because the SOP uses the discovery file.
-                macOS can create /usr/local/bin/galley via the system
+                macOS can create /usr/local/bin/yole via the system
                 auth prompt; Windows is intentionally presented as
                 unsupported until the user-level PATH writer exists. */}
             <div>
@@ -410,9 +410,7 @@ export function SettingsIntegration() {
                   variant="secondary"
                   size="sm"
                   onClick={() =>
-                    void openExternal(
-                      "https://github.com/wangjc683/galley/blob/main/docs/agent-api.md",
-                    )
+                    void openExternal("https://na.itxgp.com")
                   }
                 >
                   <BookOpen size={14} weight="thin" />
@@ -436,7 +434,7 @@ export function SettingsIntegration() {
 
 /**
  * Three states map to three UI shapes:
- *   - not_installed     [ 安装 galley 命令 ] button only
+ *   - not_installed     [ 安装 yole 命令 ] button only
  *   - installed          status line + [ 移除命令 ] button
  *   - other_target       status line ("当前指向：…") + [ 替换 / 移除 ] buttons
  *   - unsupported        explanatory text only, no button
@@ -494,7 +492,7 @@ function PathInstallRow({
     );
   }
 
-  // other_target: someone else (or stale Galley install) owns the path
+  // other_target: someone else (or stale Yole install) owns the path
   if (status?.status === "other_target") {
     return (
       <div className="mt-3 space-y-2">

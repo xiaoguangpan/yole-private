@@ -7,10 +7,11 @@ export interface SettingsRuntimeProps {
   activeRuntimeKind: RuntimeKind;
   hasManagedRuntimeConfigured: boolean;
   hasExternalRuntimeConfigured: boolean;
+  simplifiedUi?: boolean;
   /**
-   * v0.1.1+: when false (default), Galley spawns its own bundled Python
+   * v0.1.1+: when false (default), Yole spawns its own bundled Python
    * interpreter and the Python panel is a read-only info card. When
-   * true, the legacy picker UI is shown so the user can point Galley
+   * true, the legacy picker UI is shown so the user can point Yole
    * at an external interpreter (their own venv, conda env, etc).
    */
   useExternalPython: boolean;

@@ -626,7 +626,7 @@ export function StepModelConfig({
                   )
                 }
               >
-                {onboardingCopy.startUsingGalley}
+                {onboardingCopy.startUsingYole}
               </Button>
             </>
           )}

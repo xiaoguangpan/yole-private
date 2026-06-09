@@ -1,6 +1,6 @@
--- 001_init.sql · GA Workbench v0.1
+-- 001_init.sql · Yole v0.1
 -- Schema mirrors PRD §8 (Data model). Persisted via tauri-plugin-sql
--- in the user's app-data directory (sqlite:workbench.db).
+-- in the user's app-data directory (sqlite:yole.db).
 --
 -- All timestamps stored as ISO 8601 strings (TEXT) — readable in
 -- queries, sortable lexicographically, no timezone surprises. Matches
@@ -57,7 +57,7 @@ CREATE INDEX sessions_by_project
 -- Conversation messages — user / assistant / tool rows ordered by
 -- (session_id, turn_index, sequence). `tool_calls` / `tool_results`
 -- shapes follow GA's NativeClaudeSession history blocks (Anthropic
--- native messages format) — see bridge/workbench_bridge.py
+-- native messages format) — see bridge/yole_bridge.py
 -- _load_history adapter for the canonical layout.
 CREATE TABLE messages (
   id            TEXT PRIMARY KEY,

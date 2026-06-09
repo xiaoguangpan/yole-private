@@ -95,7 +95,7 @@ pub struct RunnerProcess {
     /// to decide whether the session is eviction-protected. Shared with the
     /// reader task via `Arc`.
     agent_running: Arc<AtomicBool>,
-    /// True once shutdown/kill is user-initiated by Galley. The stdout reader
+    /// True once shutdown/kill is user-initiated by Yole. The stdout reader
     /// still emits a close event, but maps it to a clean close so GUI does not
     /// show a crash toast for deliberate lifecycle transitions.
     expected_close: Arc<AtomicBool>,
@@ -107,7 +107,7 @@ pub struct RunnerProcess {
 }
 
 impl RunnerProcess {
-    /// Spawn a new Python `runner.workbench_bridge` subprocess.
+    /// Spawn a new Python `runner.yole_bridge` subprocess.
     ///
     /// On success the subprocess is alive with stdout/stderr being read on
     /// background tasks. Subscribers should call [`subscribe`](Self::subscribe)
@@ -135,7 +135,7 @@ impl RunnerProcess {
         let mut cmd = Command::new(&args.python);
         cmd.args([
             "-m",
-            "runner.workbench_bridge",
+            "runner.yole_bridge",
             "--ga-path",
             &ga_path_str,
             "--session-id",

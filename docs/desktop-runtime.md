@@ -8,7 +8,7 @@ identifier safety, unsigned releases, bundled Python, and Mac / Windows notes.
 
 ## Tauri Identifier
 
-Tauri `identifier` binds Galley's app directories on all supported platforms.
+Tauri `identifier` binds Yole's app directories on all supported platforms.
 The main SQLite DB follows `tauri-plugin-sql` and lives in the app config
 directory:
 
@@ -16,7 +16,7 @@ directory:
 - Linux: `$XDG_CONFIG_HOME/{identifier}/` or `~/.config/{identifier}/`
 - Windows: `%APPDATA%/{identifier}/`
 
-Galley currently uses `app.galley`. SQLite data for sessions, projects,
+Yole currently uses `app.yole`. SQLite data for sessions, projects,
 tool events, prefs, and migrations lives under that identifier-controlled
 directory.
 
@@ -33,13 +33,13 @@ Do not change the Tauri identifier unless the same change includes:
 3. Dogfood using a manually seeded old data directory.
 4. Release notes explaining the one-time migration.
 
-Historical lesson: the 2026-05-13 rename from `app.gaworkbench` to `app.galley`
+Historical lesson: an earlier 2026-05-13 identifier rename to `app.yole`
 made sessions appear missing during dogfood. The data was not lost; the app was
 looking at a new directory.
 
 ## Signing Strategy
 
-Pre-v1.0 Galley ships unsigned:
+Pre-v1.0 Yole ships unsigned:
 
 - macOS `.app` / `.dmg` are not codesigned or notarized.
 - Windows `.exe` / NSIS installer is not signed with an EV certificate.
@@ -59,42 +59,44 @@ this policy and [release workflow](./release-workflow.md).
 
 ## Auto Update Runtime
 
-Galley checks for app updates on startup and exposes the current update state in
+Yole checks for app updates on startup and exposes the current update state in
 Settings -> About / Runtime. Update delivery is enabled only for builds that
 provide both compile-time variables:
 
-- `GALLEY_UPDATER_PUBKEY`: Tauri updater public key embedded in the app.
-- `GALLEY_UPDATER_ENDPOINT`: HTTPS URL for the updater manifest.
+- `YOLE_UPDATER_PUBKEY`: Tauri updater public key embedded in the app.
+- `YOLE_UPDATER_ENDPOINT`: HTTPS URL for the updater manifest.
 
 Current stable endpoint:
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
+https://na.itxgp.com/yole-updates/stable/latest.json
 ```
 
-`updates/beta/latest.json` is kept as a legacy alias for builds compiled before
-the stable channel cutover.
+VPS-hosted updates are the current release path for Windows manual-test builds.
+GitHub Releases may be used as a backup distribution surface, but installed
+apps should read the explicit VPS manifest above unless a future release plan
+changes this document.
 
 Without both values, the app reports that this build is not connected to an
 update channel and local development keeps working. This is intentional: Tauri
 updater package verification is mandatory and should not be bypassed just
-because Galley itself is still unsigned at the OS level.
+because Yole itself is still unsigned at the OS level.
 
 Update installation is task-protected. If any session is actively running,
-Galley may remember that an update is available, but it will not download,
+Yole may remember that an update is available, but it will not download,
 install, or relaunch for that update until the session is idle. This avoids
 turning a background maintenance action into a lost-task event.
 
 ## Background Mode
 
-Galley runs in Background Mode by default on macOS and Windows. Closing the
-main window hides the window; it does not quit the app or shut down Galley Core.
+Yole runs in Background Mode by default on macOS and Windows. Closing the
+main window hides the window; it does not quit the app or shut down Yole Core.
 This keeps local socket access alive for the CLI, Supervisor automation, and
 external IM / agent frontends while the desktop window is out of the way.
 
-The first time the window is hidden to background on a device, Galley shows a
+The first time the window is hidden to background on a device, Yole shows a
 one-time native dialog explaining that closing only hides the window and that
-true exit happens via `Quit Galley`. The dialog is informational (single OK
+true exit happens via `Quit Yole`. The dialog is informational (single OK
 button); it never offers to quit and never blocks the hide. The seen state is
 persisted in the `close_to_background_hint_seen` pref: written by the Rust close
 handler on first show, and read back during Rust `setup` (right after
@@ -102,32 +104,32 @@ migrations) to arm an in-process guard before the window can be closed. Seeding
 in `setup` rather than at GUI hydrate is deliberate — it keeps the hint
 at-most-once-per-device even if the user closes the window before the GUI
 finishes hydrating. The dialog copy is localized: the GUI pushes the
-active-language title / body into Galley Core at hydrate and on language change
+active-language title / body into Yole Core at hydrate and on language change
 (the close handler runs synchronously and cannot reach GUI i18n itself).
 
 Platform behavior:
 
 - macOS: window close and `Cmd+W` hide the main window. The Dock icon remains,
-  and a right-side menu bar status item can reopen or hide Galley.
-- Windows: the window close button and `Alt+F4` hide Galley to the system tray.
-  The tray menu can reopen or hide Galley.
+  and a right-side menu bar status item can reopen or hide Yole.
+- Windows: the window close button and `Alt+F4` hide Yole to the system tray.
+  The tray menu can reopen or hide Yole.
 
 True application exit is explicit:
 
-- The tray / status item exposes `Quit Galley`.
-- macOS also exposes `Quit Galley` from the app menu with `Cmd+Q`.
+- The tray / status item exposes `Quit Yole`.
+- macOS also exposes `Quit Yole` from the app menu with `Cmd+Q`.
 - If any Agent task is running, true quit asks for confirmation before shutting
   down the app and interrupting active work.
 
-The tray / status item provides the small set of actions useful while Galley is
+The tray / status item provides the small set of actions useful while Yole is
 running in the background:
 
-- `Open Galley` / `Hide Galley`: mirror the current simple window state.
-- `New Chat`: reopen Galley and start a new conversation.
-- `Settings`: reopen Galley and open Settings.
-- `Check for Updates...`: reopen Galley to Settings -> About and check the
+- `Open Yole` / `Hide Yole`: mirror the current simple window state.
+- `New Chat`: reopen Yole and start a new conversation.
+- `Settings`: reopen Yole and open Settings.
+- `Check for Updates...`: reopen Yole to Settings -> About and check the
   update channel.
-- `Quit Galley`: explicitly exit the app.
+- `Quit Yole`: explicitly exit the app.
 
 The first version intentionally has no running / approval badge; task state
 remains inside the main UI.
@@ -141,24 +143,24 @@ Release builds opt into signed updater artifacts by generating
 `tauri.conf.json` intentionally does not enable `createUpdaterArtifacts`, so
 local Dev and unsigned local builds do not require `TAURI_SIGNING_PRIVATE_KEY`.
 
-The release workflow creates a candidate `latest.json` as a draft Release asset.
-After smoke test and publishing the release, run the manual
-`promote-update-channel.yml` workflow to update the beta manifest that installed
-apps read.
+The release workflow can create a candidate `latest.json` as a draft Release
+asset. For the current VPS-hosted channel, the final signed package and
+`latest.json` are uploaded to the VPS paths documented in
+[repository and release topology](./repository-and-release-topology.md).
 
 ## Bundled Python
 
-Since v0.1.1, Galley release builds embed CPython 3.11.15 plus GenericAgent core
+Since v0.1.1, Yole release builds embed CPython 3.11.15 plus GenericAgent core
 dependencies. Users do not need to configure Python or a venv for normal use.
 
 Runtime policy:
 
-- Managed / bundled GA must be open-and-run from Galley's own Python and
+- Managed / bundled GA must be open-and-run from Yole's own Python and
   packaged dependencies. A release that needs the user's Python to start the
   managed runtime is not release-ready.
-- Attach / external GA also defaults to Galley's bundled Python in release
+- Attach / external GA also defaults to Yole's bundled Python in release
   builds. This gives user-owned GenericAgent checkouts the same baseline
-  dependencies without letting Galley modify the checkout, venv, PATH, or state.
+  dependencies without letting Yole modify the checkout, venv, PATH, or state.
 - External Python is an explicit escape hatch (`gaConfig.useExternalPython =
   true`) for user-added dependencies, unsupported upstream frontends, or users
   who deliberately want their own interpreter.
@@ -175,7 +177,7 @@ Implementation notes:
   - `python-bundled` for macOS / Linux (`bin/python3`)
   - `python-bundled-win` for Windows (`python.exe`)
 - Release gate: `scripts/check-bundled-python-managed-ga.sh` verifies that the
-  generated bundle can import `managed-ga/code` and Galley-owned runtime deps.
+  generated bundle can import `managed-ga/code` and Yole-owned runtime deps.
 
 Bundled GenericAgent core deps are audited during baseline upgrades. See
 [GA baseline](./ga-baseline.md).
@@ -188,11 +190,11 @@ Managed / bundled GA keeps code and state separate:
   `managed-ga/patches/`.
 - Application Support contains `managed-ga-state/` and
   `managed-model-config/`.
-- For unsigned release builds, `workbench.db` contains encrypted managed model
+- For unsigned release builds, `yole.db` contains encrypted managed model
   API key payloads plus the local encryption key. Generated runtime config stores
   only `apiKeyRef`, never plaintext API keys.
 
-Galley may replace the managed code payload during an app update, but it must
+Yole may replace the managed code payload during an app update, but it must
 not overwrite managed state. Startup may create missing state directories only.
 Advanced diagnostics can show managed runtime paths, baseline commit, patch
 stack status, and generated config presence; diagnostics must never display API
@@ -228,4 +230,4 @@ Windows manual smoke lives in [windows build checklist](./windows-build-checklis
 - `macOS` means the operating system. Use for platform names, system
   requirements, and release titles.
 - `Mac` means the hardware family or user device.
-- Release title example: `Galley v0.2.0`.
+- Release title example: `Yole v0.2.0`.

@@ -1,6 +1,6 @@
 //! Browser Control capability for the managed GenericAgent runtime.
 //!
-//! Galley ships the upstream `tmwd_cdp_bridge` extension as managed GA code,
+//! Yole ships the upstream `tmwd_cdp_bridge` extension as managed GA code,
 //! but Chromium should load it from a stable user-data directory rather than
 //! directly from the app bundle. This module owns that synced directory and a
 //! small probe that verifies the extension can connect to TMWebDriver.
@@ -93,6 +93,7 @@ const CHROME_EXTENSION_MANAGEMENT_ARGS: &[&str] = &[CHROME_EXTENSION_MANAGEMENT_
 #[cfg(any(target_os = "windows", test))]
 const EDGE_EXTENSION_MANAGEMENT_ARGS: &[&str] = &["--new-window", EDGE_EXTENSION_MANAGEMENT_URL];
 
+#[cfg(any(not(target_os = "windows"), test))]
 fn extension_management_url(browser: BrowserControlBrowser) -> &'static str {
     match browser {
         BrowserControlBrowser::Chrome => CHROME_EXTENSION_MANAGEMENT_URL,
@@ -173,10 +174,10 @@ pub async fn probe_for_app(
         .arg(script)
         .current_dir(&code_root)
         .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env("GALLEY_GA_STATE_ROOT", state_root)
-        .env("GALLEY_BROWSER_PROBE_CODE_ROOT", code_root)
+        .env("YOLE_GA_STATE_ROOT", state_root)
+        .env("YOLE_BROWSER_PROBE_CODE_ROOT", code_root)
         .env(
-            "GALLEY_BROWSER_PROBE_TIMEOUT_SECONDS",
+            "YOLE_BROWSER_PROBE_TIMEOUT_SECONDS",
             format!("{:.3}", wait_duration.as_secs_f64()),
         )
         .stdin(Stdio::piped())
@@ -473,7 +474,7 @@ fn ensure_config_js(extension_dir: &Path) -> std::io::Result<()> {
         .unwrap_or(0);
     fs::write(
         config_path,
-        format!("const TID = '__galley_{:x}';\n", micros % 0xFF_FFFF),
+        format!("const TID = '__yole_{:x}';\n", micros % 0xFF_FFFF),
     )
 }
 
@@ -495,7 +496,7 @@ fn python_probe_script() -> &'static str {
     r#"
 import json, os, sys, time, traceback
 
-code_root = os.environ.get("GALLEY_BROWSER_PROBE_CODE_ROOT")
+code_root = os.environ.get("YOLE_BROWSER_PROBE_CODE_ROOT")
 if code_root:
     sys.path.insert(0, code_root)
 
@@ -503,7 +504,7 @@ try:
     from TMWebDriver import TMWebDriver
     driver = TMWebDriver()
     try:
-        wait_seconds = float(os.environ.get("GALLEY_BROWSER_PROBE_TIMEOUT_SECONDS", "12"))
+        wait_seconds = float(os.environ.get("YOLE_BROWSER_PROBE_TIMEOUT_SECONDS", "12"))
     except Exception:
         wait_seconds = 12.0
     deadline = time.time() + max(0.5, wait_seconds)
@@ -594,7 +595,7 @@ mod tests {
         assert!(extension_dir.join("manifest.json").is_file());
         assert!(extension_dir.join("content.js").is_file());
         let config = fs::read_to_string(extension_dir.join("config.js")).expect("config");
-        assert!(config.starts_with("const TID = '__galley_"));
+        assert!(config.starts_with("const TID = '__yole_"));
     }
 
     #[test]
@@ -609,7 +610,7 @@ mod tests {
         prepare_extension_layout(&source_dir, &extension_dir).expect("recreate config");
         assert!(extension_dir.join("config.js").is_file());
 
-        let stable_config = "const TID = '__galley_existing';\n";
+        let stable_config = "const TID = '__yole_existing';\n";
         fs::write(extension_dir.join("config.js"), stable_config).expect("write stable config");
         prepare_extension_layout(&source_dir, &extension_dir).expect("preserve config");
         let config = fs::read_to_string(extension_dir.join("config.js")).expect("config");

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Galley M2 Spike",
+  "productName": "Yole M2 Spike",
   "version": "0.0.1",
-  "identifier": "app.galley.m2spike",
+  "identifier": "app.yole.m2spike",
   "build": {
     "frontendDist": "."
   },
@@ -10,7 +10,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Galley M2 Tray-mode Spike",
+        "title": "Yole M2 Tray-mode Spike",
         "width": 540,
         "height": 420,
         "resizable": true,

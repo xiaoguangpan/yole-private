@@ -8,9 +8,9 @@
 # `artifactName` config to customize this. We do the rename after
 # `tauri build` instead:
 #
-#   Galley_0.1.1-alpha.1_aarch64.dmg       → Galley_0.1.1-alpha.1_macOS_aarch64.dmg
-#   Galley_0.1.1-alpha.1_x64.dmg           → Galley_0.1.1-alpha.1_macOS_x64.dmg
-#   Galley_0.1.1-alpha.1_x64-setup.exe     → Galley_0.1.1-alpha.1_Windows_x64-setup.exe
+#   Yole_0.1.1-alpha.1_aarch64.dmg       → Yole_0.1.1-alpha.1_macOS_aarch64.dmg
+#   Yole_0.1.1-alpha.1_x64.dmg           → Yole_0.1.1-alpha.1_macOS_x64.dmg
+#   Yole_0.1.1-alpha.1_x64-setup.exe     → Yole_0.1.1-alpha.1_Windows_x64-setup.exe
 #
 # Idempotent: skips files that already include `_macOS_` / `_Windows_`.
 #
@@ -79,7 +79,7 @@ for f in "${matches[@]}"; do
     echo "[rename-artifact] $f already contains '_${OS}_', skipping"
     continue
   fi
-  # Tauri pattern: Galley_<version>_<archSuffix>.<ext>
+  # Tauri pattern: Yole_<version>_<archSuffix>.<ext>
   # Split: drop ext, then split base on last underscore.
   BASE="${f%.*}"
   EXT="${f##*.}"

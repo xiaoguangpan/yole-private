@@ -37,7 +37,7 @@ function ToolTimelineShowcase() {
   '/Users/jc/Library/protected/output.log'
   
   at do_file_write (ga.py:1247)
-  at WorkbenchHandler.dispatch (handlers.py:88)`}
+  at YoleHandler.dispatch (handlers.py:88)`}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button className="btn"><Icon name="arrow-clockwise" size={12} /> Retry</button>

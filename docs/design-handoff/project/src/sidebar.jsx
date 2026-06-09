@@ -54,7 +54,7 @@ function Sidebar({ sessions, activeId, onSelect, compact = false }) {
           fontSize: 16, fontWeight: 500,
           color: 'var(--text-primary)',
           letterSpacing: '0.01em',
-        }}>GA Workbench</div>
+        }}>Yole</div>
         <div style={{
           marginTop: 6,
           display: 'flex', alignItems: 'center', gap: 6,
@@ -101,7 +101,7 @@ function Sidebar({ sessions, activeId, onSelect, compact = false }) {
         <SectionLabel>Projects</SectionLabel>
         <div className="quick-action" style={{ paddingLeft: 14 }}>
           <Icon name="folder" size={14} color="var(--text-secondary)" />
-          <span>GA Workbench</span>
+          <span>Yole</span>
           <span className="muted" style={{ marginLeft: 'auto', fontSize: 11 }}>4</span>
         </div>
         <div className="quick-action" style={{ paddingLeft: 14 }}>

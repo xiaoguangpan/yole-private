@@ -55,7 +55,7 @@ DESIGN.md onboarding subtitle 改 dual-native framing（playbook T9.3 mention）
 
 ### 2.1 主语：dual-native local agent team orchestrator
 
-PRD v0.3 已经定 framing：「local agent team 编排器，人和 agent 都是一等公民」+「Galley GUI 给坐在桌前的 human operator，Galley CLI 给 Supervisor Agent 远程操作整个 session team」。README + release notes 沿用这个 framing。
+PRD v0.3 已经定 framing：「local agent team 编排器，人和 agent 都是一等公民」+「Yole GUI 给坐在桌前的 human operator，Yole CLI 给 Supervisor Agent 远程操作整个 session team」。README + release notes 沿用这个 framing。
 
 **不用** 之前的 framing:
 - ❌「本地桌面工作台」（v0.1 framing，scope 太小）
@@ -85,7 +85,7 @@ README 当前结构：
 1. tagline
 2. 截图大图
 3. badges
-4. Galley 是什么
+4. Yole 是什么
    - 今天（v0.1）
    - v0.2 之后
 5. 功能
@@ -104,9 +104,9 @@ README 当前结构：
 
 ### 2.4 「Supervisor Agent」第一次出现给非读者的解释
 
-README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进来）。「Supervisor Agent」是 Galley 自创术语，**第一次出现必须自带 inline 解释**：
+README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进来）。「Supervisor Agent」是 Yole 自创术语，**第一次出现必须自带 inline 解释**：
 
-> Supervisor Agent —— 跑在你电脑或手机 IM 上的另一个 agent，通过 `galley` CLI 给你电脑里的 session team 派任务（你出门后还能远程指挥）。
+> Supervisor Agent —— 跑在你电脑或手机 IM 上的另一个 agent，通过 `yole` CLI 给你电脑里的 session team 派任务（你出门后还能远程指挥）。
 
 之后段落自由使用「Supervisor」简称。
 
@@ -114,7 +114,7 @@ README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进
 
 「dual-native」对程序员熟悉（dual binding），普通用户陌生。inline 解释：
 
-> Galley 是 dual-native —— 既给坐在电脑前的你 GUI，也给跑在另一个进程的 agent CLI，两边对等访问同一份本地数据。
+> Yole 是 dual-native —— 既给坐在电脑前的你 GUI，也给跑在另一个进程的 agent CLI，两边对等访问同一份本地数据。
 
 ---
 
@@ -125,10 +125,10 @@ README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进
 | Section | 处理 |
 |---|---|
 | tagline blockquote | **改** Tagline D（§2.2 选项） |
-| 致敬 Galley/GA 来源（origin quote） | 保留 |
+| 致敬 Yole/GA 来源（origin quote） | 保留 |
 | 截图大图（screenshot_05.png） | 保留 |
 | Badges (License / Release / Platform / Stars) | 保留 |
-| "Galley 是什么" section | **大改**：v0.1/v0.2 时序分裂 → 单段 v0.2-现在时；v0.1 退化为括号注 |
+| "Yole 是什么" section | **大改**：v0.1/v0.2 时序分裂 → 单段 v0.2-现在时；v0.1 退化为括号注 |
 | Local-first + non-invasive 段 | 保留 |
 | "功能" 今日/即将 split | **大改**：合并为一份「v0.2 能做什么」list；v0.1-only 不重列；GA-non-invasive / per-session LLM / FTS5 等核心能力跨 v0.1+v0.2 |
 | 截图 grid | 保留 |
@@ -145,8 +145,8 @@ README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进
 
 | Candidate | 评估 | 决策 |
 |---|---|---|
-| "给 Supervisor Agent 用：装 Skill / SOP" mini-section | ✅ v0.2 卖点直接关联 | **加**，2-3 段，链接到 docs/integrations/galley-supervisor-sop.md + .claude/skills/galley-supervisor/README.md |
-| "Galley CLI 速查表" | ❌ 完整 CLI doc 在 docs/agent-api.md | **不加**，README 不重复 |
+| "给 Supervisor Agent 用：装 Skill / SOP" mini-section | ✅ v0.2 卖点直接关联 | **加**，2-3 段，链接到 docs/integrations/yole-supervisor-sop.md + .claude/skills/yole-supervisor/README.md |
+| "Yole CLI 速查表" | ❌ 完整 CLI doc 在 docs/agent-api.md | **不加**，README 不重复 |
 | "Roadmap (v0.6+)" | ❌ 未确定，过早 | **不加** |
 | "比较 X / Y / Z" 竞品对照 | ❌ 招黑 | **不加** |
 | Stargazers Over Time / 性能 benchmark | ❌ 不必要 | **不加** |
@@ -155,30 +155,30 @@ README 受众包括第一次看到的人（GitHub 浏览者 / 社交分享点进
 
 **改前**:
 ```markdown
-**今天（v0.1）**：Galley 是 GenericAgent 的本地桌面工作台。多个 agent session 并排跑…
+**今天（v0.1）**：Yole 是 GenericAgent 的本地桌面工作台。多个 agent session 并排跑…
 
-**v0.2 之后**：Galley 变成 dual-native ——…
+**v0.2 之后**：Yole 变成 dual-native ——…
 ```
 
 **改后**:
 ```markdown
-Galley 是一个本地 agent team orchestrator —— 同一台机器上跑多个 AI agent session，
+Yole 是一个本地 agent team orchestrator —— 同一台机器上跑多个 AI agent session，
 左边 GUI 给坐在电脑前的你，右边 CLI 给另一个 Supervisor Agent 来远程编排
 （出门后通过手机 IM 让 supervisor agent 帮你监管 session team 状态）。
 
-Supervisor Agent —— 跑在你电脑或手机 IM 上的另一个 agent，通过 `galley` 命令给
+Supervisor Agent —— 跑在你电脑或手机 IM 上的另一个 agent，通过 `yole` 命令给
 你电脑里的 session team 派任务、看进度、改 LLM 配置（你出门后还能远程指挥）。
 
-Galley 是 **dual-native** —— GUI 给人 / CLI 给 agent，两边对等访问同一份本地数据。
+Yole 是 **dual-native** —— GUI 给人 / CLI 给 agent，两边对等访问同一份本地数据。
 
-**v0.1 (历史)**：Galley 最初只是 GenericAgent 的桌面工作台（multi-session 并行 +
-工具时间线 + 审批系统）。v0.2 引入 Galley Core（Rust 写的本地权威层）+ Galley CLI，
+**v0.1 (历史)**：Yole 最初只是 GenericAgent 的桌面工作台（multi-session 并行 +
+工具时间线 + 审批系统）。v0.2 引入 Yole Core（Rust 写的本地权威层）+ Yole CLI，
 工作台 + 编排器 一体。
 
-Galley 是 **local-first** —— 你的数据不离开你的机器。**远程访问**由 Supervisor
-在外部传输层（GA IM frontend / SSH / 其他）负责，不是 Galley 的责任。
+Yole 是 **local-first** —— 你的数据不离开你的机器。**远程访问**由 Supervisor
+在外部传输层（GA IM frontend / SSH / 其他）负责，不是 Yole 的责任。
 
-Galley 不会修改用户已有的 GenericAgent。删 Galley，GenericAgent 独立运行不受影响。
+Yole 不会修改用户已有的 GenericAgent。删 Yole，GenericAgent 独立运行不受影响。
 ```
 
 类似 expansion for 功能 section / 架构 section / 安装 section 内 v0.x.x → v0.2.x。
@@ -215,24 +215,24 @@ Release notes 不写到任何 repo 文件，而是 sub-plan 内附 draft。M9 sh
 ### 4.2 Draft
 
 ```markdown
-# v0.2.0-beta.1 — Dual-native: Galley CLI ships
+# v0.2.0-beta.1 — Dual-native: Yole CLI ships
 
 ## Highlights
 
-- **Galley CLI** (`galley` binary) — 跟 GUI 对等访问同一份本地数据，让外部
+- **Yole CLI** (`yole` binary) — 跟 GUI 对等访问同一份本地数据，让外部
   Supervisor Agent 远程编排你的 session team
 - **Agent API** schema v1 frozen — 19 个命令 stable identifier set，下游
   SOP / Skill 长期兼容
-- **Galley Supervisor SOP** (给 GenericAgent) + **galley-supervisor skill**
+- **Yole Supervisor SOP** (给 GenericAgent) + **yole-supervisor skill**
   (给 Claude Code) — supervisor agent 集成开箱即用
 - **Pre-migration backup** — schema migration 自动备份数据目录，零数据丢失风险
 
 ## New
 
-- Galley CLI 11 个 write 命令（session new / send / btw / stop / archive /
+- Yole CLI 11 个 write 命令（session new / send / btw / stop / archive /
   restore / move / project create / list / delete / llm list / set）
 - localhost-only Unix socket / Windows named pipe transport
-- Settings → Agent tab：可选安装 `galley` 命令，复制 Supervisor SOP
+- Settings → Agent tab：可选安装 `yole` 命令，复制 Supervisor SOP
   发给你信任的 Agent
 - TopBar supervisor activity pill + per-message origin annotation
 - macOS menubar daemon mode（关窗不退出，留在 menubar）
@@ -245,32 +245,32 @@ Release notes 不写到任何 repo 文件，而是 sub-plan 内附 draft。M9 sh
 
 ## Migration
 
-升级跑 schema 迁移时自动备份 `~/Library/Application Support/app.galley/`
-到 sibling `app.galley.backup.<UTC-timestamp>/`。失败拒启动 + dialog 给出
+升级跑 schema 迁移时自动备份 `~/Library/Application Support/app.yole/`
+到 sibling `app.yole.backup.<UTC-timestamp>/`。失败拒启动 + dialog 给出
 数据安全位置。
 
 ## Installation
 
 ### macOS
-下载 `Galley_0.2.0-beta.1_macOS_aarch64.dmg`（Apple Silicon）或
-`Galley_0.2.0-beta.1_macOS_x64.dmg`（Intel），拖到应用程序文件夹，跑：
+下载 `Yole_0.2.0-beta.1_macOS_aarch64.dmg`（Apple Silicon）或
+`Yole_0.2.0-beta.1_macOS_x64.dmg`（Intel），拖到应用程序文件夹，跑：
 
 ```
-xattr -d com.apple.quarantine /Applications/Galley.app
+xattr -d com.apple.quarantine /Applications/Yole.app
 ```
 
 ### Windows
-下载 `Galley_0.2.0-beta.1_Windows_x64-setup.exe`。SmartScreen 警告点 "更多信息"
+下载 `Yole_0.2.0-beta.1_Windows_x64-setup.exe`。SmartScreen 警告点 "更多信息"
 → "仍要运行"。
 
 ---
 
-🤖 [B4 完成 devlog](https://github.com/wangjc683/galley/blob/main/docs/devlog/2026-05-20-b4-cli-feature-complete.md) · [agent-api.md schema v1](https://github.com/wangjc683/galley/blob/main/docs/agent-api.md)
+🤖 [B4 完成 devlog](https://github.com/wangjc683/yole/blob/main/docs/devlog/2026-05-20-b4-cli-feature-complete.md) · [agent-api.md schema v1](https://github.com/wangjc683/yole/blob/main/docs/agent-api.md)
 ```
 
 ### 4.3 ship 时还要补的动态信息
 
-- 具体 `Galley_0.2.0-beta.1_*` 文件名（CI 出 artifact 后填）
+- 具体 `Yole_0.2.0-beta.1_*` 文件名（CI 出 artifact 后填）
 - B4 完成 devlog 路径（M9 T9.8 写完才有）
 - Supervisor 集成新功能图（截图）
 
@@ -319,7 +319,7 @@ Closeout devlog 不写 —— M9 paperwork 不是 milestone ship，M9 真正 mil
 - [ ] **O1** README_en.md 同步更新还是标 "(legacy v0.1)"？倾向**标 legacy**，v0.2 ship 后再做英文重写（防止本 session paperwork 过长）
 - [ ] **O2** Tagline 选 D 还是 A？倾向 **D（`本地 agent team 编排器 —— GUI 给人，CLI 给 supervisor agent`）**
 - [ ] **O3** 截图 grid 是否 v0.2 更新？倾向**不动**，v0.1.1 6 张 hero 截图（screenshot_01-06）+ screenshot_05 hero 仍有效，supervisor 功能 GUI 改动小（TopBar pill / annotation strip 不显眼，不值单独截图重做）
-- [ ] **O4** 「Galley CLI 速查表」加在 README 还是单独 docs/galley-cli-cheatsheet.md？倾向**不加**，docs/agent-api.md 是 canonical reference
+- [ ] **O4** 「Yole CLI 速查表」加在 README 还是单独 docs/yole-cli-cheatsheet.md？倾向**不加**，docs/agent-api.md 是 canonical reference
 
 ---
 

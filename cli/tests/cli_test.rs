@@ -1,11 +1,11 @@
-//! Integration tests for the `galley` CLI binary.
+//! Integration tests for the `yole` CLI binary.
 //!
 //! Each test:
 //!   1. Builds a fresh on-disk SQLite file in a tempdir (in-memory pools
 //!      can't be shared between processes, so a file is required).
 //!   2. Seeds rows via direct sqlx writes (matches core/tests/db_test.rs
 //!      style — same migration SQL + seed helpers).
-//!   3. Spawns `target/debug/galley <args>` with `GALLEY_DB_PATH`
+//!   3. Spawns `target/debug/yole <args>` with `YOLE_DB_PATH`
 //!      pointing at the temp file.
 //!   4. Asserts stdout / exit code.
 //!
@@ -35,7 +35,7 @@ const MIG_013: &str = include_str!("../../core/migrations/013_session_llm_key.sq
 
 /// Build a temp .db file with all migrations applied + (optionally)
 /// seed rows. Returns the path; caller stashes it for the spawned
-/// command via `GALLEY_DB_PATH`.
+/// command via `YOLE_DB_PATH`.
 async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
     // `mode=rwc` so sqlx creates the file if missing.
     let opts = SqliteConnectOptions::new()
@@ -109,21 +109,21 @@ async fn seed_message(pool: &SqlitePool, id: &str, session_id: &str, content: &s
 
 /// Resolve the binary path. Cargo writes test binaries to
 /// `target/<profile>/deps/...` but workspace bins land at
-/// `target/<profile>/<name>`. `CARGO_BIN_EXE_galley` is set by Cargo
+/// `target/<profile>/<name>`. `CARGO_BIN_EXE_yole` is set by Cargo
 /// for the test-runner so we can locate the binary deterministically.
-fn galley_bin() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_galley"))
+fn yole_bin() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_yole"))
 }
 
-fn run_galley(db_path: &std::path::Path, args: &[&str]) -> (String, Option<i32>) {
-    let out = Command::new(galley_bin())
+fn run_yole(db_path: &std::path::Path, args: &[&str]) -> (String, Option<i32>) {
+    let out = Command::new(yole_bin())
         .args(args)
-        .env("GALLEY_DB_PATH", db_path)
+        .env("YOLE_DB_PATH", db_path)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .expect("spawn galley");
+        .expect("spawn yole");
     let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
     (stdout, out.status.code())
 }
@@ -156,24 +156,24 @@ fn assert_search_session_ids(stdout: &str, expected: &[&str]) {
 #[tokio::test]
 async fn version_subcommand_prints_schema_v1() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let _pool = seeded_db_at(&db).await;
-    let (stdout, code) = run_galley(&db, &["version"]);
+    let (stdout, code) = run_yole(&db, &["version"]);
     assert_eq!(code, Some(0));
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     // B4 M6 freeze: version output uses camelCase to align with the rest
     // of the wire format (sessions/projects/etc all camelCase).
     assert_eq!(payload["schemaVersion"], 1);
-    assert!(payload.get("galleyVersion").is_some());
+    assert!(payload.get("yoleVersion").is_some());
 }
 
 #[tokio::test]
 async fn schema_pin_matching_v1_passes_through() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let _pool = seeded_db_at(&db).await;
     // B4 M6: --schema=1 against a v1 binary passes through to the command.
-    let (stdout, code) = run_galley(&db, &["--schema", "1", "version"]);
+    let (stdout, code) = run_yole(&db, &["--schema", "1", "version"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["schemaVersion"], 1);
@@ -182,11 +182,11 @@ async fn schema_pin_matching_v1_passes_through() {
 #[tokio::test]
 async fn schema_pin_mismatch_exits_2_invalid_args() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let _pool = seeded_db_at(&db).await;
     // B4 M6: pinning to an unknown schema → exit 2 invalid_args with
     // `schema_mismatch:` prefix in the message.
-    let (stdout, code) = run_galley(&db, &["--schema", "99", "version"]);
+    let (stdout, code) = run_yole(&db, &["--schema", "99", "version"]);
     assert_eq!(code, Some(2), "stdout: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["error"], "invalid_args");
@@ -200,13 +200,13 @@ async fn schema_pin_mismatch_exits_2_invalid_args() {
 #[tokio::test]
 async fn sessions_list_emits_ndjson_recent_first() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let pool = seeded_db_at(&db).await;
     seed_session(&pool, "old", "old", "idle", "2026-05-10T00:00:00Z").await;
     seed_session(&pool, "new", "new", "idle", "2026-05-18T00:00:00Z").await;
     drop(pool);
 
-    let (stdout, code) = run_galley(&db, &["sessions", "list", "--runtime", "all"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "list", "--runtime", "all"]);
     assert_eq!(code, Some(0));
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 2);
@@ -220,7 +220,7 @@ async fn sessions_list_emits_ndjson_recent_first() {
 #[tokio::test]
 async fn sessions_list_defaults_to_current_runtime() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let pool = seeded_db_at(&db).await;
     seed_session_with_runtime(
         &pool,
@@ -242,7 +242,7 @@ async fn sessions_list_defaults_to_current_runtime() {
     .await;
     drop(pool);
 
-    let (stdout, code) = run_galley(&db, &["sessions", "list"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "list"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 1);
@@ -250,7 +250,7 @@ async fn sessions_list_defaults_to_current_runtime() {
     assert_eq!(only["id"], "managed");
     assert_eq!(only["runtimeKind"], "managed");
 
-    let (stdout, code) = run_galley(&db, &["sessions", "list", "--runtime", "external"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "list", "--runtime", "external"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 1);
@@ -262,7 +262,7 @@ async fn sessions_list_defaults_to_current_runtime() {
 #[tokio::test]
 async fn sessions_search_defaults_to_current_runtime() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let pool = seeded_db_at(&db).await;
     seed_session_with_runtime(
         &pool,
@@ -296,15 +296,15 @@ async fn sessions_search_defaults_to_current_runtime() {
     seed_message(&pool, "m_arch", "managed_archived", "sharedtoken").await;
     drop(pool);
 
-    let (stdout, code) = run_galley(&db, &["sessions", "search", "sharedtoken"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "search", "sharedtoken"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert_search_session_ids(&stdout, &["managed"]);
 
-    let (stdout, code) = run_galley(&db, &["sessions", "search", "sharedtoken", "--all"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "search", "sharedtoken", "--all"]);
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert_search_session_ids(&stdout, &["managed", "managed_archived"]);
 
-    let (stdout, code) = run_galley(
+    let (stdout, code) = run_yole(
         &db,
         &[
             "sessions",
@@ -317,14 +317,14 @@ async fn sessions_search_defaults_to_current_runtime() {
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert_search_session_ids(&stdout, &["external"]);
 
-    let (stdout, code) = run_galley(
+    let (stdout, code) = run_yole(
         &db,
         &["sessions", "search", "sharedtoken", "--runtime", "all"],
     );
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert_search_session_ids(&stdout, &["external", "managed"]);
 
-    let (stdout, code) = run_galley(
+    let (stdout, code) = run_yole(
         &db,
         &[
             "sessions",
@@ -342,9 +342,9 @@ async fn sessions_search_defaults_to_current_runtime() {
 #[tokio::test]
 async fn session_brief_missing_exits_3() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let _pool = seeded_db_at(&db).await;
-    let (stdout, code) = run_galley(&db, &["session", "brief", "sess_missing"]);
+    let (stdout, code) = run_yole(&db, &["session", "brief", "sess_missing"]);
     assert_eq!(code, Some(3), "stdout was: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["error"], "not_found");
@@ -353,9 +353,9 @@ async fn session_brief_missing_exits_3() {
 #[tokio::test]
 async fn sessions_list_invalid_status_exits_2() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let _pool = seeded_db_at(&db).await;
-    let (stdout, code) = run_galley(&db, &["sessions", "list", "--status", "not_a_status"]);
+    let (stdout, code) = run_yole(&db, &["sessions", "list", "--status", "not_a_status"]);
     assert_eq!(code, Some(2), "stdout was: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["error"], "invalid_args");
@@ -365,9 +365,9 @@ async fn sessions_list_invalid_status_exits_2() {
 async fn db_unavailable_exits_4() {
     let td = tempdir();
     // No seeded_db_at call → file doesn't exist. `create_if_missing(false)`
-    // in SqliteGalley::open() should surface as DbUnavailable / exit 4.
+    // in SqliteYole::open() should surface as DbUnavailable / exit 4.
     let db = td.path().join("nonexistent.db");
-    let (stdout, code) = run_galley(&db, &["status"]);
+    let (stdout, code) = run_yole(&db, &["status"]);
     assert_eq!(code, Some(4), "stdout was: {stdout}");
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(payload["error"], "db_unavailable");
@@ -376,13 +376,13 @@ async fn db_unavailable_exits_4() {
 #[tokio::test]
 async fn status_returns_counts() {
     let td = tempdir();
-    let db = td.path().join("workbench.db");
+    let db = td.path().join("yole.db");
     let pool = seeded_db_at(&db).await;
     seed_session(&pool, "a", "a", "idle", "2026-05-18T00:00:00Z").await;
     seed_session(&pool, "b", "b", "completed", "2026-05-18T00:00:01Z").await;
     drop(pool);
 
-    let (stdout, code) = run_galley(&db, &["status"]);
+    let (stdout, code) = run_yole(&db, &["status"]);
     assert_eq!(code, Some(0));
     let s: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(s["total"], 2);
@@ -390,7 +390,7 @@ async fn status_returns_counts() {
 
 // ---- B2 M4 write command tests ----
 
-/// `galley session send` with no Galley Core running maps to exit 4
+/// `yole session send` with no Yole Core running maps to exit 4
 /// (DbUnavailable per CLI exit-code contract). Asserts the CLI gracefully
 /// reports the socket connect failure instead of panicking.
 #[tokio::test]
@@ -401,18 +401,18 @@ async fn session_send_without_core_running_exits_4() {
     seed_session(&pool, "s1", "x", "idle", "2026-05-18T00:00:00Z").await;
     drop(pool);
 
-    // No Galley Core process → socket file absent OR refused. Either
+    // No Yole Core process → socket file absent OR refused. Either
     // way, session send should report exit 4. We pre-empt cross-test
     // pollution by setting TMPDIR to the tempdir so any (impossible)
     // existing socket in /tmp doesn't accidentally match.
     let (stdout, code) =
-        run_galley_with_tmpdir(&db, td.path(), &["session", "send", "s1", "hello"]);
+        run_yole_with_tmpdir(&db, td.path(), &["session", "send", "s1", "hello"]);
     assert_eq!(code, Some(4), "exit code: stdout = {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "db_unavailable");
 }
 
-/// `galley session watch` same as above: no Core → exit 4.
+/// `yole session watch` same as above: no Core → exit 4.
 #[tokio::test]
 async fn session_watch_without_core_running_exits_4() {
     let td = tempdir();
@@ -420,7 +420,7 @@ async fn session_watch_without_core_running_exits_4() {
     let pool = seeded_db_at(&db).await;
     drop(pool);
 
-    let (stdout, code) = run_galley_with_tmpdir(&db, td.path(), &["session", "watch", "s1"]);
+    let (stdout, code) = run_yole_with_tmpdir(&db, td.path(), &["session", "watch", "s1"]);
     assert_eq!(code, Some(4), "exit code: stdout = {stdout}");
 }
 
@@ -435,7 +435,7 @@ async fn session_watch_socket_error_emits_single_cli_error() {
     let pool = seeded_db_at(&db).await;
     drop(pool);
 
-    let socket_path = td.path().join(format!("galley-{}.sock", current_uid()));
+    let socket_path = td.path().join(format!("yole-{}.sock", current_uid()));
     let listener = UnixListener::bind(&socket_path).expect("bind fake socket");
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.expect("accept");
@@ -451,7 +451,7 @@ async fn session_watch_socket_error_emits_single_cli_error() {
         write_half.write_all(b"\n").await.expect("write newline");
     });
 
-    let (stdout, code) = run_galley_with_tmpdir(&db, td.path(), &["session", "watch", "s1"]);
+    let (stdout, code) = run_yole_with_tmpdir(&db, td.path(), &["session", "watch", "s1"]);
     server.await.expect("fake socket task");
     assert_eq!(code, Some(3), "stdout = {stdout}");
     let lines: Vec<&str> = stdout.trim().lines().collect();
@@ -461,24 +461,24 @@ async fn session_watch_socket_error_emits_single_cli_error() {
     assert_eq!(parsed.get("ok"), None);
 }
 
-/// Variant of run_galley that also sets TMPDIR so the CLI's
+/// Variant of run_yole that also sets TMPDIR so the CLI's
 /// `socket_path()` helper resolves to a tempdir-relative socket — keeps
-/// these tests from accidentally picking up a real Galley Core socket
+/// these tests from accidentally picking up a real Yole Core socket
 /// on the dev machine.
-fn run_galley_with_tmpdir(
+fn run_yole_with_tmpdir(
     db: &std::path::Path,
     tmp: &std::path::Path,
     args: &[&str],
 ) -> (String, Option<i32>) {
-    let bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_galley"));
+    let bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_yole"));
     let out = Command::new(&bin)
         .args(args)
-        .env("GALLEY_DB_PATH", db)
+        .env("YOLE_DB_PATH", db)
         .env("TMPDIR", tmp)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .expect("spawn galley");
+        .expect("spawn yole");
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     (stdout, out.status.code())
 }
@@ -488,7 +488,7 @@ fn run_galley_with_tmpdir(
 // so cleanup runs at the end of the test body.
 fn tempdir() -> TempDir {
     tempfile::Builder::new()
-        .prefix("galley-cli-test-")
+        .prefix("yole-cli-test-")
         .tempdir()
         .expect("create tempdir")
 }

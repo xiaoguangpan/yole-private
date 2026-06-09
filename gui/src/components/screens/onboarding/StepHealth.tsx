@@ -27,8 +27,8 @@ interface StepHealthProps {
    * to relabel as "取消" (since there's no Attach step to go back to —
    * this is really cancellation). Default: "返回". */
   backLabel?: string;
-  /** Override "进入 Galley" button label. Used by Settings revisit
-   * flow to relabel as "返回设置". Default: "进入 Galley". */
+  /** Override "进入 Yole" button label. Used by Settings revisit
+   * flow to relabel as "返回设置". Default: "进入 Yole". */
   continueLabel?: string;
 }
 
@@ -36,7 +36,7 @@ interface StepHealthProps {
  * Onboarding Step 2 — Health Check. DESIGN.md §5 Step 2.
  *
  * Five-row health check, all must pass before "Continue" is enabled.
- * No "skip" option — a Workbench without a working LLM has nothing
+ * No "skip" option — a Yole without a working LLM has nothing
  * to do, so we don't pretend read-only mode is useful (DESIGN.md §5
  * "故意决策").
  *
@@ -56,7 +56,7 @@ export function StepHealth({
   const copy = useCopy();
   const onboardingCopy = copy.onboarding;
   const resolvedBackLabel = backLabel ?? copy.common.back;
-  const resolvedContinueLabel = continueLabel ?? onboardingCopy.enterGalley;
+  const resolvedContinueLabel = continueLabel ?? onboardingCopy.enterYole;
   const allPassed =
     items.length > 0 && items.every((c) => c.state === "success");
   const settled =

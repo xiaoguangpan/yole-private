@@ -28,7 +28,7 @@ audit 后发现 `DEMO_*` 名字下其实混着三种东西：
 **A 类 · 名字叫 DEMO 但其实是生产默认值** —— 留下来改名 + 搬家。
 - `DEMO_GA_CONFIG` / `DEMO_APPROVAL_CONFIG` / `DEMO_LLMS` / `DEMO_LLM_DISPLAY_NAME` / `DEMO_RUNTIME_INFO`
 - 全部消费在 prefs.ts initial state 跟 runtime.ts bridge-ready 前的兜底。Two shipped releases 都靠这些值在 first-launch / pre-bridge 时不崩。
-- 改名 `DEFAULT_*`、搬去新 `stores/defaults.ts`、顺手修 `workbenchVersion: "0.1.0"` 撒谎问题（hydrate.ts 已经会用 `getVersion()` 真值覆盖，但兜底值留 "0.1.0" 既不真又像谎话）→ 改成空字符串 sentinel，hydrate fail 时 Settings → About 渲染 `v` 而不是骗人的旧字面值。
+- 改名 `DEFAULT_*`、搬去新 `stores/defaults.ts`、顺手修 `yoleVersion: "0.1.0"` 撒谎问题（hydrate.ts 已经会用 `getVersion()` 真值覆盖，但兜底值留 "0.1.0" 既不真又像谎话）→ 改成空字符串 sentinel，hydrate fail 时 Settings → About 渲染 `v` 而不是骗人的旧字面值。
 
 **B 类 · DevScreenToggle 链路** —— 退役。
 - `DevScreenToggle` / `DevSegment` / `DevButton` / `SCREEN_TOGGLE_LABEL` + 两处 render site

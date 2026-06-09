@@ -1,7 +1,7 @@
-# Galley Agent API
+# Yole Agent API
 
-The contract between **Galley** and any agent that drives it via the
-`galley` CLI binary or the Unix-socket / named-pipe local transport.
+The contract between **Yole** and any agent that drives it via the
+`yole` CLI binary or the Unix-socket / named-pipe local transport.
 
 > **Status: `schemaVersion: 1` FROZEN for `v0.2.0`.** The
 > commands documented in §5 are wired, tested, and locked. Inside
@@ -15,7 +15,7 @@ The contract between **Galley** and any agent that drives it via the
 ## 1 · Stability
 
 The CLI output schema **and the socket wire format** are both part of
-Galley's public contract — supervisor agents and Skills depend on
+Yole's public contract — supervisor agents and Skills depend on
 them. We commit to the rules in
 [AGENTS.md "CLI Surface Is Public Contract"](../AGENTS.md).
 
@@ -54,7 +54,7 @@ hold. Each maps 1-1 to an exit code (§3):
 | `internal`         | 1         | Unexpected server failure                                         |
 | `invalid_args`     | 2         | Argument validation failed                                        |
 | `not_found`        | 3         | Resource missing                                                  |
-| `db_unavailable`   | 4         | DB unopenable / Galley Core not running                           |
+| `db_unavailable`   | 4         | DB unopenable / Yole Core not running                           |
 | `runner_error`     | 5         | Runner subprocess unreachable / IPC dispatch failed after persist |
 
 #### Error discriminants — socket-wire only (4)
@@ -103,7 +103,7 @@ For NDJSON stream-end frames on `session watch` (§5.5b),
 | `subprocess_exited`  | Runner subprocess exited cleanly                 |
 | `subprocess_error`   | Runner subprocess died unexpectedly              |
 | `cancelled`          | Client disconnected (SIGINT / closed socket)     |
-| `core_unavailable`   | Snapshot read worked, but no Galley Core socket was reachable |
+| `core_unavailable`   | Snapshot read worked, but no Yole Core socket was reachable |
 | `not_live`           | Session exists but no live runner is subscribed  |
 | `socket_closed`      | Watch socket closed without a stream-end frame   |
 | `no_live_sessions`   | Project follow found no live stream output       |
@@ -126,7 +126,7 @@ SOPs that want to defend against future schema bumps can pin to
 
 Omitting the pin uses the server's default. Today that's `1`; a future
 multi-schema binary will document its default + the supported set on
-`galley version`.
+`yole version`.
 
 SOPs that want forward compatibility instead can omit the pin and
 rely on the additive-only promise: new fields appear, but the ones
@@ -134,53 +134,53 @@ they read keep their names + semantics inside `schemaVersion: 1`.
 
 ## 2 · Where to find things
 
-- **Database location.** The CLI reads the same SQLite file the Galley
+- **Database location.** The CLI reads the same SQLite file the Yole
   GUI writes to. Default paths:
-  - macOS: `~/Library/Application Support/app.galley/workbench.db`
-  - Linux: `$XDG_CONFIG_HOME/app.galley/workbench.db` or
-    `~/.config/app.galley/workbench.db`
-  - Windows: `%APPDATA%/app.galley/workbench.db`
-- **Override.** Set `GALLEY_DB_PATH=<absolute-path>` to point at a
+  - macOS: `~/Library/Application Support/app.yole/yole.db`
+  - Linux: `$XDG_CONFIG_HOME/app.yole/yole.db` or
+    `~/.config/app.yole/yole.db`
+  - Windows: `%APPDATA%/app.yole/yole.db`
+- **Override.** Set `YOLE_DB_PATH=<absolute-path>` to point at a
   specific file (snapshots, isolated test fixtures, etc.).
-- **Identifier.** `app.galley` is the Tauri bundle identifier — do not
+- **Identifier.** `app.yole` is the Tauri bundle identifier — do not
   change without a coordinated migration (see
   [desktop runtime](./desktop-runtime.md#tauri-identifier)).
 
 ## 2A · Transports
 
-Galley CLI commands reach Galley Core through one of two transports
+Yole CLI commands reach Yole Core through one of two transports
 depending on whether the command is read-only or writes state.
 
 ### Read-only commands → direct SQLite
 
 `sessions list / search`, `session brief / show`, `project list`,
 `project brief`, `project show`, `status`, `health`, `version` open
-the SQLite file directly via `GALLEY_DB_PATH` (or the platform default
+the SQLite file directly via `YOLE_DB_PATH` (or the platform default
 path in §2). **No daemon required.** Useful when:
 
-- Galley GUI isn't running but the agent wants to inspect history
+- Yole GUI isn't running but the agent wants to inspect history
 - A CI / cron job wants to scrape session state from a snapshot DB
 
-These commands return the same JSON whether or not Galley Core is
+These commands return the same JSON whether or not Yole Core is
 running — they don't talk to it.
 
 ### Write commands → local socket
 
 `session send`, `session watch`, and write commands connect to a
-per-user local socket served by a running Galley Core process.
+per-user local socket served by a running Yole Core process.
 `session follow` and `project follow` are hybrid commands: they read
 SQLite snapshots first, then attempt live socket subscriptions when a
 runner is available.
 
-- **macOS / Linux**: Unix domain socket at `$TMPDIR/galley-$UID.sock`
-  (typically `/tmp/galley-501.sock`). Permission `0600` — only the
+- **macOS / Linux**: Unix domain socket at `$TMPDIR/yole-$UID.sock`
+  (typically `/tmp/yole-501.sock`). Permission `0600` — only the
   owning OS user can connect.
-- **Windows**: Named pipe at `\\.\pipe\galley-$USERNAME`, scoped to
+- **Windows**: Named pipe at `\\.\pipe\yole-$USERNAME`, scoped to
   the calling user's namespace.
 
 **No TCP, no token, no TLS.** Auth = filesystem permission (Unix) /
 user-scoped namespace (Windows). Cross-machine access goes through
-GA's IM frontends + Galley CLI on the host machine, not directly to
+GA's IM frontends + Yole CLI on the host machine, not directly to
 this socket. See [AGENTS.md "Localhost Only"](../AGENTS.md).
 
 #### Wire format (NDJSON)
@@ -237,7 +237,7 @@ These are stable identifiers — agents pattern-match on them:
 | ------------------ | -------------------------------------------------------------------- |
 | `invalid_args`     | Argument validation failed (missing field, bad JSON)                 |
 | `not_found`        | Target resource missing (no session with that id, etc.)              |
-| `db_unavailable`   | DB file missing / unopenable / Galley Core not running               |
+| `db_unavailable`   | DB file missing / unopenable / Yole Core not running               |
 | `unknown_command`  | Server doesn't know that command name                                |
 | `schema_mismatch`  | Client's `schemaVersion` != server's accepted version                |
 | `not_implemented`  | Command name reserved but no handler wired (transitional state)     |
@@ -249,7 +249,7 @@ error.
 
 #### Race detection at startup
 
-If a second Galley Core process tries to start while another is
+If a second Yole Core process tries to start while another is
 already bound to the same socket path, it logs a diagnostic and
 returns without binding (so the first instance keeps owning the
 socket). Stale sockets from crashed previous processes get unlinked
@@ -268,7 +268,7 @@ the user restarts.
 | `1`  | `internal`        | unexpected failure (sqlx bug, FS race, etc.)                |
 | `2`  | `invalid_args`    | argument validation failed (unknown `--status` value, …)    |
 | `3`  | `not_found`       | requested resource missing (`session brief <id>` no row)    |
-| `4`  | `db_unavailable`  | DB file missing / unopenable / corrupted; Galley Core not reachable on socket |
+| `4`  | `db_unavailable`  | DB file missing / unopenable / corrupted; Yole Core not reachable on socket |
 | `5`  | `runner_error`    | runner subprocess unreachable / IPC dispatch failed after persist (`session btw` no live bridge, `llm set` runner write fail) |
 
 Exit codes are reserved categories — they do not get reassigned. A new
@@ -291,23 +291,23 @@ disturbing `1–5`.
 
 ## 5 · Commands
 
-### 5.1 · `galley version`
+### 5.1 · `yole version`
 
 Returns the CLI version + the schema version of its output protocol.
 
 ```bash
-$ galley version
-{"galleyVersion":"0.2.0","schemaVersion":1}
+$ yole version
+{"yoleVersion":"0.2.0","schemaVersion":1}
 ```
 
 Response fields:
 
 | Field            | Type   | Notes                                              |
 | ---------------- | ------ | -------------------------------------------------- |
-| `galleyVersion`  | string | semver of the `galley` binary itself               |
+| `yoleVersion`  | string | semver of the `yole` binary itself               |
 | `schemaVersion`  | int    | this document's stability key (`1` for v0.2.x) |
 
-### 5.2 · `galley sessions list [--runtime=current|managed|external|all] [--project=X] [--status=Y] [--archived | --all]`
+### 5.2 · `yole sessions list [--runtime=current|managed|external|all] [--project=X] [--status=Y] [--archived | --all]`
 
 Lists sessions in `pinned DESC, last_activity_at DESC` order. NDJSON,
 one `SessionBrief` per line.
@@ -326,7 +326,7 @@ sidebar default).
 Example:
 
 ```bash
-$ galley sessions list --project=proj_demo
+$ yole sessions list --project=proj_demo
 {"id":"s-abc","title":"first chat","status":"idle","turnCount":3,"lastActivityAt":"…","createdAt":"…","updatedAt":"…","pinned":false,"hasUnread":false}
 {"id":"s-def","title":"second chat","status":"completed","turnCount":12,"lastActivityAt":"…","createdAt":"…","updatedAt":"…","pinned":false,"hasUnread":false}
 ```
@@ -350,12 +350,12 @@ $ galley sessions list --project=proj_demo
 | `selectedLlmKey`  | string?         | stable per-session LLM identity: managed model id or external GA raw LLM name      |
 | `selectedLlmDisplayName` | string?   | cached display name for the persisted LLM selection                                |
 | `runtimeKind`     | string enum     | `managed` / `external`; product-facing alias for CLI callers                       |
-| `runtimeLabel`    | string          | `Galley` / `Attached GenericAgent`                                                 |
+| `runtimeLabel`    | string          | `Yole` / `Attached GenericAgent`                                                 |
 | `gaRuntimeKind`   | string enum     | `managed` / `external`; runtime ownership captured at session creation             |
 | `gaRuntimeId`     | string?         | stable runtime id for future multi-runtime support                                 |
 | `promptProfile`   | string?         | managed prompt profile id, when applied                                            |
 
-### 5.3 · `galley sessions search <query> [--runtime current|managed|external|all] [--all]`
+### 5.3 · `yole sessions search <query> [--runtime current|managed|external|all] [--all]`
 
 FTS5 trigram search over message bodies. Two-character queries fall
 back to LIKE substring search. Queries shorter than two characters
@@ -371,7 +371,7 @@ asks for all runtimes.
 Example:
 
 ```bash
-$ galley sessions search "ndjson"
+$ yole sessions search "ndjson"
 {"sessionId":"s-abc","messageId":"m1","snippet":"… emit <mark>ndjson</mark> on stdout …","rank":-1.234}
 ```
 
@@ -384,20 +384,20 @@ $ galley sessions search "ndjson"
 | `snippet`    | string | excerpt with matches wrapped in `<mark>…</mark>`; HTML-safe                    |
 | `rank`       | float  | FTS5 BM25 score (lower = better). `0.0` when the LIKE fallback returned the hit |
 
-### 5.4 · `galley session brief <id>`
+### 5.4 · `yole session brief <id>`
 
 One `SessionBrief` for the given id, or exit `3 not_found`.
 
 ```bash
-$ galley session brief s-abc
+$ yole session brief s-abc
 {"id":"s-abc","title":"…","status":"idle", …}
 
-$ galley session brief sess_missing ; echo "exit: $?"
+$ yole session brief sess_missing ; echo "exit: $?"
 {"error":"not_found","detail":{"message":"session sess_missing not found"}}
 exit: 3
 ```
 
-### 5.5 · `galley session show <id> [--tail=N]`
+### 5.5 · `yole session show <id> [--tail=N]`
 
 Conversation messages for a session, oldest first. NDJSON, one
 `MessageBrief` per line.
@@ -419,10 +419,10 @@ Conversation messages for a session, oldest first. NDJSON, one
 | `turnIndex`   | int?            | which user-message-turn this message belongs to                       |
 | `origin`      | `Origin`?       | source of this message (B2+; omitted on rows from before migration 006) |
 
-### 5.5a · `galley session send <id> "<content>" [--supervisor=<x>] [--reason=<y>]`
+### 5.5a · `yole session send <id> "<content>" [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — persists a user message into a session and dispatches
-it to the live runner subprocess. Requires Galley Core to be running
+it to the live runner subprocess. Requires Yole Core to be running
 (exit `4 db_unavailable` if the socket isn't reachable).
 
 | Flag           | Default                                  | Notes                                                                |
@@ -431,7 +431,7 @@ it to the live runner subprocess. Requires Galley Core to be running
 | `--reason`     | (none)                                   | Free-text rationale. Stored on `messages.origin_note`; appears in audit views. |
 
 ```bash
-$ galley session send sess_abc "summarize the last turn" \
+$ yole session send sess_abc "summarize the last turn" \
     --supervisor=ga-claude-1 --reason="user said tldr"
 {"message":{"id":"msg_…","sessionId":"sess_abc","role":"user","content":"summarize the last turn", \
 "createdAt":"2026-05-19T…","turnIndex":3,"origin":{"via":"supervisor","supervisor":"ga-claude-1","reason":"user said tldr"}}, \
@@ -447,7 +447,7 @@ Response shape:
 
 **Semantics**: fire-and-forget. The CLI returns as soon as the message
 is persisted; it does **not** wait for the runner to complete the
-agent turn. Pair with `galley session watch <id>` if you need to see
+agent turn. Pair with `yole session watch <id>` if you need to see
 the resulting events. See [B2 playbook running note N34] for the
 rationale.
 
@@ -458,9 +458,9 @@ agent identity.
 
 Exit codes: `0` success / `3 not_found` (session missing) /
 `2 invalid_args` (session archived, malformed args) /
-`4 db_unavailable` (Galley Core not running).
+`4 db_unavailable` (Yole Core not running).
 
-### 5.5b · `galley session watch <id>`
+### 5.5b · `yole session watch <id>`
 
 **Subscription command** — streams live IPC events from a session's
 runner subprocess on stdout (one event per line, NDJSON). The
@@ -469,11 +469,11 @@ connection stays open until either:
 - the subprocess exits (server sends `{"stream":"end","reason":"subprocess_exited"}` then closes), or
 - the client sends SIGINT (Ctrl-C) / the process exits
 
-Requires Galley Core to be running and a live runner for the target
+Requires Yole Core to be running and a live runner for the target
 session.
 
 ```bash
-$ galley session watch sess_abc
+$ yole session watch sess_abc
 {"stream":"event","requestId":null,"data":{"kind":"turn_start","sessionId":"sess_abc",…}}
 {"stream":"event","requestId":null,"data":{"kind":"tool_call_start",…}}
 {"stream":"event","requestId":null,"data":{"kind":"tool_call_end",…}}
@@ -482,19 +482,19 @@ $ galley session watch sess_abc
 $ # exit 0
 ```
 
-The `data` payload mirrors the runner ↔ Galley Core IPC event shape
+The `data` payload mirrors the runner ↔ Yole Core IPC event shape
 defined in [`docs/ipc-protocol.md`](./ipc-protocol.md) §4 — same
 `kind` discriminator and per-event field set.
 
 **No backlog support yet.** Subscribers see events from subscribe-time
 forward only. Catching up on the recent history requires
-`galley session show <id> --tail=N` first. A `--from=<event-index>`
+`yole session show <id> --tail=N` first. A `--from=<event-index>`
 flag is planned (see [B2 playbook running note N35]).
 
 Exit codes: `0` clean stream end / `3 not_found` (no live runner for
-that session id) / `4 db_unavailable` (Galley Core not running).
+that session id) / `4 db_unavailable` (Yole Core not running).
 
-### 5.5c · `galley session follow <id> [--tail=N]`
+### 5.5c · `yole session follow <id> [--tail=N]`
 
 **Hybrid subscription command** — emits a persisted snapshot first,
 then follows live runner events if a runner exists, then emits a final
@@ -505,14 +505,14 @@ This is the supervisor-friendly wrapper around `session show` +
 error: the command returns the snapshot and ends cleanly.
 
 ```bash
-$ galley session follow sess_abc --tail=20
+$ yole session follow sess_abc --tail=20
 {"schemaVersion":1,"stream":"snapshot","phase":"initial","session":{…},"messages":[…]}
 {"schemaVersion":1,"stream":"event","sessionId":"sess_abc","data":{"kind":"turn_start",…}}
 {"schemaVersion":1,"stream":"snapshot","phase":"final","session":{…},"messages":[…]}
 {"schemaVersion":1,"stream":"end","reason":"subprocess_exited"}
 ```
 
-If Galley Core is not reachable after the initial snapshot:
+If Yole Core is not reachable after the initial snapshot:
 
 ```json
 {"schemaVersion":1,"stream":"end","reason":"core_unavailable"}
@@ -529,12 +529,12 @@ Exit codes: `0` when the session exists and the snapshot can be read /
 unopenable). Live-runner absence is reported in the end frame, not as
 exit 3.
 
-### 5.6 · `galley status`
+### 5.6 · `yole status`
 
 Aggregate counts.
 
 ```bash
-$ galley status
+$ yole status
 {"total":7,"running":0,"waitingInput":0,"errored":0}
 ```
 
@@ -547,16 +547,16 @@ $ galley status
 | `waitingInput`  | int  | sessions with `waiting_approval` status (same persistence caveat)                                  |
 | `errored`       | int  | sessions in `error` status (same caveat)                                                           |
 
-### 5.7 · `galley health`
+### 5.7 · `yole health`
 
 Health probe. B1 ships a partial set — filesystem / SQLite-checkable
 rows are real; Python-dependent rows (`agentmain_import`,
 `llm_session_init`) report `deferred_b4` until B4 daemon mode ships.
 
 ```bash
-$ galley health
+$ yole health
 {"checks":[
-  {"id":"db_readable","status":"ok","detail":"/Users/.../workbench.db"},
+  {"id":"db_readable","status":"ok","detail":"/Users/.../yole.db"},
   {"id":"ga_path","status":"ok","detail":"/Users/.../GenericAgent"},
   {"id":"mykey_py","status":"ok","detail":"/Users/.../mykey.py"},
   {"id":"agentmain_import","status":"deferred_b4","detail":"requires runner spawn — see B4 daemon"},
@@ -589,10 +589,10 @@ Probe id catalogue (will grow):
 | `llm_session_init`  | B4 — instantiate one LLM session, capture the API-key resolution error if any                        |
 
 Pattern: agents should branch on the `status` value (`ok` / `warn` /
-`fail` actionable; `deferred_b4` indicates "Galley can't currently check
+`fail` actionable; `deferred_b4` indicates "Yole can't currently check
 this — trust other signals or wait for B4").
 
-### 5.8 · `galley session new "<task>" [--runtime=current|managed|external] [--project=<id>] [--llm=<name>] [--supervisor=<x>] [--reason=<y>]`
+### 5.8 · `yole session new "<task>" [--runtime=current|managed|external] [--project=<id>] [--llm=<name>] [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — creates a session, persists the first user message
 in **one SQLite transaction**, starts a runner, and dispatches the first
@@ -609,7 +609,7 @@ agents know the delegated task did not actually start.
 | `--reason`     | (none)                               | Free-text rationale on `origin.reason`.                                                        |
 
 ```bash
-$ galley session new "summarize AGENTS.md" --project=proj_demo --llm=glm-4.5-x \
+$ yole session new "summarize AGENTS.md" --project=proj_demo --llm=glm-4.5-x \
     --supervisor=ga-claude-1 --reason="weekly review"
 {"session":{"id":"s-mvr2-3a7q","title":"新对话","status":"idle",…},
  "message":{"id":"msg_…","sessionId":"s-mvr2-3a7q","role":"user","content":"summarize AGENTS.md", …},
@@ -631,7 +631,7 @@ Exit codes: `0` success / `2 invalid_args` (empty `task`, unknown
 but the task did not start) / `1 internal` (commit failure — both rows
 roll back).
 
-### 5.9 · `galley session btw <id> "<question>" [--supervisor=<x>] [--reason=<y>]`
+### 5.9 · `yole session btw <id> "<question>" [--supervisor=<x>] [--reason=<y>]`
 
 **Write command (transient)** — sends a "by the way" side question to a
 running session's agent. The runner detects the `/btw` prefix and
@@ -643,7 +643,7 @@ session loses the side-question thread (v0.1 transient policy, sub-plan
 Requires an alive bridge (`exit 5` otherwise).
 
 ```bash
-$ galley session btw sess_abc "what's the wall-clock time so far?"
+$ yole session btw sess_abc "what's the wall-clock time so far?"
 {"dispatch":"dispatched"}
 ```
 
@@ -656,7 +656,7 @@ Exit codes: `0` success / `2 invalid_args` (empty question) /
 `3 not_found` (session id) / `4 db_unavailable` /
 `5 runner_error` (no live bridge for that session — `/btw` needs one).
 
-### 5.10 · `galley session stop <id> [--reason=<y>] [--supervisor=<x>]`
+### 5.10 · `yole session stop <id> [--reason=<y>] [--supervisor=<x>]`
 
 **Write command** — signals the runner to abort the current turn. Maps
 to `IpcCommand::Abort` (**not** `Shutdown`): the agent's loop exits and
@@ -669,10 +669,10 @@ Sub-plan §1.4 explains the Abort vs Shutdown trade-off. A future
 `session kill` (§8) would surface the Shutdown path.
 
 ```bash
-$ galley session stop sess_abc --reason="changed my mind"
+$ yole session stop sess_abc --reason="changed my mind"
 {"dispatch":"abort_sent"}
 
-$ galley session stop sess_idle
+$ yole session stop sess_idle
 {"dispatch":"already_stopped"}
 ```
 
@@ -684,20 +684,20 @@ Exit codes: `0` (both branches) / `3 not_found` (session id) /
 `4 db_unavailable` / `5 runner_error` (rare: runner died mid-dispatch
 in a way we can't recover from idempotently).
 
-### 5.11 · `galley session archive <id> [--supervisor=<x>] [--reason=<y>]`
+### 5.11 · `yole session archive <id> [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — flips a session's status to `archived`. The session
 disappears from the GUI sidebar's active list; reversible via
 `session restore`. Thin wrapper over the `archive_session` trait method.
 
 ```bash
-$ galley session archive sess_abc --supervisor=ga-claude-1 --reason="auto-cleanup"
+$ yole session archive sess_abc --supervisor=ga-claude-1 --reason="auto-cleanup"
 {"session":{"id":"sess_abc","status":"archived",…}}
 ```
 
 Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
 
-### 5.12 · `galley session restore <id> [--supervisor=<x>] [--reason=<y>]`
+### 5.12 · `yole session restore <id> [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — inverse of `session archive`. Flips status from
 `archived` back to `idle`; no-op if the session wasn't archived (returns
@@ -705,13 +705,13 @@ the brief unchanged, exit 0). Thin wrapper over the `unarchive_session`
 trait method.
 
 ```bash
-$ galley session restore sess_abc
+$ yole session restore sess_abc
 {"session":{"id":"sess_abc","status":"idle",…}}
 ```
 
 Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
 
-### 5.13 · `galley session move <id> [--to=<project-id>] [--supervisor=<x>] [--reason=<y>]`
+### 5.13 · `yole session move <id> [--to=<project-id>] [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — moves a session into a project or detaches it from
 its current one. Naming follows the PRD §11.2 grammar rule "noun =
@@ -723,17 +723,17 @@ shuffle (sub-plan O3).
 | `--to`  | (omit → detach)            | Target project id. Omit to move the session to ungrouped.        |
 
 ```bash
-$ galley session move sess_abc --to=proj_demo
+$ yole session move sess_abc --to=proj_demo
 {"session":{"id":"sess_abc","projectId":"proj_demo",…}}
 
-$ galley session move sess_abc        # no --to → detach
+$ yole session move sess_abc        # no --to → detach
 {"session":{"id":"sess_abc",…}}       # projectId now absent
 ```
 
 Exit codes: `0` success / `2 invalid_args` (project id doesn't exist —
 FK violation) / `3 not_found` (session id) / `4 db_unavailable`.
 
-### 5.14 · `galley project create "<name>" [--root-path=…] [--icon=…] [--color=…] [--supervisor=<x>] [--reason=<y>]`
+### 5.14 · `yole project create "<name>" [--root-path=…] [--icon=…] [--color=…] [--supervisor=<x>] [--reason=<y>]`
 
 **Write command** — creates a project. Id is server-side minted
 (`proj_<16-hex>`) so SOPs don't have to invent ids. `name` is trimmed
@@ -746,21 +746,21 @@ server-side; empty after trim → `invalid_args`.
 | `--color`      | (none)         | Hex accent color (e.g. `#7c84ff`).                                                                       |
 
 ```bash
-$ galley project create "MyApp refactor" --root-path=/Users/me/src/myapp
+$ yole project create "MyApp refactor" --root-path=/Users/me/src/myapp
 {"project":{"id":"proj_a1b2c3d4e5f60718","name":"MyApp refactor","rootPath":"/Users/me/src/myapp",…}}
 ```
 
 Exit codes: `0` success / `2 invalid_args` (empty name) /
 `4 db_unavailable`.
 
-### 5.15 · `galley project list`
+### 5.15 · `yole project list`
 
 **Read-only** — direct SQLite, no socket needed. NDJSON, one
 `ProjectBrief` per line, ordered `pinned DESC`, then effective project
 content activity descending (matches the GUI sidebar).
 
 ```bash
-$ galley project list
+$ yole project list
 {"id":"proj_demo","name":"MyApp refactor","pinned":true,"lastActivityAt":"…",…}
 {"id":"proj_xyz","name":"Side project","pinned":false,"lastActivityAt":"…",…}
 ```
@@ -781,7 +781,7 @@ $ galley project list
 
 Exit codes: `0` success / `4 db_unavailable`.
 
-### 5.15a · `galley project brief <project-id> [--all]`
+### 5.15a · `yole project brief <project-id> [--all]`
 
 **Read-only** — direct SQLite, no socket. Returns one JSON object that
 rolls up a project for supervisor batch orchestration.
@@ -790,7 +790,7 @@ By default archived sessions are excluded. Pass `--all` to include
 archived sessions in `sessionCount` and `statusCounts`.
 
 ```bash
-$ galley project brief proj_demo
+$ yole project brief proj_demo
 {"schemaVersion":1,"project":{…},"sessionCount":4,
  "statusCounts":{"running":2,"completed":2},
  "runningSessions":[{…},{…}],"lastActivityAt":"…"}
@@ -807,14 +807,14 @@ $ galley project brief proj_demo
 
 Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
 
-### 5.15b · `galley project show <project-id> [--tail=N] [--all]`
+### 5.15b · `yole project show <project-id> [--tail=N] [--all]`
 
 **Read-only** — direct SQLite, no socket. Returns the same project
 rollup plus each session's recent transcript tail. Default
 `--tail=20`.
 
 ```bash
-$ galley project show proj_demo --tail=10
+$ yole project show proj_demo --tail=10
 {"schemaVersion":1,"project":{…},"sessionCount":2,
  "statusCounts":{"completed":1,"running":1},
  "sessions":[{"session":{…},"messages":[…]},{"session":{…},"messages":[…]}]}
@@ -826,14 +826,14 @@ show`.
 
 Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
 
-### 5.15c · `galley project follow <project-id> [--tail=N] [--all] [--until-idle] [--final-show]`
+### 5.15c · `yole project follow <project-id> [--tail=N] [--all] [--until-idle] [--final-show]`
 
 **Hybrid subscription command** — emits a project snapshot, attempts to
 follow sessions inside the project, and optionally exits when the
 project becomes idle. Default `--tail=10`.
 
 The command attempts subscription for project sessions because runner
-liveness lives in Galley Core, not only in the persisted SQLite status.
+liveness lives in Yole Core, not only in the persisted SQLite status.
 For sessions persisted as `connecting`, `running`, or `waiting_approval`,
 an initial `not_live` / `core_unavailable` is reported as a
 `sessionEnd` frame. For ordinary idle/completed sessions, that quiet
@@ -864,11 +864,11 @@ it with `--until-idle` so they can synthesize directly from the final
 payload:
 
 ```bash
-$ galley project follow proj_demo --tail=80 --until-idle --final-show
+$ yole project follow proj_demo --tail=80 --until-idle --final-show
 ```
 
 ```bash
-$ galley project follow proj_demo --tail=10
+$ yole project follow proj_demo --tail=10
 {"schemaVersion":1,"stream":"snapshot","phase":"initial","project":{…},"sessions":[…],"followState":{…}}
 {"schemaVersion":1,"stream":"event","sessionId":"s-a","data":{"kind":"turn_start",…}}
 {"schemaVersion":1,"stream":"sessionEnd","sessionId":"s-a","reason":"subprocess_exited"}
@@ -883,7 +883,7 @@ snapshot and:
 {"schemaVersion":1,"stream":"end","reason":"no_live_sessions"}
 ```
 
-If a live-status session has no live runner or Galley Core is not
+If a live-status session has no live runner or Yole Core is not
 reachable, that session gets a `sessionEnd` frame with
 `reason: "not_live"` or `reason: "core_unavailable"`; the command still
 emits a final snapshot and exits 0.
@@ -892,7 +892,7 @@ Exit codes: `0` when the project snapshot can be read / `3 not_found`
 / `4 db_unavailable`. Per-session live-runner absence is represented
 as stream frames, not process failure.
 
-### 5.16 · `galley project delete <project-id> [--supervisor=<x>] [--reason=<y>]`
+### 5.16 · `yole project delete <project-id> [--supervisor=<x>] [--reason=<y>]`
 
 **Destructive write command** — removes the project row. FK SET NULL
 auto-detaches child sessions to ungrouped; the session rows themselves
@@ -905,7 +905,7 @@ reversible `project archive` alongside (§8); schemaVersion 1 doesn't
 support reversible archive.
 
 ```bash
-$ galley project delete proj_demo --supervisor=ga-claude-1 --reason="merged into MyApp"
+$ yole project delete proj_demo --supervisor=ga-claude-1 --reason="merged into MyApp"
 {"deleted":true,"projectId":"proj_demo","detachedSessions":3,
  "detachedSessionIds":["sess_a","sess_b","sess_c"]}
 ```
@@ -919,14 +919,14 @@ $ galley project delete proj_demo --supervisor=ga-claude-1 --reason="merged into
 
 Exit codes: `0` success / `3 not_found` / `4 db_unavailable`.
 
-### 5.17 · `galley llm list`
+### 5.17 · `yole llm list`
 
 **Read-only** — direct SQLite, no socket. Reads the cached `llm_list`
 pref that the GUI seeds after a bridge warmup. NDJSON, one entry per
 line.
 
 ```bash
-$ galley llm list
+$ yole llm list
 {"index":0,"name":"glm-5.1","key":"NativeClaudeSession/glm-5.1","displayName":"NativeClaudeSession/glm-5.1"}
 {"index":1,"name":"claude-opus-4-7","key":"NativeClaudeSession/claude-opus-4-7","displayName":"NativeClaudeSession/claude-opus-4-7"}
 ```
@@ -940,7 +940,7 @@ Exit codes: `0` success (incl. empty cache) / `2 invalid_args` (the
 stored value isn't a JSON array — would indicate a future-GUI schema
 drift the CLI hasn't learned about) / `4 db_unavailable`.
 
-### 5.18 · `galley llm set <session-id> <llm-name>`
+### 5.18 · `yole llm set <session-id> <llm-name>`
 
 **Write command** — persists a session's per-bridge LLM choice + best-
 effort tells any live runner the new pick. Two-step semantics mirror
@@ -948,17 +948,17 @@ effort tells any live runner the new pick. Two-step semantics mirror
 opportunistic.
 
 `<llm-name>` is matched case-insensitively against the session runtime's
-model list — managed sessions resolve Galley model records; external GA
-sessions resolve `galley llm list` entries. The persisted row keeps
+model list — managed sessions resolve Yole model records; external GA
+sessions resolve `yole llm list` entries. The persisted row keeps
 `selectedLlmKey` so reordering models does not silently point the
 session at a different model.
 
 ```bash
-$ galley llm set sess_abc glm-4.5-x
+$ yole llm set sess_abc glm-4.5-x
 {"session":{"id":"sess_abc","selectedLlmIndex":0,"selectedLlmKey":"NativeClaudeSession/glm-4.5-x","selectedLlmDisplayName":"glm-4.5-x",…},
  "dispatch":"dispatched"}
 
-$ galley llm set sess_other glm-4.5-x   # no live bridge
+$ yole llm set sess_other glm-4.5-x   # no live bridge
 {"session":{…},"dispatch":"persisted_only"}
 ```
 
@@ -988,7 +988,7 @@ Every CLI error — read or write — uses the same shape on stdout:
 }
 ```
 
-- `error` is a stable discriminant (matches the `GalleyError` enum
+- `error` is a stable discriminant (matches the `YoleError` enum
   variants in [`core/src/error.rs`](../core/src/error.rs)).
 - `message` is the human-readable explanation. Top-level so SOPs can
   read one shape across both transports (B4 M6 freeze).
@@ -999,7 +999,7 @@ Every CLI error — read or write — uses the same shape on stdout:
 Example:
 
 ```bash
-$ galley session brief sess_missing ; echo "exit: $?"
+$ yole session brief sess_missing ; echo "exit: $?"
 {"error":"not_found","message":"session sess_missing not found"}
 exit: 3
 ```
@@ -1012,7 +1012,7 @@ caller's `requestId` so a single connection can multiplex many
 in-flight requests:
 
 ```bash
-$ galley session send sess_missing "hi" ; echo "exit: $?"
+$ yole session send sess_missing "hi" ; echo "exit: $?"
 {"ok":false,"requestId":null,"error":"not_found","message":"session 'sess_missing' does not exist"}
 exit: 3
 ```
@@ -1032,13 +1032,13 @@ omit it).
 | Field         | Type            | Notes                                                                  |
 | ------------- | --------------- | ---------------------------------------------------------------------- |
 | `via`         | string enum     | `gui` / `cli` / `supervisor` / `system`. Matches the SQL CHECK constraint on `messages.created_via` and `sessions.created_via` |
-| `supervisor`  | string?         | Supervisor label / agent identity (e.g. `"ga-claude-1"`). Required when `via=supervisor`; absent for `via=gui` / `via=system`; optional for `via=cli` (presence with `via=cli` would indicate a manual terminal user impersonating a supervisor — Galley doesn't reject it but supervisors should prefer `via=supervisor` to claim identity) |
+| `supervisor`  | string?         | Supervisor label / agent identity (e.g. `"ga-claude-1"`). Required when `via=supervisor`; absent for `via=gui` / `via=system`; optional for `via=cli` (presence with `via=cli` would indicate a manual terminal user impersonating a supervisor — Yole doesn't reject it but supervisors should prefer `via=supervisor` to claim identity) |
 | `reason`      | string?         | Free-text rationale. Shows up in audit / activity-log views. Recommended on destructive operations + autonomous (non-user-relayed) judgments |
 
 The CLI auto-elevates `via` based on `--supervisor`: pass `--supervisor=<id>`
 on any write command → stored `via = supervisor`; omit it → `via = cli`.
 The GUI always writes `via = gui`. `via = system` is reserved for
-internal Galley triggers (auto-clear-unread, lifecycle events, etc.).
+internal Yole triggers (auto-clear-unread, lifecycle events, etc.).
 
 Wire example:
 
@@ -1072,7 +1072,7 @@ Inside a future `schemaVersion: 2`:
   request) will support opting back into the v1 view; old SOPs keep
   working until they choose to migrate.
 
-`galley version` returns the schema version the CLI binary is willing
+`yole version` returns the schema version the CLI binary is willing
 to speak. The socket `version` command returns the server's accepted
 schema version. Future binaries that speak multiple versions will
 expose this as an array.
@@ -1083,17 +1083,17 @@ The following are intentionally **not in `schemaVersion: 1` CLI surface
 yet** — mentioned here so SOPs can plan their integration shape.
 Additions will be non-breaking inside `schemaVersion: 1` per §7.
 
-- `galley session kill <id>` — runner Shutdown (vs `session stop` which
+- `yole session kill <id>` — runner Shutdown (vs `session stop` which
   Aborts the turn but keeps the bridge alive). Deferred to a future release,
   pending dogfood evidence that bridge-wedge cases are common enough
   to warrant a destructive surface ([B4 M1 sub-plan O6](./refactor/B4-M1-sub-plan.md)).
-- `galley project archive <id>` — true reversible archive (current
+- `yole project archive <id>` — true reversible archive (current
   `project delete` is destructive; a future schema can add an
   `archived_at` column and ship this as a separate command without
   changing the existing `delete` semantics — sub-plan O2).
-- `galley session watch <id> --from=<event-index>` — backlog/resume
+- `yole session watch <id> --from=<event-index>` — backlog/resume
   support for supervisors reconnecting after a network blip (B2 N35).
-- `galley llm warmup <id>` — explicit "spawn a bridge so `llm list`
+- `yole llm warmup <id>` — explicit "spawn a bridge so `llm list`
   cache fills" command, for SOPs that don't want to rely on the GUI
   having been opened.
 
@@ -1101,7 +1101,7 @@ All future write commands will accept `--supervisor=<x>` /
 `--reason=<y>` flags following the same Origin convention `session send`
 uses today (§5.5a). Read commands stay flag-light.
 
-### 8A · `GalleyApi` trait surface (B3 M4a)
+### 8A · `YoleApi` trait surface (B3 M4a)
 
 The full session/project CRUD trait landed in B3 M4a as the
 authoritative write path. **B4 M1 minted CLI subcommands for the
@@ -1158,7 +1158,7 @@ Error categories (all map to the §3 exit codes):
 ### Transport notes
 
 For the **transport**: the read commands' direct-SQLite path is a B1
-convenience kept for "Galley Core not running" scenarios (snapshot
+convenience kept for "Yole Core not running" scenarios (snapshot
 inspection, CI). The write commands' socket path is the eventual
 canonical path for everything; B4 may consolidate read commands onto
 it too once daemon mode is the dogfood baseline.
@@ -1167,7 +1167,7 @@ it too once daemon mode is the dogfood baseline.
 
 - [PRD §11 Agent / CLI surface](./PRD.md) — design rationale.
 - [IPC protocol](./ipc-protocol.md) — wire format for the runner ↔
-  Galley Core stdin/stdout channel + the socket transport this
+  Yole Core stdin/stdout channel + the socket transport this
   document layers on top.
 - [B1 playbook](./refactor/B1-rust-core.md) — read-command rollout.
 - [B2 playbook](./refactor/B2-bridge-ownership.md) — socket + first

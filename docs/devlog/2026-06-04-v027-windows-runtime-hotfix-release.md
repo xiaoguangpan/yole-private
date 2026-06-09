@@ -6,7 +6,7 @@
 - Status: `v0.2.7` published as stable GitHub Latest and promoted to the
   default update channel.
 - Related:
-  - [GitHub issue #9](https://github.com/wangjc683/galley/issues/9)
+  - [GitHub issue #9](https://github.com/wangjc683/yole/issues/9)
   - [Project status](../project-status.md)
   - [Release / update SOP](../release-update-sop.md)
   - [Managed GA patch stack](../../managed-ga/patches/manifest.md)
@@ -17,7 +17,7 @@
 
 GitHub issue #9 grouped three Windows reports: update checking failed, images
 could not be pasted into the dialog, and Python subprocess execution could hang
-until stdin was closed. The reports came from Galley `0.2.6` on Windows 10 with
+until stdin was closed. The reports came from Yole `0.2.6` on Windows 10 with
 WebView2 and Python 3.13.
 
 The release channel itself was healthy: GitHub Latest was `v0.2.6`, the Windows
@@ -31,17 +31,17 @@ can fail.
 - Ship the Python subprocess fix as a managed GA patch, not as a Windows-only
   special case. `code_run` is non-interactive by design, so child processes
   should receive `stdin=subprocess.DEVNULL` on every platform.
-- Keep the fix inside Galley-managed GA only. External / Attach GA remains
-  user-owned and must not be modified by Galley.
+- Keep the fix inside Yole-managed GA only. External / Attach GA remains
+  user-owned and must not be modified by Yole.
 - Add a regression test that monkeypatches `subprocess.Popen` and asserts the
   child stdin is closed, instead of trying to reproduce the Windows hang in CI.
 - Preserve updater's friendly one-line status, but add copyable diagnostics
   with phase, endpoint, and raw detail for troubleshooting.
 - Add a manual download link beside update-check errors so users blocked by
   network / proxy / TLS issues still have a clear next action.
-- Defer image paste. Galley React/Tauri currently lacks the full image
+- Defer image paste. Yole React/Tauri currently lacks the full image
   paste/send/render/model path, and the issue's referenced file belongs to the
-  upstream GenericAgent desktop frontend rather than Galley's main UI.
+  upstream GenericAgent desktop frontend rather than Yole's main UI.
 
 ## Verification
 
@@ -61,8 +61,8 @@ can fail.
 - GitHub Release `v0.2.7` is published, non-prerelease, and GitHub Latest.
 - `promote-update-channel.yml` run `26931705162` promoted `stable` and the
   legacy `beta` alias.
-- `node scripts/check-update-channel.mjs --repo wangjc683/galley --tag v0.2.7 --channel stable --cache-bust --retries 6 --retry-delay-ms 10000`
-- `node scripts/check-update-channel.mjs --repo wangjc683/galley --tag v0.2.7 --channel beta --cache-bust --retries 6 --retry-delay-ms 10000`
+- `node scripts/check-update-channel.mjs --repo wangjc683/yole --tag v0.2.7 --channel stable --cache-bust --retries 6 --retry-delay-ms 10000`
+- `node scripts/check-update-channel.mjs --repo wangjc683/yole --tag v0.2.7 --channel beta --cache-bust --retries 6 --retry-delay-ms 10000`
 
 ## Rejected alternatives
 
@@ -81,12 +81,12 @@ can fail.
 
 - Whether Windows updater diagnostics should eventually expose a first-class
   "copy details" button instead of inline truncated diagnostics.
-- Whether image paste should be implemented as a Galley-native multimodal
+- Whether image paste should be implemented as a Yole-native multimodal
   attachment path or deferred until the managed GA multimodal contract is
   tightened upstream.
 
 ## Next
 
 Reply to issue #9 with the published `v0.2.7` fix and ask the reporter to
-retest on Windows. Keep image paste as a separate Galley-native multimodal
+retest on Windows. Keep image paste as a separate Yole-native multimodal
 thread instead of folding it into this hotfix.

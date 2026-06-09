@@ -10,15 +10,15 @@ every agent startup context.
 ## Repository Map
 
 ```text
-galley/
+yole/
 ├── README.md
 ├── README_en.md
 ├── AGENTS.md
 ├── runner/                  # Python bridge into GenericAgent
-├── core/                    # Rust Galley Core + Tauri backend
-├── cli/                     # Rust `galley` CLI
+├── core/                    # Rust Yole Core + Tauri backend
+├── cli/                     # Rust `yole` CLI
 ├── gui/                     # React / Tauri frontend
-├── managed-ga/              # Galley-managed GenericAgent runtime (code, patches, manifest)
+├── managed-ga/              # Yole-managed GenericAgent runtime (code, patches, manifest)
 ├── scripts/                 # Build, bundle, and release / update-channel scripts
 ├── docs/                    # Product, architecture, workflow, devlog
 └── .github/workflows/       # CI and release workflows
@@ -30,9 +30,9 @@ Key directories:
   runner tests.
 - `core/`: Rust authoritative layer, SQLite migrations, Tauri commands,
   socket / named pipe listener, bundled resources.
-- `cli/`: Agent-facing `galley` command.
+- `cli/`: Agent-facing `yole` command.
 - `gui/`: React 19 + Tauri frontend, Zustand domain stores, visual components.
-- `managed-ga/`: Galley-managed GenericAgent runtime — vendored code, Galley
+- `managed-ga/`: Yole-managed GenericAgent runtime — vendored code, Yole
   patches, and the runtime manifest.
 - `scripts/`: build, bundle, and release / update-channel automation.
 - `docs/refactor/`: B-phase implementation playbooks and invariants.
@@ -118,7 +118,7 @@ Protocol is a contract. Change docs first, then code.
    affected.
 3. Update TypeScript mirror types in `gui/src/types/ipc.ts` when GUI protocol is
    affected.
-4. Update Rust command / event types when Galley Core protocol is affected.
+4. Update Rust command / event types when Yole Core protocol is affected.
 5. Add or adjust tests in the same change.
 
 For Agent-facing CLI JSON, read [agent-api](./agent-api.md). That surface is

@@ -6,7 +6,7 @@ index 7bc7259..a9706cb 100644
  from ga import GenericAgentHandler, smart_format, get_global_memory, format_error, consume_file
 
  script_dir = os.path.dirname(os.path.abspath(__file__))
-+state_dir = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or script_dir)
++state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 +def state_path(*parts):
 +    return os.path.join(state_dir, *parts)
 +
@@ -103,7 +103,7 @@ index 57b1870..77552bf 100644
 
  from agent_loop import BaseHandler, StepOutcome, json_default
  script_dir = os.path.dirname(os.path.abspath(__file__))
-+state_dir = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or script_dir)
++state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 +def state_path(*parts):
 +    return os.path.join(state_dir, *parts)
 +
@@ -149,7 +149,7 @@ index 4562893..7a9f27a 100644
  def _write_llm_log(label, content, log_path=None):
      if not log_path:
 -        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'temp/model_responses/model_responses_{os.getpid()}.txt')
-+        state_root = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or os.path.dirname(os.path.abspath(__file__)))
++        state_root = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or os.path.dirname(os.path.abspath(__file__)))
 +        log_path = os.path.join(state_root, f'temp/model_responses/model_responses_{os.getpid()}.txt')
      os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
      ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -165,7 +165,7 @@ index 260a8c3..039c4a3 100644
 -_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 -                        'temp', 'model_responses')
 +_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+_STATE_ROOT = os.path.abspath(os.environ.get('GALLEY_GA_STATE_ROOT') or _CODE_ROOT)
++_STATE_ROOT = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or _CODE_ROOT)
 +_LOG_DIR = os.path.join(_STATE_ROOT, 'temp', 'model_responses')
  _LOG_GLOB = os.path.join(_LOG_DIR, 'model_responses_*.txt')
  _BLOCK_RE = re.compile(r'^=== (Prompt|Response) ===.*?\n(.*?)(?=^=== (?:Prompt|Response) ===|\Z)',

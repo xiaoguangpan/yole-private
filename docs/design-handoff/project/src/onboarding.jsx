@@ -60,7 +60,7 @@ function Onboarding() {
           marginTop: 10, marginBottom: 28,
           lineHeight: 1.6,
         }}>
-          全部通过后才能进入主界面 · Workbench 不会修改你的 GA。
+          全部通过后才能进入主界面 · Yole 不会修改你的 GA。
         </p>
 
         <div className="hc-card">

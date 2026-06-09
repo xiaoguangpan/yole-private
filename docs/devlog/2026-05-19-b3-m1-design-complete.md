@@ -28,7 +28,7 @@ B3 M1 是 paperwork 阶段（[playbook M1](../refactor/B3-store-slice.md#m1--sli
 | 2 | `activeProjectFilter` → **sessionsStore**（不是 ui） | filter 是 sessions list 的衍生 view。挂 ui = 跨 slice 派生 visibleSessions 时 selector 路径 > 2 layers（违反 T1.7）或 cycle（违反 G9）。两层都不通 |
 | 3 | `agentRunning` → **messagesStore**（不是 runtime） | 语义是 "conversation 在 streaming/agent loop" 而非 bridge lifecycle。订阅方全在 conversation-area 组件（Composer / TurnTicker / Sidebar "正在工作"）。bridgeStatus 才是真 runtime 字段 |
 | 4 | 9 个 module-level symbol **全删** | B2 后 Rust RunnerManager 是 ground truth；3 Map + getBridgeClient（0 外部 callers，grep verified）+ LRU + stderr buffer + _warmupComplete + 各种 const 全成 vestigial cache。删干净不留 @deprecated（[B3-I6](../refactor/B3-store-slice.md#phase-invariants--b3-特有的硬规则)） |
-| 5 | Rust 端 emit **5 个 domain event**，GUI 不订阅 raw runner-event | sessions-updated / messages-appended / projects-updated / prefs-updated / runtime-updated 是 Rust spawn_emit_task 派生的 domain event。这是 [Galley 架构原则 §1 路径 B 不可逆](../../CLAUDE.md)的 TS 端落地 —— Rust 是 authoritative interpreter，GUI 是 stateless presenter；GUI 不重复解释 IpcEvent |
+| 5 | Rust 端 emit **5 个 domain event**，GUI 不订阅 raw runner-event | sessions-updated / messages-appended / projects-updated / prefs-updated / runtime-updated 是 Rust spawn_emit_task 派生的 domain event。这是 [Yole 架构原则 §1 路径 B 不可逆](../../CLAUDE.md)的 TS 端落地 —— Rust 是 authoritative interpreter，GUI 是 stateless presenter；GUI 不重复解释 IpcEvent |
 
 完整决策列表 + delete 路径 + DAG / dependency 见 [`b3-slice-adr.md`](../refactor/b3-slice-adr.md) AD-01 到 AD-11。
 

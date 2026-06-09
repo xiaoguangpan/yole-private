@@ -1,21 +1,20 @@
 //! Platform paths that must match Tauri's runtime resolver.
 //!
-//! `tauri-plugin-sql` resolves `sqlite:workbench.db` against
-//! `app.path().app_config_dir()`, which is `<config_dir>/app.galley`.
-//! Galley Core and the CLI do not always have an `AppHandle`, so they
+//! `tauri-plugin-sql` resolves `sqlite:yole.db` against
+//! `app.path().app_config_dir()`, which is `<config_dir>/app.yole`.
+//! Yole Core and the CLI do not always have an `AppHandle`, so they
 //! reproduce that resolver here with `directories::BaseDirs`.
 
 use std::path::{Path, PathBuf};
 
 use directories::BaseDirs;
 
-/// Tauri bundle identifier. Changing this moves the user data directory.
-pub(crate) const APP_IDENTIFIER: &str = "app.galley";
+/// Main SQLite filename used by `tauri-plugin-sql`'s `sqlite:yole.db`.
+pub(crate) const DB_FILENAME: &str = "yole.db";
 
-/// Main SQLite filename used by `tauri-plugin-sql`'s `sqlite:workbench.db`.
-pub(crate) const DB_FILENAME: &str = "workbench.db";
+pub(crate) const APP_IDENTIFIER: &str = "app.yole";
 
-const DB_PATH_ENV: &str = "GALLEY_DB_PATH";
+const DB_PATH_ENV: &str = "YOLE_DB_PATH";
 
 pub(crate) fn app_config_dir() -> Option<PathBuf> {
     BaseDirs::new().map(|dirs| app_config_dir_from_base(dirs.config_dir()))
@@ -46,7 +45,7 @@ mod tests {
 
     #[test]
     fn db_path_sits_directly_under_app_config_dir() {
-        let base = Path::new("/tmp/galley-config");
+        let base = Path::new("/tmp/yole-config");
         let app_dir = app_config_dir_from_base(base);
         let db = app_dir.join(DB_FILENAME);
 

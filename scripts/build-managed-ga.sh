@@ -101,7 +101,7 @@ for patch_name in "${MANAGED_PATCHES[@]}"; do
 done
 
 # Upstream sometimes ships incidental trailing spaces. Keep the generated
-# checked-in payload compatible with Galley's `git diff --check` gate without
+# checked-in payload compatible with Yole's `git diff --check` gate without
 # baking whitespace-only removals into patch files that would fail that same gate.
 for file in "${NORMALIZE_FILES[@]}"; do
   [[ -f "$file" ]] && perl -0pi -e 's/[ \t]+$//mg; s/\n*\z/\n/' "$file"

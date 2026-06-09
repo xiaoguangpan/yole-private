@@ -744,7 +744,7 @@ function fallbackImageFilename(extension: string): string {
     .slice(0, 19)
     .replace(/[-:T]/g, "")
     .replace(/^(\d{8})(\d{6})$/, "$1-$2");
-  return `galley-image-${stamp}.${extension}`;
+  return `yole-image-${stamp}.${extension}`;
 }
 
 function errorMessage(error: unknown): string {

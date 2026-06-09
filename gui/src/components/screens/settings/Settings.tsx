@@ -60,6 +60,7 @@ export interface SettingsProps {
   themePreference: ThemePreference;
   resolvedTheme: ResolvedTheme;
   onChangeThemePreference: (preference: ThemePreference) => void;
+  simplifiedUi?: boolean;
 }
 
 /**
@@ -77,7 +78,7 @@ export interface SettingsProps {
  *   - left tab list 180px
  *   - right content area 860px
  *   - close button top-right (Esc also works via Radix Dialog)
- *   - backdrop clicks do not close Settings; users often leave Galley
+ *   - backdrop clicks do not close Settings; users often leave Yole
  *     to copy model provider keys/URLs, and accidental outside clicks
  *     must not discard in-progress settings forms.
  *
@@ -116,6 +117,7 @@ export function Settings({
   onChangeThemePreference,
   tab: controlledTab,
   onTabChange,
+  simplifiedUi = false,
 }: SettingsProps) {
   const copy = useCopy();
   const [uncontrolledTab, setUncontrolledTab] =
@@ -123,10 +125,21 @@ export function Settings({
   const tab = controlledTab ?? uncontrolledTab;
   const setTab = onTabChange ?? setUncontrolledTab;
   const showImTab = activeRuntimeKind === "managed";
+  const visibleTab =
+    simplifiedUi &&
+    (tab === "models" || tab === "integration" || tab === "shortcuts")
+      ? "runtime"
+      : tab;
 
   useEffect(() => {
     if (!showImTab && tab === "im") setTab("runtime");
-  }, [setTab, showImTab, tab]);
+    if (
+      simplifiedUi &&
+      (tab === "models" || tab === "integration" || tab === "shortcuts")
+    ) {
+      setTab("runtime");
+    }
+  }, [setTab, showImTab, simplifiedUi, tab]);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -156,7 +169,7 @@ export function Settings({
           </Dialog.Close>
 
           <SettingsSidebar
-            tab={tab}
+            tab={visibleTab}
             onChange={setTab}
             languagePreference={languagePreference}
             resolvedLanguage={resolvedLanguage}
@@ -165,11 +178,12 @@ export function Settings({
             resolvedTheme={resolvedTheme}
             onChangeThemePreference={onChangeThemePreference}
             showImTab={showImTab}
+            simplifiedUi={simplifiedUi}
           />
 
           <div className="min-w-0 flex-1 overflow-y-auto bg-app">
             <div className="px-8 py-7">
-              {tab === "runtime" && (
+              {visibleTab === "runtime" && (
                 <SettingsRuntime
                   info={runtimeInfo}
                   hasRunningSessions={hasRunningSessions}
@@ -185,12 +199,13 @@ export function Settings({
                   onToggleExternalPython={onToggleExternalPython}
                   onCommitGAPath={onCommitGAPath}
                   onOpenModels={() => setTab("models")}
+                  simplifiedUi={simplifiedUi}
                 />
               )}
-              {tab === "models" && (
+              {visibleTab === "models" && (
                 <SettingsModels activeRuntimeKind={activeRuntimeKind} />
               )}
-              {tab === "approval" && (
+              {visibleTab === "approval" && (
                 <SettingsApproval
                   config={approval}
                   yoloMode={yoloMode}
@@ -200,17 +215,19 @@ export function Settings({
                   onRemoveAlwaysAllow={onRemoveAlwaysAllow}
                 />
               )}
-              {tab === "integration" && <SettingsIntegration />}
-              {showImTab && tab === "im" && (
+              {visibleTab === "integration" && <SettingsIntegration />}
+              {showImTab && visibleTab === "im" && (
                 <SettingsIM
                   hasManagedRuntimeConfigured={hasManagedRuntimeConfigured}
-                  onOpenModels={() => setTab("models")}
+                  onOpenModels={
+                    simplifiedUi ? undefined : () => setTab("models")
+                  }
                 />
               )}
-              {tab === "shortcuts" && <SettingsShortcuts />}
-              {tab === "about" && (
+              {visibleTab === "shortcuts" && <SettingsShortcuts />}
+              {visibleTab === "about" && (
                 <SettingsAbout
-                  workbenchVersion={runtimeInfo.workbenchVersion}
+                  yoleVersion={runtimeInfo.yoleVersion}
                   gaBaseline={runtimeInfo.gaBaseline}
                   managedRuntime={runtimeInfo.managedRuntime}
                   hasRunningSessions={hasRunningSessions}

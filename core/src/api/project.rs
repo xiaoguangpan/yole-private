@@ -41,7 +41,7 @@ pub struct ProjectBrief {
     pub updated_at: String,
 }
 
-/// Payload for [`crate::api::GalleyApi::create_project`]. Mirrors
+/// Payload for [`crate::api::YoleApi::create_project`]. Mirrors
 /// `CreateSessionInput` semantics — caller-assigned id (GUI mints
 /// `proj_<random16>`; CLI / supervisor follow the same shape).
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -57,7 +57,7 @@ pub struct CreateProjectInput {
     pub color: Option<String>,
 }
 
-/// Partial-update payload for [`crate::api::GalleyApi::update_project`].
+/// Partial-update payload for [`crate::api::YoleApi::update_project`].
 ///
 /// `None` on a field means "leave the column alone". For
 /// `root_path` / `icon` / `color` the wrapper is a double-`Option` so

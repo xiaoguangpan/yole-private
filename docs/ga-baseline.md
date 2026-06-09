@@ -3,11 +3,11 @@
 > Maintainer-facing document. Contributors touching GenericAgent integration
 > should read this; most users do not need it.
 
-Galley integrates with GenericAgent in two different ways:
+Yole integrates with GenericAgent in two different ways:
 
-- **External / attach GA**: user-owned GenericAgent. Galley audits
+- **External / attach GA**: user-owned GenericAgent. Yole audits
   compatibility but never upgrades or modifies that checkout.
-- **Managed / bundled GA**: Galley-owned GenericAgent runtime. Galley vendors
+- **Managed / bundled GA**: Yole-owned GenericAgent runtime. Yole vendors
   the audited upstream commit and reapplies its managed-runtime patch stack.
 
 The baseline records the upstream GenericAgent commit that both paths have been
@@ -31,22 +31,22 @@ Locked commit: `5d122e20ea7e9dfd7941998acb902fbac4a2bc9a`
 
 Relevant compatibility notes:
 
-- `agent_loop.py`: no diff in this range. The dispatch / hooks surface Galley
+- `agent_loop.py`: no diff in this range. The dispatch / hooks surface Yole
   audits for attach mode did not move.
 - `agentmain.py`: upstream added an EXIT sentinel for the run loop, per-instance
   `no_print` injection, and a lower-collision model-response log id. Managed
   mode preserves those changes while routing temp/log paths through
-  `GALLEY_GA_STATE_ROOT`.
+  `YOLE_GA_STATE_ROOT`.
 - `ga.py`: upstream added `safe_print` / `myprint` plumbing. Managed mode keeps
-  that while preserving Galley's non-interactive `code_run` stdin close and
+  that while preserving Yole's non-interactive `code_run` stdin close and
   Browser Control recovery diagnostics.
-- `llmcore.py`: no upstream diff in this range. Galley's ChatGPT / Codex
-  managed backend remains a managed patch because it is a Galley credential IPC
+- `llmcore.py`: no upstream diff in this range. Yole's ChatGPT / Codex
+  managed backend remains a managed patch because it is a Yole credential IPC
   contract, not upstream GA behavior.
 - `frontends/continue_cmd.py`: upstream hardened malformed-log preview fallback.
   Managed mode keeps `/continue` log scan and cache paths under
-  `GALLEY_GA_STATE_ROOT`.
-- `TMWebDriver.py`: upstream reduced duplicate disconnect logging. Galley's
+  `YOLE_GA_STATE_ROOT`.
+- `TMWebDriver.py`: upstream reduced duplicate disconnect logging. Yole's
   extension status probe remains a managed patch for user-facing no-tabs
   diagnostics.
 - `reflect/checklist_master.py`: upstream added a checklist poll hard cap.
@@ -59,22 +59,22 @@ When auditing a GenericAgent upgrade, focus on these surfaces:
 
 1. `BaseHandler.dispatch` signature and generator protocol
 2. Whether `BaseHandler.dispatch` calls callbacks or `plugins.hooks`
-3. Galley's `WorkbenchHandler.dispatch` approval gate before `super()`
+3. Yole's `YoleHandler.dispatch` approval gate before `super()`
 4. `BaseHandler.turn_end_callback`
 5. `agent._turn_end_hooks`
 6. `agentmain.GenericAgentHandler` import path
 7. `llmclient.backend.history` read/write semantics
 8. `agent.list_llms()` behavior
 
-Galley may read GenericAgent public APIs and stable in-memory objects. Galley
+Yole may read GenericAgent public APIs and stable in-memory objects. Yole
 must not write GenericAgent source, memory, venv, PATH, or runtime state.
 
 ## Upgrade Triggers
 
 Upgrade is event-driven, not calendar-driven.
 
-- Before a Galley minor or patch release, normally audit and bump the baseline.
-- If users report that a new GenericAgent behavior does not work in Galley,
+- Before a Yole minor or patch release, normally audit and bump the baseline.
+- If users report that a new GenericAgent behavior does not work in Yole,
   audit immediately.
 - If upstream ships a critical stability or security fix, audit immediately.
 - Do not upgrade just because time has passed.
@@ -92,16 +92,16 @@ git ls-remote https://github.com/lsdefine/GenericAgent.git refs/heads/main
    from a dirty user checkout. A local temporary clone is fine:
 
 ```bash
-git clone ~/Documents/GenericAgent /tmp/galley-ga-upgrade
-git -C /tmp/galley-ga-upgrade checkout <target_sha>
-git -C /tmp/galley-ga-upgrade status --short
+git clone ~/Documents/GenericAgent /tmp/yole-ga-upgrade
+git -C /tmp/yole-ga-upgrade checkout <target_sha>
+git -C /tmp/yole-ga-upgrade status --short
 ```
 
 3. Review the external / attach integration surface:
 
 ```bash
-git -C /tmp/galley-ga-upgrade log <current_baseline>..<target_sha> --oneline
-git -C /tmp/galley-ga-upgrade diff <current_baseline>..<target_sha> -- \
+git -C /tmp/yole-ga-upgrade log <current_baseline>..<target_sha> --oneline
+git -C /tmp/yole-ga-upgrade diff <current_baseline>..<target_sha> -- \
   agent_loop.py ga.py agentmain.py llmcore.py pyproject.toml
 ```
 
@@ -114,7 +114,7 @@ git -C /tmp/galley-ga-upgrade diff <current_baseline>..<target_sha> -- \
 ```bash
 cd ~/Documents/genericagent-webui
 # update managed-ga/manifest.json upstream.commit / upstream.auditedAt first
-./scripts/build-managed-ga.sh /tmp/galley-ga-upgrade
+./scripts/build-managed-ga.sh /tmp/yole-ga-upgrade
 node scripts/check-managed-ga-payload.mjs
 ```
 
@@ -122,19 +122,19 @@ Then inspect the managed patch stack semantically, not just mechanically:
 
 - Did every patch apply?
 - Did upstream add new writes to `memory/`, `sop/`, `skills/`, `temp/`, or
-  `model_responses/` that bypass `GALLEY_GA_STATE_ROOT`?
+  `model_responses/` that bypass `YOLE_GA_STATE_ROOT`?
 - Did upstream add an official state-root/profile option that should replace a
-  Galley patch?
-- Did upstream rename a key that Galley's managed model config emits?
+  Yole patch?
+- Did upstream rename a key that Yole's managed model config emits?
 
 6. Run the compatibility matrix:
 
 ```bash
-GA_PATH=/tmp/galley-ga-upgrade \
+GA_PATH=/tmp/yole-ga-upgrade \
   .venv/bin/python -m pytest runner/tests/ -m 'not e2e'
 
 # Optional when spending model quota is acceptable:
-GA_PATH=/tmp/galley-ga-upgrade \
+GA_PATH=/tmp/yole-ga-upgrade \
   BRIDGE_PYTHON=<python-with-ga-deps> \
   .venv/bin/python -m pytest runner/tests/ -m e2e
 ```
@@ -152,7 +152,7 @@ managed-GA smoke; run `check-bundled-python-managed-ga.sh` again when checking a
 already-generated bundle without rebuilding it. The smoke must verify
 `managed-ga/code`, not `~/Documents/GenericAgent`.
 
-8. Start Galley dev mode and run a real multi-step task in both runtime modes
+8. Start Yole dev mode and run a real multi-step task in both runtime modes
    when possible:
 
 - External GA: streaming, thinking state, approvals, tool dispatch, LLM display.
@@ -168,12 +168,12 @@ docs/devlog/YYYY-MM-DD-ga-upstream-upgrade-<old>-to-<new>.md
 ```
 
 11. Keep the upstream upgrade as an independent commit when possible. If the
-    upgrade forces a Galley adapter or packaging guard, include that adapter in
+    upgrade forces a Yole adapter or packaging guard, include that adapter in
     the same branch and document the product impact.
 
 ## Bundled Python Dependency Audit
 
-Galley releases bundle CPython plus the GenericAgent core runtime dependencies.
+Yole releases bundle CPython plus the GenericAgent core runtime dependencies.
 Every baseline upgrade must check GenericAgent `pyproject.toml`:
 
 - If `[project.dependencies]` changes, update `scripts/bundle-python.sh`.
@@ -182,7 +182,7 @@ Every baseline upgrade must check GenericAgent `pyproject.toml`:
   bundle. Managed GA must not depend on the maintainer's `.venv` or external
   `~/Documents/GenericAgent` checkout.
 - `optional-dependencies` for GenericAgent UI/frontends are not automatically in
-  Galley scope. Galley only bundles frontend deps when a managed product
+  Yole scope. Yole only bundles frontend deps when a managed product
   surface owns that frontend.
 
 Current bundled GenericAgent core deps:
@@ -198,10 +198,10 @@ Current bundled GenericAgent core deps:
 
 Runtime packaging details live in [desktop runtime](./desktop-runtime.md).
 
-## Things Galley Does Not Do
+## Things Yole Does Not Do
 
-- Galley does not automatically upgrade a user's GenericAgent checkout.
-- Galley does not prompt users to pull GenericAgent just because upstream moved.
-- Galley does not policy-manage GenericAgent's release cadence.
+- Yole does not automatically upgrade a user's GenericAgent checkout.
+- Yole does not prompt users to pull GenericAgent just because upstream moved.
+- Yole does not policy-manage GenericAgent's release cadence.
 - The Settings GA Version state is informational: aligned / user has upgraded /
   user has older checkout.

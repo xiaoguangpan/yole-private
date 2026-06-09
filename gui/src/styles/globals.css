@@ -12,7 +12,7 @@
 @import "@fontsource/jetbrains-mono/500.css";
 
 /*
- * Galley design tokens — see docs/DESIGN.md §2.
+ * Yole design tokens — see docs/DESIGN.md §2.
  *
  * Naming notes (Tailwind v4 utility-friendly):
  *   --color-app       → bg-app

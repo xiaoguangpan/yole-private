@@ -11,6 +11,7 @@ export function BuiltinRuntimeCard({
   hasManagedRuntimeConfigured,
   hasRunningSessions,
   highlighted,
+  simplifiedUi = false,
   onOpenModels,
   onActivate,
 }: {
@@ -18,6 +19,7 @@ export function BuiltinRuntimeCard({
   hasManagedRuntimeConfigured: boolean;
   hasRunningSessions: boolean;
   highlighted: boolean;
+  simplifiedUi?: boolean;
   onOpenModels?: () => void;
   onActivate?: () => void;
 }) {
@@ -69,7 +71,7 @@ export function BuiltinRuntimeCard({
               <div className="mt-0.5 text-[12px] text-ink-muted">{detail}</div>
             </div>
           </div>
-          {needsModel ? (
+          {needsModel && !simplifiedUi ? (
             <Button
               variant="primary"
               size="sm"

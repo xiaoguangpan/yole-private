@@ -2,12 +2,12 @@
 
 **Status**: **COMPLETE — 17/17 PASS. Verdict: GO for B1.** Single sitting on 2026-05-18 (session 1). See results.md for the full go/no-go writeup and Open items list. Cursor below points to the start of B1 (T1.1).
 **Purpose**: 2-3 day throwaway prototype to validate that Rust can own Python runner subprocesses with **equivalent latency, throughput, and reliability** compared to the current TypeScript ownership.
-**Gate for**: B1 (Galley Core refactor) — go/no-go based on this experiment.
+**Gate for**: B1 (Yole Core refactor) — go/no-go based on this experiment.
 **Related**:
 - [vision pivot devlog](../../../../docs/devlog/2026-05-15-vision-pivot-to-orchestrator.md) §D13
-- [PRD v0.3](../../../../docs/PRD.md) §10 (Galley Core) + §17 (roadmap)
+- [PRD v0.3](../../../../docs/PRD.md) §10 (Yole Core) + §17 (roadmap)
 - Current TypeScript ownership: [`desktop/src/lib/bridge.ts`](../../../src/lib/bridge.ts), [`desktop/src/lib/ipc-handlers.ts`](../../../src/lib/ipc-handlers.ts)
-- Existing bridge IPC: [`bridge/workbench_bridge.py`](../../../../bridge/workbench_bridge.py), [`docs/ipc-protocol.md`](../../../../docs/ipc-protocol.md)
+- Existing bridge IPC: [`bridge/yole_bridge.py`](../../../../bridge/yole_bridge.py), [`docs/ipc-protocol.md`](../../../../docs/ipc-protocol.md)
 
 ## Why we need this prototype
 
@@ -18,7 +18,7 @@ The current TypeScript ownership relies on `tauri-plugin-shell`. The new ownersh
 - Can Rust read Python stdout line-buffered at the same rate as the current path?
 - Does Tauri event emit add measurable latency vs. direct WebSocket-like channel?
 - Can a Rust-owned child handle reliably broadcast its stdout to multiple subscribers (Tauri event sink + future CLI socket subscriber)?
-- Does the child process clean up correctly on Galley quit / panic?
+- Does the child process clean up correctly on Yole quit / panic?
 
 This prototype answers these in 2-3 days **before** committing 3 months to the refactor.
 
@@ -38,7 +38,7 @@ This experiment is **throwaway**. Code lives in `desktop/src-tauri/experiments/b
 
 ```
                           ┌────────────────────────────┐
-                          │  Galley Tauri process      │
+                          │  Yole Tauri process      │
                           │  (Rust)                    │
                           │                            │
    React (Tauri event) ←──┤  BridgeRegistry            │
@@ -49,7 +49,7 @@ This experiment is **throwaway**. Code lives in `desktop/src-tauri/experiments/b
                                      │ stdin       │ stdout
                                      ▼             ▲
                               ┌──────────────────────┐
-                              │ workbench_bridge.py  │
+                              │ yole_bridge.py  │
                               │ (existing, unchanged)│
                               └──────────────────────┘
 ```
@@ -62,11 +62,11 @@ Each item is **pass / fail / unknown**. All must pass for B1 to start.
 
 ### Lifecycle
 
-- [x] **L1**: Spawn one bridge via `tokio::process::Command` with the existing `bridge/workbench_bridge.py` (no modifications to bridge/ side). Bridge sends `ready` event, Rust captures it. _(2026-05-18 session 1 — 430ms ready latency; results.md)_
+- [x] **L1**: Spawn one bridge via `tokio::process::Command` with the existing `bridge/yole_bridge.py` (no modifications to bridge/ side). Bridge sends `ready` event, Rust captures it. _(2026-05-18 session 1 — 430ms ready latency; results.md)_
 - [x] **L2**: Spawn 3 bridges concurrently. Each independent (separate PIDs, separate stdin/stdout). Verify in Activity Monitor / Task Manager. _(2026-05-18 session 1 — concurrent ready in 340ms, faster than single; results.md)_
 - [x] **L3**: Kill bridge externally (`kill -9 <pid>`). Rust detects exit within 1 second and emits `bridge:exited` event with exit code. _(2026-05-18 session 1 — 3.48ms via tokio Child::wait + SIGCHLD; results.md)_
-- [x] **L4**: Galley app quits cleanly. All bridge children terminate (no orphan processes). Verify `ps aux | grep workbench_bridge` after quit returns nothing. _(2026-05-18 session 1 — `kill_on_drop(true)` reaps child within 2s; results.md)_
-- [x] **L5**: Galley app panics (force a `panic!` in Rust). All bridge children terminate. (Important: Rust drop semantics must propagate to child kill.) _(2026-05-18 session 1 — unwind drops BridgeProcess, kill_on_drop fires; results.md)_
+- [x] **L4**: Yole app quits cleanly. All bridge children terminate (no orphan processes). Verify `ps aux | grep yole_bridge` after quit returns nothing. _(2026-05-18 session 1 — `kill_on_drop(true)` reaps child within 2s; results.md)_
+- [x] **L5**: Yole app panics (force a `panic!` in Rust). All bridge children terminate. (Important: Rust drop semantics must propagate to child kill.) _(2026-05-18 session 1 — unwind drops BridgeProcess, kill_on_drop fires; results.md)_
 
 ### Stdin → Bridge command path
 
@@ -92,7 +92,7 @@ Compare with the current TypeScript path. Run on the same machine, same GA, same
   - Rust ownership: must not be **>50ms slower** than baseline.
 - [x] **P2**: Streaming throughput. Long response (100+ tokens). Time from first to last token. Compare event delivery rate. _(2026-05-18 session 1 — Approach B: Rust-side ~4684 events/sec sustained; strict comparison deferred; results.md)_
   - Must not be **>10% slower** than baseline.
-- [x] **P3**: Memory. Run 3 bridges for 5 minutes. Galley process memory growth must be **<50 MB** beyond baseline (no leak per event broadcast). _(2026-05-18 session 1 — **300s spec-compliant: +0.4 MB; RSS plateaus at ~3150 KB from t+111s for 3+ minutes despite 9003 events** = steady-state, no per-event leak; results.md)_
+- [x] **P3**: Memory. Run 3 bridges for 5 minutes. Yole process memory growth must be **<50 MB** beyond baseline (no leak per event broadcast). _(2026-05-18 session 1 — **300s spec-compliant: +0.4 MB; RSS plateaus at ~3150 KB from t+111s for 3+ minutes despite 9003 events** = steady-state, no per-event leak; results.md)_
 
 ### Stress
 
@@ -196,7 +196,7 @@ tokio::spawn(async move {
 
 // Subscriber 2: Mock CLI subscriber (UnixListener)
 let mut cli_rx = bridge.subscribe();
-let listener = UnixListener::bind("/tmp/galley-experiment.sock")?;
+let listener = UnixListener::bind("/tmp/yole-experiment.sock")?;
 tokio::spawn(async move {
     let (mut stream, _) = listener.accept().await?;
     while let Ok(line) = cli_rx.recv().await {
@@ -215,7 +215,7 @@ PID=$!
 sleep 2
 kill $PID
 sleep 1
-ps aux | grep workbench_bridge | grep -v grep
+ps aux | grep yole_bridge | grep -v grep
 # expect: empty
 
 # P1: latency measurement
@@ -223,7 +223,7 @@ ps aux | grep workbench_bridge | grep -v grep
 
 # S2/S3: dual subscriber sanity
 ./build/bridge-owner-experiment &
-nc -U /tmp/galley-experiment.sock > cli-events.log &
+nc -U /tmp/yole-experiment.sock > cli-events.log &
 # trigger a session run from React side; compare cli-events.log line count vs React-side event count
 ```
 
@@ -273,8 +273,8 @@ If no-go:
   `tests.sh`, `results.md`. Builds clean both with and without
   `--features experiments`.
 - **Done**: L1 PASS, L4 PASS.
-- **Gotcha caught**: pgrep -f workbench_bridge picks up daily-driver
-  `/Applications/Galley.app` children too. Filter `tests.sh` orphan check by
+- **Gotcha caught**: pgrep -f yole_bridge picks up daily-driver
+  `/Applications/Yole.app` children too. Filter `tests.sh` orphan check by
   `--session-id exp_`. Pattern applies to any future prototype/experiment.
 - **Load-bearing invariant**: `preload_rx` inside `BridgeProcess::spawn`. Drop
   it and we race the first `subscribe()` call against the ready event.

@@ -4,7 +4,7 @@
 # Run from genericagent-webui/core (so cargo finds Cargo.toml) OR from
 # genericagent-webui (so the binary's default cwd is right).
 #
-# Each scenario sets cwd to the workbench repo root and points GA_PATH at
+# Each scenario sets cwd to the yole repo root and points GA_PATH at
 # JC's GA checkout. Override via env vars if those defaults are wrong.
 
 set -uo pipefail
@@ -31,7 +31,7 @@ echo
 
 BIN="$CORE_DIR/target/debug/bridge-owner-experiment"
 
-# Run from repo root so Python's `-m runner.workbench_bridge` resolves.
+# Run from repo root so Python's `-m runner.yole_bridge` resolves.
 cd "$REPO_ROOT"
 GA_PATH="$GA_PATH" PYTHON="$PYTHON" "$BIN" "$scenario"
 exit_code=$?
@@ -41,7 +41,7 @@ echo "[runner] scenario $scenario exited with code $exit_code"
 
 # Belt-and-suspenders orphan check (covers L4 even if the binary said PASS).
 # We filter to `--session-id exp_*` so the check ignores any unrelated bridge
-# children (e.g. JC's running /Applications/Galley.app, which we keep alive
+# children (e.g. JC's running /Applications/Yole.app, which we keep alive
 # during refactor per invariant I8).
 echo "[runner] orphan check (exp_* session-ids only)..."
 remaining=$(pgrep -f -- "--session-id exp_" 2>/dev/null || true)

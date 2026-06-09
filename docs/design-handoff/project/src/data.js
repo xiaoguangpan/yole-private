@@ -1,4 +1,4 @@
-// Mock data for GA Workbench screens
+// Mock data for Yole screens
 
 const MOCK_SESSIONS = [
   // PINNED
@@ -16,11 +16,11 @@ const MOCK_SESSIONS = [
   // TODAY
   {
     id: 's-today-1',
-    title: 'Workbench 桌面端 SQLite schema',
+    title: 'Yole 桌面端 SQLite schema',
     status: 'running',
     summary: 'Turn 12 · 正在写 sessions 表迁移脚本',
     currentTool: 'file_patch',
-    project: 'GA Workbench',
+    project: 'Yole',
     bucket: 'today',
     pendingApproval: 1,
     errors: 0,
@@ -42,7 +42,7 @@ const MOCK_SESSIONS = [
     title: '翻译 DESIGN.md 到 EN',
     status: 'waiting_approval',
     summary: 'Turn 9 · 等待 file_write 审批',
-    project: 'GA Workbench',
+    project: 'Yole',
     bucket: 'today',
     pendingApproval: 1,
     errors: 0,
@@ -63,7 +63,7 @@ const MOCK_SESSIONS = [
     title: 'shadcn 组件库选型对比',
     status: 'completed',
     summary: 'Turn 6 · 推荐 shadcn + Radix',
-    project: 'GA Workbench',
+    project: 'Yole',
     bucket: 'week',
     pendingApproval: 0,
     errors: 0,
@@ -73,7 +73,7 @@ const MOCK_SESSIONS = [
     title: '修复 bridge 子进程 zombie',
     status: 'error',
     summary: 'Turn 5 · subprocess.kill() 抛 ProcessLookupError',
-    project: 'GA Workbench',
+    project: 'Yole',
     bucket: 'week',
     pendingApproval: 0,
     errors: 1,
@@ -104,7 +104,7 @@ const MOCK_SESSIONS = [
     title: 'Phosphor icons 集成 POC',
     status: 'archived',
     summary: 'Turn 4 · 通过',
-    project: 'GA Workbench',
+    project: 'Yole',
     bucket: 'earlier',
     pendingApproval: 0,
     errors: 0,
@@ -114,9 +114,9 @@ const MOCK_SESSIONS = [
 // The currently selected session's full conversation
 const MOCK_CONVERSATION = {
   sessionId: 's-today-1',
-  title: 'Workbench 桌面端 SQLite schema',
+  title: 'Yole 桌面端 SQLite schema',
   llm: 'Claude Sonnet 4.5',
-  cwd: '~/Code/ga-workbench',
+  cwd: '~/Code/ga-yole',
   pid: 48213,
   turns: [
     {
@@ -180,7 +180,7 @@ const MOCK_PATCH = {
     { n: null, text: '', kind: 'empty' },
   ],
   newLines: [
-    { n: 1,  text: '-- 001_init.sql · GA Workbench v0.1', kind: 'add' },
+    { n: 1,  text: '-- 001_init.sql · Yole v0.1', kind: 'add' },
     { n: 2,  text: '-- Created by GA agent · 2026-05-08', kind: 'add' },
     { n: 3,  text: '', kind: 'add' },
     { n: 4,  text: 'CREATE TABLE projects (', kind: 'add' },

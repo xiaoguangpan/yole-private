@@ -42,9 +42,9 @@ default endpoint was renamed to `updates/stable/latest.json`, and
 
 ## Verification
 
-- `cargo test -p galley-core codex_probe_payload`
+- `cargo test -p yole-core codex_probe_payload`
 - `cargo check --workspace`
-- `.venv/bin/python -m pytest runner/tests/test_workbench_bridge.py`
+- `.venv/bin/python -m pytest runner/tests/test_yole_bridge.py`
 - `.venv/bin/python -m mypy runner/managed_runtime.py`
 - `pnpm --dir gui typecheck`
 - `pnpm --dir gui lint`
@@ -57,7 +57,7 @@ default endpoint was renamed to `updates/stable/latest.json`, and
   `scripts/check-update-channel.mjs --cache-bust` confirmed version `0.2.5` for
   macOS Apple Silicon, macOS Intel, and Windows x64.
 - Endpoint rename: stable and legacy beta manifests both verify as `0.2.5`;
-  `GALLEY_UPDATER_ENDPOINT` now points at `updates/stable/latest.json`.
+  `YOLE_UPDATER_ENDPOINT` now points at `updates/stable/latest.json`.
 
 ## Rejected alternatives
 

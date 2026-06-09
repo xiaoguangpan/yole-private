@@ -1,4 +1,4 @@
-//! Integration tests for [`galley_core_lib::socket_listener`].
+//! Integration tests for [`yole_core_lib::socket_listener`].
 //!
 //! These tests start the listener against a temp socket path + connect a
 //! tokio client, verifying the NDJSON protocol end-to-end.
@@ -6,7 +6,7 @@
 //! ## Why not use the real `start()` entry point
 //!
 //! `start()` uses [`socket_path()`] which is process-wide (one Unix socket
-//! per UID). Running these tests would conflict with a real Galley Core
+//! per UID). Running these tests would conflict with a real Yole Core
 //! instance on the developer's machine. Instead we spin up a private
 //! listener bound to a tempdir-relative path and exercise the same
 //! dispatch loop through that listener.
@@ -21,7 +21,7 @@
 
 #![cfg(unix)]
 
-use galley_core_lib::socket_listener::{SocketResponse, SCHEMA_VERSION};
+use yole_core_lib::socket_listener::{SocketResponse, SCHEMA_VERSION};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::Duration;

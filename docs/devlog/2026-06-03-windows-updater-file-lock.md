@@ -17,38 +17,38 @@ When they downloaded the new installer manually and installed over the existing
 app, NSIS failed while writing:
 
 ```text
-d:\Users\Qw\AppData\Local\Galley\python\DLLs\_bz2.pyd
+d:\Users\Qw\AppData\Local\Yole\python\DLLs\_bz2.pyd
 ```
 
-The file lives inside Galley's bundled Python runtime. On Windows, DLL / `.pyd`
+The file lives inside Yole's bundled Python runtime. On Windows, DLL / `.pyd`
 files loaded by a running process cannot be overwritten. The likely lock holder
-is the old Galley process hidden in the tray, or a Galley-owned bundled-Python
+is the old Yole process hidden in the tray, or a Yole-owned bundled-Python
 child process such as a runner bridge or IM supervisor.
 
 ## Decision
 
 Treat this as a lifecycle bug, not as an installer instruction problem. Users
-should not have to find Galley in the system tray or kill Python processes in
+should not have to find Yole in the system tray or kill Python processes in
 Task Manager before updating.
 
 ## Changes
 
 - Split app update installation into download and install phases.
 - After the update package is downloaded and signature-verified, stop all
-  Galley-owned IM supervisor processes and runner bridge processes before
+  Yole-owned IM supervisor processes and runner bridge processes before
   calling `Update::install`.
 - Add an NSIS `NSIS_HOOK_PREINSTALL` hook for manual installer runs. Before
   copying files, it attempts to stop:
-  - `Galley.exe` whose executable path is under `$INSTDIR`.
+  - `Yole.exe` whose executable path is under `$INSTDIR`.
   - `python.exe` whose executable path is under `$INSTDIR\python`.
 - Keep the hook scoped to the install directory so it does not kill unrelated
   user Python processes.
 
 ## User Impact
 
-- In-app Windows updates should no longer get stuck because Galley's bundled
+- In-app Windows updates should no longer get stuck because Yole's bundled
   Python files are locked by its own child processes.
-- Manual overwrite installs should stop the old background Galley process before
+- Manual overwrite installs should stop the old background Yole process before
   file copy, avoiding the `_bz2.pyd` write dialog in the common case.
 
 ## Verification

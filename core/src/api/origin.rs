@@ -1,16 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-/// How a session command was triggered. Per PRD §8.3 — Galley records
+/// How a session command was triggered. Per PRD §8.3 — Yole records
 /// this on every write so audit logs can distinguish human and agent
 /// actions even after the fact.
 ///
 /// Wire-level mapping (matches `messages.created_via` / `sessions.created_via`
 /// SQL CHECK constraint in migrations 006/007):
 ///   - Gui        → user clicked Composer / used GUI controls
-///   - Cli        → an agent invoked `galley` CLI
+///   - Cli        → an agent invoked `yole` CLI
 ///   - Supervisor → a Supervisor SOP / agent acted through the socket
 ///     transport with an attached supervisor label
-///   - System     → Galley itself injected the message (e.g. /btw replies,
+///   - System     → Yole itself injected the message (e.g. /btw replies,
 ///     system-level notifications)
 ///
 /// B1 used a narrower {Manual, Cli} pair; B2 M5 widens it to match the
@@ -22,11 +22,11 @@ use serde::{Deserialize, Serialize};
 pub enum OriginVia {
     /// Human-triggered through the GUI.
     Gui,
-    /// Agent-triggered through `galley` CLI.
+    /// Agent-triggered through `yole` CLI.
     Cli,
     /// Supervisor SOP / external agent through the socket transport.
     Supervisor,
-    /// Galley itself (system messages, /btw replies, etc.).
+    /// Yole itself (system messages, /btw replies, etc.).
     System,
 }
 

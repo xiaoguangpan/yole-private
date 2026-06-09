@@ -7,21 +7,25 @@ import {
   ArrowsOutLineHorizontal,
   CaretDown,
   Cat,
+  Check,
   ChatCircleText,
   CircleNotch,
+  Copy,
   Gear,
   Lightning,
   PencilSimple,
   PuzzlePiece,
+  QrCode,
   Warning,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { Button, IconButton } from "@/components/ui/button";
 import { ThemePreferenceMenu } from "@/components/theme/ThemePreferenceMenu";
 import { TooltipLabel } from "@/components/ui/tooltip";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { useCopy } from "@/lib/i18n";
 import { isMac, isWindowActionTarget } from "@/lib/platform";
 import { formatShortcutReadable } from "@/lib/shortcuts";
@@ -29,6 +33,7 @@ import type { ResolvedTheme, ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import type { BrowserControlStatus } from "@/lib/browser-control";
 import type { ImSupervisorState } from "@/lib/im-supervisor";
+import type { YoleAccountStatus } from "@/lib/managed-models";
 
 import { WindowControls } from "./WindowControls";
 
@@ -56,6 +61,9 @@ export interface TopBarProps {
   channelsState?: ImSupervisorState | null;
   channelsLoadError?: string | null;
   onOpenChannelsSettings?: () => void;
+  yoleAccount?: YoleAccountStatus | null;
+  yoleAccountLoading?: boolean;
+  onRefreshYoleAccount?: () => void;
   /**
    * Conversation column width mode. "compact" = 760px (default), "wide"
    * = 1400px. Renders an icon button next to Settings that flips
@@ -160,6 +168,9 @@ export function TopBar({
   channelsState = null,
   channelsLoadError = null,
   onOpenChannelsSettings,
+  yoleAccount = null,
+  yoleAccountLoading = false,
+  onRefreshYoleAccount,
   conversationWidth = "compact",
   onToggleConversationWidth,
   themePreference = "system",
@@ -278,6 +289,13 @@ export function TopBar({
               onOpen={onOpenChannelsSettings}
             />
           )}
+          {yoleAccount && (
+            <YoleBalanceIndicator
+              account={yoleAccount}
+              loading={yoleAccountLoading}
+              onRefresh={onRefreshYoleAccount}
+            />
+          )}
           {onChangeThemePreference && (
             <ThemePreferenceMenu
               preference={themePreference}
@@ -338,6 +356,184 @@ function ChannelsIndicator({
       <ChatCircleText size={16} weight="thin" />
     </IconButton>
   );
+}
+
+function YoleBalanceIndicator({
+  account,
+  loading,
+  onRefresh,
+}: {
+  account: YoleAccountStatus;
+  loading?: boolean;
+  onRefresh?: () => void;
+}) {
+  const [copied, setCopied] = useState<"support" | "wechat" | null>(null);
+  const wechatId = account.contact.wechatId?.trim();
+  const qrUrl = account.contact.wechatQrUrl?.trim();
+  const overseas = account.contact.overseas?.trim();
+
+  const copyValue = (kind: "support" | "wechat", value: string) => {
+    void copyTextToClipboard(value).then(() => {
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1400);
+    });
+  };
+
+  return (
+    <Popover.Root
+      onOpenChange={(open) => {
+        if (open) onRefresh?.();
+      }}
+    >
+      <TooltipLabel text="AI 余额" side="bottom">
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px]",
+              "transition-[background-color,border-color,color,transform] duration-[120ms]",
+              "active:translate-y-[0.5px]",
+              account.lowBalance
+                ? "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25"
+                : "border-line bg-elevated text-ink-soft hover:bg-hover hover:text-ink",
+            )}
+            aria-label={`AI 余额 ${formatUSD(account.balanceUsd)}`}
+          >
+            {loading ? (
+              <CircleNotch size={13} weight="thin" className="spin" />
+            ) : account.lowBalance ? (
+              <Warning size={13} weight="thin" />
+            ) : (
+              <span className="text-[13px] leading-none">$</span>
+            )}
+            <span>{formatUSD(account.balanceUsd)}</span>
+          </button>
+        </Popover.Trigger>
+      </TooltipLabel>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={8}
+          className={cn(
+            "z-50 w-[300px] rounded-md border border-line bg-elevated p-4 shadow-elevated",
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[12px] text-ink-muted">AI 余额</div>
+              <div className="mt-0.5 text-[22px] font-semibold leading-none text-ink">
+                {formatUSD(account.balanceUsd)}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {account.lowBalance && (
+                <span className="rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                  余额较低
+                </span>
+              )}
+              {onRefresh && (
+                <TooltipLabel
+                  text={loading ? "正在刷新余额" : "刷新余额"}
+                  side="top"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onRefresh()}
+                    disabled={loading}
+                    className={cn(
+                      "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted",
+                      "hover:bg-hover hover:text-ink disabled:cursor-default disabled:opacity-60",
+                    )}
+                    aria-label="刷新余额"
+                  >
+                    <ArrowsClockwise
+                      size={13}
+                      weight="thin"
+                      className={cn(loading && "spin")}
+                    />
+                  </button>
+                </TooltipLabel>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2 text-[12px]">
+            <YoleAccountRow label="支持ID" value={account.supportId}>
+              <button
+                type="button"
+                onClick={() => copyValue("support", account.supportId)}
+                className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+                aria-label="复制支持ID"
+              >
+                {copied === "support" ? (
+                  <Check size={13} weight="thin" />
+                ) : (
+                  <Copy size={13} weight="thin" />
+                )}
+              </button>
+            </YoleAccountRow>
+            <YoleAccountRow label="账号" value={account.username} />
+            {wechatId && (
+              <YoleAccountRow label="微信号" value={wechatId}>
+                <button
+                  type="button"
+                  onClick={() => copyValue("wechat", wechatId)}
+                  className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+                  aria-label="复制微信号"
+                >
+                  {copied === "wechat" ? (
+                    <Check size={13} weight="thin" />
+                  ) : (
+                    <Copy size={13} weight="thin" />
+                  )}
+                </button>
+              </YoleAccountRow>
+            )}
+            {overseas && <YoleAccountRow label="海外" value={overseas} />}
+          </div>
+
+          {qrUrl && (
+            <div className="mt-3 rounded-sm border border-line bg-app p-2">
+              <div className="mb-2 flex items-center gap-1.5 text-[11.5px] text-ink-muted">
+                <QrCode size={13} weight="thin" />
+                微信客服二维码
+              </div>
+              <img
+                src={qrUrl}
+                alt="微信客服二维码"
+                className="mx-auto size-32 rounded-sm object-contain"
+              />
+            </div>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function YoleAccountRow({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <div className="text-[11px] text-ink-muted">{label}</div>
+        <div className="truncate font-medium text-ink">{value}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function formatUSD(value: number): string {
+  if (!Number.isFinite(value)) return "$0.00";
+  return `$${value.toFixed(2)}`;
 }
 
 function channelsTopbarStatus(

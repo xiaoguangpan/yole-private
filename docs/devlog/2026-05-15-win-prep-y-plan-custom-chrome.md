@@ -11,7 +11,7 @@
 
 5 月 15 日已完成 Stage 3.7（[onboarding + empty state + YOLO + button polish](./2026-05-15-onboarding-empty-state-yolo-button-polish.md)），那次决定 **v0.1 Mac-only 发版**、v0.2 才上 Win。当时列了一份 Mac 侧 prep 清单（6 项 ~3 h）推到下次 session 做。今天的目标就是把这份清单清完。
 
-清单逐项过到第 6 项「窗口装饰 OS 条件化」时，JC 反问"红绿灯怎么办"——这一项才发现严重低估：Win 没原生红绿灯，自绘 chrome 跟回退原生 chrome 是两条完全不同的路径，前者要 4-10 h（含 / 不含 Snap Layouts），后者只要 30-45 min。讨论清楚两条路的代价之后 JC 选了 Y（"Galley 准备走精致工作台定位"），但 Snap Layouts 跳过。Y 计划接下来作为本 session 的主线，A 项作为收尾。
+清单逐项过到第 6 项「窗口装饰 OS 条件化」时，JC 反问"红绿灯怎么办"——这一项才发现严重低估：Win 没原生红绿灯，自绘 chrome 跟回退原生 chrome 是两条完全不同的路径，前者要 4-10 h（含 / 不含 Snap Layouts），后者只要 30-45 min。讨论清楚两条路的代价之后 JC 选了 Y（"Yole 准备走精致工作台定位"），但 Snap Layouts 跳过。Y 计划接下来作为本 session 的主线，A 项作为收尾。
 
 ## Decisions
 
@@ -19,7 +19,7 @@
 
 - **Y vs X**：方案 X = Win 用原生标题栏 + 改 TopBar 不预留红绿灯空间，30-45 min；方案 Y = `decorations: false` + 自绘 min/max/close + 阴影 + 圆角 + 拖拽 + 失焦状态，4-6 h。
 - **Snap Layouts** （Win 11 最大化按钮 hover 弹出多窗口布局选择器）：跳过。实现要在 Rust 写 `WM_NCHITTEST` 把 HTMAXBUTTON 命中区还给系统，约 50-100 行 + 容易跟 React hover 状态打架。Win 11 用户失去这个特性但有 Win+Arrow 兜底。**Why**: v0.2 阶段先把跨平台跑通比像素级 Win 11 还原更要紧。
-- **为什么不走 X**：Galley 主张「精致工作台」品牌定位，Win 用户开 Galley 应该跟 Mac 用户看到的窗口形状一致——一条原生灰条 + 自定义 TopBar 上下叠加视觉破坏感太强（或者去掉装饰但右上角 Win 控件盖住 TopBar 右 cluster）。
+- **为什么不走 X**：Yole 主张「精致工作台」品牌定位，Win 用户开 Yole 应该跟 Mac 用户看到的窗口形状一致——一条原生灰条 + 自定义 TopBar 上下叠加视觉破坏感太强（或者去掉装饰但右上角 Win 控件盖住 TopBar 右 cluster）。
 
 ### 2 · Y 计划 5 个 substep + Mac 安全三层
 
@@ -64,11 +64,11 @@
 
 ## Rejected alternatives
 
-- **方案 X · 保留 Win 原生 chrome**：30 min 就能 ship，但跟 Galley「精致工作台」定位冲突。如果 v0.2 Win 用户反馈"窗口 chrome 不一致很难受"会重新评估。
+- **方案 X · 保留 Win 原生 chrome**：30 min 就能 ship，但跟 Yole「精致工作台」定位冲突。如果 v0.2 Win 用户反馈"窗口 chrome 不一致很难受"会重新评估。
 - **Snap Layouts 现在做**：4 h + Rust/React 边界 regression 风险。等 Win 11 dogfood 实际反馈再说。
 - **`@tauri-apps/plugin-os` 而非 UA sniff**：方案过重（npm + Rust crate + permission + async）。UA 是同步 + 零成本 + 等价正确。
 - **`window-shadows` 0.2.2**：可能能用但不是 v2 优先支持。选 v2 fork。
-- **literal Win 11 #c42b1c 红色**：自绘 close 按钮的 hover 红用了 Galley `bg-danger` 而不是 Win 11 字面 hex。**Why**: 保持 chrome 在 DESIGN.md token 系统内，避免一次性 magic color；用户读到 "destructive 按钮被 hover" 的语义是对的，即使具体红跟 Win 11 略差。
+- **literal Win 11 #c42b1c 红色**：自绘 close 按钮的 hover 红用了 Yole `bg-danger` 而不是 Win 11 字面 hex。**Why**: 保持 chrome 在 DESIGN.md token 系统内，避免一次性 magic color；用户读到 "destructive 按钮被 hover" 的语义是对的，即使具体红跟 Win 11 略差。
 - **自绘 restore icon（Win 11 双叠方块）**：Phosphor 没完全对应的 glyph。用 `CopySimple`（两个重叠 rect）近似。如果 Win 机实测显示读不出 "restore" 含义，再换 inline SVG。
 - **`%USERPROFILE%\Documents\GenericAgent` 作 Win 路径示例**：env var 在文本输入框里不展开，用户照抄过去路径不存在。选 `C:\Users\你的名字\Documents\GenericAgent` 一眼看出来「你的名字」是占位符。
 - **demo.ts fixture 也 OS-aware**：fixture 在 prod 被 prefs 覆盖，触发不到。不动，避免改动面扩大。

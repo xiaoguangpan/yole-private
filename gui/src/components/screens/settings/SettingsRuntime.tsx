@@ -56,6 +56,7 @@ export function SettingsRuntime({
   activeRuntimeKind,
   hasManagedRuntimeConfigured,
   hasExternalRuntimeConfigured,
+  simplifiedUi = false,
   useExternalPython,
   onChangeGAPath,
   onChangeBridgePython,
@@ -137,34 +138,37 @@ export function SettingsRuntime({
         hasManagedRuntimeConfigured={hasManagedRuntimeConfigured}
         hasRunningSessions={hasRunningSessions}
         highlighted={highlightedRuntimeKind === "managed"}
+        simplifiedUi={simplifiedUi}
         onOpenModels={onOpenModels}
         onActivate={() => activateRuntimeKind("managed")}
       />
 
-      <AdvancedRuntimeSettings
-        expanded={externalExpanded}
-        value={activeRuntimeKind}
-        hasExternalRuntimeConfigured={hasExternalRuntimeConfigured}
-        hasRunningSessions={hasRunningSessions}
-        highlighted={highlightedRuntimeKind === "external"}
-        managedDiagnosticsSlot={
-          activeRuntimeKind === "managed" ? (
-            <ManagedRuntimeCard diagnostics={info.managedRuntime} />
-          ) : undefined
-        }
-        onOpenSetupAssistant={onOpenSetupAssistant}
-        onToggleExpanded={() => setExternalExpanded((current) => !current)}
-        onActivate={() => activateRuntimeKind("external")}
-      >
-        {externalRuntimeDetails}
-      </AdvancedRuntimeSettings>
+      {!simplifiedUi && (
+        <AdvancedRuntimeSettings
+          expanded={externalExpanded}
+          value={activeRuntimeKind}
+          hasExternalRuntimeConfigured={hasExternalRuntimeConfigured}
+          hasRunningSessions={hasRunningSessions}
+          highlighted={highlightedRuntimeKind === "external"}
+          managedDiagnosticsSlot={
+            activeRuntimeKind === "managed" ? (
+              <ManagedRuntimeCard diagnostics={info.managedRuntime} />
+            ) : undefined
+          }
+          onOpenSetupAssistant={onOpenSetupAssistant}
+          onToggleExpanded={() => setExternalExpanded((current) => !current)}
+          onActivate={() => activateRuntimeKind("external")}
+        >
+          {externalRuntimeDetails}
+        </AdvancedRuntimeSettings>
+      )}
 
       <div className="border-t border-line pt-4">
         <SettingsUpdateControl
           hasRunningSessions={hasRunningSessions}
           leading={
             <div className="font-mono text-[11px] text-ink-muted">
-              Galley v{info.workbenchVersion}
+              Yole v{info.yoleVersion}
             </div>
           }
         />
@@ -179,7 +183,7 @@ export function SettingsRuntime({
  * Python interpreter panel. Two visual modes:
  *
  *   - **Bundled (default, v0.1.1+)**: read-only card showing
- *     "Galley 内置 Python <version>". Galley ships its own CPython
+ *     "Yole 内置 Python <version>". Yole ships its own CPython
  *     with GA deps pre-staged via scripts/bundle-python.sh, so the
  *     user doesn't pick anything. A small "使用外部 Python…" toggle
  *     under the card reveals the legacy picker for advanced users
@@ -188,7 +192,7 @@ export function SettingsRuntime({
  *   - **External**: a read-only PathField mirrors the
  *     python-probe-selected path the way it did pre-v0.1.1. Same
  *     "Re-run Health Check" button below (in the parent) re-triggers
- *     the probe. A "改回 Galley 内置 Python" toggle returns to
+ *     the probe. A "改回 Yole 内置 Python" toggle returns to
  *     bundled mode.
  *
  * Toggle hands off to the parent via `onToggle(bool)` — caller

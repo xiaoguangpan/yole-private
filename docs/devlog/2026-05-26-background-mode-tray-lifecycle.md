@@ -10,7 +10,7 @@ Related: `core/src/lib.rs`, `core/src/runner_manager/manager.rs`,
 
 ## Context
 
-Galley often runs long Agent tasks or acts as the local endpoint for an
+Yole often runs long Agent tasks or acts as the local endpoint for an
 external Supervisor / IM frontend. In that shape, closing the desktop window
 should not silently tear down the local runtime. The previous desktop behavior
 treated app lifecycle like an ordinary document app; that is wrong for a local
@@ -20,16 +20,16 @@ agent orchestrator.
 
 - Background Mode is default on. There is no first-version setting because the
   user-facing goal is reliability, not preference management.
-- Closing the main window hides it. It does not quit Galley Core.
-- True quit is explicit through `Quit Galley`.
+- Closing the main window hides it. It does not quit Yole Core.
+- True quit is explicit through `Quit Yole`.
 - macOS keeps the Dock icon for now and also shows a right-side menu bar status
   item.
 - Because the Dock icon remains visible, clicking it after the main window was
   hidden must restore and focus the window. Users should not have to notice the
   menu bar status item, especially on notched MacBook displays.
 - Windows uses the system tray for the same open / hide / quit path.
-- The tray / status item first action is dynamic: `Open Galley` when hidden,
-  `Hide Galley` when visible.
+- The tray / status item first action is dynamic: `Open Yole` when hidden,
+  `Hide Yole` when visible.
 - Tray click behavior is platform-specific: macOS keeps left click as the menu
   action and treats right click as an auxiliary restore/focus action; Windows
   uses left click to open/hide the main window and right click for the tray

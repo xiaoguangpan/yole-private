@@ -1,6 +1,6 @@
 -- 012_managed_model_local_secrets.sql · unsigned-beta local credential store
 --
--- Unsigned beta builds store managed model API keys in Galley's SQLite DB as
+-- Unsigned beta builds store managed model API keys in Yole's SQLite DB as
 -- encrypted payloads. The key row lives in the same DB so backups and machine
 -- moves carry model credentials with the rest of the managed model config.
 -- This is a UX-first beta tradeoff, not OS credential-store strength.

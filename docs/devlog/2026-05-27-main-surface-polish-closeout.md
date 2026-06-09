@@ -9,7 +9,7 @@
 After Browser Control shipped as a managed-GA completion item, the main surface
 needed a second pass. The first pass made core capabilities visible; dogfood
 then exposed a different problem: once a capability is configured, the chrome
-should become quiet again. Galley also had a few small but visible jumps in
+should become quiet again. Yole also had a few small but visible jumps in
 conversation rendering and sidebar rhythm that made the app feel less settled
 than the underlying behavior.
 
@@ -29,7 +29,7 @@ than the underlying behavior.
 - Diagnostic and setup text blocks should remain selectable. Users need to copy
   paths, errors, and permission messages; preventing selection makes repair
   flows feel broken.
-- Product naming is sentence-case `Galley` across UI, docs, comments, and
+- Product naming is sentence-case `Yole` across UI, docs, comments, and
   commit messages. The earlier all-caps wordmark made the sidebar feel heavier
   than the rest of the interface and created a second naming convention without
   enough benefit.
@@ -44,7 +44,7 @@ than the underlying behavior.
   needed.
 - **Add a separate Supervisor modal** — heavier than the job. The user's next
   action is to copy the SOP, and Settings -> Agent already owns that content.
-- **Preserve the all-caps `GALLEY` wordmark** — distinctive, but too loud in the
+- **Preserve the all-caps `YOLE` wordmark** — distinctive, but too loud in the
   current sidebar scale and inconsistent with the naming rules elsewhere.
 - **Use explanatory text to justify every small control** — rejected in favor of
   quiet icons, tooltips, and stable placement. Main chrome should guide without
@@ -63,7 +63,7 @@ than the underlying behavior.
 ## Open Questions
 
 - Whether the managed-mode Supervisor entry should eventually show readiness
-  state after Galley can observe external agents actually using the SOP.
+  state after Yole can observe external agents actually using the SOP.
 - Whether the sidebar product mark wants a custom drawn wordmark later, once
   the app has enough brand surface to justify it.
 

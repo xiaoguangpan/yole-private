@@ -130,7 +130,7 @@ User 问：mykey.py 改了 LLM 配置怎么告诉用户重启生效？
 
 ```
 ─────────────────────
-修改 mykey.py 后重启 Workbench 生效
+修改 mykey.py 后重启 Yole 生效
 ```
 
 放在 LLM picker popover 底部，10.5px ink-muted/70 极轻样式。理由：context-of-need 比 discoverability nudging 重要——用户打开 dropdown 时正是「找模型」的时机，hint 在那里出现最自然。Zero memorization required；不需要 user 主动去 Settings 找。

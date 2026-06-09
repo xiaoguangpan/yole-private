@@ -2,12 +2,12 @@
 
 **Date:** 2026-05-27  
 **Status:** Implemented  
-**Related:** `cli/src/main.rs`, `docs/agent-api.md`, `docs/integrations/galley-supervisor-sop.md`
+**Related:** `cli/src/main.rs`, `docs/agent-api.md`, `docs/integrations/yole-supervisor-sop.md`
 
 ## Context
 
 Supervisor agents need a reliable way to split one complex user goal into
-several Galley sessions, watch progress, and synthesize the results. Galley
+several Yole sessions, watch progress, and synthesize the results. Yole
 already has Projects, so adding a separate Task Group concept would create
 product vocabulary before dogfood proves it is needed.
 

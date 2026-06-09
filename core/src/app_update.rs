@@ -64,7 +64,7 @@ pub async fn install_app_update<R: Runtime>(
         .await
         .map_err(|e| format_update_error_for_phase("download", e))?;
 
-    stop_galley_child_processes(&app).await;
+    stop_yole_child_processes(&app).await;
 
     update
         .install(bytes)
@@ -73,7 +73,7 @@ pub async fn install_app_update<R: Runtime>(
     Ok(result)
 }
 
-async fn stop_galley_child_processes<R: Runtime>(app: &AppHandle<R>) {
+async fn stop_yole_child_processes<R: Runtime>(app: &AppHandle<R>) {
     if let Some(im_manager) =
         app.try_state::<std::sync::Arc<crate::im_supervisor::ImSupervisorManager>>()
     {
@@ -111,10 +111,10 @@ fn updater_configured() -> bool {
 }
 
 fn updater_inputs() -> Option<(&'static str, &'static str)> {
-    let pubkey = option_env!("GALLEY_UPDATER_PUBKEY")
+    let pubkey = option_env!("YOLE_UPDATER_PUBKEY")
         .map(str::trim)
         .filter(|s| !s.is_empty())?;
-    let endpoint = option_env!("GALLEY_UPDATER_ENDPOINT")
+    let endpoint = option_env!("YOLE_UPDATER_ENDPOINT")
         .map(str::trim)
         .filter(|s| !s.is_empty())?;
     Some((pubkey, endpoint))

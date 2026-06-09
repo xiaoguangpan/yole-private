@@ -21,7 +21,7 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             // -------- Build tray menu (T1-T4) --------
-            let show = MenuItem::with_id(app, "show", "Show Galley", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show Yole", true, None::<&str>)?;
             let status = MenuItem::with_id(
                 app,
                 "status",
@@ -30,7 +30,7 @@ fn main() {
                 None::<&str>,
             )?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit Galley", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit Yole", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &status, &separator, &quit])?;
 
             let _tray = TrayIconBuilder::new()

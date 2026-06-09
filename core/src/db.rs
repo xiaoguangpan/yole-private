@@ -1,6 +1,6 @@
-//! SQLite-backed implementation of [`GalleyApi`].
+//! SQLite-backed implementation of [`YoleApi`].
 //!
-//! Connection pool is held inside [`SqliteGalley`] which is `Clone`able
+//! Connection pool is held inside [`SqliteYole`] which is `Clone`able
 //! (the inner `sqlx::SqlitePool` is `Arc`-shared). Tauri commands grab
 //! a handle from app state and `await` reads concurrently. The pool
 //! sits on `sqlx` 0.8 — the same version `tauri-plugin-sql` already
@@ -9,9 +9,9 @@
 //! tokenizer available on the same flags the GUI's writes use).
 //!
 //! **Path resolution.** The DB file lives in the same directory where
-//! `tauri-plugin-sql` resolves `sqlite:workbench.db`: Tauri's
-//! app-config directory under the identifier `app.galley`. [`db_path`]
-//! reproduces that lookup without an `AppHandle` so the Galley CLI
+//! `tauri-plugin-sql` resolves `sqlite:yole.db`: Tauri's
+//! app-config directory under the identifier `app.yole`. [`db_path`]
+//! reproduces that lookup without an `AppHandle` so the Yole CLI
 //! binary can find the same DB. **Identifier change == data move** — see
 //! [desktop runtime](../../docs/desktop-runtime.md#tauri-identifier).
 
@@ -23,24 +23,24 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
 use crate::api::{
-    CreateProjectInput, CreateSessionInput, GalleyApi, HealthCheck, HealthReport, HealthStatus,
+    CreateProjectInput, CreateSessionInput, YoleApi, HealthCheck, HealthReport, HealthStatus,
     ManagedModelAuthKind, ManagedModelCredentialStatus, ManagedModelProtocol,
     ManagedModelProviderRecord, ManagedModelRecord, MessageBrief, MessageId, MessageRole, Origin,
     OriginVia, ProjectBrief, ProjectId, ProjectPatch, RuntimeKind, SearchHit, SearchScope,
     SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
 };
 use crate::app_paths;
-use crate::error::{GalleyError, Result};
+use crate::error::{YoleError, Result};
 use crate::managed_runtime;
 
-/// Resolve the absolute path of Galley's SQLite database file. Works
+/// Resolve the absolute path of Yole's SQLite database file. Works
 /// both inside a Tauri process (no `AppHandle` needed) and inside the
 /// CLI binary. Returns `None` if the platform's config directory
 /// can't be determined (very rare — would mean `$HOME` / `%APPDATA%`
 /// are both unset).
 ///
-/// **Override.** `GALLEY_DB_PATH` env var, when set, takes precedence
-/// — Galley uses that exact file path. Intended for CLI integration
+/// **Override.** `YOLE_DB_PATH` env var, when set, takes precedence
+/// — Yole uses that exact file path. Intended for CLI integration
 /// tests (point at a fixture) and advanced agent SOPs that want to
 /// read from a snapshot. The Tauri GUI process inherits the user's
 /// env so setting it for an interactive session works too.
@@ -48,22 +48,22 @@ pub fn db_path() -> Option<PathBuf> {
     app_paths::db_path()
 }
 
-/// SQLite-backed Galley Core. Cheap to clone (pool internally is
+/// SQLite-backed Yole Core. Cheap to clone (pool internally is
 /// `Arc<sqlx::PoolInner>`).
 #[derive(Clone)]
-pub struct SqliteGalley {
+pub struct SqliteYole {
     pool: SqlitePool,
 }
 
-impl SqliteGalley {
+impl SqliteYole {
     /// Open a pool against the resolved [`db_path`]. Fails with
     /// `DbUnavailable` when the file is missing or unopenable —
     /// indicates the GUI has never run on this machine. CLI callers
-    /// should surface a "Galley hasn't been initialized" message rather
+    /// should surface a "Yole hasn't been initialized" message rather
     /// than auto-creating an empty schema (which would mask a
     /// configuration mistake).
     pub async fn open() -> Result<Self> {
-        let path = db_path().ok_or_else(|| GalleyError::DbUnavailable {
+        let path = db_path().ok_or_else(|| YoleError::DbUnavailable {
             message: "platform app config directory unavailable".into(),
         })?;
         let opts = SqliteConnectOptions::new()
@@ -77,7 +77,7 @@ impl SqliteGalley {
             .max_connections(4)
             .connect_with(opts)
             .await
-            .map_err(|e| GalleyError::DbUnavailable {
+            .map_err(|e| YoleError::DbUnavailable {
                 message: format!("opening {}: {e}", path.display()),
             })?;
         Ok(Self { pool })
@@ -191,7 +191,7 @@ impl SqliteGalley {
     pub async fn set_pref_json(&self, key: &str, value: serde_json::Value) -> Result<()> {
         let key = key.trim();
         if key.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "set_pref_json: key must not be empty".into(),
             });
         }
@@ -331,7 +331,7 @@ impl SqliteGalley {
             match res {
                 Ok(rows) => return Ok(rows),
                 Err(e) => {
-                    eprintln!("[galley-core] GUI FTS5 search failed, falling back: {e}");
+                    eprintln!("[yole-core] GUI FTS5 search failed, falling back: {e}");
                 }
             }
         }
@@ -589,19 +589,19 @@ impl SqliteGalley {
     ) -> Result<ManagedModelProviderRecord> {
         let id = record.id.trim();
         if id.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed provider id must not be empty".into(),
             });
         }
         let display_name = record.display_name.trim();
         if display_name.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed provider displayName must not be empty".into(),
             });
         }
         let api_base = record.api_base.trim();
         if api_base.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed provider Base URL must not be empty".into(),
             });
         }
@@ -639,7 +639,7 @@ impl SqliteGalley {
     pub async fn delete_managed_model_provider_metadata(&self, id: &str) -> Result<Option<String>> {
         let trimmed = id.trim();
         if trimmed.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed provider id must not be empty".into(),
             });
         }
@@ -684,25 +684,25 @@ impl SqliteGalley {
     ) -> Result<ManagedModelRecord> {
         let id = record.id.trim();
         if id.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model id must not be empty".into(),
             });
         }
         let provider_id = record.provider_id.trim();
         if provider_id.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model providerId must not be empty".into(),
             });
         }
         let display_name = record.display_name.trim();
         if display_name.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model displayName must not be empty".into(),
             });
         }
         let model = record.model.trim();
         if model.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model name must not be empty".into(),
             });
         }
@@ -714,7 +714,7 @@ impl SqliteGalley {
                 .await
                 .map_err(map_sqlx_err)?;
         if provider_exists == 0 {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: format!("managed model provider {provider_id} not found"),
             });
         }
@@ -804,7 +804,7 @@ impl SqliteGalley {
     pub async fn delete_managed_model_metadata(&self, id: &str) -> Result<bool> {
         let trimmed = id.trim();
         if trimmed.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model id must not be empty".into(),
             });
         }
@@ -833,7 +833,7 @@ impl SqliteGalley {
 
     pub async fn reorder_managed_models(&self, ordered_ids: Vec<String>) -> Result<()> {
         if ordered_ids.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model order must not be empty".into(),
             });
         }
@@ -844,12 +844,12 @@ impl SqliteGalley {
             .collect();
         for id in &ordered_ids {
             if id.is_empty() {
-                return Err(GalleyError::InvalidArgs {
+                return Err(YoleError::InvalidArgs {
                     message: "managed model id must not be empty".into(),
                 });
             }
             if !seen.insert(id.clone()) {
-                return Err(GalleyError::InvalidArgs {
+                return Err(YoleError::InvalidArgs {
                     message: format!("duplicate managed model id in order: {id}"),
                 });
             }
@@ -863,7 +863,7 @@ impl SqliteGalley {
         if existing_ids.len() != ordered_ids.len()
             || !existing_ids.iter().all(|id| seen.contains(id))
         {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "managed model order must include every configured model".into(),
             });
         }
@@ -897,7 +897,7 @@ impl SqliteGalley {
             .fetch_optional(&self.pool)
             .await
             .map_err(map_sqlx_err)?
-            .ok_or_else(|| GalleyError::NotFound {
+            .ok_or_else(|| YoleError::NotFound {
                 message: format!("managed model {id} not found"),
             })?;
         row.into_record()
@@ -917,7 +917,7 @@ impl SqliteGalley {
         .fetch_optional(&self.pool)
         .await
         .map_err(map_sqlx_err)?
-        .ok_or_else(|| GalleyError::NotFound {
+        .ok_or_else(|| YoleError::NotFound {
             message: format!("managed provider {id} not found"),
         })?;
         row.into_record()
@@ -951,7 +951,7 @@ impl SqliteGalley {
         }
         .await;
         if let Err(e) = res {
-            eprintln!("[galley-core] index_message_fts failed: {e}");
+            eprintln!("[yole-core] index_message_fts failed: {e}");
         }
     }
 }
@@ -1178,7 +1178,7 @@ struct ManagedModelRow {
 impl ManagedModelRow {
     fn into_record(self) -> Result<ManagedModelRecord> {
         let advanced_options = serde_json::from_str::<serde_json::Value>(&self.advanced_options)
-            .map_err(|e| GalleyError::Internal {
+            .map_err(|e| YoleError::Internal {
                 message: format!("managed model advanced_options JSON invalid: {e}"),
             })?;
         Ok(ManagedModelRecord {
@@ -1337,7 +1337,7 @@ fn parse_session_status(s: &str) -> Result<SessionStatus> {
         "cancelled" => SessionStatus::Cancelled,
         "archived" => SessionStatus::Archived,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown session status: {other}"),
             })
         }
@@ -1362,7 +1362,7 @@ fn parse_runtime_kind(s: &str) -> Result<RuntimeKind> {
         "managed" => RuntimeKind::Managed,
         "external" => RuntimeKind::External,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown runtime kind: {other}"),
             })
         }
@@ -1381,7 +1381,7 @@ fn parse_managed_model_protocol(s: &str) -> Result<ManagedModelProtocol> {
         "anthropic" => ManagedModelProtocol::Anthropic,
         "openai" => ManagedModelProtocol::Openai,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown managed model protocol: {other}"),
             })
         }
@@ -1400,7 +1400,7 @@ fn parse_managed_model_auth_kind(s: &str) -> Result<ManagedModelAuthKind> {
         "api_key" => ManagedModelAuthKind::ApiKey,
         "chatgpt_codex_oauth" => ManagedModelAuthKind::ChatgptCodexOauth,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown managed model auth kind: {other}"),
             })
         }
@@ -1424,7 +1424,7 @@ fn parse_message_role(s: &str) -> Result<MessageRole> {
         // turn rather than surfacing them as a distinct role.
         "tool" => MessageRole::Agent,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown message role: {other}"),
             })
         }
@@ -1438,15 +1438,15 @@ fn parse_origin_via(s: &str) -> Result<OriginVia> {
         "supervisor" => OriginVia::Supervisor,
         "system" => OriginVia::System,
         other => {
-            return Err(GalleyError::Internal {
+            return Err(YoleError::Internal {
                 message: format!("unknown origin via: {other}"),
             })
         }
     })
 }
 
-fn map_sqlx_err(e: sqlx::Error) -> GalleyError {
-    GalleyError::Internal {
+fn map_sqlx_err(e: sqlx::Error) -> YoleError {
+    YoleError::Internal {
         message: format!("sqlx: {e}"),
     }
 }
@@ -1457,7 +1457,7 @@ fn map_sqlx_err(e: sqlx::Error) -> GalleyError {
 /// (exit code 1) so SOPs can distinguish "you passed a bad project id"
 /// from "something blew up server-side". This shim looks at the SQLite
 /// error message; everything else falls through to [`map_sqlx_err`].
-fn map_constraint_err(context: &str, e: sqlx::Error) -> GalleyError {
+fn map_constraint_err(context: &str, e: sqlx::Error) -> YoleError {
     if let sqlx::Error::Database(ref db_err) = e {
         let msg = db_err.message().to_ascii_lowercase();
         if msg.contains("foreign key")
@@ -1465,7 +1465,7 @@ fn map_constraint_err(context: &str, e: sqlx::Error) -> GalleyError {
             || msg.contains("check")
             || msg.contains("primary key")
         {
-            return GalleyError::InvalidArgs {
+            return YoleError::InvalidArgs {
                 message: format!("{context}: {}", db_err.message()),
             };
         }
@@ -1495,13 +1495,13 @@ async fn insert_session_row_inner(
 ) -> Result<SessionBrief> {
     let title = input.title.trim();
     if title.is_empty() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "create_session: title must not be empty".into(),
         });
     }
     let id = input.id.trim();
     if id.is_empty() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "create_session: id must not be empty".into(),
         });
     }
@@ -1574,12 +1574,12 @@ async fn active_runtime_kind_inner(conn: &mut SqliteConnection) -> Result<Runtim
 
     if let Some(raw) = raw {
         let value = serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| {
-            GalleyError::InvalidArgs {
+            YoleError::InvalidArgs {
                 message: format!("pref 'active_runtime_kind' stored value is not valid JSON: {e}"),
             }
         })?;
         let Some(kind) = value.as_str() else {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "pref 'active_runtime_kind' must be a string".into(),
             });
         };
@@ -1618,11 +1618,11 @@ async fn insert_user_message_inner(
             .fetch_optional(&mut *conn)
             .await
             .map_err(map_sqlx_err)?;
-    let (_id, status) = row.ok_or_else(|| GalleyError::NotFound {
+    let (_id, status) = row.ok_or_else(|| YoleError::NotFound {
         message: format!("session '{}' does not exist", session_id.0),
     })?;
     if status == "archived" {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: format!("session {} is archived", session_id.0),
         });
     }
@@ -1674,7 +1674,7 @@ async fn insert_user_message_inner(
     }
     .await;
     if let Err(e) = fts_res {
-        eprintln!("[galley-core] index user message fts failed: {e}");
+        eprintln!("[yole-core] index user message fts failed: {e}");
     }
     sqlx::query("UPDATE sessions SET last_activity_at = ?, updated_at = ? WHERE id = ?")
         .bind(&now)
@@ -1742,7 +1742,7 @@ const SESSIONS_SELECT_COLS: &str = "id, project_id, title, status, summary, turn
     llm_index, llm_key, llm_display_name, ga_runtime_kind, ga_runtime_id, prompt_profile";
 
 #[async_trait]
-impl GalleyApi for SqliteGalley {
+impl YoleApi for SqliteYole {
     async fn list_sessions(&self, filter: SessionFilter) -> Result<Vec<SessionBrief>> {
         // Hand-build WHERE so we can bind only the filters that are
         // set. sqlx doesn't have a fluent builder; query_builder works
@@ -1793,7 +1793,7 @@ impl GalleyApi for SqliteGalley {
         .fetch_optional(&self.pool)
         .await
         .map_err(map_sqlx_err)?
-        .ok_or_else(|| GalleyError::NotFound {
+        .ok_or_else(|| YoleError::NotFound {
             message: format!("session {id} not found"),
         })?;
         row.into_brief()
@@ -1889,7 +1889,7 @@ impl GalleyApi for SqliteGalley {
                     // FTS5 MATCH can fail on weird inputs (rare with
                     // phrase wrapping but possible). Fall through to
                     // LIKE so the search still returns something.
-                    eprintln!("[galley-core] FTS5 search failed, falling back: {e}");
+                    eprintln!("[yole-core] FTS5 search failed, falling back: {e}");
                 }
             }
         }
@@ -2099,7 +2099,7 @@ impl GalleyApi for SqliteGalley {
                 .await
                 .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {id} not found"),
             });
         }
@@ -2147,7 +2147,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {id} not found"),
             });
         }
@@ -2168,11 +2168,11 @@ impl GalleyApi for SqliteGalley {
                 .fetch_optional(&self.pool)
                 .await
                 .map_err(map_sqlx_err)?;
-        let status = current_status.ok_or_else(|| GalleyError::NotFound {
+        let status = current_status.ok_or_else(|| YoleError::NotFound {
             message: format!("session {id} not found"),
         })?;
         if status == "archived" {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: format!("session {id} is archived; cannot change pinned"),
             });
         }
@@ -2194,7 +2194,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {id} not found"),
             });
         }
@@ -2216,7 +2216,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(|e| map_constraint_err("assign_session_to_project", e))?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {session_id} not found"),
             });
         }
@@ -2245,7 +2245,7 @@ impl GalleyApi for SqliteGalley {
         .await
         .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {id} not found"),
             });
         }
@@ -2293,7 +2293,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
             if res.rows_affected() == 0 {
-                return Err(GalleyError::NotFound {
+                return Err(YoleError::NotFound {
                     message: format!("session {id} not found"),
                 });
             }
@@ -2314,7 +2314,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
             if res.rows_affected() == 0 {
-                return Err(GalleyError::NotFound {
+                return Err(YoleError::NotFound {
                     message: format!("session {id} not found"),
                 });
             }
@@ -2340,7 +2340,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("session {id} not found"),
             });
         }
@@ -2436,13 +2436,13 @@ impl GalleyApi for SqliteGalley {
     ) -> Result<ProjectBrief> {
         let id = input.id.trim();
         if id.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "create_project: id must not be empty".into(),
             });
         }
         let name = input.name.trim();
         if name.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "create_project: name must not be empty".into(),
             });
         }
@@ -2486,7 +2486,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
         if exists.is_none() {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("project {id} not found"),
             });
         }
@@ -2498,7 +2498,7 @@ impl GalleyApi for SqliteGalley {
         if let Some(raw) = patch.name.as_ref() {
             let t = raw.trim();
             if t.is_empty() {
-                return Err(GalleyError::InvalidArgs {
+                return Err(YoleError::InvalidArgs {
                     message: "update_project: name must not be empty".into(),
                 });
             }
@@ -2551,7 +2551,7 @@ impl GalleyApi for SqliteGalley {
             .await
             .map_err(map_sqlx_err)?;
         if res.rows_affected() == 0 {
-            return Err(GalleyError::NotFound {
+            return Err(YoleError::NotFound {
                 message: format!("project {id} not found"),
             });
         }
@@ -2599,7 +2599,7 @@ impl GalleyApi for SqliteGalley {
             return Ok(None);
         };
         let value = serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| {
-            GalleyError::InvalidArgs {
+            YoleError::InvalidArgs {
                 message: format!("pref '{key}' stored value is not valid JSON: {e}"),
             }
         })?;
@@ -2607,7 +2607,7 @@ impl GalleyApi for SqliteGalley {
     }
 }
 
-impl SqliteGalley {
+impl SqliteYole {
     /// Internal helper used by `create_project` / `update_project` to
     /// re-read the row after a write. Returns NotFound when the id
     /// vanished between the write and the read (should never happen
@@ -2634,7 +2634,7 @@ impl SqliteGalley {
         .fetch_optional(&self.pool)
         .await
         .map_err(map_sqlx_err)?
-        .ok_or_else(|| GalleyError::NotFound {
+        .ok_or_else(|| YoleError::NotFound {
             message: format!("project {id} not found"),
         })?;
         Ok(row.into_brief())

@@ -7,7 +7,7 @@
   message level; `session new` now starts real delegated work; GLM 5.1,
   concurrent delegation, error paths, and lifecycle actions were tested.
 - **Related**:
-  - [Supervisor SOP](../integrations/galley-supervisor-sop.md)
+  - [Supervisor SOP](../integrations/yole-supervisor-sop.md)
   - [agent-api](../agent-api.md)
   - Commits: `70e37c8`, `f468e09`, `5467667`
 
@@ -56,7 +56,7 @@ LLM switching, concurrent creation, error handling, and lifecycle operations.
   message-level marker in `MessageUser`.
 - Wired CLI/supervisor-origin user messages through GUI session/message stores
   so externally created prompts appear live with their origin metadata.
-- Changed `session new` to dispatch the first prompt through Galley Core after
+- Changed `session new` to dispatch the first prompt through Yole Core after
   persistence, and to report dispatch failure honestly.
 - Removed collision-prone socket user-message ids by scoping generated ids to
   the session id and turn index; added burst uniqueness coverage for session ids.

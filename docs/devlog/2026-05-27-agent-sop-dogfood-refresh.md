@@ -6,19 +6,19 @@
 - **Status**: Dogfood found and fixed three Agent API contract leaks; Supervisor
   SOP and Claude Skill guidance refreshed.
 - **Related**:
-  - [Supervisor SOP](../integrations/galley-supervisor-sop.md)
+  - [Supervisor SOP](../integrations/yole-supervisor-sop.md)
   - [agent-api](../agent-api.md)
   - [Supervisor provenance dogfood](./2026-05-21-supervisor-provenance-delegation-dogfood.md)
 
 ## Context
 
-The goal was to test Galley's Agent surface end to end as a real Supervisor:
+The goal was to test Yole's Agent surface end to end as a real Supervisor:
 resolve the CLI through the discovery file, inspect current state, create a
 dedicated test project/session, exercise session and project lifecycle commands,
 verify error paths, and then tighten the Agent SOP based on what actually
 happened.
 
-This pass used the live `schemaVersion: 1` CLI and current local Galley data. It
+This pass used the live `schemaVersion: 1` CLI and current local Yole data. It
 created one dedicated managed test session and deleted the temporary project
 after validating `project delete` detaches sessions instead of deleting them.
 
@@ -53,8 +53,8 @@ after validating `project delete` detaches sessions instead of deleting them.
 
 ## Dogfood coverage
 
-- Discovery file resolved to `core/target/debug/galley`, with
-  `schema_version=1`; `galley version` returned `schemaVersion: 1`.
+- Discovery file resolved to `core/target/debug/yole`, with
+  `schema_version=1`; `yole version` returned `schemaVersion: 1`.
 - Inventory covered `status`, `sessions list`, `sessions search`, `project
   list`, `llm list`, and `health`.
 - `project create`, `session new --runtime=managed --project=... --llm=glm-5.1`,
@@ -65,7 +65,7 @@ after validating `project delete` detaches sessions instead of deleting them.
   LLM, invalid `--runtime=all` for `session new`, no live runner for `watch`,
   and no live bridge for `/btw`.
 - Successful `session watch` was validated with a managed session that ran
-  `sleep 12; echo GALLEY_WATCH_OK`; the stream delivered `turn_start`, tool
+  `sleep 12; echo YOLE_WATCH_OK`; the stream delivered `turn_start`, tool
   progress, `turn_end`, `run_complete`, and the final answer. The watcher stayed
   open as designed until the client stopped the subscription.
 
@@ -81,13 +81,13 @@ after validating `project delete` detaches sessions instead of deleting them.
 
 ## Open questions
 
-- The live Galley Core process needs a restart before the new user-message FTS
+- The live Yole Core process needs a restart before the new user-message FTS
   indexing code affects socket writes in that running app instance.
 
 ## Next
 
 1. Include this Agent SOP dogfood path in future beta smoke runs.
-2. When convenient, restart Galley and re-run one `session send` plus
+2. When convenient, restart Yole and re-run one `session send` plus
    `sessions search` check to confirm live Core picks up user-message FTS
    indexing.
 3. Add the long-lived `session watch` stop/cleanup expectation to the dogfood

@@ -9,7 +9,7 @@ import { useCopy } from "@/lib/i18n";
 import type { ManagedRuntimeDiagnostics } from "@/types/inspector";
 
 interface SettingsAboutProps {
-  workbenchVersion: string;
+  yoleVersion: string;
   gaBaseline: string;
   managedRuntime?: ManagedRuntimeDiagnostics;
   hasRunningSessions: boolean;
@@ -20,13 +20,12 @@ interface SettingsAboutProps {
  *
  * Structure:
  *   1. Title + tagline
- *   2. Version table (Galley + bundled GenericAgent kernel)
- *   3. Links — Galley source/issues, GenericAgent upstream credit,
- *      plus a quiet maker link group.
- *   4. Footer with author + license.
+ *   2. Version table (Yole + bundled GenericAgent kernel)
+ *   3. Links — Yole website and GenericAgent upstream credit.
+ *   4. Footer with product ownership.
  */
 export function SettingsAbout({
-  workbenchVersion,
+  yoleVersion,
   gaBaseline,
   managedRuntime,
   hasRunningSessions,
@@ -43,27 +42,18 @@ export function SettingsAbout({
   return (
     <div className="space-y-7">
       <SettingsPanelHeader
-        title="Galley"
+        title="Yole"
         subtitle={copy.settings.about.subtitle}
         wordmark
       />
 
-      {/* Origin story — the "Why Galley?" easter egg. Putting it in
-          About means: insiders / curious users find the GenericAgent
-          heritage when they look; new users see a clean standalone
-          brand on the welcome screen. The GA capitalization is a
-          quiet bow, not a billboard. */}
-      <div className="rounded-md border border-line bg-elevated px-4 py-3 font-serif text-[13.5px] italic leading-[1.65] text-ink-soft">
-        {copy.settings.about.origin}
-      </div>
-
       <dl className="m-0 grid grid-cols-[120px_1fr] gap-y-2 text-[12.5px]">
-        <dt className="text-ink-muted">{copy.settings.about.galleyVersion}</dt>
+        <dt className="text-ink-muted">{copy.settings.about.yoleVersion}</dt>
         <dd className="m-0 min-w-0">
           <SettingsUpdateControl
             hasRunningSessions={hasRunningSessions}
             leading={
-              <span className="font-mono text-ink">v{workbenchVersion}</span>
+              <span className="font-mono text-ink">v{yoleVersion}</span>
             }
           />
         </dd>
@@ -83,32 +73,14 @@ export function SettingsAbout({
         <SettingsSectionLabel>{copy.settings.about.links}</SettingsSectionLabel>
         <div className="mt-3 space-y-1">
           <ExternalLink
-            href="https://github.com/wangjc683/galley"
-            label="Galley"
-            detail="github.com/wangjc683/galley"
-          />
-          <ExternalLink
-            href="https://github.com/wangjc683/galley/issues"
-            label={copy.settings.about.feedback}
-            detail="GitHub Issues"
+            href="https://github.com/xiaoguangpan/yole"
+            label="Yole"
+            detail="github.com/xiaoguangpan/yole"
           />
           <ExternalLink
             href="https://github.com/lsdefine/GenericAgent"
             label="GenericAgent"
             detail="github.com/lsdefine/GenericAgent"
-          />
-          <div className="pt-3 text-[11.5px] text-ink-muted">
-            {copy.settings.about.alsoBy}
-          </div>
-          <ExternalLink
-            href="https://subsage.top"
-            label="SubSage"
-            detail={copy.settings.about.subsageDetail}
-          />
-          <ExternalLink
-            href="https://15perf70mm.com"
-            label="15perf70mm"
-            detail={copy.settings.about.filmDetail}
           />
         </div>
       </div>

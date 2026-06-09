@@ -1,6 +1,6 @@
-"""Shared helpers for Galley's managed GenericAgent runtime.
+"""Shared helpers for Yole's managed GenericAgent runtime.
 
-This module is imported only by Galley-owned runner entrypoints. External /
+This module is imported only by Yole-owned runner entrypoints. External /
 attach mode must keep using the user's GenericAgent config and prompt as-is.
 """
 from __future__ import annotations
@@ -11,34 +11,34 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-GALLEY_RUNTIME_KIND_ENV = "GALLEY_RUNTIME_KIND"
-GALLEY_MANAGED_STATE_ROOT_ENV = "GALLEY_GA_STATE_ROOT"
-GALLEY_MANAGED_MODEL_CONFIG_ENV = "GALLEY_MANAGED_MODEL_CONFIG_JSON"
-GALLEY_MANAGED_MODEL_CONFIG_PATH_ENV = "GALLEY_MANAGED_MODEL_CONFIG_PATH"
-GALLEY_RUNTIME_PROMPT_TEXT_ENV = "GALLEY_RUNTIME_PROMPT_TEXT"
-GALLEY_PERSONA_PROMPT_TEXT_ENV = "GALLEY_PERSONA_PROMPT_TEXT"
+YOLE_RUNTIME_KIND_ENV = "YOLE_RUNTIME_KIND"
+YOLE_MANAGED_STATE_ROOT_ENV = "YOLE_GA_STATE_ROOT"
+YOLE_MANAGED_MODEL_CONFIG_ENV = "YOLE_MANAGED_MODEL_CONFIG_JSON"
+YOLE_MANAGED_MODEL_CONFIG_PATH_ENV = "YOLE_MANAGED_MODEL_CONFIG_PATH"
+YOLE_RUNTIME_PROMPT_TEXT_ENV = "YOLE_RUNTIME_PROMPT_TEXT"
+YOLE_PERSONA_PROMPT_TEXT_ENV = "YOLE_PERSONA_PROMPT_TEXT"
 
 
 def is_managed_runtime() -> bool:
-    return os.environ.get(GALLEY_RUNTIME_KIND_ENV) == "managed"
+    return os.environ.get(YOLE_RUNTIME_KIND_ENV) == "managed"
 
 
 def managed_state_root() -> str | None:
-    return os.environ.get(GALLEY_MANAGED_STATE_ROOT_ENV)
+    return os.environ.get(YOLE_MANAGED_STATE_ROOT_ENV)
 
 
 def managed_model_config_from_env() -> dict[str, Any]:
-    """Build GA-style mykey entries from Galley's in-memory model config."""
-    raw = os.environ.get(GALLEY_MANAGED_MODEL_CONFIG_ENV)
+    """Build GA-style mykey entries from Yole's in-memory model config."""
+    raw = os.environ.get(YOLE_MANAGED_MODEL_CONFIG_ENV)
     if not raw:
-        raise RuntimeError("Galley managed model config was not provided.")
+        raise RuntimeError("Yole managed model config was not provided.")
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"Galley managed model config is invalid JSON: {e}") from e
+        raise RuntimeError(f"Yole managed model config is invalid JSON: {e}") from e
     models = data.get("models")
     if not isinstance(models, list) or not models:
-        raise RuntimeError("Galley managed model config has no usable models.")
+        raise RuntimeError("Yole managed model config has no usable models.")
 
     out: dict[str, Any] = {}
     for idx, model in enumerate(models):
@@ -61,10 +61,10 @@ def managed_model_config_from_env() -> dict[str, Any]:
         if auth_kind == "chatgpt_codex_oauth":
             cfg["codex_backend"] = True
             cfg["api_mode"] = "responses"
-            cfg["galley_api_key_ref"] = str(model.get("apiKeyRef") or "")
+            cfg["yole_api_key_ref"] = str(model.get("apiKeyRef") or "")
             credential_ipc = model.get("credentialIpc")
             if isinstance(credential_ipc, dict):
-                cfg["galley_credential_ipc"] = credential_ipc
+                cfg["yole_credential_ipc"] = credential_ipc
         advanced = model.get("advancedOptions") or {}
         if isinstance(advanced, dict):
             cfg.update(advanced)
@@ -80,15 +80,15 @@ def managed_model_config_from_env() -> dict[str, Any]:
             continue
         out[key] = cfg
     if not out:
-        raise RuntimeError("Galley managed model config has no usable models.")
+        raise RuntimeError("Yole managed model config has no usable models.")
     return out
 
 
 def install_managed_mykey_loader() -> None:
-    """Patch managed GA's llmcore to read Galley-owned model config."""
+    """Patch managed GA's llmcore to read Yole-owned model config."""
     import llmcore  # type: ignore[import-not-found]
 
-    marker = os.environ.get(GALLEY_MANAGED_MODEL_CONFIG_PATH_ENV)
+    marker = os.environ.get(YOLE_MANAGED_MODEL_CONFIG_PATH_ENV)
     if not marker:
         raise RuntimeError("managed runtime missing model config marker path")
     marker_path = str(Path(marker).expanduser().resolve())
@@ -105,8 +105,8 @@ def install_managed_mykey_loader() -> None:
 def managed_prompt_profile(extra_env_names: Iterable[str] = ()) -> str:
     prompts = []
     for env_name in (
-        GALLEY_RUNTIME_PROMPT_TEXT_ENV,
-        GALLEY_PERSONA_PROMPT_TEXT_ENV,
+        YOLE_RUNTIME_PROMPT_TEXT_ENV,
+        YOLE_PERSONA_PROMPT_TEXT_ENV,
         *extra_env_names,
     ):
         raw_prompt = os.environ.get(env_name)

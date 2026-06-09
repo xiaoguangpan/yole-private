@@ -1,6 +1,6 @@
-# Contributing to Galley
+# Contributing to Yole
 
-Thanks for taking a look at Galley. The project is still pre-v1, so the most
+Thanks for taking a look at Yole. The project is still pre-v1, so the most
 useful contributions are focused fixes, clear bug reports, Windows/macOS smoke
 results, documentation improvements, and small improvements that fit the
 existing architecture.
@@ -17,7 +17,7 @@ Before changing code, read:
 
 ## Local Development
 
-Galley is a desktop client app. The normal development loop is:
+Yole is a desktop client app. The normal development loop is:
 
 ```bash
 pnpm --dir gui tauri dev
@@ -40,18 +40,18 @@ frontend work, but it is not full app verification.
 
 Keep these constraints intact:
 
-- Galley must not modify GenericAgent files, memory, venv, PATH, or runtime
+- Yole must not modify GenericAgent files, memory, venv, PATH, or runtime
   internals.
-- Galley Core stays localhost-only: Unix socket on macOS/Linux, named pipe on
+- Yole Core stays localhost-only: Unix socket on macOS/Linux, named pipe on
   Windows. No TCP server or token auth.
-- Rust Galley Core is authoritative for SQLite writes, session lifecycle,
+- Rust Yole Core is authoritative for SQLite writes, session lifecycle,
   runner ownership, and command dispatch.
 - The CLI JSON contract is stable. Read [agent-api](./docs/agent-api.md) before
   changing CLI output.
 
 ## Good First Contributions
 
-- Reproduce and document a bug with exact OS, Galley version, and steps.
+- Reproduce and document a bug with exact OS, Yole version, and steps.
 - Improve docs clarity or fix stale links.
 - Add focused tests around existing behavior.
 - Improve Windows smoke coverage using [windows-build-checklist](./docs/windows-build-checklist.md).

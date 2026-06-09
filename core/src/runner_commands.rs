@@ -40,7 +40,7 @@
 //! as B1's [`list_sessions`].
 
 use crate::api::{ManagedModelAuthKind, ManagedModelProtocol, RuntimeKind};
-use crate::db::SqliteGalley;
+use crate::db::SqliteYole;
 use crate::ipc::IpcCommand;
 use crate::runner_manager::{
     BroadcastItem, RunnerManager, RunnerSpawnError, SendCommandError, ShutdownError, SpawnArgs,
@@ -189,13 +189,13 @@ pub(crate) async fn prepare_managed_runtime_context(
             ),
         });
     }
-    let galley =
-        SqliteGalley::open()
+    let yole =
+        SqliteYole::open()
             .await
             .map_err(|e| RunnerSpawnError::ManagedRuntimeInvalid {
-                detail: format!("opening Galley database failed: {e}"),
+                detail: format!("opening Yole database failed: {e}"),
             })?;
-    let models = galley.list_managed_models().await.map_err(|e| {
+    let models = yole.list_managed_models().await.map_err(|e| {
         RunnerSpawnError::ManagedModelNotConfigured {
             detail: format!("loading managed model records failed: {e}"),
         }
@@ -217,19 +217,19 @@ pub(crate) async fn prepare_managed_runtime_context(
     for model in models {
         let (api_key, model_credential_ipc) = match model.auth_kind {
             ManagedModelAuthKind::ApiKey => {
-                match credential_store::get_secret(&galley, &model.api_key_ref).await {
+                match credential_store::get_secret(&yole, &model.api_key_ref).await {
                     Ok(secret) if !secret.trim().is_empty() => (secret, None),
                     _ => continue,
                 }
             }
             ManagedModelAuthKind::ChatgptCodexOauth => {
-                if credential_store::get_secret(&galley, &model.api_key_ref)
+                if credential_store::get_secret(&yole, &model.api_key_ref)
                     .await
                     .map(|secret| !secret.trim().is_empty())
                     .unwrap_or(false)
                 {
                     (
-                        "galley-codex-oauth".into(),
+                        "yole-codex-oauth".into(),
                         credential_ipc.clone(),
                     )
                 } else {
@@ -287,25 +287,25 @@ pub(crate) async fn prepare_managed_runtime_context(
         }
     })?;
     let env = vec![
-        ("GALLEY_RUNTIME_KIND".into(), "managed".into()),
+        ("YOLE_RUNTIME_KIND".into(), "managed".into()),
         ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
         (
-            "GALLEY_GA_STATE_ROOT".into(),
+            "YOLE_GA_STATE_ROOT".into(),
             diagnostics.paths.state_root.clone(),
         ),
         (
-            "GALLEY_MANAGED_MODEL_CONFIG_PATH".into(),
+            "YOLE_MANAGED_MODEL_CONFIG_PATH".into(),
             model_config_path.to_string_lossy().into_owned(),
         ),
         (
-            "GALLEY_RUNTIME_PROMPT_TEXT".into(),
+            "YOLE_RUNTIME_PROMPT_TEXT".into(),
             managed_prompt::RUNTIME_PROMPT.into(),
         ),
         (
-            "GALLEY_PERSONA_PROMPT_TEXT".into(),
+            "YOLE_PERSONA_PROMPT_TEXT".into(),
             managed_prompt::PERSONA_PROMPT.into(),
         ),
-        ("GALLEY_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config),
+        ("YOLE_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config),
     ];
 
     Ok(ManagedRuntimeProcessContext {
@@ -344,13 +344,13 @@ fn prepare_external_spawn_args(
 ) -> Result<SpawnArgs, RunnerSpawnError> {
     args.ga_path = normalize_external_ga_path(&args.ga_path)?;
 
-    // bridgeCwd is Galley's implementation detail, not user GA state.
+    // bridgeCwd is Yole's implementation detail, not user GA state.
     // Dev should run from the repo root; production should run from the
     // packaged resources dir. Ignore stale persisted bridgeCwd values such as
     // old developer-machine defaults.
     args.bridge_cwd = managed_runtime::bridge_cwd_for_app(app).map_err(|e| {
         RunnerSpawnError::BridgeCwdInvalid {
-            detail: format!("resolving Galley bridge cwd failed: {e}"),
+            detail: format!("resolving Yole bridge cwd failed: {e}"),
         }
     })?;
     Ok(args)
@@ -593,8 +593,8 @@ def run_smoke(agent):
             setattr(backend, name, value)
 
 def main():
-    ga_path = os.environ["GALLEY_PROBE_GA_PATH"]
-    smoke_test = os.environ.get("GALLEY_PROBE_SMOKE_TEST") == "1"
+    ga_path = os.environ["YOLE_PROBE_GA_PATH"]
+    smoke_test = os.environ.get("YOLE_PROBE_SMOKE_TEST") == "1"
     stage = "runtime"
     llms = []
     try:
@@ -649,7 +649,7 @@ async fn run_ga_runtime_probe(args: ProbeGaRuntimeArgs) -> ProbeGaRuntimeResult 
     }
 
     let state_root = std::env::temp_dir().join(format!(
-        "galley-ga-probe-{}-{}",
+        "yole-ga-probe-{}-{}",
         std::process::id(),
         chrono::Utc::now().timestamp_millis()
     ));
@@ -665,13 +665,13 @@ async fn run_ga_runtime_probe(args: ProbeGaRuntimeArgs) -> ProbeGaRuntimeResult 
     let mut cmd = tokio::process::Command::new(&args.python);
     cmd.args(["-c", GA_RUNTIME_PROBE_SCRIPT])
         .current_dir(&ga_path)
-        .env("GALLEY_PROBE_GA_PATH", &args.ga_path)
+        .env("YOLE_PROBE_GA_PATH", &args.ga_path)
         .env(
-            "GALLEY_PROBE_SMOKE_TEST",
+            "YOLE_PROBE_SMOKE_TEST",
             if args.smoke_test { "1" } else { "0" },
         )
         .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env("GALLEY_GA_STATE_ROOT", &state_root)
+        .env("YOLE_GA_STATE_ROOT", &state_root)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

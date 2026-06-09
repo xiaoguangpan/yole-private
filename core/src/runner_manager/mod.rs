@@ -1,9 +1,9 @@
-//! Galley runner subprocess ownership — production code path from B2 M1 onward.
+//! Yole runner subprocess ownership — production code path from B2 M1 onward.
 //!
 //! ## What this module owns
 //!
-//! Every Python `runner.workbench_bridge` subprocess that backs an active
-//! Galley session. From spawn → stdin command dispatch → stdout event broadcast
+//! Every Python `runner.yole_bridge` subprocess that backs an active
+//! Yole session. From spawn → stdin command dispatch → stdout event broadcast
 //! → graceful shutdown / forced kill. The TypeScript side ([`gui/src/lib/bridge.ts`])
 //! is being thinned to an `invoke()` shim against this module in [B2 M2].
 //!

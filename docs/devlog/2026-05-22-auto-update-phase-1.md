@@ -6,7 +6,7 @@
 
 ## Context
 
-目标体验是：Galley 后台发现新版本，准备好更新，然后提示用户重启。
+目标体验是：Yole 后台发现新版本，准备好更新，然后提示用户重启。
 但当前 release 仍是 beta prerelease，且项目的 macOS / Windows 分发策略还未进入
 完整代码签名阶段。Tauri updater 又强依赖独立的更新包签名，所以不能把
 「加一个检查更新按钮」误做成「发布链路已经完整可用」。
@@ -16,11 +16,11 @@
 - 第一阶段先接入真实 updater plumbing：Rust 注册 `tauri-plugin-updater`，
   Settings -> About / Runtime 增加检查 / 下载 / 重启入口，启动时后台检查；
   发布构建发现新版本后会后台下载并准备更新。
-- 更新通道用编译期变量显式启用：`GALLEY_UPDATER_PUBKEY` 和
-  `GALLEY_UPDATER_ENDPOINT` 同时存在才会真正检查远端 manifest。
+- 更新通道用编译期变量显式启用：`YOLE_UPDATER_PUBKEY` 和
+  `YOLE_UPDATER_ENDPOINT` 同时存在才会真正检查远端 manifest。
 - 未配置时 UI 显示「此构建未连接更新通道；Dev 模式下这是预期状态」，
   但不让 Dev、本地 build、或普通启动失败。
-- Webview 不直接调用 updater plugin command；前端只调用 Galley 自己的
+- Webview 不直接调用 updater plugin command；前端只调用 Yole 自己的
   Rust command。这样可以把「未配置」作为产品状态，而不是暴露成底层
   `EmptyEndpoints` 错误。
 - `plugin-process` 只用于安装完成后的 relaunch；如果仍有 session 在运行，
@@ -33,13 +33,13 @@
 - Release workflow 在 CI 内临时生成 `core/tauri.updater.generated.conf.json`，
   把 public key / endpoint 合并进 Tauri config，并打开
   `createUpdaterArtifacts`；构建前要求 `TAURI_SIGNING_PRIVATE_KEY`、
-  `GALLEY_UPDATER_PUBKEY`、`GALLEY_UPDATER_ENDPOINT` 存在。
+  `YOLE_UPDATER_PUBKEY`、`YOLE_UPDATER_ENDPOINT` 存在。
 - Release artifacts 会包含平台安装包以及 updater 所需的 signed artifacts：
   macOS `.app.tar.gz` + `.sig`，Windows setup `.exe` + `.sig`。
 - Release workflow 生成 `latest.json` candidate 作为 draft Release asset；这个
   candidate 用于 review，不直接更新用户通道。
 - 新增手动 `promote-update-channel.yml`：release publish + smoke test 之后，
-  明确把某个 tag 推到 `galley-update-channel` 分支的
+  明确把某个 tag 推到 `yole-update-channel` 分支的
   `updates/beta/latest.json`，已安装 app 读取这个稳定 beta endpoint。
 - `tauri signer generate` 写出的 `.pub` 文件内容就是 Tauri updater config
   需要的 base64 public key；decode 后的 minisign public key 只适合人工检查，
@@ -57,7 +57,7 @@
 - 让前端直接用 `@tauri-apps/plugin-updater`：产品状态会被底层错误语义牵着走，
   也更难保持本地 Dev 的降级体验。
 - beta channel 的 manifest 托管用 GitHub Release asset、GitHub Pages，还是
-  独立对象存储。当前选择 `galley-update-channel` 分支上的 raw GitHub URL，
+  独立对象存储。当前选择 `yole-update-channel` 分支上的 raw GitHub URL，
   因为不需要额外基础设施，也不依赖 prerelease 的 Latest 语义。
 - release workflow 直接更新 beta manifest：会让 draft / 未 smoke 版本提前暴露给
   用户，和当前发版 SOP 冲突。

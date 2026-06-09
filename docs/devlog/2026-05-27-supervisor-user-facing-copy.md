@@ -2,36 +2,36 @@
 
 **Date:** 2026-05-27  
 **Status:** Implemented  
-**Related:** `docs/integrations/galley-supervisor-sop.md`, `gui/src/components/screens/settings/SettingsIntegration.tsx`
+**Related:** `docs/integrations/yole-supervisor-sop.md`, `gui/src/components/screens/settings/SettingsIntegration.tsx`
 
 ## Context
 
 The Supervisor SOP is copy-first: users often paste it into an external Agent
 without reading it themselves. That means the external Agent needs stable
-user-facing language for explaining what "using Galley through me" means. The
+user-facing language for explaining what "using Yole through me" means. The
 Settings -> Agent page also needed a tiny affordance so users can try the flow
 without reading the full SOP.
 
 ## Decisions
 
-- Treat "Galley mode" as user-facing shorthand, not a real system mode or
+- Treat "Yole mode" as user-facing shorthand, not a real system mode or
   state machine.
-- Add a `User-Facing Galley Mode Copy` section to the Supervisor SOP with
+- Add a `User-Facing Yole Mode Copy` section to the Supervisor SOP with
   short intro copy, examples, safety boundaries, and "do not say" guidance.
 - Use one name for the copied document in user-facing UI:
-  `Galley Supervisor SOP`. Avoid mixing `Supervisor SOP` and `Agent SOP`.
+  `Yole Supervisor SOP`. Avoid mixing `Supervisor SOP` and `Agent SOP`.
 - Define the target as a "local Supervisor Agent": GA behind an IM bot,
   OpenClaw, Hermes, Claude Code, Codex, or another trusted local Agent that can
-  run commands on the same machine as Galley.
+  run commands on the same machine as Yole.
 - Present WeChat, Feishu/Lark, Telegram, Discord, and similar services as chat
   entry points, not as the execution location. A purely cloud-hosted Agent
-  cannot operate Galley CLI directly without a local runner or bridge.
+  cannot operate Yole CLI directly without a local runner or bridge.
 - Revise the Settings -> Agent layout into two default sections:
-  `Galley Supervisor SOP` explains what the copied SOP is and how to use it;
+  `Yole Supervisor SOP` explains what the copied SOP is and how to use it;
   `可以这样说` is a standalone example list.
 - Add four copyable examples covering status check, continue with a non-coding
   work requirement, start one bounded coding investigation, and split a general
-  travel-planning task. The example set should reflect Galley as a local
+  travel-planning task. The example set should reflect Yole as a local
   agent-team orchestrator, not a coding-only product.
 - Keep the prompt example copy buttons directly after each sentence, because
   the action is "copy this exact thing" rather than "manage a row."
@@ -43,14 +43,14 @@ without reading the full SOP.
 
 ## Rejected Alternatives
 
-- A real "Enter Galley Mode" product state: rejected because the Supervisor
+- A real "Enter Yole Mode" product state: rejected because the Supervisor
   already has a SOP; a fake mode would confuse implementation and user
   expectations.
 - A long tutorial inside Settings: rejected because the actual training
   material belongs in the copied SOP, not in the user-facing setup surface.
 - Saying "I can control your computer": rejected as too broad and scarier than
   the actual boundary. The correct language is "manage local Agent sessions
-  through Galley."
+  through Yole."
 
 ## Open Questions
 

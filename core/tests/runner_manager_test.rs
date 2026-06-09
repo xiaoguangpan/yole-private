@@ -1,14 +1,14 @@
-//! Integration tests for [`galley_core_lib::runner_manager`].
+//! Integration tests for [`yole_core_lib::runner_manager`].
 //!
 //! These tests use a mock Python script (written to a tempdir at test start)
-//! instead of the real `runner.workbench_bridge` module, so they don't depend
+//! instead of the real `runner.yole_bridge` module, so they don't depend
 //! on a configured GA install. The mock emits IPC events from a hardcoded
 //! script — exactly the shape the real runner would emit — and the tests
 //! verify the manager surfaces them correctly.
 //!
 //! ## Why the mock approach
 //!
-//! - Real `workbench_bridge` requires a GA path + Python deps + mykey.py,
+//! - Real `yole_bridge` requires a GA path + Python deps + mykey.py,
 //!   none of which CI has reliably.
 //! - The manager's contract is "spawn a child, fan out its stdout, talk to
 //!   its stdin" — pure plumbing. A mock validates the plumbing without
@@ -26,8 +26,8 @@
 //! actions/setup-python step (`release.yml` already invokes it for the
 //! bundled Python build).
 
-use galley_core_lib::ipc::{IpcCommand, IpcEvent};
-use galley_core_lib::runner_manager::{BroadcastItem, RunnerManager, SpawnArgs};
+use yole_core_lib::ipc::{IpcCommand, IpcEvent};
+use yole_core_lib::runner_manager::{BroadcastItem, RunnerManager, SpawnArgs};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command as StdCommand, Stdio};
@@ -73,7 +73,7 @@ fn python_candidate_works(candidate: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Write a mock `runner/workbench_bridge.py` (and the `runner/__init__.py`
+/// Write a mock `runner/yole_bridge.py` (and the `runner/__init__.py`
 /// it needs to be importable as a package) into `dir`. The mock parses
 /// command-line args the same way the real runner does, emits a `ready`
 /// event, and then reads stdin to respond to a few commands (just enough
@@ -155,7 +155,7 @@ for line in sys.stdin:
         # No-op for the mock
         pass
 "#;
-    fs::write(runner_dir.join("workbench_bridge.py"), script).expect("write mock");
+    fs::write(runner_dir.join("yole_bridge.py"), script).expect("write mock");
 }
 
 fn write_exiting_runner(dir: &std::path::Path, code: i32) {
@@ -193,7 +193,7 @@ print("mock bridge exiting", file=sys.stderr, flush=True)
 sys.exit({code})
 "#
     );
-    fs::write(runner_dir.join("workbench_bridge.py"), script).expect("write mock");
+    fs::write(runner_dir.join("yole_bridge.py"), script).expect("write mock");
 }
 
 fn make_args(session_id: &str, bridge_cwd: PathBuf) -> SpawnArgs {
@@ -308,7 +308,7 @@ async fn send_command_reaches_subprocess() {
 
     mgr.send_command(
         "s2",
-        &IpcCommand::UserMessage(galley_core_lib::ipc::UserMessageCommand {
+        &IpcCommand::UserMessage(yole_core_lib::ipc::UserMessageCommand {
             text: "hello".into(),
             images: vec![],
         }),
@@ -350,7 +350,7 @@ async fn agent_running_toggles_with_turn_lifecycle() {
 
     mgr.send_command(
         "s3",
-        &IpcCommand::UserMessage(galley_core_lib::ipc::UserMessageCommand {
+        &IpcCommand::UserMessage(yole_core_lib::ipc::UserMessageCommand {
             text: "go".into(),
             images: vec![],
         }),

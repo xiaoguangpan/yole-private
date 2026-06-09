@@ -1,6 +1,6 @@
-# Galley 文案与语言规范
+# Yole 文案与语言规范
 
-> 这是 Galley 本地化与 UI 文案的工作草案。目标不是机械翻译，而是让中文和英文各自都像原生产品文案。
+> 这是 Yole 本地化与 UI 文案的工作草案。目标不是机械翻译，而是让中文和英文各自都像原生产品文案。
 
 ## 状态
 
@@ -11,7 +11,7 @@
 
 ## 核心原则
 
-Galley 应该有两套原生文案系统，而不是一套 source string 加一层机械翻译。
+Yole 应该有两套原生文案系统，而不是一套 source string 加一层机械翻译。
 
 - 中文版要像中文产品，不要像英文逐字翻译。
 - 英文版要像英文产品，不要像中文版逐字翻译。
@@ -140,7 +140,7 @@ About
 
 | 词 | 规则 |
 |---|---|
-| `Galley` | 品牌名，永远保留 |
+| `Yole` | 品牌名，永远保留 |
 | `GenericAgent` | 正式说明、首次接触、Onboarding、About、Runtime 中保留全称 |
 | `GA` | 紧凑状态、重复标签、路径、短 UI 中使用缩写 |
 | `Agent` | 外部操作者 / 生态角色，保留英文；不要翻成「代理」 |
@@ -155,7 +155,7 @@ About
 | `YOLO` | 模式名，保留 |
 | `LLM` | 紧凑控件可保留；正文优先说「模型」或「大语言模型」 |
 | 模型 / 服务品牌 | OpenAI、Anthropic、Claude、GPT、DeepSeek、Kimi、GLM、MiniMax、OpenRouter、SiliconFlow、Xiaomi MiMo 等保留 |
-| `galley` | 命令名，保留并用 inline code |
+| `yole` | 命令名，保留并用 inline code |
 | 文件 / 目录名 | `agentmain.py`、`mykey.py`、`.venv`、`memory/`、`assets/` 等保留 |
 | Tool id | `file_patch`、`code_run`、`start_long_term_update` 等保留，但旁边要有中文解释 |
 
@@ -180,14 +180,14 @@ About
 
 `Agent` 和 `AI` 不等价。
 
-当文案指向一个能通过 SOP / CLI / API 检查、创建、管理、自动化 Galley 的外部操作者时，用 `Agent`。
+当文案指向一个能通过 SOP / CLI / API 检查、创建、管理、自动化 Yole 的外部操作者时，用 `Agent`。
 
 示例：
 
 - `Agent`
 - `Agent SOP`
 - `Agent API`
-- `让 Agent 接管和操作 Galley`
+- `让 Agent 接管和操作 Yole`
 
 当文案指向用户日常感知里的回复方、被通知方、对话对象时，用 `AI`。
 
@@ -225,18 +225,18 @@ About
 |---|---|
 | 左侧 tab | 中文 UI 使用英文主标签 + 中文辅助标签 |
 | Runtime page title | 保留 `Runtime` |
-| Runtime subtitle | `Galley 使用的 GenericAgent 运行环境` |
+| Runtime subtitle | `Yole 使用的 GenericAgent 运行环境` |
 | Health Check section | 保留 `Health Check` |
 | Health Check button | `跑一次 Health Check` |
 | Models page title | 保留 `Models` |
-| Models subtitle | `为 Galley 配置模型提供商和模型` |
+| Models subtitle | `为 Yole 配置模型提供商和模型` |
 | Approval page title | 保留 `Approval` |
 | Approval subtitle | `配置 Agent 操作的审批规则` |
 | Agent page title | 保留 `Agent` |
-| Agent subtitle | `让 Agent 接管和操作 Galley` |
+| Agent subtitle | `让 Agent 接管和操作 Yole` |
 | Shortcuts page title | 保留 `Shortcuts` |
 | Shortcuts subtitle | `快捷键设置` |
-| About title | 保留 `Galley` |
+| About title | 保留 `Yole` |
 
 ### 命令面板
 
@@ -271,7 +271,7 @@ About
 
 1. 按 UI 区域出英文稿，不按代码字符串顺序。
 2. 英文版按英文产品语气重写，不逐字翻译中文。
-3. Galley 英文语气：local-first、准确、克制、偏操作型。
+3. Yole 英文语气：local-first、准确、克制、偏操作型。
 4. 避免 SaaS marketing 腔。
 5. 英文 copy review 通过后，再进入 i18n dictionary 实现。
 

@@ -41,20 +41,20 @@ const zhCopy = {
   app: {
     unconfiguredModel: "未配置模型",
     managedModelHint: "配置模型",
-    externalModelHint: "修改 mykey.py 后重启 Galley 生效",
+    externalModelHint: "修改 mykey.py 后重启 Yole 生效",
     chooseGAFolderTitle: "选择 GenericAgent 仓库目录",
     restoreTimeout: "历史会话恢复超时",
     bridgeStartupTimeout:
-      "Galley 运行时启动超时。请重试；如果持续出现，请重启 Galley。",
+      "Yole 运行时启动超时。请重试；如果持续出现，请重启 Yole。",
     minimize: "最小化",
     maximize: "最大化",
     restoreWindow: "向下还原",
     closeBackgroundHint: {
-      title: "Galley 仍在后台运行",
+      title: "Yole 仍在后台运行",
       bodyMac:
-        "关闭窗口只是隐藏 Galley，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从菜单栏的 Galley 图标选择 Quit Galley。",
+        "关闭窗口只是隐藏 Yole，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从菜单栏的 Yole 图标选择 Quit Yole。",
       bodyWindows:
-        "关闭窗口只是隐藏 Galley，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从系统托盘的 Galley 图标选择 Quit Galley。",
+        "关闭窗口只是隐藏 Yole，后台任务和已接入的 Channel 会继续运行。需要彻底退出时，从系统托盘的 Yole 图标选择 Quit Yole。",
     },
   },
   sidebar: {
@@ -68,7 +68,7 @@ const zhCopy = {
     chooseExistingGAFolder: "选择已有的 GenericAgent 目录",
     openRuntimeForExternal: "打开 Runtime 接入外部 GA",
     supervisorSop: "Supervisor SOP",
-    supervisorSopTooltip: "复制 SOP，让外部 Agent 调度 Galley",
+    supervisorSopTooltip: "复制 SOP，让外部 Agent 调度 Yole",
     openSupervisorSop: "打开 Supervisor SOP 设置",
     newConversation: "新对话",
     newConversationInProject: (projectName: string) =>
@@ -149,7 +149,7 @@ const zhCopy = {
     closeDesktopPet: "关闭桌面宠物",
   },
   browserControlAttention: {
-    message: "连接浏览器控制后，Galley 才能操作你已登录的浏览器。",
+    message: "连接浏览器控制后，Yole 才能操作你已登录的浏览器。",
     action: "连接浏览器控制",
   },
   browserControl: {
@@ -157,12 +157,12 @@ const zhCopy = {
     connectedTitle: "浏览器控制已可用",
     connectedNoTabsTitle: "浏览器控制已连接",
     offlineTitle: "浏览器未打开",
-    connectedDescription: "Galley 已能读取和操作浏览器，并沿用你的登录态。",
+    connectedDescription: "Yole 已能读取和操作浏览器，并沿用你的登录态。",
     connectedNoTabsDescription:
       "插件已连接，等待网页可用。",
     offlineDescription:
       "已测试通过。打开 Chrome / Edge 浏览器后即可使用。",
-    description: "安装后，Galley 可以读取和操作浏览器，并沿用你的登录态。",
+    description: "安装后，Yole 可以读取和操作浏览器，并沿用你的登录态。",
     close: "关闭浏览器控制设置",
     folderName: "tmwd_cdp_bridge",
     developerMode: "开发者模式",
@@ -172,7 +172,7 @@ const zhCopy = {
     stepPrepare: "定位 tmwd_cdp_bridge 文件夹",
     stepPrepareReady: "文件夹已准备好",
     stepPrepareFailed:
-      "Galley 未能准备 tmwd_cdp_bridge。请重试，或重新安装 Galley。",
+      "Yole 未能准备 tmwd_cdp_bridge。请重试，或重新安装 Yole。",
     stepPrepareHintPrefix: "让 ",
     stepPrepareHintSuffix: " 文件夹保持可见，稍后要拖到浏览器。",
     stepOpenExtensions: "打开浏览器扩展管理",
@@ -186,7 +186,7 @@ const zhCopy = {
     stepInstallFallbackSuffix: "」选择这个文件夹。",
     stepOpenTestPage: "打开测试页",
     stepOpenTestPageHint:
-      "Galley 会用测试页确认浏览器控制可用。",
+      "Yole 会用测试页确认浏览器控制可用。",
     openChromeTestPage: "Chrome",
     openEdgeTestPage: "Edge",
     openTestPageFallback: (url: string) =>
@@ -224,7 +224,7 @@ const zhCopy = {
     testing: "正在测试连接...",
     later: "稍后再说",
     runDemo: "新建测试对话",
-    runDemoTitle: "新建一条对话，让 Galley 打开浏览器搜索天气",
+    runDemoTitle: "新建一条对话，让 Yole 打开浏览器搜索天气",
     demoPrompt:
       "请打开百度，搜索今天的天气，并告诉我结果。不要用代码或外部 API 查询。",
   },
@@ -285,7 +285,7 @@ const zhCopy = {
       about: { label: "About", helper: "关于" },
     },
     runtime: {
-      subtitle: "Galley 使用的 GenericAgent 运行环境",
+      subtitle: "Yole 使用的 GenericAgent 运行环境",
       runtimeMode: "Runtime Mode",
       bundledGA: "内置 GA",
       recommended: "推荐",
@@ -304,10 +304,10 @@ const zhCopy = {
         "重新走一遍首次设置流程，检查 Runtime、模型和 Health Check。现有对话会保留。",
       openSetupAssistant: "打开设置向导...",
       setupAssistantRunningBlock: "有任务运行时暂时不能打开设置向导。",
-      bundledPythonDetail: "Galley 内置 · 已附带 GA 依赖，零配置可用",
+      bundledPythonDetail: "Yole 内置 · 已附带 GA 依赖，零配置可用",
       useExternalPython: "使用外部 Python…",
       externalPythonHint: "外部 Python · 改变后用下方 Re-run 重新探测",
-      useBundledPython: "改回 Galley 内置 Python",
+      useBundledPython: "改回 Yole 内置 Python",
       advancedDiagnostics: "高级诊断",
       currentMode: "当前模式",
       kernelVersion: "内核版本",
@@ -349,7 +349,7 @@ const zhCopy = {
       notGenerated: "未生成",
     },
     models: {
-      subtitle: "为 Galley 配置模型提供商和模型",
+      subtitle: "为 Yole 配置模型提供商和模型",
       externalNotice:
         "当前使用外部 GA。这里的模型只用于内置 GA，不影响外部 GA。",
       connectedProviders: "已接入的模型提供商",
@@ -364,7 +364,7 @@ const zhCopy = {
       chatgptCodexPresetDescription: "登录 ChatGPT，使用 Codex 额度",
       chatgptCodexBadge: "ChatGPT 登录",
       chatgptCodexReadyBody:
-        "连接你的 ChatGPT 账号，让 Galley 使用你的 Codex 额度。",
+        "连接你的 ChatGPT 账号，让 Yole 使用你的 Codex 额度。",
       chatgptCodexWebLogin: "ChatGPT 网页登录",
       chatgptCodexDeviceCode: "设备码",
       copyDeviceCode: "复制",
@@ -432,7 +432,7 @@ const zhCopy = {
       noEnabledModels: "还没有启用模型",
       sessionModelScopeTitle: "生效范围",
       sessionModelScopeHint:
-        "新模型立即用于新对话；已启动的对话重启 Galley 后生效。",
+        "新模型立即用于新对话；已启动的对话重启 Yole 后生效。",
       defaultModel: "默认",
       defaultModelStatus: "默认模型",
       moveUp: (name: string) => `上移 ${name}`,
@@ -492,8 +492,8 @@ const zhCopy = {
       deleteProviderDialogTitle: "删除模型提供商？",
       deleteProviderDialogBody: (name: string, modelCount: number) =>
         modelCount > 0
-          ? `这会删除 ${name}，同时移除 ${modelCount} 个已启用模型，并删除 Galley 本地保存的 API Key。`
-          : `这会删除 ${name}，并删除 Galley 本地保存的 API Key。`,
+          ? `这会删除 ${name}，同时移除 ${modelCount} 个已启用模型，并删除 Yole 本地保存的 API Key。`
+          : `这会删除 ${name}，并删除 Yole 本地保存的 API Key。`,
       deleteProviderDialogAction: "删除提供商",
       cannotUndo: "此操作无法撤销。",
     },
@@ -559,23 +559,21 @@ const zhCopy = {
       subtitle: "基于 GenericAgent 的开源本地 Agent 工作台",
       links: "Links",
       feedback: "反馈建议",
-      origin:
-        "Galley 最初是 GenericAgent 的 workbench；名字前两个字母 GA，是对它的致意。",
-      galleyVersion: "Galley 版本",
+      yoleVersion: "Yole 版本",
       bundledGAVersion: "内置 GA 版本",
-      alsoBy: "JC Wang 的更多作品",
-      subsageDetail: "AI Agent 原生订阅管家 · subsage.top",
-      filmDetail: "IMAX 胶片电影资料库 · 15perf70mm.com",
-      madeBy: "由 JC Wang 开发 · MIT License",
+      alsoBy: "Yole",
+      subsageDetail: "Yole",
+      filmDetail: "Yole",
+      madeBy: "Yole Desktop · Copyright (c) 2026 Yole",
     },
     agent: {
-      subtitle: "把 Galley 交给本地 Agent 调度",
+      subtitle: "把 Yole 交给本地 Agent 调度",
       discoveryFile: "Discovery file",
       discoveryDescription:
-        "Galley 启动时把 CLI 的绝对路径写进这个文件。Galley Supervisor SOP 第一步读它来定位 galley。",
-      agentSop: "Galley Supervisor SOP",
+        "Yole 启动时把 CLI 的绝对路径写进这个文件。Yole Supervisor SOP 第一步读它来定位 yole。",
+      agentSop: "Yole Supervisor SOP",
       sopDescription:
-        "复制给你信任的本地 Agent，让它通过 Galley 调度 sessions。",
+        "复制给你信任的本地 Agent，让它通过 Yole 调度 sessions。",
       sopCapabilities: [
         "继续现有 session",
         "新开单个 session",
@@ -583,10 +581,10 @@ const zhCopy = {
       ],
       tryPrompts: "可以这样说",
       promptExamples: [
-        "看看 Galley 现在有哪些 session 在跑，分别进展到哪了。",
+        "看看 Yole 现在有哪些 session 在跑，分别进展到哪了。",
         "继续最近那个客户拜访计划 session，补充要求：把会议议程和后续跟进清单也整理出来。",
-        "开一个 Galley session，检查这个 repo 的测试失败原因。先不要改文件，只给结论。",
-        "用 Galley 帮我规划上海到杭州两天一夜周末游，建一个 Project，拆成交通、住宿、行程 3 个 session 并行跑，最后统一汇总。",
+        "开一个 Yole session，检查这个 repo 的测试失败原因。先不要改文件，只给结论。",
+        "用 Yole 帮我规划上海到杭州两天一夜周末游，建一个 Project，拆成交通、住宿、行程 3 个 session 并行跑，最后统一汇总。",
       ],
       copyExample: "复制这句话",
       exampleCopied: "已复制",
@@ -599,17 +597,17 @@ const zhCopy = {
       advanced: "高级选项",
       cliShortcut: "命令行快捷入口",
       cliDescription:
-        "可选。安装后，你和脚本都能在终端直接用 galley。Galley Supervisor SOP 不依赖它。",
+        "可选。安装后，你和脚本都能在终端直接用 yole。Yole Supervisor SOP 不依赖它。",
       pathInstallHintMac: "macOS 会请求一次系统权限。",
       pathUnsupportedWindows:
-        "Windows 一键安装命令稍后支持。Galley Supervisor SOP 不依赖它。",
+        "Windows 一键安装命令稍后支持。Yole Supervisor SOP 不依赖它。",
       pathUnsupportedGeneric:
-        "当前平台暂不支持一键安装。Galley Supervisor SOP 不依赖它。",
+        "当前平台暂不支持一键安装。Yole Supervisor SOP 不依赖它。",
       pathInstalled: "已安装：",
       pathBusy: "处理中…",
       pathRemove: "移除命令",
       pathReplace: "替换命令",
-      pathInstall: "安装 galley 命令",
+      pathInstall: "安装 yole 命令",
       pathAuth: "等鉴权…",
       pathOccupied: "已被占用，当前指向：",
       apiDocs: "API 文档",
@@ -620,20 +618,20 @@ const zhCopy = {
       openFailed: (reason: string) => `打开失败：${reason}`,
       sopStillLoading: "SOP 还在加载，请稍后再试",
       cliBinaryNotFound: (searched: string) =>
-        `没找到 galley 二进制（${searched}）。dev 模式可重启 pnpm tauri dev，或运行 cd core && cargo build -p galley-cli。`,
+        `没找到 yole 二进制（${searched}）。dev 模式可重启 pnpm tauri dev，或运行 cd core && cargo build -p yole-cli。`,
     },
     im: {
-      subtitle: "在聊天软件里和 Galley 对话",
+      subtitle: "在聊天软件里和 Yole 对话",
       wechatTitle: "微信",
       setupSteps: [
         "用手机微信扫描二维码完成接入。",
-        "接入完成后，直接在微信里给 Galley 发消息。",
-        "保持 Galley 运行，微信入口会持续可用。",
+        "接入完成后，直接在微信里给 Yole 发消息。",
+        "保持 Yole 运行，微信入口会持续可用。",
       ],
       connectedSteps: [
-        "在微信里给 Galley 发消息。",
-        "Galley 会在本机处理请求，并把结果回复到微信。",
-        "保持 Galley 运行，微信入口会持续可用。",
+        "在微信里给 Yole 发消息。",
+        "Yole 会在本机处理请求，并把结果回复到微信。",
+        "保持 Yole 运行，微信入口会持续可用。",
       ],
       notConnected: "未接入",
       starting: "正在接入",
@@ -642,10 +640,10 @@ const zhCopy = {
       expired: "接入已失效",
       error: "异常",
       stopped: "已暂停",
-      notConnectedHint: "接入后，微信会变成 Galley 的一个聊天入口。",
-      startingHint: "Galley 正在准备微信入口。",
+      notConnectedHint: "接入后，微信会变成 Yole 的一个聊天入口。",
+      startingHint: "Yole 正在准备微信入口。",
       waitingScanHint: "用手机微信扫描二维码完成接入。",
-      runningHint: "微信入口已可用，可以直接在微信里给 Galley 发消息。",
+      runningHint: "微信入口已可用，可以直接在微信里给 Yole 发消息。",
       expiredHint: "微信接入已失效，需要重新接入。",
       errorHint: "微信接入异常，可以重试。",
       stoppedHint: "已暂停接收微信消息。",
@@ -663,7 +661,7 @@ const zhCopy = {
       lastError: "错误详情",
       disconnectDialogTitle: "解除微信接入？",
       disconnectDialogBody:
-        "这只会让 Galley 停止通过当前微信会话收发消息，不会退出你手机上的微信账号。",
+        "这只会让 Yole 停止通过当前微信会话收发消息，不会退出你手机上的微信账号。",
       restartChannelsTitle: "Channels 正在使用旧模型配置",
       restartChannelsBody:
         "重启后，已启用 Channels 会使用最新模型配置。可能中断当前回复，不会退出登录。",
@@ -672,7 +670,7 @@ const zhCopy = {
         "这会重启所有已启用的 Channels，可能中断当前回复；不会退出登录。",
       openModels: "先去配置模型",
       modelRequired:
-        "微信接入会使用 Galley 已配置的模型。接入前，需要先在 Models 里配置一个可用模型。",
+        "微信接入会使用 Yole 已配置的模型。接入前，需要先在 Models 里配置一个可用模型。",
     },
   },
   onboarding: {
@@ -681,14 +679,14 @@ const zhCopy = {
     comingLater: "敬请期待",
     connectExisting: "接入已经安装的 GenericAgent",
     attachTrust:
-      "Galley 不修改你的 GenericAgent。删除 Galley，它照常独立运行。",
-    modelTitle: "为 Galley 配置模型",
+      "Yole 不修改你的 GenericAgent。删除 Yole，它照常独立运行。",
+    modelTitle: "为 Yole 配置模型",
     modelSubtitle: "选择提供商，填入密钥和模型。",
     connectExistingButton: "接入已有 GenericAgent",
-    testAndStart: "测试并开始使用 Galley",
-    startUsingGalley: "开始使用 Galley",
+    testAndStart: "测试并开始使用 Yole",
+    startUsingYole: "开始使用 Yole",
     attachTitle: "接入已经安装的 GenericAgent",
-    attachSubtitle: "指向本地 GA 目录 · Galley 用它启动 GA。",
+    attachSubtitle: "指向本地 GA 目录 · Yole 用它启动 GA。",
     gaPathLabel: "GA 路径",
     foundGA: "找到 GA 安装",
     agentmainVisible: "agentmain.py 可见",
@@ -699,9 +697,9 @@ const zhCopy = {
     downloadGuide: "查看教程：下载 GA",
     folderGuide: "查看教程：选对 GA 目录",
     healthTitle: "检查 GA 运行环境",
-    healthSubtitle: "全部通过后进入主界面 · Galley 不修改你的 GA。",
+    healthSubtitle: "全部通过后进入主界面 · Yole 不修改你的 GA。",
     rerunChecks: "重新检查",
-    enterGalley: "进入 Galley",
+    enterYole: "进入 Yole",
     backToSettings: "返回设置",
     continueWithCurrentModel: "继续使用当前模型",
     useGAVenv: "改用 GA venv 并重新检查",
@@ -728,7 +726,7 @@ const zhCopy = {
     memoryVisible: "memory/ 目录可见",
     assetsVisible: "assets/ 目录可见",
     pythonInterpreter: "Python 解释器",
-    bundledPython: "Galley 内置 Python",
+    bundledPython: "Yole 内置 Python",
     loadablePython: "查找能加载 GA 的 Python",
     llmConnection: "LLM 连接测试",
     llmConnectionDetail: "真实测试，最多 1 个输出 token",
@@ -834,7 +832,7 @@ const zhCopy = {
   },
   errors: {
     runtimeTitle: "工具执行失败",
-    bridgeTitle: "Galley 错误",
+    bridgeTitle: "Yole 错误",
     businessTitle: "操作未能完成",
     sendFailed: "发送失败",
     bridgeCrashed: "Bridge 进程崩溃",
@@ -863,7 +861,7 @@ const zhCopy = {
     switchLLM: "切换 LLM",
     managedModelUnavailable:
       "内置 GA 没有可用模型。在 Models 添加模型，或重填 API Key。",
-    managedRuntimeInvalid: "Galley 内置运行时不完整。请重新安装或更新 Galley。",
+    managedRuntimeInvalid: "Yole 内置运行时不完整。请重新安装或更新 Yole。",
     gaPathInvalid:
       "接入的 GenericAgent 路径不可用。到 Settings → Runtime 重选 GA 目录。",
   },
@@ -878,10 +876,10 @@ const zhCopy = {
       kind === "managed" ? "已切换到内置 GA" : "已切换到外部 GA",
     runtimeSwitchKept: "原对话已保留，可切回查看。",
     savedPath: "已保存路径配置",
-    restartForExisting: "重启 Galley 才能让现有对话生效",
+    restartForExisting: "重启 Yole 才能让现有对话生效",
     modelConfigSaved: "模型配置已保存",
     modelConfigSavedMessage:
-      "新对话立即生效；已启动的对话重启 Galley 后生效。",
+      "新对话立即生效；已启动的对话重启 Yole 后生效。",
     modelConfigSavedChannelsMessage: "已启用 Channels 重启后使用新模型配置。",
     modelConfigSavedChannelsSuffix: "已启用 Channels 重启后使用新模型配置。",
     restartChannels: "重启 Channels",
@@ -891,17 +889,17 @@ const zhCopy = {
     channelsRestartNone: "没有已启用的 Channel。",
     modelSelectionChanged: "已切换到默认模型",
     modelSelectionChangedMessage:
-      "此对话之前使用的模型已不可用，Galley 将改用默认模型。",
+      "此对话之前使用的模型已不可用，Yole 将改用默认模型。",
     updateReady: "更新已准备好",
-    updateReadyMessage: "新版本已下载，重启 Galley 生效。",
-    appUpdated: "Galley 已更新",
+    updateReadyMessage: "新版本已下载，重启 Yole 生效。",
+    appUpdated: "Yole 已更新",
     appUpdatedMessage: "已更新到最新版本。",
     imageSaved: "图片已保存",
     imageSavedMessage: "已保存到本地。",
     imageSaveFailed: "保存失败",
-    imageSaveFailedMessage: "Galley 没能保存这张图片。",
+    imageSaveFailedMessage: "Yole 没能保存这张图片。",
     imageOpenFailed: "打开失败",
-    imageOpenFailedMessage: "Galley 没能打开这张图片。",
+    imageOpenFailedMessage: "Yole 没能打开这张图片。",
     toolsReinjected: "工具已重新注入",
     toolsReinjectedMessage: (count: number) =>
       `已为本对话注入 ${count} 条工具定义。`,
@@ -911,7 +909,7 @@ const zhCopy = {
     archived: "已 Archive",
     archivedCount: (count: number) => `已归档 ${count} 个对话`,
     deleteFailed: "删除失败",
-    deleteFailedMessage: "Galley 没能从本地数据库删除这个对话。请稍后再试。",
+    deleteFailedMessage: "Yole 没能从本地数据库删除这个对话。请稍后再试。",
   },
   projects: {
     fallbackProject: "项目",
@@ -985,11 +983,11 @@ const zhCopy = {
     upToDate: "已是最新版本",
     foundPreparing: "正在下载更新",
     preparing: "正在下载更新",
-    ready: "新版本已下载，重启 Galley 生效",
+    ready: "新版本已下载，重启 Yole 生效",
     readyAfterTasks: "当前任务结束后再重启",
     foundAfterTasks: "发现新版本，当前任务结束后自动准备更新",
     noUpdateAvailable: "没有可安装的新版本。",
-    invalidEndpoint: "更新通道配置有误，请检查 GALLEY_UPDATER_ENDPOINT。",
+    invalidEndpoint: "更新通道配置有误，请检查 YOLE_UPDATER_ENDPOINT。",
     channelUnavailable: "更新通道暂时不可用，请稍后重试。",
     invalidManifest: "更新通道数据异常，已停止更新检查。",
     platformUnavailable: "当前平台暂时没有可用的更新包。",
@@ -1048,20 +1046,20 @@ const enCopy: AppCopy = {
   app: {
     unconfiguredModel: "No model configured",
     managedModelHint: "Configure models",
-    externalModelHint: "Restart Galley after editing mykey.py",
+    externalModelHint: "Restart Yole after editing mykey.py",
     chooseGAFolderTitle: "Choose GenericAgent repository folder",
     restoreTimeout: "Restoring the conversation timed out",
     bridgeStartupTimeout:
-      "Galley runtime did not finish starting. Try again; if it keeps happening, restart Galley.",
+      "Yole runtime did not finish starting. Try again; if it keeps happening, restart Yole.",
     minimize: "Minimize",
     maximize: "Maximize",
     restoreWindow: "Restore down",
     closeBackgroundHint: {
-      title: "Galley is still running",
+      title: "Yole is still running",
       bodyMac:
-        "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the Galley menu bar icon.",
+        "Closing the window only hides Yole. Background tasks and connected channels keep running. To quit completely, choose Quit Yole from the Yole menu bar icon.",
       bodyWindows:
-        "Closing the window only hides Galley. Background tasks and connected channels keep running. To quit completely, choose Quit Galley from the Galley tray icon.",
+        "Closing the window only hides Yole. Background tasks and connected channels keep running. To quit completely, choose Quit Yole from the Yole tray icon.",
     },
   },
   sidebar: {
@@ -1076,7 +1074,7 @@ const enCopy: AppCopy = {
     openRuntimeForExternal: "Open Runtime to connect external GA",
     supervisorSop: "Supervisor SOP",
     supervisorSopTooltip:
-      "Copy the SOP so an external Agent can coordinate Galley",
+      "Copy the SOP so an external Agent can coordinate Yole",
     openSupervisorSop: "Open Supervisor SOP settings",
     newConversation: "New conversation",
     newConversationInProject: (projectName) =>
@@ -1159,7 +1157,7 @@ const enCopy: AppCopy = {
   },
   browserControlAttention: {
     message:
-      "Connect Browser Control so Galley can operate your signed-in browser.",
+      "Connect Browser Control so Yole can operate your signed-in browser.",
     action: "Connect Browser Control",
   },
   browserControl: {
@@ -1168,13 +1166,13 @@ const enCopy: AppCopy = {
     connectedNoTabsTitle: "Browser Control is connected",
     offlineTitle: "Browser is not open",
     connectedDescription:
-      "Galley can already read and operate this browser, using your existing login state.",
+      "Yole can already read and operate this browser, using your existing login state.",
     connectedNoTabsDescription:
       "The extension is connected and waiting for a webpage.",
     offlineDescription:
       "Test passed. Open Chrome / Edge to use Browser Control.",
     description:
-      "After installation, Galley can read and operate this browser, using your existing login state.",
+      "After installation, Yole can read and operate this browser, using your existing login state.",
     close: "Close Browser Control setup",
     folderName: "tmwd_cdp_bridge",
     developerMode: "Developer mode",
@@ -1184,7 +1182,7 @@ const enCopy: AppCopy = {
     stepPrepare: "Reveal the tmwd_cdp_bridge folder",
     stepPrepareReady: "Folder ready",
     stepPrepareFailed:
-      "Galley could not prepare tmwd_cdp_bridge. Try again, or reinstall Galley.",
+      "Yole could not prepare tmwd_cdp_bridge. Try again, or reinstall Yole.",
     stepPrepareHintPrefix: "Keep the ",
     stepPrepareHintSuffix:
       " folder visible; you will drag it into the browser soon.",
@@ -1199,7 +1197,7 @@ const enCopy: AppCopy = {
     stepInstallFallbackSuffix: " and choose that folder.",
     stepOpenTestPage: "Open test page",
     stepOpenTestPageHint:
-      "Galley will use the test page to confirm Browser Control works.",
+      "Yole will use the test page to confirm Browser Control works.",
     openChromeTestPage: "Chrome",
     openEdgeTestPage: "Edge",
     openTestPageFallback: (url) =>
@@ -1240,7 +1238,7 @@ const enCopy: AppCopy = {
     later: "Later",
     runDemo: "New test chat",
     runDemoTitle:
-      "Create a chat that asks Galley to open the browser and search for weather",
+      "Create a chat that asks Yole to open the browser and search for weather",
     demoPrompt:
       "Open Baidu, search for today's weather, and tell me the result. Do not use code or external APIs.",
   },
@@ -1263,9 +1261,9 @@ const enCopy: AppCopy = {
     regionLabel: "Epigraph",
   },
   empty: {
-    globalPlaceholder: "What should Galley work on today?",
+    globalPlaceholder: "What should Yole work on today?",
     projectPlaceholder: (projectName) =>
-      `What should Galley do in ${projectName}?`,
+      `What should Yole do in ${projectName}?`,
   },
   command: {
     label: "Command palette",
@@ -1301,7 +1299,7 @@ const enCopy: AppCopy = {
       about: { label: "About", helper: "关于" },
     },
     runtime: {
-      subtitle: "GenericAgent runtime used by Galley",
+      subtitle: "GenericAgent runtime used by Yole",
       runtimeMode: "Runtime Mode",
       bundledGA: "Bundled GA",
       recommended: "Recommended",
@@ -1322,11 +1320,11 @@ const enCopy: AppCopy = {
       openSetupAssistant: "Open Setup Assistant...",
       setupAssistantRunningBlock:
         "Setup Assistant is unavailable while a task is running.",
-      bundledPythonDetail: "Bundled with Galley · GA dependencies included",
+      bundledPythonDetail: "Bundled with Yole · GA dependencies included",
       useExternalPython: "Use external Python...",
       externalPythonHint:
         "External Python · Re-run Health Check after changing it",
-      useBundledPython: "Use Galley's bundled Python",
+      useBundledPython: "Use Yole's bundled Python",
       advancedDiagnostics: "Advanced diagnostics",
       currentMode: "Current mode",
       kernelVersion: "Runtime version",
@@ -1354,7 +1352,7 @@ const enCopy: AppCopy = {
       validPath: "Path is valid",
       agentmainVisible: "agentmain.py visible",
       pathMissingAgentmain:
-        "The path exists, but agentmain.py was not found. Galley will save it; confirm this is the GA folder.",
+        "The path exists, but agentmain.py was not found. Yole will save it; confirm this is the GA folder.",
       pathNotFound: "Path not found · Not saved",
       checking: "Checking...",
       genericAgentVersion: "GenericAgent version",
@@ -1363,13 +1361,13 @@ const enCopy: AppCopy = {
       aligned: "Aligned",
       selfUpdated: "Self-updated",
       commitCompatibilityNote:
-        "New commits may introduce compatibility issues. Galley will check and report them next time it starts.",
+        "New commits may introduce compatibility issues. Yole will check and report them next time it starts.",
       pendingPackage: "pending package",
       uninitialized: "not initialized",
       notGenerated: "not generated",
     },
     models: {
-      subtitle: "Configure model providers and models for Galley",
+      subtitle: "Configure model providers and models for Yole",
       externalNotice:
         "External GA is active. Models here are only used by bundled GA; external GA is unaffected.",
       connectedProviders: "Connected model providers",
@@ -1385,7 +1383,7 @@ const enCopy: AppCopy = {
       chatgptCodexPresetDescription: "Sign in to ChatGPT and use Codex quota",
       chatgptCodexBadge: "ChatGPT sign-in",
       chatgptCodexReadyBody:
-        "Connect your ChatGPT account so Galley can use your Codex quota.",
+        "Connect your ChatGPT account so Yole can use your Codex quota.",
       chatgptCodexWebLogin: "ChatGPT web sign-in",
       chatgptCodexDeviceCode: "Device code",
       copyDeviceCode: "Copy",
@@ -1407,7 +1405,7 @@ const enCopy: AppCopy = {
       modelListManualFallback:
         "You can keep going without a returned model list: enter the model name manually and save.",
       selectedModelOutsideList: (model) =>
-        `Galley will save ${model}. It was not in the returned list, but you can keep it as a manual model.`,
+        `Yole will save ${model}. It was not in the returned list, but you can keep it as a manual model.`,
       providerName: "Provider display name",
       providerNamePlaceholder:
         "Optional custom name; helps identify it in the list.",
@@ -1457,7 +1455,7 @@ const enCopy: AppCopy = {
       noEnabledModels: "No enabled models yet",
       sessionModelScopeTitle: "Scope",
       sessionModelScopeHint:
-        "New models apply to new conversations immediately; already-started conversations update after a Galley restart.",
+        "New models apply to new conversations immediately; already-started conversations update after a Yole restart.",
       defaultModel: "Default",
       defaultModelStatus: "Default model",
       moveUp: (name) => `Move ${name} up`,
@@ -1518,8 +1516,8 @@ const enCopy: AppCopy = {
       deleteProviderDialogTitle: "Delete model provider?",
       deleteProviderDialogBody: (name, modelCount) =>
         modelCount > 0
-          ? `This will delete ${name}, remove ${modelCount} enabled model${modelCount === 1 ? "" : "s"}, and delete the API Key saved locally by Galley.`
-          : `This will delete ${name} and delete the API Key saved locally by Galley.`,
+          ? `This will delete ${name}, remove ${modelCount} enabled model${modelCount === 1 ? "" : "s"}, and delete the API Key saved locally by Yole.`
+          : `This will delete ${name} and delete the API Key saved locally by Yole.`,
       deleteProviderDialogAction: "Delete provider",
       cannotUndo: "This cannot be undone.",
     },
@@ -1553,7 +1551,7 @@ const enCopy: AppCopy = {
       notForText:
         "production code, shared systems, unfamiliar Agents, or sensitive data",
       yoloIndicatorNote:
-        "Galley will show a YOLO indicator in the top bar, and you can turn it off anytime.",
+        "Yole will show a YOLO indicator in the top bar, and you can turn it off anytime.",
       understandRisk: "Yes, I understand the risk",
       filePatch: "file_patch (modify files)",
       fileWrite: "file_write (write files)",
@@ -1587,26 +1585,24 @@ const enCopy: AppCopy = {
       enterSubmenu: "Enter the command palette submenu",
     },
     about: {
-      subtitle: "Open-source local Agent workbench built on GenericAgent",
+      subtitle: "Open-source local Agent orchestrator built on GenericAgent",
       links: "Links",
       feedback: "Feedback",
-      origin:
-        "Galley started as a workbench for GenericAgent. The first two letters of our name are a quiet bow to where we came from.",
-      galleyVersion: "Galley version",
+      yoleVersion: "Yole version",
       bundledGAVersion: "Bundled GA version",
-      alsoBy: "More by JC Wang",
-      subsageDetail: "Your AI Agent's Subscription Memory · subsage.top",
-      filmDetail: "IMAX Film Datebase · 15perf70mm.com",
-      madeBy: "Built by JC Wang · MIT License",
+      alsoBy: "Yole",
+      subsageDetail: "Yole",
+      filmDetail: "Yole",
+      madeBy: "Yole Desktop · Copyright (c) 2026 Yole",
     },
     agent: {
-      subtitle: "Let a local Agent coordinate Galley",
+      subtitle: "Let a local Agent coordinate Yole",
       discoveryFile: "Discovery file",
       discoveryDescription:
-        "Galley writes the absolute CLI path here on startup. Galley Supervisor SOP reads it first to locate galley.",
-      agentSop: "Galley Supervisor SOP",
+        "Yole writes the absolute CLI path here on startup. Yole Supervisor SOP reads it first to locate yole.",
+      agentSop: "Yole Supervisor SOP",
       sopDescription:
-        "Copy it to a local Agent you trust so it can coordinate Galley sessions.",
+        "Copy it to a local Agent you trust so it can coordinate Yole sessions.",
       sopCapabilities: [
         "Continue an existing session",
         "Start one focused session",
@@ -1614,10 +1610,10 @@ const enCopy: AppCopy = {
       ],
       tryPrompts: "Try Saying",
       promptExamples: [
-        "Show me which Galley sessions are running and where each one stands.",
+        "Show me which Yole sessions are running and where each one stands.",
         "Continue the recent client-visit planning session. Add this requirement: also prepare the meeting agenda and follow-up checklist.",
-        "Start a Galley session to investigate why this repo's tests are failing. Do not change files yet; report conclusions only.",
-        "Use Galley to plan a two-day weekend trip from Shanghai to Hangzhou. Create a Project, split it into 3 sessions for transportation, lodging, and itinerary, then synthesize the results.",
+        "Start a Yole session to investigate why this repo's tests are failing. Do not change files yet; report conclusions only.",
+        "Use Yole to plan a two-day weekend trip from Shanghai to Hangzhou. Create a Project, split it into 3 sessions for transportation, lodging, and itinerary, then synthesize the results.",
       ],
       copyExample: "Copy this prompt",
       exampleCopied: "Copied",
@@ -1630,17 +1626,17 @@ const enCopy: AppCopy = {
       advanced: "Advanced options",
       cliShortcut: "CLI shortcut",
       cliDescription:
-        "Optional. Once installed, you and your scripts can run galley from the terminal. Galley Supervisor SOP does not depend on it.",
+        "Optional. Once installed, you and your scripts can run yole from the terminal. Yole Supervisor SOP does not depend on it.",
       pathInstallHintMac: "macOS will ask for system permission once.",
       pathUnsupportedWindows:
-        "One-click command installation on Windows is coming later. Galley Supervisor SOP does not depend on it.",
+        "One-click command installation on Windows is coming later. Yole Supervisor SOP does not depend on it.",
       pathUnsupportedGeneric:
-        "One-click command installation is not supported on this platform. Galley Supervisor SOP does not depend on it.",
+        "One-click command installation is not supported on this platform. Yole Supervisor SOP does not depend on it.",
       pathInstalled: "Installed: ",
       pathBusy: "Working...",
       pathRemove: "Remove command",
       pathReplace: "Replace command",
-      pathInstall: "Install galley command",
+      pathInstall: "Install yole command",
       pathAuth: "Waiting for authorization...",
       pathOccupied: "is already occupied and currently points to:",
       apiDocs: "API docs",
@@ -1651,20 +1647,20 @@ const enCopy: AppCopy = {
       openFailed: (reason) => `Open failed: ${reason}`,
       sopStillLoading: "SOP is still loading. Try again in a moment.",
       cliBinaryNotFound: (searched) =>
-        `Could not find the galley binary (${searched}). In dev mode, restart pnpm tauri dev, or run cd core && cargo build -p galley-cli.`,
+        `Could not find the yole binary (${searched}). In dev mode, restart pnpm tauri dev, or run cd core && cargo build -p yole-cli.`,
     },
     im: {
-      subtitle: "Talk with Galley from your messaging apps",
+      subtitle: "Talk with Yole from your messaging apps",
       wechatTitle: "WeChat",
       setupSteps: [
         "Scan the QR code with WeChat on your phone.",
-        "After connecting, send Galley a message directly in WeChat.",
-        "Keep Galley running to keep the WeChat entry available.",
+        "After connecting, send Yole a message directly in WeChat.",
+        "Keep Yole running to keep the WeChat entry available.",
       ],
       connectedSteps: [
-        "Send Galley a message in WeChat.",
-        "Galley handles the request on this computer and replies in WeChat.",
-        "Keep Galley running to keep the WeChat entry available.",
+        "Send Yole a message in WeChat.",
+        "Yole handles the request on this computer and replies in WeChat.",
+        "Keep Yole running to keep the WeChat entry available.",
       ],
       notConnected: "Not connected",
       starting: "Connecting",
@@ -1673,11 +1669,11 @@ const enCopy: AppCopy = {
       expired: "Connection expired",
       error: "Issue",
       stopped: "Paused",
-      notConnectedHint: "After setup, WeChat becomes a chat entry for Galley.",
-      startingHint: "Galley is preparing the WeChat entry.",
+      notConnectedHint: "After setup, WeChat becomes a chat entry for Yole.",
+      startingHint: "Yole is preparing the WeChat entry.",
       waitingScanHint: "Scan the QR code with WeChat on your phone to connect.",
       runningHint:
-        "WeChat is connected. Message Galley from WeChat while Galley is running.",
+        "WeChat is connected. Message Yole from WeChat while Yole is running.",
       expiredHint: "The WeChat connection expired. Scan again to reconnect.",
       errorHint: "The WeChat connection has an issue. You can retry.",
       stoppedHint: "Receiving WeChat messages is paused.",
@@ -1695,7 +1691,7 @@ const enCopy: AppCopy = {
       lastError: "Error details",
       disconnectDialogTitle: "Disconnect WeChat?",
       disconnectDialogBody:
-        "This only stops Galley from sending and receiving through the current WeChat session. It will not log you out of WeChat on your phone.",
+        "This only stops Yole from sending and receiving through the current WeChat session. It will not log you out of WeChat on your phone.",
       restartChannelsTitle: "Channels are using old model config",
       restartChannelsBody:
         "After restart, enabled Channels will use the latest model config. This may interrupt the current reply, but will not log you out.",
@@ -1704,7 +1700,7 @@ const enCopy: AppCopy = {
         "This restarts all enabled Channels. It may interrupt the current reply, but will not log you out.",
       openModels: "Configure models first",
       modelRequired:
-        "WeChat uses Galley's configured models. Add a usable model in Models before connecting.",
+        "WeChat uses Yole's configured models. Add a usable model in Models before connecting.",
     },
   },
   onboarding: {
@@ -1713,15 +1709,15 @@ const enCopy: AppCopy = {
     comingLater: "Coming later",
     connectExisting: "Connect an existing GenericAgent",
     attachTrust:
-      "Galley does not modify your GenericAgent. Remove Galley, and it still runs on its own.",
-    modelTitle: "Set up a model for Galley",
+      "Yole does not modify your GenericAgent. Remove Yole, and it still runs on its own.",
+    modelTitle: "Set up a model for Yole",
     modelSubtitle: "Choose a provider, enter the API key and model.",
     connectExistingButton: "Connect existing GenericAgent",
-    testAndStart: "Test and start using Galley",
-    startUsingGalley: "Start using Galley",
+    testAndStart: "Test and start using Yole",
+    startUsingYole: "Start using Yole",
     attachTitle: "Connect an existing GenericAgent",
     attachSubtitle:
-      "Point Galley to your local GA folder · Galley starts GA from it.",
+      "Point Yole to your local GA folder · Yole starts GA from it.",
     gaPathLabel: "GA Folder",
     foundGA: "Found GA installation",
     agentmainVisible: "agentmain.py visible",
@@ -1733,9 +1729,9 @@ const enCopy: AppCopy = {
     folderGuide: "Open guide: choose the GA folder",
     healthTitle: "Check GA runtime",
     healthSubtitle:
-      "All checks must pass first · Galley does not modify your GA.",
+      "All checks must pass first · Yole does not modify your GA.",
     rerunChecks: "Re-run checks",
-    enterGalley: "Enter Galley",
+    enterYole: "Enter Yole",
     backToSettings: "Back to Settings",
     continueWithCurrentModel: "Continue with current model",
     useGAVenv: "Use GA venv and re-check",
@@ -1762,7 +1758,7 @@ const enCopy: AppCopy = {
     memoryVisible: "memory/ folder visible",
     assetsVisible: "assets/ folder visible",
     pythonInterpreter: "Python interpreter",
-    bundledPython: "Galley bundled Python",
+    bundledPython: "Yole bundled Python",
     loadablePython: "Find Python that can load GA",
     llmConnection: "LLM connection test",
     llmConnectionDetail: "Real test, max 1 output token",
@@ -1825,7 +1821,7 @@ const enCopy: AppCopy = {
     codeNoCommand: "(no command)",
     emptyContent: "(empty content)",
     fileWriteDeferred:
-      "The content comes from the LLM's current response and will be written to this file. do_file_write extracts the actual content from the response after dispatch, so Galley cannot preview it here.",
+      "The content comes from the LLM's current response and will be written to this file. do_file_write extracts the actual content from the response after dispatch, so Yole cannot preview it here.",
   },
   approval: {
     allow: "Allow",
@@ -1869,7 +1865,7 @@ const enCopy: AppCopy = {
   },
   errors: {
     runtimeTitle: "Tool execution failed",
-    bridgeTitle: "Galley error",
+    bridgeTitle: "Yole error",
     businessTitle: "Action could not be completed",
     sendFailed: "Send failed",
     bridgeCrashed: "Bridge process crashed",
@@ -1901,7 +1897,7 @@ const enCopy: AppCopy = {
     managedModelUnavailable:
       "Bundled GA has no usable model. Add a model in Models or re-enter the API Key.",
     managedRuntimeInvalid:
-      "Galley's bundled runtime is incomplete. Reinstall or update Galley.",
+      "Yole's bundled runtime is incomplete. Reinstall or update Yole.",
     gaPathInvalid:
       "The connected GenericAgent folder is unavailable. Choose the GA folder again in Settings > Runtime.",
   },
@@ -1918,10 +1914,10 @@ const enCopy: AppCopy = {
       "Existing conversations are kept; switch back anytime to view them.",
     savedPath: "Path settings saved",
     restartForExisting:
-      "Restart Galley to apply this to existing conversations",
+      "Restart Yole to apply this to existing conversations",
     modelConfigSaved: "Model config saved",
     modelConfigSavedMessage:
-      "New conversations apply it immediately; running ones update after a Galley restart.",
+      "New conversations apply it immediately; running ones update after a Yole restart.",
     modelConfigSavedChannelsMessage:
       "Enabled Channels use the new model config after restart.",
     modelConfigSavedChannelsSuffix:
@@ -1934,18 +1930,18 @@ const enCopy: AppCopy = {
     channelsRestartNone: "No enabled Channel.",
     modelSelectionChanged: "Switched to the default model",
     modelSelectionChangedMessage:
-      "The model this conversation used is no longer available; Galley will switch to the default.",
+      "The model this conversation used is no longer available; Yole will switch to the default.",
     updateReady: "Update ready",
     updateReadyMessage:
-      "The new version has been downloaded. Restart Galley to apply it.",
-    appUpdated: "Galley updated",
-    appUpdatedMessage: "Galley is now on the latest version.",
+      "The new version has been downloaded. Restart Yole to apply it.",
+    appUpdated: "Yole updated",
+    appUpdatedMessage: "Yole is now on the latest version.",
     imageSaved: "Image saved",
     imageSavedMessage: "Saved locally.",
     imageSaveFailed: "Save failed",
-    imageSaveFailedMessage: "Galley could not save this image.",
+    imageSaveFailedMessage: "Yole could not save this image.",
     imageOpenFailed: "Open failed",
-    imageOpenFailedMessage: "Galley could not open this image.",
+    imageOpenFailedMessage: "Yole could not open this image.",
     toolsReinjected: "Tools reinjected",
     toolsReinjectedMessage: (count) =>
       `Injected ${count} tool definitions into this conversation.`,
@@ -1957,7 +1953,7 @@ const enCopy: AppCopy = {
     archivedCount: (count) => `Archived ${count} conversations`,
     deleteFailed: "Delete failed",
     deleteFailedMessage:
-      "Galley could not delete the conversation from the local database. Try again in a moment.",
+      "Yole could not delete the conversation from the local database. Try again in a moment.",
   },
   projects: {
     fallbackProject: "Project",
@@ -2037,13 +2033,13 @@ const enCopy: AppCopy = {
     upToDate: "Up to date",
     foundPreparing: "Downloading update",
     preparing: "Downloading update",
-    ready: "New version downloaded. Restart Galley to apply it.",
+    ready: "New version downloaded. Restart Yole to apply it.",
     readyAfterTasks: "Restart after the current task finishes.",
     foundAfterTasks:
-      "New version found. Galley will prepare it after the current task finishes.",
+      "New version found. Yole will prepare it after the current task finishes.",
     noUpdateAvailable: "No installable update is available.",
     invalidEndpoint:
-      "The update channel is misconfigured. Check GALLEY_UPDATER_ENDPOINT.",
+      "The update channel is misconfigured. Check YOLE_UPDATER_ENDPOINT.",
     channelUnavailable:
       "The update channel is temporarily unavailable. Try again later.",
     invalidManifest:
@@ -2051,11 +2047,11 @@ const enCopy: AppCopy = {
     platformUnavailable:
       "No update package is currently available for this platform.",
     networkUnavailable:
-      "Galley cannot reach the update channel right now. Try again later.",
-    downloadFailed: "Galley could not download the update. Try again later.",
+      "Yole cannot reach the update channel right now. Try again later.",
+    downloadFailed: "Yole could not download the update. Try again later.",
     signatureInvalid:
-      "Galley could not verify the update package, so installation stopped.",
-    installFailed: "Galley could not install the update. Check again first.",
+      "Yole could not verify the update package, so installation stopped.",
+    installFailed: "Yole could not install the update. Check again first.",
     checkFailed: "Update check failed.",
   },
 };

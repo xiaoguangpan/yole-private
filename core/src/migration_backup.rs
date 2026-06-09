@@ -1,9 +1,9 @@
-//! Pre-migration backup of the Galley data directory (B4 M8).
+//! Pre-migration backup of the Yole data directory (B4 M8).
 //!
 //! When the on-disk SQLite schema version is older than the highest
-//! version Galley Core knows about, the Rust-side `tauri-plugin-sql`
+//! version Yole Core knows about, the Rust-side `tauri-plugin-sql`
 //! preload will run pending migrations. Per
-//! [B4-I6](../../docs/refactor/B4-cli-bg-artifact.md), Galley must
+//! [B4-I6](../../docs/refactor/B4-cli-bg-artifact.md), Yole must
 //! snapshot the entire data directory **before** that happens so a
 //! botched migration is recoverable.
 //!
@@ -13,12 +13,12 @@
 //! - On-disk version > latest known → [`BackupOutcome::NotApplicable`]
 //!   (user downgraded; log + let the plugin no-op).
 //! - On-disk version < latest known → copy data dir to
-//!   `app.galley.backup.<utc-timestamp>/` sibling, then return
+//!   `app.yole.backup.<utc-timestamp>/` sibling, then return
 //!   [`BackupOutcome::Backed`].
 //!
 //! Backup failures are surfaced as [`BackupError`]. The Tauri setup
 //! hook in [`crate::run`](crate) turns those into a blocking error
-//! dialog + `std::process::exit(2)` — Galley refuses to open the DB
+//! dialog + `std::process::exit(2)` — Yole refuses to open the DB
 //! when its safety net broke.
 //!
 //! Schema version is **derived from the migrations vec** in
@@ -34,9 +34,9 @@ use sqlx::{ConnectOptions, Row};
 
 use crate::app_paths::{self, DB_FILENAME};
 
-/// Sibling directory name prefix (e.g. `app.galley.backup.20260520T140530Z/`
-/// next to `app.galley/`).
-const BACKUP_DIR_PREFIX: &str = "app.galley.backup.";
+/// Sibling directory name prefix (e.g. `app.yole.backup.20260520T140530Z/`
+/// next to `app.yole/`).
+const BACKUP_DIR_PREFIX: &str = "app.yole.backup.";
 
 /// Outcome of [`ensure_backup_before_migrate`].
 #[derive(Debug, Clone)]
@@ -44,11 +44,11 @@ pub enum BackupOutcome {
     /// Data directory / DB file does not exist. Nothing to back up;
     /// `tauri-plugin-sql` will create a fresh schema.
     FreshInstall,
-    /// On-disk migration version equals the latest Galley Core ships.
+    /// On-disk migration version equals the latest Yole Core ships.
     /// No migration will run, no backup needed.
     UpToDate { version: i64 },
-    /// On-disk version is **higher** than the latest Galley knows about.
-    /// User likely ran a newer Galley and downgraded — neither migration
+    /// On-disk version is **higher** than the latest Yole knows about.
+    /// User likely ran a newer Yole and downgraded — neither migration
     /// nor backup makes sense. The plugin will no-op.
     NotApplicable { on_disk: i64, code_max: i64 },
     /// Migration pending and backup completed successfully.
@@ -63,7 +63,7 @@ pub enum BackupOutcome {
 #[derive(Debug)]
 pub enum BackupError {
     /// The platform app config directory could not be resolved.
-    /// Extremely unusual; Galley can't proceed safely.
+    /// Extremely unusual; Yole can't proceed safely.
     DataDirUnavailable,
     /// `sqlx` open / probe query failed against the existing DB file.
     /// Likely a corrupted DB; user should restore from a Time Machine
@@ -101,11 +101,11 @@ impl std::fmt::Display for BackupError {
 
 impl std::error::Error for BackupError {}
 
-/// Resolve the directory where `tauri-plugin-sql` opens `workbench.db`.
+/// Resolve the directory where `tauri-plugin-sql` opens `yole.db`.
 ///
 /// Historical note: this function kept the "data dir" name from B4 M8,
 /// but the correct source of truth is Tauri's app-config dir because
-/// that is what `tauri-plugin-sql` uses for `sqlite:workbench.db`.
+/// that is what `tauri-plugin-sql` uses for `sqlite:yole.db`.
 /// `None` only when the platform's home/config directory is
 /// unresolvable (extremely rare; see B4-M8 sub-plan §R1).
 ///
@@ -135,7 +135,7 @@ pub fn ensure_backup_before_migrate_in(
     }
 
     // 2. DB file doesn't exist → also fresh install (data dir is
-    //    empty or holds non-DB Galley state we don't track).
+    //    empty or holds non-DB Yole state we don't track).
     let db_path = data_dir.join(DB_FILENAME);
     if !db_path.exists() {
         return Ok(BackupOutcome::FreshInstall);
@@ -174,7 +174,7 @@ pub fn ensure_backup_before_migrate_in(
 
 /// Probe `_sqlx_migrations` for the highest successfully-applied
 /// version. Returns 0 when the table doesn't exist (e.g. extremely
-/// old Galley pre-init state, or an empty DB) so the caller treats
+/// old Yole pre-init state, or an empty DB) so the caller treats
 /// it as "everything pending".
 fn probe_on_disk_version(db_path: &Path) -> Result<i64, BackupError> {
     let opts = SqliteConnectOptions::new()
@@ -192,7 +192,7 @@ fn probe_on_disk_version(db_path: &Path) -> Result<i64, BackupError> {
 
         // `_sqlx_migrations` is the table `sqlx` (and therefore
         // `tauri-plugin-sql`) writes per its standard migrator. If
-        // the user is on a DB that pre-dates Galley's own
+        // the user is on a DB that pre-dates Yole's own
         // migrations (shouldn't happen since 001_init.sql creates
         // the schema), the table is missing — we treat that as
         // version 0 to fall through to the backup branch.
@@ -221,7 +221,7 @@ fn probe_on_disk_version(db_path: &Path) -> Result<i64, BackupError> {
 
 /// Recursive directory copy. `std::fs` has no `copy_dir_all`, so we
 /// roll our own — 14 lines, no extra deps (B4 M8 sub-plan §1.8).
-/// Symlinks are skipped silently (Galley's data dir never creates
+/// Symlinks are skipped silently (Yole's data dir never creates
 /// any; if a user manually drops one in, we'd rather leave it than
 /// follow into untrusted territory).
 fn copy_dir_all(src: &Path, dst: &Path) -> io::Result<()> {
@@ -340,12 +340,12 @@ mod tests {
     }
 
     /// Helper — create a parent + nested data dir layout that mirrors
-    /// the production `~/Library/Application Support/app.galley/`
+    /// the production `~/Library/Application Support/app.yole/`
     /// structure (parent must exist because backup goes to a sibling).
     fn make_parent_with_data_dir(tmp: &TempDir) -> PathBuf {
         let parent = tmp.path().join("AppData");
         fs::create_dir(&parent).unwrap();
-        let data = parent.join("app.galley");
+        let data = parent.join("app.yole");
         fs::create_dir(&data).unwrap();
         data
     }
@@ -362,7 +362,7 @@ mod tests {
     fn fresh_install_db_missing() {
         let tmp = TempDir::new().unwrap();
         let data = make_parent_with_data_dir(&tmp);
-        // data dir exists but no workbench.db inside
+        // data dir exists but no yole.db inside
         let out = ensure_backup_before_migrate_in(&data, 7).unwrap();
         assert!(matches!(out, BackupOutcome::FreshInstall));
     }
@@ -431,7 +431,7 @@ mod tests {
                 assert_eq!(nested, b"hello nested");
                 // DB file also copied
                 assert!(backup_path.join(DB_FILENAME).is_file());
-                // Managed GA state is Galley-owned user state and must travel
+                // Managed GA state is Yole-owned user state and must travel
                 // with ordinary app-data backup.
                 assert_eq!(
                     fs::read(
@@ -460,7 +460,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let data = make_parent_with_data_dir(&tmp);
         // DB claims version 99 (e.g. user downgraded after running a
-        // future Galley).
+        // future Yole).
         init_db_with_version(&data.join(DB_FILENAME), 99);
         let out = ensure_backup_before_migrate_in(&data, 7).unwrap();
         match out {

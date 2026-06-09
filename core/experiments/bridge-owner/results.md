@@ -255,8 +255,8 @@ percentiles. ~half-day of setup but trivial mechanics.
 
 ### Session 1 surprises
 
-- **`pgrep -f workbench_bridge` is too coarse** during dogfood. JC's running
-  `/Applications/Galley.app` was spawning bridge children with session-ids
+- **`pgrep -f yole_bridge` is too coarse** during dogfood. JC's running
+  `/Applications/Yole.app` was spawning bridge children with session-ids
   `s-mp*-*` while our experiment was running. Initial L1 falsely reported
   orphans because of those. Fixed `tests.sh` to `pgrep -f -- "--session-id
   exp_"` instead. Lesson for all future experiment / prototype work during
@@ -311,7 +311,7 @@ To be measured in a later session, before any Rust-side numbers:
 
 ## Final go/no-go
 
-**Verdict: GO for B1** — start the Galley Core refactor.
+**Verdict: GO for B1** — start the Yole Core refactor.
 
 Date: 2026-05-18 (session 1, single sitting).
 

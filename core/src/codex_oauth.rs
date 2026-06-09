@@ -1,6 +1,6 @@
-//! ChatGPT / Codex OAuth support for Galley-owned managed runtime.
+//! ChatGPT / Codex OAuth support for Yole-owned managed runtime.
 //!
-//! This module is intentionally Core-owned: refresh tokens stay in Galley's
+//! This module is intentionally Core-owned: refresh tokens stay in Yole's
 //! encrypted local store and managed GA can only request short-lived access
 //! tokens over a localhost-only IPC channel.
 
@@ -19,8 +19,8 @@ use crate::api::{
     ManagedModelProviderRecord, ManagedModelRecord,
 };
 use crate::credential_store;
-use crate::db::{SqliteGalley, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata};
-use crate::error::{GalleyError, Result};
+use crate::db::{SqliteYole, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata};
+use crate::error::{YoleError, Result};
 
 pub const CODEX_PROVIDER_ID: &str = "mp_chatgpt_codex";
 pub const CODEX_MODEL_ID: &str = "mm_chatgpt_codex_gpt_55";
@@ -34,7 +34,7 @@ const CODEX_OAUTH_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const CODEX_AUTH_ISSUER: &str = "https://auth.openai.com";
 const CODEX_DEVICE_URL: &str = "https://auth.openai.com/codex/device";
 const CODEX_PROBE_INSTRUCTIONS: &str =
-    "This is a Galley model health check. Reply with a short acknowledgement.";
+    "This is a Yole model health check. Reply with a short acknowledgement.";
 const REFRESH_SKEW_SECONDS: i64 = 120;
 const HTTP_TIMEOUT_SECS: u64 = 20;
 
@@ -150,15 +150,15 @@ pub async fn start_device_login() -> Result<CodexDeviceLoginStart> {
         .json(&serde_json::json!({ "client_id": CODEX_OAUTH_CLIENT_ID }))
         .send()
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("ChatGPT sign-in request failed: {e}"),
         })?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
         message: format!("reading ChatGPT sign-in response failed: {e}"),
     })?;
     if !status.is_success() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: format!(
                 "ChatGPT sign-in failed (HTTP {}: {})",
                 status.as_u16(),
@@ -167,7 +167,7 @@ pub async fn start_device_login() -> Result<CodexDeviceLoginStart> {
         });
     }
     let data: DeviceCodeResponse =
-        serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+        serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
             message: format!("ChatGPT sign-in response is invalid JSON: {e}"),
         })?;
     let device_auth_id = nonempty(data.device_auth_id, "device_auth_id")?;
@@ -196,14 +196,14 @@ pub async fn complete_device_login(
 
 pub async fn import_cli_login() -> Result<CodexAuthSetupResult> {
     let auth_path = codex_cli_auth_path()?;
-    let body = std::fs::read_to_string(&auth_path).map_err(|e| GalleyError::InvalidArgs {
+    let body = std::fs::read_to_string(&auth_path).map_err(|e| YoleError::InvalidArgs {
         message: format!(
             "Codex CLI login was not found at {}: {e}",
             auth_path.display()
         ),
     })?;
     let file: CodexCliAuthFile =
-        serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+        serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
             message: format!("Codex CLI auth file is invalid JSON: {e}"),
         })?;
     let mut secret = CodexOAuthSecret::new(file.tokens.access_token, file.tokens.refresh_token)?;
@@ -217,15 +217,15 @@ pub async fn logout_provider(input: CodexProviderActionInput) -> Result<()> {
     let provider_id = input
         .provider_id
         .unwrap_or_else(|| CODEX_PROVIDER_ID.into());
-    let galley = SqliteGalley::open().await?;
-    let api_key_ref = galley
+    let yole = SqliteYole::open().await?;
+    let api_key_ref = yole
         .list_managed_model_providers()
         .await?
         .into_iter()
         .find(|provider| provider.id == provider_id)
         .map(|provider| provider.api_key_ref)
         .unwrap_or_else(|| credential_store::managed_provider_api_key_ref(&provider_id));
-    credential_store::delete_secret(&galley, &api_key_ref).await
+    credential_store::delete_secret(&yole, &api_key_ref).await
 }
 
 pub async fn test_codex_connection(
@@ -233,26 +233,26 @@ pub async fn test_codex_connection(
     model: &str,
     reasoning_effort: &str,
 ) -> Result<ManagedModelConnectionResult> {
-    let galley = SqliteGalley::open().await?;
-    let token = resolve_access_token(&galley, api_key_ref).await?;
+    let yole = SqliteYole::open().await?;
+    let token = resolve_access_token(&yole, api_key_ref).await?;
     probe_with_access_token(&token.access_token, model, reasoning_effort).await
 }
 
 pub async fn resolve_access_token(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     api_key_ref: &str,
 ) -> Result<ResolvedCodexAccessToken> {
-    let raw = credential_store::get_secret(galley, api_key_ref).await?;
+    let raw = credential_store::get_secret(yole, api_key_ref).await?;
     let mut secret: CodexOAuthSecret =
-        serde_json::from_str(&raw).map_err(|e| GalleyError::InvalidArgs {
+        serde_json::from_str(&raw).map_err(|e| YoleError::InvalidArgs {
             message: format!("ChatGPT / Codex credential is invalid: {e}"),
         })?;
     if token_is_expiring(&secret.access_token, REFRESH_SKEW_SECONDS) {
         secret = refresh_secret(secret).await?;
-        let serialized = serde_json::to_string(&secret).map_err(|e| GalleyError::Internal {
+        let serialized = serde_json::to_string(&secret).map_err(|e| YoleError::Internal {
             message: format!("serializing refreshed Codex credential failed: {e}"),
         })?;
-        credential_store::set_secret(galley, api_key_ref, &serialized).await?;
+        credential_store::set_secret(yole, api_key_ref, &serialized).await?;
     }
     Ok(ResolvedCodexAccessToken {
         access_token: secret.access_token,
@@ -274,13 +274,13 @@ pub async fn start_credential_ipc() -> Result<CodexCredentialIpcConfig> {
 }
 
 async fn persist_probe_and_return(secret: CodexOAuthSecret) -> Result<CodexAuthSetupResult> {
-    let galley = SqliteGalley::open().await?;
+    let yole = SqliteYole::open().await?;
     let api_key_ref = credential_store::managed_provider_api_key_ref(CODEX_PROVIDER_ID);
-    let serialized = serde_json::to_string(&secret).map_err(|e| GalleyError::Internal {
+    let serialized = serde_json::to_string(&secret).map_err(|e| YoleError::Internal {
         message: format!("serializing Codex credential failed: {e}"),
     })?;
-    credential_store::set_secret(&galley, &api_key_ref, &serialized).await?;
-    let provider = galley
+    credential_store::set_secret(&yole, &api_key_ref, &serialized).await?;
+    let provider = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: CODEX_PROVIDER_ID.into(),
             display_name: CODEX_DISPLAY_NAME.into(),
@@ -290,7 +290,7 @@ async fn persist_probe_and_return(secret: CodexOAuthSecret) -> Result<CodexAuthS
             api_key_ref,
         })
         .await?;
-    let model = galley
+    let model = yole
         .upsert_managed_model_metadata(UpsertManagedModelMetadata {
             id: CODEX_MODEL_ID.into(),
             provider_id: CODEX_PROVIDER_ID.into(),
@@ -342,16 +342,16 @@ async fn poll_device_authorization(
             }))
             .send()
             .await
-            .map_err(|e| GalleyError::RunnerError {
+            .map_err(|e| YoleError::RunnerError {
                 message: format!("polling ChatGPT sign-in failed: {e}"),
             })?;
         let status = resp.status();
-        let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+        let body = resp.text().await.map_err(|e| YoleError::RunnerError {
             message: format!("reading ChatGPT sign-in poll response failed: {e}"),
         })?;
         if status.is_success() {
             let data: DevicePollResponse =
-                serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+                serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
                     message: format!("ChatGPT sign-in poll response is invalid JSON: {e}"),
                 })?;
             if data.authorization_code.is_some() && data.code_verifier.is_some() {
@@ -360,7 +360,7 @@ async fn poll_device_authorization(
         } else if status.as_u16() == 403 || status.as_u16() == 404 {
             continue;
         } else {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: format!(
                     "ChatGPT sign-in polling failed (HTTP {}: {})",
                     status.as_u16(),
@@ -369,7 +369,7 @@ async fn poll_device_authorization(
             });
         }
     }
-    Err(GalleyError::InvalidArgs {
+    Err(YoleError::InvalidArgs {
         message: "ChatGPT sign-in timed out".into(),
     })
 }
@@ -394,7 +394,7 @@ async fn exchange_authorization_code(
         ])
         .send()
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("exchanging ChatGPT sign-in code failed: {e}"),
         })?;
     token_response_to_secret(resp, None).await
@@ -402,7 +402,7 @@ async fn exchange_authorization_code(
 
 async fn refresh_secret(secret: CodexOAuthSecret) -> Result<CodexOAuthSecret> {
     if secret.refresh_token.trim().is_empty() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "ChatGPT / Codex session expired; sign in again".into(),
         });
     }
@@ -416,7 +416,7 @@ async fn refresh_secret(secret: CodexOAuthSecret) -> Result<CodexOAuthSecret> {
         ])
         .send()
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("refreshing ChatGPT / Codex token failed: {e}"),
         })?;
     token_response_to_secret(resp, Some(secret.refresh_token)).await
@@ -427,17 +427,17 @@ async fn token_response_to_secret(
     previous_refresh_token: Option<String>,
 ) -> Result<CodexOAuthSecret> {
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
         message: format!("reading ChatGPT / Codex token response failed: {e}"),
     })?;
     if status.as_u16() == 429 {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "Codex usage limit reached; retry after the limit resets".into(),
         });
     }
     if !status.is_success() {
         let relogin = status.as_u16() == 401 || status.as_u16() == 403;
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: if relogin {
                 "ChatGPT / Codex session expired; sign in again".into()
             } else {
@@ -450,7 +450,7 @@ async fn token_response_to_secret(
         });
     }
     let token: TokenResponse =
-        serde_json::from_str(&body).map_err(|e| GalleyError::InvalidArgs {
+        serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
             message: format!("ChatGPT / Codex token response is invalid JSON: {e}"),
         })?;
     let access_token = nonempty(token.access_token, "access_token")?;
@@ -458,7 +458,7 @@ async fn token_response_to_secret(
         .refresh_token
         .filter(|s| !s.trim().is_empty())
         .or(previous_refresh_token)
-        .ok_or_else(|| GalleyError::InvalidArgs {
+        .ok_or_else(|| YoleError::InvalidArgs {
             message: "ChatGPT / Codex token response did not include a refresh token".into(),
         })?;
     CodexOAuthSecret::new(access_token, refresh_token)
@@ -475,31 +475,31 @@ async fn probe_with_access_token(
         .post(&endpoint)
         .bearer_auth(access_token)
         .header("Accept", "application/json")
-        .header("User-Agent", "codex_cli_rs/0.0.0 (Galley)")
+        .header("User-Agent", "codex_cli_rs/0.0.0 (Yole)")
         .header("originator", "codex_cli_rs")
         .json(&codex_probe_payload(model, reasoning_effort));
     if let Some(account_id) = account_id_from_jwt(access_token) {
         req = req.header("ChatGPT-Account-ID", account_id);
     }
-    let resp = req.send().await.map_err(|e| GalleyError::RunnerError {
+    let resp = req.send().await.map_err(|e| YoleError::RunnerError {
         message: format!("testing ChatGPT / Codex model failed: {e}"),
     })?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| GalleyError::RunnerError {
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
         message: format!("reading ChatGPT / Codex probe response failed: {e}"),
     })?;
     if status.as_u16() == 429 {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "Codex usage limit reached; retry after the limit resets".into(),
         });
     }
     if status.as_u16() == 401 || status.as_u16() == 403 {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "ChatGPT / Codex session is not ready; sign in again".into(),
         });
     }
     if !status.is_success() {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: format!(
                 "ChatGPT / Codex model test failed (HTTP {}: {})",
                 status.as_u16(),
@@ -538,12 +538,12 @@ impl CodexOAuthSecret {
         let access_token = access_token.trim().to_string();
         let refresh_token = refresh_token.trim().to_string();
         if access_token.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "ChatGPT / Codex token response did not include an access token".into(),
             });
         }
         if refresh_token.is_empty() {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: "ChatGPT / Codex token response did not include a refresh token".into(),
             });
         }
@@ -562,7 +562,7 @@ fn http_client() -> Result<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(HTTP_TIMEOUT_SECS))
         .build()
-        .map_err(|e| GalleyError::Internal {
+        .map_err(|e| YoleError::Internal {
             message: format!("building HTTP client: {e}"),
         })
 }
@@ -572,7 +572,7 @@ fn codex_cli_auth_path() -> Result<PathBuf> {
         .ok()
         .map(PathBuf::from)
         .or_else(|| directories::BaseDirs::new().map(|dirs| dirs.home_dir().join(".codex")))
-        .ok_or_else(|| GalleyError::InvalidArgs {
+        .ok_or_else(|| YoleError::InvalidArgs {
             message: "cannot locate Codex CLI auth directory".into(),
         })?;
     Ok(codex_home.join("auth.json"))
@@ -582,7 +582,7 @@ fn nonempty(value: Option<String>, field: &str) -> Result<String> {
     value
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| GalleyError::InvalidArgs {
+        .ok_or_else(|| YoleError::InvalidArgs {
             message: format!("ChatGPT / Codex response missing {field}"),
         })
 }
@@ -648,7 +648,7 @@ fn compact_body(body: &str) -> String {
 fn random_hex(bytes_len: usize) -> Result<String> {
     let rng = SystemRandom::new();
     let mut bytes = vec![0_u8; bytes_len];
-    rng.fill(&mut bytes).map_err(|_| GalleyError::Internal {
+    rng.fill(&mut bytes).map_err(|_| YoleError::Internal {
         message: "generating credential IPC token failed".into(),
     })?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
@@ -659,12 +659,12 @@ async fn start_platform_credential_ipc(token: String) -> Result<CodexCredentialI
     use tokio::net::UnixListener;
 
     let address = std::env::temp_dir().join(format!(
-        "galley-codex-{}-{}.sock",
+        "yole-codex-{}-{}.sock",
         std::process::id(),
         random_hex(8)?
     ));
     let _ = std::fs::remove_file(&address);
-    let listener = UnixListener::bind(&address).map_err(|e| GalleyError::Internal {
+    let listener = UnixListener::bind(&address).map_err(|e| YoleError::Internal {
         message: format!("binding credential IPC socket failed: {e}"),
     })?;
     let token_for_task = token.clone();
@@ -691,7 +691,7 @@ async fn start_platform_credential_ipc(token: String) -> Result<CodexCredentialI
     use tokio::net::windows::named_pipe::ServerOptions;
 
     let address = format!(
-        r"\\.\pipe\galley-codex-{}-{}",
+        r"\\.\pipe\yole-codex-{}-{}",
         std::process::id(),
         random_hex(8)?
     );
@@ -728,38 +728,38 @@ where
     reader
         .read_line(&mut line)
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("reading credential IPC request failed: {e}"),
         })?;
     let req: CredentialIpcRequest =
-        serde_json::from_str(&line).map_err(|e| GalleyError::InvalidArgs {
+        serde_json::from_str(&line).map_err(|e| YoleError::InvalidArgs {
             message: format!("credential IPC request is invalid JSON: {e}"),
         })?;
     if req.token != expected_token {
-        return Err(GalleyError::InvalidArgs {
+        return Err(YoleError::InvalidArgs {
             message: "credential IPC token mismatch".into(),
         });
     }
-    let galley = SqliteGalley::open().await?;
-    let resolved = resolve_access_token(&galley, &req.api_key_ref).await?;
+    let yole = SqliteYole::open().await?;
+    let resolved = resolve_access_token(&yole, &req.api_key_ref).await?;
     let body = serde_json::to_vec(&CredentialIpcResponse {
         access_token: resolved.access_token,
         account_id: resolved.account_id,
         expires_at: resolved.expires_at,
     })
-    .map_err(|e| GalleyError::Internal {
+    .map_err(|e| YoleError::Internal {
         message: format!("serializing credential IPC response failed: {e}"),
     })?;
     writer
         .write_all(&body)
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("writing credential IPC response failed: {e}"),
         })?;
     writer
         .write_all(b"\n")
         .await
-        .map_err(|e| GalleyError::RunnerError {
+        .map_err(|e| YoleError::RunnerError {
             message: format!("writing credential IPC response failed: {e}"),
         })?;
     Ok(())

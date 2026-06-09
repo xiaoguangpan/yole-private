@@ -48,7 +48,7 @@ Control recovery and ChatGPT / Codex backend behavior.
 
 - Browser Control and ChatGPT / Codex remain managed-only integration patches.
   If upstream exposes equivalent extension status or Codex credential/request
-  support, remove the Galley patches instead of keeping parallel behavior.
+  support, remove the Yole patches instead of keeping parallel behavior.
 - Real bundled-GA dogfood should run before publishing `v0.2.7`; automated
   payload and runner checks are necessary but not enough for release confidence.
 

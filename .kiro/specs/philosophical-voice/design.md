@@ -6,7 +6,7 @@
 
 ## Overview
 
-This feature adds Galley's first load-bearing philosophical touch as a small,
+This feature adds Yole's first load-bearing philosophical touch as a small,
 reversible probe. It has two coordinated parts that share one voice:
 
 - **Part A — Epigraph.** A single, state-bound Wittgenstein line rendered
@@ -295,7 +295,7 @@ Both candidates keep `/btw` literal (functional-first) and stay in voice:
 
 | Register | State | Current copy (zh / en) | Proposed |
 |---|---|---|---|
-| commissioning | empty state | 今天交代什么？ / What should Galley work on today? | keep (already in voice) |
+| commissioning | empty state | 今天交代什么？ / What should Yole work on today? | keep (already in voice) |
 | continuing | idle + history | 继续这个对话… / Continue this conversation... | keep |
 | reply | pendingAskUser | 回复以继续，或选择上方候选 / Reply to continue, or choose an option above | keep |
 | by-the-way | running | — (none today) | NEW (see candidates) |

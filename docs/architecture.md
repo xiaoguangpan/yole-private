@@ -1,18 +1,18 @@
 # Architecture
 
-Galley is a local agent team orchestrator with two first-class frontends:
+Yole is a local agent team orchestrator with two first-class frontends:
 
-- **Galley GUI** for the human operator at the desktop.
-- **Galley CLI** for trusted Agent / Supervisor automation on the same machine.
+- **Yole GUI** for the human operator at the desktop.
+- **Yole CLI** for trusted Agent / Supervisor automation on the same machine.
 
-Both frontends talk to the same Rust-side authority layer: Galley Core.
+Both frontends talk to the same Rust-side authority layer: Yole Core.
 
 ```text
-Galley GUI (Tauri/React)        Galley CLI (Rust)
+Yole GUI (Tauri/React)        Yole CLI (Rust)
           \                         /
            \                       /
             v                     v
-              Galley Core (Rust)
+              Yole Core (Rust)
               - session lifecycle
               - SQLite writes
               - runner ownership
@@ -27,13 +27,13 @@ Galley GUI (Tauri/React)        Galley CLI (Rust)
 
 ## Design Goals
 
-Galley is built around four ideas:
+Yole is built around four ideas:
 
-1. **Local-first orchestration.** Galley runs on the user's machine and keeps
+1. **Local-first orchestration.** Yole runs on the user's machine and keeps
    data local.
 2. **Human and agent parity.** A person can use the GUI; another trusted agent
    can use the CLI.
-3. **Non-invasive GenericAgent integration.** Galley wraps GA without modifying
+3. **Non-invasive GenericAgent integration.** Yole wraps GA without modifying
    GA files, memory, venv, or tool internals.
 4. **Stable agent-facing contract.** The CLI and socket schema are treated as a
    public API for downstream agents and SOPs.
@@ -49,16 +49,16 @@ subscribes to events.
 
 ### CLI
 
-The CLI lives in `cli/` and exposes the `galley` command. Agents use it to list
+The CLI lives in `cli/` and exposes the `yole` command. Agents use it to list
 sessions, inspect context, create sessions, send messages, move sessions,
 switch LLMs, and archive or restore work.
 
 The CLI contract is documented in [agent-api](./agent-api.md). For `v0.2.0`,
 `schemaVersion: 1` is frozen.
 
-### Galley Core
+### Yole Core
 
-Galley Core lives in `core/`. It owns:
+Yole Core lives in `core/`. It owns:
 
 - SQLite reads and writes
 - migrations and pre-migration backup
@@ -76,29 +76,29 @@ The runner lives in `runner/`. It is the Python bridge into GenericAgent. It
 starts GA as a child process, registers supported hooks, captures events, and
 keeps the integration non-invasive.
 
-Each Galley session maps to its own GenericAgent subprocess.
+Each Yole session maps to its own GenericAgent subprocess.
 
 ## Localhost Only
 
-Galley Core accepts local control through:
+Yole Core accepts local control through:
 
 - AF_UNIX socket on macOS/Linux
 - Windows named pipe on Windows
 
 It does not expose a TCP server, HTTP API, token auth, OAuth flow, or remote
 login. Remote workflows belong to the user's trusted Supervisor Agent or IM
-transport; Galley stays local.
+transport; Yole stays local.
 
 ## Data Boundaries
 
-Galley stores:
+Yole stores:
 
 - session metadata
-- messages inside Galley sessions
+- messages inside Yole sessions
 - tool and approval state
 - supervisor action origin fields, such as who issued a command and why
 
-Galley does not store the conversation between the user and their external
+Yole does not store the conversation between the user and their external
 Supervisor Agent. That history belongs to the supervisor platform.
 
 ## Document Map

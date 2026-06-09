@@ -5,7 +5,7 @@
 
 ## Context
 
-JC asked to move both Galley's built-in GenericAgent runtime and external-GA
+JC asked to move both Yole's built-in GenericAgent runtime and external-GA
 compatibility audit to the official latest GenericAgent commit. The official
 target was locked with `git ls-remote`:
 
@@ -25,7 +25,7 @@ committed at `2026-06-02T10:10:20+08:00`.
 
 2. **Keep the upgrade non-invasive for external GA**
    JC's local `/Users/inkstone/Documents/GenericAgent` checkout already points
-   at `5f46b438`, but it has untracked bot launch scripts. Galley did not modify
+   at `5f46b438`, but it has untracked bot launch scripts. Yole did not modify
    that checkout and did not build managed GA from it. A clean temporary clone
    was used for the managed payload.
 
@@ -33,7 +33,7 @@ committed at `2026-06-02T10:10:20+08:00`.
    Upstream added two new state writes that matter only for managed mode:
    long prompts are written to `temp/user_prompt_*.md`, and `/continue` stores a
    round-count cache under `~/.genericagent`. Both were routed under
-   `GALLEY_GA_STATE_ROOT` so managed runtime state stays in Galley app data.
+   `YOLE_GA_STATE_ROOT` so managed runtime state stays in Yole app data.
 
 4. **Regenerate the asset-path patch against the new upstream context**
    The old `0003-normalize-asset-path-joins.patch` depended on the old
@@ -42,7 +42,7 @@ committed at `2026-06-02T10:10:20+08:00`.
 
 5. **Normalize incidental upstream trailing spaces during managed build**
    Upstream `agentmain.py` and `llmcore.py` contained two trailing spaces in the
-   new delta. Galley keeps `git diff --check` as a release gate, so the managed
+   new delta. Yole keeps `git diff --check` as a release gate, so the managed
    build script now strips trailing spaces from those two generated payload
    files after replaying the patch stack. This keeps the checked-in payload
    clean without baking whitespace-only removals into a patch file that would
@@ -55,7 +55,7 @@ committed at `2026-06-02T10:10:20+08:00`.
 | `agent_loop.py` | No diff | Safe |
 | `agentmain.py` | Task / reflect mode now force non-stream; long prompts are externalized to temp files; task timeouts increased | Bridge-safe; managed temp path patched |
 | `ga.py` | Folded earlier-context window reduced from 100 to 70 lines | Safe |
-| `llmcore.py` | Cloudflare 520-527 retry statuses; `BaseSession.ask()` always returns generator; NativeClaude headers / betas / fake-CC system injection changed; `MixinSession` broadcasts `stream` and `read_timeout` | Safe for Galley's generator-consuming bridge; no managed config schema change |
+| `llmcore.py` | Cloudflare 520-527 retry statuses; `BaseSession.ask()` always returns generator; NativeClaude headers / betas / fake-CC system injection changed; `MixinSession` broadcasts `stream` and `read_timeout` | Safe for Yole's generator-consuming bridge; no managed config schema change |
 | `frontends/continue_cmd.py` | Added bounded preview/search and round-count cache | Managed log/cache paths patched |
 | `plugins/__init__.py` | New package marker | Safe |
 | `pyproject.toml` | No diff | No bundle dependency change |
@@ -73,9 +73,9 @@ node scripts/check-managed-ga-payload.mjs
 ./scripts/bundle-python.sh mac-x64
 => managed GA import OK (bundle is bridge-ready)
 
-PYTHONDONTWRITEBYTECODE=1 GALLEY_GA_STATE_ROOT=/private/tmp/galley-managed-import-smoke-current \
-  GALLEY_VERIFY_GA_PATH=/Users/inkstone/Documents/genericagent-webui/managed-ga/code \
-  core/python-bundle/python/bin/python3 -c "import os, sys; sys.path.insert(0, os.environ['GALLEY_VERIFY_GA_PATH']); import agentmain, llmcore, qrcode, dotenv; from Crypto.Cipher import AES"
+PYTHONDONTWRITEBYTECODE=1 YOLE_GA_STATE_ROOT=/private/tmp/yole-managed-import-smoke-current \
+  YOLE_VERIFY_GA_PATH=/Users/inkstone/Documents/genericagent-webui/managed-ga/code \
+  core/python-bundle/python/bin/python3 -c "import os, sys; sys.path.insert(0, os.environ['YOLE_VERIFY_GA_PATH']); import agentmain, llmcore, qrcode, dotenv; from Crypto.Cipher import AES"
 => managed GA import OK (current payload + bundled python)
 
 pnpm --dir gui typecheck

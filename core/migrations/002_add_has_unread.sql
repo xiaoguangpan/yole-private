@@ -1,4 +1,4 @@
--- 002_add_has_unread.sql · GA Workbench v0.1
+-- 002_add_has_unread.sql · Yole v0.1
 -- Add per-session unread flag (Stage 3 dev-verify round 7).
 --
 -- has_unread is set when a turn_end IPC event arrives for a session

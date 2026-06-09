@@ -3,9 +3,9 @@ name: Release
 # Tag-triggered release. Push a tag matching `v*` (e.g. `v0.2.0`) on main
 # to fire this workflow. It produces three primary artifacts in parallel:
 #
-#   - Galley_<version>_macOS_aarch64.dmg       (Apple Silicon Mac)
-#   - Galley_<version>_macOS_x64.dmg           (Intel Mac)
-#   - Galley_<version>_Windows_x64-setup.exe   (Windows)
+#   - Yole_<version>_macOS_aarch64.dmg       (Apple Silicon Mac)
+#   - Yole_<version>_macOS_x64.dmg           (Intel Mac)
+#   - Yole_<version>_Windows_x64-setup.exe   (Windows)
 #
 # Mac Intel uses macos-15's Apple Silicon runner with cross-compile +
 # Rosetta 2. This keeps Intel artifacts in the official CI release path
@@ -111,26 +111,34 @@ jobs:
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          GALLEY_UPDATER_PUBKEY: ${{ vars.GALLEY_UPDATER_PUBKEY }}
-          GALLEY_UPDATER_ENDPOINT: ${{ vars.GALLEY_UPDATER_ENDPOINT }}
+          YOLE_UPDATER_PUBKEY: ${{ vars.YOLE_UPDATER_PUBKEY }}
+          YOLE_UPDATER_ENDPOINT: ${{ vars.YOLE_UPDATER_ENDPOINT }}
+          YOLE_PROVISIONER_URL: ${{ vars.YOLE_PROVISIONER_URL }}
         run: |
           missing=0
           if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
             echo "Missing GitHub secret TAURI_SIGNING_PRIVATE_KEY." >&2
             missing=1
           fi
-          if [[ -z "$GALLEY_UPDATER_PUBKEY" ]]; then
-            echo "Missing GitHub variable GALLEY_UPDATER_PUBKEY." >&2
+          if [[ -z "$YOLE_UPDATER_PUBKEY" ]]; then
+            echo "Missing GitHub variable YOLE_UPDATER_PUBKEY." >&2
             missing=1
-          elif ! node -e 'const key = Buffer.from(process.env.GALLEY_UPDATER_PUBKEY, "base64").toString("utf8"); if (!key.startsWith("untrusted comment:")) process.exit(1);'; then
-            echo "GitHub variable GALLEY_UPDATER_PUBKEY must be the base64 Tauri updater public key." >&2
+          elif ! node -e 'const key = Buffer.from(process.env.YOLE_UPDATER_PUBKEY, "base64").toString("utf8"); if (!key.startsWith("untrusted comment:")) process.exit(1);'; then
+            echo "GitHub variable YOLE_UPDATER_PUBKEY must be the base64 Tauri updater public key." >&2
             missing=1
           fi
-          if [[ -z "$GALLEY_UPDATER_ENDPOINT" ]]; then
-            echo "Missing GitHub variable GALLEY_UPDATER_ENDPOINT." >&2
+          if [[ -z "$YOLE_UPDATER_ENDPOINT" ]]; then
+            echo "Missing GitHub variable YOLE_UPDATER_ENDPOINT." >&2
             missing=1
-          elif [[ "$GALLEY_UPDATER_ENDPOINT" != https://* ]]; then
-            echo "GitHub variable GALLEY_UPDATER_ENDPOINT must be an HTTPS URL." >&2
+          elif [[ "$YOLE_UPDATER_ENDPOINT" != https://* ]]; then
+            echo "GitHub variable YOLE_UPDATER_ENDPOINT must be an HTTPS URL." >&2
+            missing=1
+          fi
+          if [[ -z "$YOLE_PROVISIONER_URL" ]]; then
+            echo "Missing GitHub variable YOLE_PROVISIONER_URL." >&2
+            missing=1
+          elif [[ "$YOLE_PROVISIONER_URL" != https://* ]]; then
+            echo "GitHub variable YOLE_PROVISIONER_URL must be an HTTPS URL." >&2
             missing=1
           fi
           if [[ "$missing" -ne 0 ]]; then
@@ -140,8 +148,8 @@ jobs:
       - name: Write updater release config
         shell: bash
         env:
-          GALLEY_UPDATER_PUBKEY: ${{ vars.GALLEY_UPDATER_PUBKEY }}
-          GALLEY_UPDATER_ENDPOINT: ${{ vars.GALLEY_UPDATER_ENDPOINT }}
+          YOLE_UPDATER_PUBKEY: ${{ vars.YOLE_UPDATER_PUBKEY }}
+          YOLE_UPDATER_ENDPOINT: ${{ vars.YOLE_UPDATER_ENDPOINT }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
@@ -158,8 +166,8 @@ jobs:
             },
             plugins: {
               updater: {
-                pubkey: process.env.GALLEY_UPDATER_PUBKEY,
-                endpoints: [process.env.GALLEY_UPDATER_ENDPOINT],
+                pubkey: process.env.YOLE_UPDATER_PUBKEY,
+                endpoints: [process.env.YOLE_UPDATER_ENDPOINT],
               },
             },
           };
@@ -193,10 +201,10 @@ jobs:
         if: matrix.target == 'x86_64-apple-darwin'
         run: softwareupdate --install-rosetta --agree-to-license
 
-      # v0.1.1+ Galley ships a bundled CPython 3.11 + GA core deps at
+      # v0.1.1+ Yole ships a bundled CPython 3.11 + GA core deps at
       # $RESOURCE/python/. `scripts/bundle-python.sh` downloads the
       # python-build-standalone tarball, strips non-essential stdlib,
-      # pip-installs Galley's audited GA runtime deps, and smoke-tests
+      # pip-installs Yole's audited GA runtime deps, and smoke-tests
       # the vendored managed-ga/code payload against that interpreter.
       # Output lands in
       # core/python-bundle/python/, which tauri.conf.json's
@@ -235,7 +243,7 @@ jobs:
 
       - name: Prepare CLI sidecar
         shell: bash
-        run: ./scripts/prepare-cli-sidecar.sh --target ${{ matrix.target }}
+        run: node scripts/prepare-cli-sidecar.mjs --target ${{ matrix.target }}
 
       - name: Cargo check
         working-directory: ./core
@@ -246,16 +254,17 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          GALLEY_UPDATER_PUBKEY: ${{ vars.GALLEY_UPDATER_PUBKEY }}
-          GALLEY_UPDATER_ENDPOINT: ${{ vars.GALLEY_UPDATER_ENDPOINT }}
+          YOLE_UPDATER_PUBKEY: ${{ vars.YOLE_UPDATER_PUBKEY }}
+          YOLE_UPDATER_ENDPOINT: ${{ vars.YOLE_UPDATER_ENDPOINT }}
+          YOLE_PROVISIONER_URL: ${{ vars.YOLE_PROVISIONER_URL }}
           TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
         run: pnpm tauri build --target ${{ matrix.target }} --config tauri.updater.generated.conf.json
 
       - name: Managed GA app bundle gate
         if: matrix.target == 'aarch64-apple-darwin' || matrix.target == 'x86_64-apple-darwin'
-        run: node scripts/check-managed-ga-app-bundle.mjs core/target/${{ matrix.target }}/release/bundle/macos/Galley.app
+        run: node scripts/check-managed-ga-app-bundle.mjs core/target/${{ matrix.target }}/release/bundle/macos/Yole.app
 
-      # Tauri's bundler names artifacts `Galley_<version>_<arch>.<ext>`
+      # Tauri's bundler names artifacts `Yole_<version>_<arch>.<ext>`
       # with no `artifactName` config to customize. Post-build, insert
       # the OS slug (macOS / Windows) so users see what they're
       # downloading without having to recognize the file extension.
@@ -291,7 +300,7 @@ jobs:
               for file in "$bundle_root/macos"/*.app.tar.gz "$bundle_root/macos"/*.app.tar.gz.sig; do
                 name="$(basename "$file")"
                 suffix="${name#*.app.tar.gz}"
-                cp "$file" "$out/Galley_${version}_macOS_${{ matrix.arch }}.app.tar.gz${suffix}"
+                cp "$file" "$out/Yole_${version}_macOS_${{ matrix.arch }}.app.tar.gz${suffix}"
                 updater_count=$((updater_count + 1))
               done
               ;;
@@ -321,7 +330,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: galley-${{ matrix.platform }}-${{ matrix.arch }}
+          name: yole-${{ matrix.platform }}-${{ matrix.arch }}
           path: artifacts/${{ matrix.target }}/*
           if-no-files-found: error
 
@@ -378,7 +387,7 @@ jobs:
         with:
           draft: true
           prerelease: ${{ steps.meta.outputs.prerelease }}
-          name: Galley ${{ github.ref_name }}
+          name: Yole ${{ github.ref_name }}
           generate_release_notes: true
           files: artifacts/**/*
           fail_on_unmatched_files: true

@@ -114,7 +114,7 @@ def test_turn_progress_round_trip() -> None:
     ev = TurnProgressEvent(
         sessionId="s1",
         delta="partial output chunk",
-        source="workbench",
+        source="yole",
     )
     decoded = decode_event(encode(ev))
     assert decoded == ev

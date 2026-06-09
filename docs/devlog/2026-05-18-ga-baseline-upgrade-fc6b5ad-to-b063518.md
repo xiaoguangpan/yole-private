@@ -5,7 +5,7 @@
 
 ## Context
 
-JC raised the baseline alignment right before ship-tagging v0.1.1-alpha.1, per the workflow's "Galley 准备发版" trigger. 49 commits had accumulated upstream since 2026-05-15 — heaviest single jump since this project's baseline tracking began. Bulk of the commits are TUI v2 theme work + hive worker fixes + new TUI slash commands (`/cost` / `/review` / `/rename` / `/continue` / theme picker `Ctrl+T` etc), none of which touch the bridge layer.
+JC raised the baseline alignment right before ship-tagging v0.1.1-alpha.1, per the workflow's "Yole 准备发版" trigger. 49 commits had accumulated upstream since 2026-05-15 — heaviest single jump since this project's baseline tracking began. Bulk of the commits are TUI v2 theme work + hive worker fixes + new TUI slash commands (`/cost` / `/review` / `/rename` / `/continue` / theme picker `Ctrl+T` etc), none of which touch the bridge layer.
 
 Followed the workflow procedure from [CLAUDE.md → Baseline Upgrade Workflow](../../CLAUDE.md#baseline-upgrade-workflow) verbatim:
 
@@ -20,7 +20,7 @@ JC's local `~/Documents/GenericAgent` left on `main` branch pointing at `fc6b5ad
 
 ## Decisions
 
-- **Lock to `b063518`** (upstream/main HEAD on 2026-05-18) as the new Galley-tested baseline.
+- **Lock to `b063518`** (upstream/main HEAD on 2026-05-18) as the new Yole-tested baseline.
 - **Zero adapter changes needed in bridge** — every change to the four interface surfaces is either additive (new optional kwarg, new payload field) or affects code paths the bridge doesn't touch.
 - **Ship with v0.1.1-alpha.1** as a single bundled change — baseline upgrade lands in its own commit (per workflow's "独立成一个 commit，方便回滚") but pulls into the same release tag.
 
@@ -49,7 +49,7 @@ Both ends clean. Forward compat: bridge runs against the new baseline. Backward 
 
 - **Auto-pull user's local GA** to `b063518` — workflow explicitly opts against this; JC controls his own GA `git pull` cadence. Settings → Runtime → "GenericAgent 版本" will surface 「你已自行升级 / 已对齐」states organically based on whether his local SHA matches the new baseline pin.
 - **Adopting `yield_info=True`** in bridge to consume per-turn `{'turn': N}` markers from the new `agent_runner_loop` — out of scope for this baseline upgrade. The bridge already gets `turn_end_callback` from `_turn_end_hooks` which is canonical; the in-stream marker would be redundant unless we want sub-turn elapsed timing (the deferred Phase 3 item).
-- **Holding the baseline at `fc6b5ad`** for v0.1.1-alpha.1 — would have meant Settings → "你已自行升级" badge would light up for *every* user since 2026-05-15, defeating its purpose. Workflow's "Galley 准备发版默认升一次" exists precisely for this case.
+- **Holding the baseline at `fc6b5ad`** for v0.1.1-alpha.1 — would have meant Settings → "你已自行升级" badge would light up for *every* user since 2026-05-15, defeating its purpose. Workflow's "Yole 准备发版默认升一次" exists precisely for this case.
 
 ## Open questions
 

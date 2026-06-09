@@ -41,7 +41,7 @@ export interface EmptyStateProps {
 }
 
 /**
- * Empty state — what the user sees the first time they launch Galley
+ * Empty state — what the user sees the first time they launch Yole
  * (and any time no session is active). Per DESIGN.md §7.
  *
  * Minimalist Linear-style: no heading, Composer is the focal point.

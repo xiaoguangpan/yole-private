@@ -1,4 +1,4 @@
--- 003_add_message_summary.sql · GA Workbench v0.1
+-- 003_add_message_summary.sql · Yole v0.1
 -- Persist per-turn summary on assistant message rows (dev-verify
 -- round 11 follow-up).
 --

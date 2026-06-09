@@ -64,7 +64,7 @@ jobs:
         env:
           CHANNEL: ${{ inputs.channel }}
           TAG: ${{ inputs.tag }}
-          CHANNEL_BRANCH: galley-update-channel
+          CHANNEL_BRANCH: yole-update-channel
         run: |
           set -euo pipefail
 
@@ -90,9 +90,9 @@ jobs:
             mkdir -p "$worktree_dir/updates/$publish_channel"
             cp "update-channel/latest.json" "$worktree_dir/updates/$publish_channel/latest.json"
             if [[ "$publish_channel" == "beta" && "$CHANNEL" == "stable" ]]; then
-              printf "Galley legacy beta update channel alias.\\n\\nCurrent tag: %s\\nPrimary channel: stable\\n" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
+              printf "Yole legacy beta update channel alias.\\n\\nCurrent tag: %s\\nPrimary channel: stable\\n" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
             else
-              printf "Galley %s update channel.\\n\\nCurrent tag: %s\\n" "$publish_channel" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
+              printf "Yole %s update channel.\\n\\nCurrent tag: %s\\n" "$publish_channel" "$TAG" > "$worktree_dir/updates/$publish_channel/README.md"
             fi
           done
 
@@ -102,7 +102,7 @@ jobs:
           if git -C "$worktree_dir" diff --cached --quiet; then
             echo "Update channel $CHANNEL already points at $TAG."
           else
-            git -C "$worktree_dir" commit -m "Promote Galley $TAG to $CHANNEL update channel"
+            git -C "$worktree_dir" commit -m "Promote Yole $TAG to $CHANNEL update channel"
             git -C "$worktree_dir" push origin "HEAD:$CHANNEL_BRANCH"
           fi
 

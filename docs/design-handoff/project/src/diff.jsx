@@ -85,7 +85,7 @@ function FilePatchApproval({ patch, approvalState, onApprove }) {
             <Icon name={approvalState === 'deny' ? 'prohibit' : 'check-circle'} size={14} />
             {approvalState === 'allow_once' && 'Allowed · 已通过本次执行'}
             {approvalState === 'deny' && 'Denied · agent 将收到拒绝信号'}
-            {approvalState === 'always_project' && '已加入 GA Workbench Project 白名单'}
+            {approvalState === 'always_project' && '已加入 Yole Project 白名单'}
             {approvalState === 'always_global' && '已加入全局白名单'}
           </div>
         )}

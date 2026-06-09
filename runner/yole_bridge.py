@@ -1,10 +1,10 @@
-"""Galley bridge: connects one GA subprocess to the desktop frontend.
+"""Yole bridge: connects one GA subprocess to the desktop frontend.
 
 Run as a subprocess. Reads JSON Lines commands on stdin, writes JSON Lines
 events on stdout. See docs/ipc-protocol.md for the wire format.
 
 Usage:
-    python -m runner.workbench_bridge \\
+    python -m runner.yole_bridge \\
         --ga-path /Users/me/Documents/GenericAgent \\
         --session-id sess_abc \\
         [--cwd /path/to/project] \\
@@ -130,10 +130,10 @@ _managed_model_config_from_env = managed_runtime.managed_model_config_from_env
 
 
 def _llm_display_name(raw: str) -> str:
-    """Return the display name to send over Galley's IPC protocol.
+    """Return the display name to send over Yole's IPC protocol.
 
     External GA is for users who own and debug their GenericAgent setup, so
-    Galley exposes the raw GA name verbatim. Managed GA is Galley-owned: the
+    Yole exposes the raw GA name verbatim. Managed GA is Yole-owned: the
     injected backend name already is the configured display name, or the exact
     model id when no display name was set.
     """
@@ -350,7 +350,7 @@ class SessionState:
         self.always_allow_project: set[str] = set()
         # YOLO mode (PRD §11.5). Default off; desktop syncs the user's
         # persisted preference via SetYoloModeCommand right after `ready`.
-        # Read by WorkbenchHandler.needs_approval through the yolo_check
+        # Read by YoleHandler.needs_approval through the yolo_check
         # closure on every dispatch — toggling here takes effect on the
         # very next tool call.
         self.yolo_mode: bool = False
@@ -405,7 +405,7 @@ class Bridge:
         self.run_in_progress = threading.Event()
         self.current_turn: int = 0
         # turn_start dedupe state. Two emitters share this:
-        #   1. WorkbenchHandler dispatch wrapper (real-time, fires when
+        #   1. YoleHandler dispatch wrapper (real-time, fires when
         #      GA enters tool dispatch for the current turn).
         #   2. _on_turn_end's predict-emit (fires turn_start(turn+1)
         #      right after the just-finished turn's TurnEndEvent, so
@@ -456,7 +456,7 @@ class Bridge:
         managed_state_root = managed_runtime.managed_state_root()
         if managed_runtime.is_managed_runtime():
             if not managed_state_root:
-                raise RuntimeError("managed runtime missing GALLEY_GA_STATE_ROOT")
+                raise RuntimeError("managed runtime missing YOLE_GA_STATE_ROOT")
             self._install_managed_mykey_loader()
             for rel in ("memory", "sop", "skills", "temp", "temp/model_responses"):
                 os.makedirs(os.path.join(managed_state_root, rel), exist_ok=True)
@@ -544,11 +544,11 @@ class Bridge:
         managed_runtime.install_managed_prompt_profile(self.agent)
 
     def _install_handler_subclass(self) -> None:
-        from runner.handlers import WorkbenchHandler
+        from runner.handlers import YoleHandler
 
         bridge_self = self
 
-        class _ConfiguredWorkbenchHandler(WorkbenchHandler):
+        class _ConfiguredYoleHandler(YoleHandler):
             def __init__(
                 self,
                 parent: Any,
@@ -568,7 +568,7 @@ class Bridge:
                     yolo_check=lambda: bridge_self.state.yolo_mode,
                     # turn_start emission: GA's agent_runner_loop has no
                     # turn_start_callback, but it sets handler.current_turn
-                    # before each tool dispatch. WorkbenchHandler invokes
+                    # before each tool dispatch. YoleHandler invokes
                     # this callback around dispatch so the desktop sidebar
                     # can show "正在工作 · 第 N 步" live.
                     turn_started_callback=bridge_self._emit_turn_start,
@@ -577,12 +577,12 @@ class Bridge:
         # agentmain bound the name at import time (`from ga import
         # GenericAgentHandler`), so we patch the agentmain module's binding,
         # not ga's. agentmain.run() looks up the name in agentmain's globals.
-        self.agentmain.GenericAgentHandler = _ConfiguredWorkbenchHandler
+        self.agentmain.GenericAgentHandler = _ConfiguredYoleHandler
 
     def _register_turn_end_hook(self) -> None:
         if not hasattr(self.agent, "_turn_end_hooks"):
             self.agent._turn_end_hooks = {}
-        self.agent._turn_end_hooks[f"workbench_{self.session_id}"] = self._on_turn_end
+        self.agent._turn_end_hooks[f"yole_{self.session_id}"] = self._on_turn_end
 
     # ---------------- Event emission ----------------
 
@@ -591,7 +591,7 @@ class Bridge:
 
         Two emitters call this (both deduped via _last_emitted_turn):
 
-          1. WorkbenchHandler dispatch wrapper: real-time emission when
+          1. YoleHandler dispatch wrapper: real-time emission when
              GA actually reaches tool dispatch for the current turn. This
              is the authoritative "we are on step N" signal, but it lands
              several seconds *after* the turn started (LLM call has to
@@ -701,7 +701,7 @@ class Bridge:
                         # bypasses agent_runner_loop. No turn_end
                         # callback fires for these — emit a
                         # SystemMessageEvent so desktop can render
-                        # the content. The default `'workbench'`
+                        # the content. The default `'yole'`
                         # source's `done` is intentionally ignored
                         # (turn_end carries the canonical payload).
                         if str(item.get("source", "")) == "system":
@@ -936,7 +936,7 @@ class Bridge:
             self._last_emitted_turn = 0
             self.run_in_progress.set()
             display_queue = self.agent.put_task(
-                cmd.text, source="workbench", images=cmd.images
+                cmd.text, source="yole", images=cmd.images
             )
             self._start_progress_drain(display_queue)
         elif isinstance(cmd, ApprovalResponseCommand):
@@ -952,7 +952,7 @@ class Bridge:
             # fresh agent_runner_loop with turn counter restarting at 1.
             self._last_emitted_turn = 0
             self.run_in_progress.set()
-            display_queue = self.agent.put_task(cmd.text, source="workbench")
+            display_queue = self.agent.put_task(cmd.text, source="yole")
             self._start_progress_drain(display_queue)
         elif isinstance(cmd, AbortCommand):
             # GA's abort() sets stop_sig and breaks out of the run loop
@@ -993,7 +993,7 @@ class Bridge:
             self.state.always_allow_project.clear()
             self.state.always_allow_project.update(cmd.alwaysAllowProject)
         elif isinstance(cmd, SetYoloModeCommand):
-            # YOLO mode (PRD §11.5). Read by WorkbenchHandler through a
+            # YOLO mode (PRD §11.5). Read by YoleHandler through a
             # closure that reaches into self.state, so this single
             # assignment takes effect on the next tool dispatch — no
             # need to rebuild the handler or notify it explicitly.
@@ -1285,7 +1285,7 @@ class Bridge:
             if not hasattr(self.agent, "_turn_end_hooks"):
                 self.agent._turn_end_hooks = {}
             self.agent._turn_end_hooks[
-                f"galley_pet_{self.session_id}"
+                f"yole_pet_{self.session_id}"
             ] = _pet_hook
         except Exception as e:
             # Hook registration failed — kill the orphan pet subprocess.
@@ -1314,7 +1314,7 @@ class Bridge:
         try:
             hooks = getattr(self.agent, "_turn_end_hooks", None)
             if isinstance(hooks, dict):
-                hooks.pop(f"galley_pet_{self.session_id}", None)
+                hooks.pop(f"yole_pet_{self.session_id}", None)
         except Exception:
             pass
         # Terminate subprocess.
@@ -1427,7 +1427,7 @@ class Bridge:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="runner.workbench_bridge")
+    parser = argparse.ArgumentParser(prog="runner.yole_bridge")
     parser.add_argument("--ga-path", required=True)
     parser.add_argument("--session-id", required=True)
     parser.add_argument("--cwd", default=None)

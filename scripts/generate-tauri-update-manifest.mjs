@@ -6,15 +6,15 @@ import path from "node:path";
 const PLATFORM_ARTIFACTS = [
   {
     key: "darwin-aarch64",
-    packagePattern: /^Galley_(.+)_macOS_aarch64\.app\.tar\.gz$/,
+    packagePattern: /^Yole_(.+)_macOS_aarch64\.app\.tar\.gz$/,
   },
   {
     key: "darwin-x86_64",
-    packagePattern: /^Galley_(.+)_macOS_x64\.app\.tar\.gz$/,
+    packagePattern: /^Yole_(.+)_macOS_x64\.app\.tar\.gz$/,
   },
   {
     key: "windows-x86_64",
-    packagePattern: /^Galley_(.+)_Windows_x64-setup\.exe$/,
+    packagePattern: /^Yole_(.+)_Windows_x64-setup\.exe$/,
   },
 ];
 

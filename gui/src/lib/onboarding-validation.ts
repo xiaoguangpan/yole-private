@@ -49,7 +49,7 @@ const DEFAULT_HEALTH_CHECK_LABELS: HealthCheckLabels = {
   memoryVisible: "memory/ 目录可见",
   assetsVisible: "assets/ 目录可见",
   pythonInterpreter: "Python 解释器",
-  bundledPython: "Galley 内置 Python",
+  bundledPython: "Yole 内置 Python",
   loadablePython: "查找能加载 GA 的 Python",
   llmConnection: "LLM 连接测试",
   llmConnectionDetail: "真实测试，最多 1 个输出 token",
@@ -195,7 +195,7 @@ export async function runHealthChecks(
 
   const useExternalPython = options?.useExternalPython ?? false;
   // Two row identities. External mode says "Python interpreter"
-  // because Galley may switch to a discovered venv; bundled mode names
+  // because Yole may switch to a discovered venv; bundled mode names
   // the packaged interpreter directly.
   const pythonRow: HealthCheckItem = useExternalPython
     ? {
@@ -443,7 +443,7 @@ async function fsExists(path: string): Promise<boolean> {
   // `exists()`. The plugin-fs version is gated by `fs:scope` in
   // capabilities/default.json which defaults to a user-profile glob
   // allow-list — fine for Tauri's sandboxed-web threat model, but
-  // wrong for Galley: a v0.1-alpha Windows user with GA at
+  // wrong for Yole: a v0.1-alpha Windows user with GA at
   // `D:\projects_2026\GenericAgent` saw every health-check row fail
   // because `D:\` wasn't in the allow-list. See the command's doc
   // comment for the full rationale. Lazy import keeps a Vite-only

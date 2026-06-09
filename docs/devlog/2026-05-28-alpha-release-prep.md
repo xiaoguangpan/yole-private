@@ -17,7 +17,7 @@ release blockers:
   managed runtime was being launched.
 - Browser Control setup had moved from an overly forceful modal to a top-bar
   entry, but that made the feature too easy to ignore even though it is central
-  to Galley's intended experience.
+  to Yole's intended experience.
 - Release naming was still pointing at `v0.2.0-beta.1`, while the actual plan
   was a smaller invited-tester build before any broad public beta.
 
@@ -32,7 +32,7 @@ release blockers:
 - Changed Browser Control from a blocking first-run modal to a persistent
   product-surface prompt: the TopBar gets a stronger pending state, and the
   main surface can show a non-modal guidance bar. This keeps Browser Control
-  hard to ignore without making Galley feel like malware.
+  hard to ignore without making Yole feel like malware.
 - Polished Browser Control setup copy and flow for Windows and macOS:
   "extension page" language became "extension management", Edge opens the
   correct management URL, the folder reveal path works for drag-install, and

@@ -65,14 +65,14 @@ export function AppShell({
   main: ReactNode;
 }) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "ga-workbench-layout-2col-v2",
+    id: "ga-yole-layout-2col-v2",
     panelIds: ["sidebar", "main"],
   });
   return (
     <div className="flex h-screen min-h-[600px] w-screen min-w-[960px] flex-col bg-app text-ink">
       {topBar}
       <Group
-        id="ga-workbench-layout-2col-v2"
+        id="ga-yole-layout-2col-v2"
         orientation="horizontal"
         defaultLayout={defaultLayout}
         onLayoutChanged={onLayoutChanged}

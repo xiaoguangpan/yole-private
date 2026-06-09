@@ -1,4 +1,4 @@
-"""Unit tests for module-level helpers in runner.workbench_bridge.
+"""Unit tests for module-level helpers in runner.yole_bridge.
 
 Heavy integration is in test_e2e.py. This file covers pure-function helpers
 that don't need a GA subprocess: error classification and LLM display names.
@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from runner.workbench_bridge import (
+from runner.yole_bridge import (
     Bridge,
     _classify_error,
     _FenceFilter,
@@ -74,7 +74,7 @@ def test_classify_business_error_no_hint() -> None:
 def test_classify_first_match_wins() -> None:
     """When a message matches multiple categories, first-listed pattern wins.
 
-    Pattern order in workbench_bridge is: check_llm_config -> quota -> network.
+    Pattern order in yole_bridge is: check_llm_config -> quota -> network.
     A message containing both 'unauthorized' and 'rate limit' should classify
     as check_llm_config because auth is checked first.
     """
@@ -94,7 +94,7 @@ def test_classify_case_insensitive() -> None:
 def test_llm_display_name_external_runtime_uses_raw_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("GALLEY_RUNTIME_KIND", raising=False)
+    monkeypatch.delenv("YOLE_RUNTIME_KIND", raising=False)
 
     assert _llm_display_name("NativeClaudeSession/glm-5.1") == (
         "NativeClaudeSession/glm-5.1"
@@ -104,10 +104,10 @@ def test_llm_display_name_external_runtime_uses_raw_name(
     )
 
 
-def test_llm_display_name_managed_runtime_uses_galley_name(
+def test_llm_display_name_managed_runtime_uses_yole_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("GALLEY_RUNTIME_KIND", "managed")
+    monkeypatch.setenv("YOLE_RUNTIME_KIND", "managed")
 
     assert (
         _llm_display_name("NativeClaudeSession/glm-5.1") == "glm-5.1"
@@ -118,9 +118,9 @@ def test_llm_display_name_managed_runtime_uses_galley_name(
 def test_managed_model_config_maps_connect_timeout_to_ga_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Newer GA reads `timeout`; Galley keeps `connect_timeout` in Settings."""
+    """Newer GA reads `timeout`; Yole keeps `connect_timeout` in Settings."""
     monkeypatch.setenv(
-        "GALLEY_MANAGED_MODEL_CONFIG_JSON",
+        "YOLE_MANAGED_MODEL_CONFIG_JSON",
         json.dumps(
             {
                 "models": [
@@ -151,7 +151,7 @@ def test_managed_model_config_maps_codex_oauth_to_ga_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(
-        "GALLEY_MANAGED_MODEL_CONFIG_JSON",
+        "YOLE_MANAGED_MODEL_CONFIG_JSON",
         json.dumps(
             {
                 "models": [
@@ -159,13 +159,13 @@ def test_managed_model_config_maps_codex_oauth_to_ga_config(
                         "protocol": "openai",
                         "authKind": "chatgpt_codex_oauth",
                         "displayName": "ChatGPT / Codex",
-                        "apiKey": "galley-codex-oauth",
+                        "apiKey": "yole-codex-oauth",
                         "apiKeyRef": "managed-provider:mp_chatgpt_codex",
                         "apiBase": "https://chatgpt.com/backend-api/codex",
                         "model": "gpt-5.5",
                         "credentialIpc": {
                             "kind": "unix",
-                            "address": "/tmp/galley.sock",
+                            "address": "/tmp/yole.sock",
                             "token": "secret",
                         },
                         "advancedOptions": {
@@ -185,8 +185,8 @@ def test_managed_model_config_maps_codex_oauth_to_ga_config(
     assert cfg["api_mode"] == "responses"
     assert cfg["stream"] is True
     assert cfg["reasoning_effort"] == "medium"
-    assert cfg["galley_api_key_ref"] == "managed-provider:mp_chatgpt_codex"
-    assert cfg["galley_credential_ipc"]["token"] == "secret"
+    assert cfg["yole_api_key_ref"] == "managed-provider:mp_chatgpt_codex"
+    assert cfg["yole_credential_ipc"]["token"] == "secret"
 
 
 # ---------------- _extract_ask_user ----------------

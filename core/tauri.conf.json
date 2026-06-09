@@ -1,18 +1,18 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Galley",
-  "version": "0.2.7",
-  "identifier": "app.galley",
+  "productName": "Yole",
+  "version": "0.0.1",
+  "identifier": "app.yole",
   "build": {
-    "beforeDevCommand": "./scripts/prepare-cli-sidecar.sh --profile debug && pnpm --dir gui dev",
+    "beforeDevCommand": "node scripts/prepare-cli-sidecar.mjs --profile debug && pnpm --dir gui dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "./scripts/prepare-cli-sidecar.sh && pnpm --dir gui build",
+    "beforeBuildCommand": "node scripts/prepare-cli-sidecar.mjs && pnpm --dir gui build",
     "frontendDist": "../gui/dist"
   },
   "app": {
     "windows": [
       {
-        "title": "Galley",
+        "title": "Yole",
         "width": 1480,
         "height": 920,
         "minWidth": 960,
@@ -49,6 +49,12 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg", "nsis"],
+    "publisher": "Yole",
+    "homepage": "https://github.com/xiaoguangpan/yole",
+    "copyright": "Copyright (c) 2026 Yole",
+    "category": "Productivity",
+    "shortDescription": "Yole desktop agent workspace",
+    "longDescription": "Yole is a desktop workspace for running a bundled local agent runtime with managed model configuration.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -61,7 +67,7 @@
       "../managed-ga": "managed-ga",
       "python-bundle/python": "python"
     },
-    "externalBin": ["target/tauri-sidecars/galley"],
+    "externalBin": ["target/tauri-sidecars/yole"],
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
@@ -78,7 +84,7 @@
       "endpoints": []
     },
     "sql": {
-      "preload": ["sqlite:workbench.db"]
+      "preload": ["sqlite:yole.db"]
     }
   }
 }

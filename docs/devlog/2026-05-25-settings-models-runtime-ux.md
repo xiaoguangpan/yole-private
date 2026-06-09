@@ -8,7 +8,7 @@
 
 ## Context
 
-Managed / bundled GA moved from implementation into real dogfood. The first working slice exposed a product problem: Settings still carried attach-era mental models. Models and Provider were initially too separate, the default runtime was over-explained, and the main Sidebar still said "GA 就绪", which made Galley feel like a wrapper around an externally managed GenericAgent instead of a product with a recommended built-in runtime.
+Managed / bundled GA moved from implementation into real dogfood. The first working slice exposed a product problem: Settings still carried attach-era mental models. Models and Provider were initially too separate, the default runtime was over-explained, and the main Sidebar still said "GA 就绪", which made Yole feel like a wrapper around an externally managed GenericAgent instead of a product with a recommended built-in runtime.
 
 The user goal for this session was not just cosmetic Chinese copy. It was to make a first-time user understand how to configure a model quickly, while keeping external GA as an available but quieter path for advanced users.
 
@@ -33,13 +33,13 @@ The user goal for this session was not just cosmetic Chinese copy. It was to mak
    Built-in GA with configured models shows nothing in the Sidebar header. Built-in GA without models shows "配置模型" and opens Settings -> Models. External GA shows "外部 GA" with a green dot; external unconfigured shows "接入外部 GA" and opens Runtime.
 
 7. **Model configuration backup is deferred**
-   The need is real for users with many models, but the first version will not add import/export. Galley keeps API keys in Keychain / Windows Credential Manager. A future model-config export should default to no keys, with any full key migration requiring explicit encrypted export.
+   The need is real for users with many models, but the first version will not add import/export. Yole keeps API keys in Keychain / Windows Credential Manager. A future model-config export should default to no keys, with any full key migration requiring explicit encrypted export.
 
 8. **Settings uses one stable larger frame**
    Models has become a real configuration surface, so the old 720x560 Settings dialog was too cramped. The dialog now uses one larger 960x680 frame across all tabs instead of resizing only Models. This keeps Settings spatially stable while giving model-heavy screens room to breathe.
 
 9. **About is identity, version, and links only**
-   The local-first privacy/value-prop block was removed from About. That information is still true, but it belongs closer to API-key/model setup moments, not in the product identity page. About now focuses on Galley version, built-in GA version, source/feedback/upstream links, maker links, and license.
+   The local-first privacy/value-prop block was removed from About. That information is still true, but it belongs closer to API-key/model setup moments, not in the product identity page. About now focuses on Yole version, built-in GA version, source/feedback/upstream links, maker links, and license.
 
 10. **TopBar status pills should match visual weight**
     YOLO and conversation-width pills can appear side by side, so their active text needs comparable contrast even though they use different semantic colors. The width pill now uses the stronger brand token when active. The YOLO popover's "在 Settings 中查看" action also opens Settings -> Approval directly.
@@ -49,7 +49,7 @@ The user goal for this session was not just cosmetic Chinese copy. It was to mak
 - **Show "内置 GA 已就绪" in the Sidebar**: rejected because it makes the default state noisy and keeps exposing implementation detail.
 - **Make all Provider/model tests rely on `/models`**: rejected because many compatible third-party services only guarantee chat/messages endpoints.
 - **Keep drag reorder**: rejected after dogfood because the affordance and feedback were not trustworthy enough.
-- **Store or export API keys in ordinary SQLite/JSON for convenience**: rejected as the default path. It optimizes migration but weakens Galley's security posture.
+- **Store or export API keys in ordinary SQLite/JSON for convenience**: rejected as the default path. It optimizes migration but weakens Yole's security posture.
 - **Hide Models entirely in external GA mode**: rejected because it caused more confusion. The current page stays visible but explains that these settings affect only built-in GA.
 - **Resize Settings only for Models**: rejected because tab changes would make the dialog feel unstable. A single larger frame is calmer and more predictable.
 - **Keep About as a value-prop page**: rejected because it mixed product promises with version/source identity. Privacy messaging should appear where it affects user trust decisions.

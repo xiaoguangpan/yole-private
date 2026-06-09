@@ -24,7 +24,7 @@ export function SidebarHeader({
   onOpenAgentSettings?: () => void;
 }) {
   const copy = useCopy();
-  // Single-line header (refactored 2026-05-13): the "Galley" wordmark
+  // Single-line header (refactored 2026-05-13): the "Yole" wordmark
   // is short (~50px at 16px serif), which left ~200px of dead space
   // to the right at the typical 20% sidebar width. Status indicator
   // moved up here right-aligned to use that space and reclaim one
@@ -49,11 +49,11 @@ export function SidebarHeader({
     Boolean(onOpenAgentSettings);
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line/70 px-4 py-3">
-      {/* Product mark: sentence-case Galley keeps the name legible as
+      {/* Product mark: sentence-case Yole keeps the name legible as
           a product rather than an acronym. */}
       <div className="flex min-w-0 items-center gap-2">
         <div className="shrink-0 font-serif text-[17px] font-medium italic tracking-[0.005em] text-ink">
-          Galley
+          Yole
         </div>
         {externalRuntimeBadge ? (
           <IconTooltip text={externalRuntimeBadge.title} side="bottom">

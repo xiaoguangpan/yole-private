@@ -40,7 +40,7 @@ export function SettingsIM({
   onOpenModels,
 }: {
   hasManagedRuntimeConfigured: boolean;
-  onOpenModels: () => void;
+  onOpenModels?: () => void;
 }) {
   const copy = useCopy();
   const imCopy = copy.settings.im;
@@ -128,15 +128,17 @@ export function SettingsIM({
           <div className="text-[13px] leading-[1.55] text-ink-soft">
             {imCopy.modelRequired}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="mt-3"
-            onClick={onOpenModels}
-          >
-            {imCopy.openModels}
-          </Button>
+          {onOpenModels && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={onOpenModels}
+            >
+              {imCopy.openModels}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

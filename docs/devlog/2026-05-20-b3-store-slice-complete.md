@@ -36,7 +36,7 @@ predicted duration 3-4 周（可能拖到 5-6 周）。**实际 2 天 / 6 sessio
 |---|---|---|
 | `gui/src/stores/ui.ts` | 66 | Pure display state (screen / palette / settings / toasts / pendingPetMigration) |
 | `gui/src/stores/runtime.ts` | ~680 | Per-session runtime: LLM list + bridge lifecycle + warmup + pet attached + runtimeInfo |
-| `gui/src/stores/sessions.ts` | ~1160 | Authoritative session/project list（write 走 Rust GalleyApi 17 trait method）+ activeSessionId + activateSession orchestrator |
+| `gui/src/stores/sessions.ts` | ~1160 | Authoritative session/project list（write 走 Rust YoleApi 17 trait method）+ activeSessionId + activateSession orchestrator |
 | `gui/src/stores/messages.ts` | 584 | Per-session conversation (turns / approvals / askUser / inFlightContent / turnIndexOffset) + global userSubmitTick |
 | `gui/src/stores/messages/rowsToTurns.ts` | 123 | SQLite row → Turn[] hydration（G11 子文件） |
 | `gui/src/stores/prefs.ts` | 378 | 5 prefs（gaConfig / approvalConfig / yoloMode / yoloIntroSeen / conversationWidth）+ setGAConfig fan-out + hydratePrefs |
@@ -133,7 +133,7 @@ M6 实施初版写了 5 处反 pattern 注释：「Born from B3 M6 retiring useA
 逐条 tick：
 
 - [x] **A1**: `useAppStore.ts` 拆完。6 文件 layout: ui (66) + runtime (~680) + sessions (~1160) + messages (584 + rowsToTurns 123) + prefs (378) + lib/hydrate.ts (127). **useAppStore.ts 已删除**.
-- [x] **A2**: authoritative state 写入路径全 Rust（sessions/projects 走 GalleyApi 17 trait method；runtime spawn/sendIPC 走 RunnerManager；messages SQLite write 仍 fire-and-forget 直 SQL，B4 才考虑改 trait；prefs setPref 也 fire-and-forget）
+- [x] **A2**: authoritative state 写入路径全 Rust（sessions/projects 走 YoleApi 17 trait method；runtime spawn/sendIPC 走 RunnerManager；messages SQLite write 仍 fire-and-forget 直 SQL，B4 才考虑改 trait；prefs setPref 也 fire-and-forget）
 - [x] **A3**: display state 全 slice 端（ui screen/palette/settings/toasts / sessions activeProjectFilter / runtime pendingLLMIndex / prefs approvalConfig），无 Rust round-trip
 - [x] **A4**: 所有 session/project SQLite 写入路径都在 Rust (M4a 16 + M4a addendum 1 = 17 trait method)
 - [x] **A5**: bridge / runner spawn 路径在 Rust (B2 M2 + M3b)
@@ -170,8 +170,8 @@ M6 实施初版写了 5 处反 pattern 注释：「Born from B3 M6 retiring useA
 ## Next
 
 1. **B3 complete commit + tag** —— 本 session 完成
-2. **B4 playbook 升格**（fresh session, dedicated paperwork）—— mirror B1 / B2 / B3 playbook 结构。Scope: CLI feature-complete + menubar background mode + Galley Supervisor SOP + galley-supervisor skill + docs/agent-api.md 正式 v1 + discovery file。预估 2-3w 实施时间，1 session paperwork。
+2. **B4 playbook 升格**（fresh session, dedicated paperwork）—— mirror B1 / B2 / B3 playbook 结构。Scope: CLI feature-complete + menubar background mode + Yole Supervisor SOP + yole-supervisor skill + docs/agent-api.md 正式 v1 + discovery file。预估 2-3w 实施时间，1 session paperwork。
 3. **B4 implementation** —— per B1 / B2 / B3 经验，sub-plan-then-impl 两段式可能压缩到 1-2 周（vs PRD 估 2-3w）。
-4. **v0.5 milestone target**: dual-native orchestrator 正式发布。Galley GUI + Galley CLI 对等前端 + Supervisor adapter 生态启动。10月底-11月初前后（CLAUDE.md 阶段表）。
+4. **v0.5 milestone target**: dual-native orchestrator 正式发布。Yole GUI + Yole CLI 对等前端 + Supervisor adapter 生态启动。10月底-11月初前后（CLAUDE.md 阶段表）。
 
 预期 B4 + v0.5 milestone 在 2-3 周内 ship，跟 PRD v0.3 路径 B 节奏对齐。

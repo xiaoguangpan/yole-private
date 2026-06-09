@@ -14,7 +14,7 @@
 ## Context
 
 After `v0.2.2` shipped, a macOS user reported that a fresh install plus the
-`tmwd_cdp_bridge` Chrome extension looked normal in Chrome, but Galley's
+`tmwd_cdp_bridge` Chrome extension looked normal in Chrome, but Yole's
 Browser Control test did nothing and managed GA could not control the browser.
 The decisive signal was that opening any ordinary webpage in Chrome made the
 test pass immediately.
@@ -34,11 +34,11 @@ with cache-busting.
 - Ship this as a stable patch target, `v0.2.3`, rather than waiting for a larger
   feature release.
 - Split Browser Control probe state into an explicit `connected_no_tabs` result
-  so Galley can say the extension is connected but needs a normal webpage.
+  so Yole can say the extension is connected but needs a normal webpage.
 - Keep the cold-start managed-GA probe quiet in this state. A newly opened app
   should not warn the user when the bridge is ready and only lacks a page.
 - Add a browser-specific setup step that opens `https://example.com` in Chrome
-  or Edge before asking the user to run the Galley test.
+  or Edge before asking the user to run the Yole test.
 - Keep the step explicit instead of automatically opening a page on app launch;
   app startup should avoid surprising browser side effects.
 - Make dragging the whole `tmwd_cdp_bridge` folder the primary instruction.
@@ -46,14 +46,14 @@ with cache-busting.
 - On macOS / Windows, "locate folder" now selects the whole
   `tmwd_cdp_bridge` folder, because that is what the user needs to drag into
   Chrome.
-- Keep Browser Control setup usable at Galley's 600px minimum window height by
+- Keep Browser Control setup usable at Yole's 600px minimum window height by
   making the step list scroll while the footer actions stay visible.
 - Retain extension reconnect hardening so service-worker wakeup timing is less
   brittle on fresh installs.
 
 ## Rejected alternatives
 
-- Automatically opening a webpage during Galley startup: too much surprise for a
+- Automatically opening a webpage during Yole startup: too much surprise for a
   local desktop app and too easy to confuse with unsolicited browser control.
 - A default-browser link button: on macOS it could open Safari, which does not
   help when the user installed the Chrome / Edge extension.

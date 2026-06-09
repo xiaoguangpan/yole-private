@@ -10,7 +10,7 @@ use super::session::SessionId;
 pub struct MessageId(pub String);
 
 /// Role of a message in the conversation history. Mirrors GA's roles
-/// plus Galley's "system" pseudo-role for /btw side questions.
+/// plus Yole's "system" pseudo-role for /btw side questions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageRole {

@@ -61,7 +61,7 @@ export interface ConversationToolEvent {
  * 006). Drives the M7 supervisor provenance marker: when `via` is
  * `supervisor`, the UserTurn renders a small robot icon beside the
  * message. Other `via` values (`gui` / `cli` / `system`) render no
- * annotation — they're the default Galley-driven origin and don't need
+ * annotation — they're the default Yole-driven origin and don't need
  * to interrupt the reading flow.
  *
  * agent-api.md §6A is the canonical contract.

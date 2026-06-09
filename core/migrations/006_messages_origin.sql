@@ -1,6 +1,6 @@
 -- 006_messages_origin.sql · B2 M5
 --
--- Origin fields on messages. From v0.5 a Galley session can receive
+-- Origin fields on messages. From v0.5 a Yole session can receive
 -- messages from multiple frontends (GUI, CLI, Supervisor SOPs). The
 -- origin triple `(created_via, supervisor, origin_note)` tells later
 -- consumers where a given message came from + the reason an external
@@ -20,9 +20,9 @@ ALTER TABLE messages ADD COLUMN supervisor TEXT;
 ALTER TABLE messages ADD COLUMN origin_note TEXT;
 
 -- Index for "show me everything supervisor X has injected into this session"
--- queries — the Galley v0.5 UI surfaces a supervisor activity log per session
+-- queries — the Yole v0.5 UI surfaces a supervisor activity log per session
 -- (PRD §15). Until that UI ships, agents can run the same query via
--- `galley session show <id> --origin=supervisor:foo`.
+-- `yole session show <id> --origin=supervisor:foo`.
 CREATE INDEX messages_by_supervisor
   ON messages(session_id, supervisor)
   WHERE supervisor IS NOT NULL;

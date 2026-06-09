@@ -64,7 +64,7 @@
 
 **纳入**：
 
-- `core/src/api.rs` 加 16 个 trait method 到 `GalleyApi`
+- `core/src/api.rs` 加 16 个 trait method 到 `YoleApi`
 - `core/src/api/session.rs` 加 input types: `CreateSessionInput` / `SessionPatch`
 - `core/src/api/project.rs` 加 input types: `CreateProjectInput` / `ProjectPatch`
 - `core/src/db.rs` 实现 16 个 method，每个 `async fn ... -> Result<...>`
@@ -93,7 +93,7 @@
 - 删 `lib/db.ts` 的 `persistSession` / `deleteSession` / `persistProject` / `deleteProject`（per B3-I6 不留 @deprecated）
 - 保留 `lib/db.ts` 的 `loadSessions` → `loadSessionsViaCore` 切换前的 B1 M3 deprecated 还在；本 commit 一并清
 
-**关键差异 vs M3**：M3 是 frontend 拆分 + 现有 IPC 路径不变；M4b **首次把 DB 写路径从 `tauri-plugin-sql` 直 SQL 转到 GalleyApi invoke**。这是路径 B 「业务逻辑权威全部在 Rust 端」(CLAUDE.md §4) 的首次落地。
+**关键差异 vs M3**：M3 是 frontend 拆分 + 现有 IPC 路径不变；M4b **首次把 DB 写路径从 `tauri-plugin-sql` 直 SQL 转到 YoleApi invoke**。这是路径 B 「业务逻辑权威全部在 Rust 端」(CLAUDE.md §4) 的首次落地。
 
 **Cross-store 协调**（M4b 范围内）：
 
@@ -105,7 +105,7 @@
 ### 序列 + dogfood gate
 
 ```
-M4a ship (单 commit "Refactor: B3 M4a — extract Rust GalleyApi session/project CRUD methods")
+M4a ship (单 commit "Refactor: B3 M4a — extract Rust YoleApi session/project CRUD methods")
   ↓ JC quick smoke (Rust cargo test 全过 + 起 dev mode 无 regression — 因为 M4a 不接 frontend)
 M4b ship (fresh session 重开 — 单 commit "Refactor: B3 M4b — extract sessionsStore + route writes through Rust core")
   ↓ dogfood 1 天（重点：bulk archive / delete / project filter / rename / pin / unread clear / emptyArchive）
@@ -161,7 +161,7 @@ pub struct ProjectPatch {
 
 **决策**：id 由 frontend 生成（保持当前 `s-<timestamp>-<rand>` / `proj_<random16>` convention，per `useAppStore.ts:1094` / `1384`）。Rust 不强制 UUID，避免 invoke 后才知道 id 的 lifetime 同步问题。
 
-### T4a.2 · GalleyApi trait method 签名
+### T4a.2 · YoleApi trait method 签名
 
 `core/src/api.rs` extend trait（按 mapping § B order）：
 
@@ -191,9 +191,9 @@ async fn delete_project(&self, id: ProjectId, origin: Origin) -> Result<()>;
 
 **Return shape**: 单个 write 返回更新后的 `SessionBrief` / `ProjectBrief` — frontend 直接用作 in-memory state mirror 来源（不需要 client-side guess 新 `updated_at`），跟 GUI 当前 `updated: Session | null` + `persistSession(updated)` pattern semantic 一致。delete 返回 `()`。bulk 返回 affected row count（GUI 用作 toast 信号源）。
 
-### T4a.3 · SqliteGalley 实现
+### T4a.3 · SqliteYole 实现
 
-在 `core/src/db.rs` 现有 `impl GalleyApi for SqliteGalley` block 内 append 16 个 method body。每个：
+在 `core/src/db.rs` 现有 `impl YoleApi for SqliteYole` block 内 append 16 个 method body。每个：
 
 1. (write path) UPDATE / INSERT / DELETE SQL via sqlx
 2. (read-back) `SELECT ... WHERE id = ?` 拿更新后 row → `SessionRow::into_brief()`
@@ -203,8 +203,8 @@ async fn delete_project(&self, id: ProjectId, origin: Origin) -> Result<()>;
 
 **Error handling**：
 
-- 不存在的 id → `GalleyError::NotFound`
-- `set_session_pinned` 在 archived session 上 → `GalleyError::InvalidArgs`
+- 不存在的 id → `YoleError::NotFound`
+- `set_session_pinned` 在 archived session 上 → `YoleError::InvalidArgs`
 - empty title rename → server-side fall back `新对话`（不 reject，frontend 行为兼容）
 - `create_session` id 冲突 → SQLite PRIMARY KEY constraint 报错 → 包装成 `InvalidArgs`
 - `assign_session_to_project` 中 project_id 不存在 → SQLite FK 约束自动拒绝 → 包装成 `InvalidArgs`
@@ -219,18 +219,18 @@ async fn create_session(
     input: CreateSessionInput,
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
-    let galley = SqliteGalley::open().await.map_err(stringify_error)?;
-    galley.create_session(input, origin).await.map_err(stringify_error)
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.create_session(input, origin).await.map_err(stringify_error)
 }
 ```
 
-抽 `fn stringify_error(e: GalleyError) -> String` helper（pattern 跟现有 `list_sessions` 行 64/68 重复，DRY 一次），减少 16 × 2 = 32 行 boilerplate。
+抽 `fn stringify_error(e: YoleError) -> String` helper（pattern 跟现有 `list_sessions` 行 64/68 重复，DRY 一次），减少 16 × 2 = 32 行 boilerplate。
 
 `invoke_handler!` macro 加入新 command name × 16。
 
 ### T4a.5 · Cargo tests
 
-新建 `core/src/db_writes_tests.rs` (or extend `core/tests/test_galley_api.rs`)。每个 method 1-2 test：
+新建 `core/src/db_writes_tests.rs` (or extend `core/tests/test_yole_api.rs`)。每个 method 1-2 test：
 
 - happy path: setup DB row → invoke method → re-read row 确认字段变化
 - error path: not-found id / invalid status / archived pin reject 等
@@ -253,7 +253,7 @@ async fn create_session(
 ### T4a.8 · M4a commit
 
 ```
-git commit -m "Refactor: B3 M4a — extract Rust GalleyApi session/project CRUD methods"
+git commit -m "Refactor: B3 M4a — extract Rust YoleApi session/project CRUD methods"
 ```
 
 ---
@@ -314,7 +314,7 @@ git commit -m "Refactor: B3 M4a — extract Rust GalleyApi session/project CRUD 
 - [ ] `cd gui && pnpm lint` 0 warning
 - [ ] 起 `pnpm tauri dev` + 跑现有 GUI 流程（创建 / archive / rename / pin / delete session / 建 project / 改 project / 删 project）—— **行为 byte-identical**（因为 frontend 没接 Rust trait method，全部走旧的 `tauri-plugin-sql` 路径）
 - [ ] grep `useAppStore.*\(create_session\|archive_session\|rename_session\|set_session_pinned\|delete_session\|create_project\|update_project\|delete_project\)` 返回 0（M4a 不允许 frontend call site sneak in）
-- [ ] `core/src/api.rs` `GalleyApi` trait method 数量从 7 (B1 M3 + B2 M4) 增到 23（+16）
+- [ ] `core/src/api.rs` `YoleApi` trait method 数量从 7 (B1 M3 + B2 M4) 增到 23（+16）
 - [ ] `core/src/lib.rs` `tauri::generate_handler!` 注册 trait method 数从 7 增到 23
 
 **M4b 完成判据**：
@@ -334,7 +334,7 @@ git commit -m "Refactor: B3 M4a — extract Rust GalleyApi session/project CRUD 
 |---|---|---|
 | M4a sub-plan（本文档）| ~400 markdown | 1h |
 | M4a Rust types + trait signature | ~150 | 1h |
-| M4a SqliteGalley impl（16 method body）| ~400 | 2-3h |
+| M4a SqliteYole impl（16 method body）| ~400 | 2-3h |
 | M4a Tauri commands + handler 注册 | ~150 | 0.5h |
 | M4a cargo tests | ~600 | 2-3h |
 | M4a agent-api.md schema 增补 | ~150 markdown | 0.5h |

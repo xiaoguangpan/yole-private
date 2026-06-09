@@ -18,11 +18,11 @@ interface StepWelcomeProps {
  *   2. "接入已经安装的 GenericAgent" — the only live path in v0.1.
  *      Card click goes straight to Attach step.
  *
- * The trust note "Galley 不会修改你的 GA …" moved from a page-level
+ * The trust note "Yole 不会修改你的 GA …" moved from a page-level
  * footer into Mode 2's body — it's the value prop of the attach path
  * specifically, not a global app fact, so it reads more honestly there.
  *
- * Title typography: 36px sentence-case "Galley" (Newsreader medium).
+ * Title typography: 36px sentence-case "Yole" (Newsreader medium).
  * The product name stays sentence-case across the UI so it reads as a
  * name, not an acronym.
  */
@@ -31,7 +31,7 @@ export function StepWelcome({ onStart }: StepWelcomeProps) {
   return (
     <div className="max-w-[580px]">
       <h1 className="m-0 font-serif text-[36px] font-medium leading-[1.1] tracking-[0.005em] text-ink">
-        Galley
+        Yole
       </h1>
       <p className="mb-9 mt-3 text-[18px] italic leading-[1.55] text-ink-soft">
         {copy.onboarding.welcomeTagline}

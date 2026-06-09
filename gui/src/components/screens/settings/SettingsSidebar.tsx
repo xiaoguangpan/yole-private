@@ -31,6 +31,7 @@ export function SettingsSidebar({
   resolvedTheme,
   onChangeThemePreference,
   showImTab,
+  simplifiedUi = false,
 }: {
   tab: SettingsTab;
   onChange: (tab: SettingsTab) => void;
@@ -41,6 +42,7 @@ export function SettingsSidebar({
   resolvedTheme: ResolvedTheme;
   onChangeThemePreference: (preference: ThemePreference) => void;
   showImTab: boolean;
+  simplifiedUi?: boolean;
 }) {
   const copy = useCopy();
   const showChineseHelpers = isChineseLanguage(resolvedLanguage);
@@ -55,13 +57,15 @@ export function SettingsSidebar({
           subLabel={showChineseHelpers ? tabCopy.runtime.helper : undefined}
           onClick={() => onChange("runtime")}
         />
-        <SettingsTabButton
-          active={tab === "models"}
-          Icon={Key}
-          label={tabCopy.models.label}
-          subLabel={showChineseHelpers ? tabCopy.models.helper : undefined}
-          onClick={() => onChange("models")}
-        />
+        {!simplifiedUi && (
+          <SettingsTabButton
+            active={tab === "models"}
+            Icon={Key}
+            label={tabCopy.models.label}
+            subLabel={showChineseHelpers ? tabCopy.models.helper : undefined}
+            onClick={() => onChange("models")}
+          />
+        )}
         <SettingsTabButton
           active={tab === "approval"}
           Icon={ShieldCheck}
@@ -69,13 +73,15 @@ export function SettingsSidebar({
           subLabel={showChineseHelpers ? tabCopy.approval.helper : undefined}
           onClick={() => onChange("approval")}
         />
-        <SettingsTabButton
-          active={tab === "integration"}
-          Icon={PlugsConnected}
-          label={tabCopy.agent.label}
-          subLabel={showChineseHelpers ? tabCopy.agent.helper : undefined}
-          onClick={() => onChange("integration")}
-        />
+        {!simplifiedUi && (
+          <SettingsTabButton
+            active={tab === "integration"}
+            Icon={PlugsConnected}
+            label={tabCopy.agent.label}
+            subLabel={showChineseHelpers ? tabCopy.agent.helper : undefined}
+            onClick={() => onChange("integration")}
+          />
+        )}
         {showImTab && (
           <SettingsTabButton
             active={tab === "im"}
@@ -85,13 +91,15 @@ export function SettingsSidebar({
             onClick={() => onChange("im")}
           />
         )}
-        <SettingsTabButton
-          active={tab === "shortcuts"}
-          Icon={Keyboard}
-          label={tabCopy.shortcuts.label}
-          subLabel={showChineseHelpers ? tabCopy.shortcuts.helper : undefined}
-          onClick={() => onChange("shortcuts")}
-        />
+        {!simplifiedUi && (
+          <SettingsTabButton
+            active={tab === "shortcuts"}
+            Icon={Keyboard}
+            label={tabCopy.shortcuts.label}
+            subLabel={showChineseHelpers ? tabCopy.shortcuts.helper : undefined}
+            onClick={() => onChange("shortcuts")}
+          />
+        )}
         <SettingsTabButton
           active={tab === "about"}
           Icon={Info}

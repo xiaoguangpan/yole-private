@@ -112,7 +112,7 @@ Session 主线：
 
 ### 8. Projects 功能 V0.1（重磅）
 
-**战略判断**（JC）："GA 用户群有相当多人想要 Projects；官方 Streamlit 给不了；飞书/微信/Telegram IM bot 因为单 chat 形态本质上也给不了。这是 GA Workbench 真正能拉差距的 surface。**V0.1 上，且要打磨到惊艳。**"
+**战略判断**（JC）："GA 用户群有相当多人想要 Projects；官方 Streamlit 给不了；飞书/微信/Telegram IM bot 因为单 chat 形态本质上也给不了。这是 Yole 真正能拉差距的 surface。**V0.1 上，且要打磨到惊艳。**"
 
 **心智边界**（PRD §7.3 + 2026-05-09 devlog）：Project = **纯归类抽屉**（A. 归类 + B. 可选 cwd），**完全不改变 GA 内核体验**。不做项目级 CLAUDE.md / system prompt / RAG / 默认 LLM。
 

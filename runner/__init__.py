@@ -1,1 +1,1 @@
-"""Galley bridge package."""
+"""Yole bridge package."""

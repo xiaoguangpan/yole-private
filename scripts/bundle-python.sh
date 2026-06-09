@@ -85,7 +85,7 @@ fi
 echo "[bundle-python] stripping non-essential stdlib..."
 # Remove modules we never use, freeing ~10-15MB per bundle:
 #   - test/      CPython's own test suite (~10MB)
-#   - tkinter/   GUI toolkit (Galley is Tauri, GA has no Tk surface)
+#   - tkinter/   GUI toolkit (Yole is Tauri, GA has no Tk surface)
 #   - lib-dynload/_tkinter*.so   Mac x64 codesign blocker per
 #     python-build-standalone issue #749 (headerpad limitation)
 #   - idlelib/, turtledemo/   demo/edu modules
@@ -124,7 +124,7 @@ echo "[bundle-python] installing GA deps to bundle's site-packages..."
   "${GA_DEPS[@]}"
 
 # Verify the managed GA import chain works against the bundle. This must
-# use Galley's vendored managed-ga/code payload, not the maintainer's
+# use Yole's vendored managed-ga/code payload, not the maintainer's
 # external ~/Documents/GenericAgent checkout, or a local setup can hide
 # missing packaged dependencies.
 echo "[bundle-python] verifying bundle..."

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Snapshot of aggregate session counts. Returned by
-/// [`crate::api::GalleyApi::status`] for quick dashboard / CLI summary.
+/// [`crate::api::YoleApi::status`] for quick dashboard / CLI summary.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusSummary {

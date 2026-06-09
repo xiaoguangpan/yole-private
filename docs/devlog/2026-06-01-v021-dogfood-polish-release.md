@@ -6,7 +6,7 @@
 
 ## Context
 
-`v0.2.0` shipped Galley's first stable baseline: bundled GA, external GA,
+`v0.2.0` shipped Yole's first stable baseline: bundled GA, external GA,
 Agent / CLI, Browser Control, and Channels. The next day of dogfood surfaced a
 set of user-visible polish items that are too useful to hold for a later minor
 release but not broad enough to justify `v0.3.0`.

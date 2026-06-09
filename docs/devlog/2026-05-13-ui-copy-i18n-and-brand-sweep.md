@@ -2,7 +2,7 @@
 
 **Date**: 2026-05-13
 **Status**: shipped
-**Related**: [Galley 重命名 + 多项 V0.1 功能马拉松](./2026-05-13-galley-rename-and-features-marathon.md)（前序 rebrand），CLAUDE.md「Brand wordmark rules」
+**Related**: [Yole 重命名 + 多项 V0.1 功能马拉松](./2026-05-13-yole-rename-and-features-marathon.md)（前序 rebrand），CLAUDE.md「Brand wordmark rules」
 
 ## Context
 
@@ -10,10 +10,10 @@ V0.1 dogfood polish 阶段，作者指出 TopBar 标题旁边的 `⋯` 按钮「
 
 - TopBar 菜单触发器形态怎么改才不歧义？
 - 顺手发现 Sidebar 右键菜单 / TopBar / Settings / Onboarding / ApprovalForm 大面积中英混杂
-- 前几天 GA Workbench → Galley rebrand commit 之后，UI 里还有 11 处 `Workbench` 漏网
+- 前几天 Yole → Yole rebrand commit 之后，UI 里还有 11 处 `Yole` 漏网
 - 既然品牌都改了，GitHub repo 名是不是也该同步？
 
-整个 session 围绕「一旦决定走中文 UI 和 Galley brand，就把半成品一致性收齐」展开。
+整个 session 围绕「一旦决定走中文 UI 和 Yole brand，就把半成品一致性收齐」展开。
 
 ## Decisions
 
@@ -53,9 +53,9 @@ V0.1 dogfood polish 阶段，作者指出 TopBar 标题旁边的 `⋯` 按钮「
 
 规则：
 
-- **section header / brand 锚点 / 装饰性 label** → 保留英文（`PROJECTS` / `GALLEY` 等）
+- **section header / brand 锚点 / 装饰性 label** → 保留英文（`PROJECTS` / `YOLE` 等）
 - **body / 菜单项 / hint / placeholder / aria-label** → 全中文
-- **代码 identifier**（`sessionId` / `Session` type / `workbenchVersion` 字段名 / `workbench_bridge` Python 模块 / `genericagent-workbench` GitHub URL 直到我们重命名）→ 保留英文
+- **代码 identifier**（`sessionId` / `Session` type / `yoleVersion` 字段名 / `yole_bridge` Python 模块 / `yole` GitHub URL 直到我们重命名）→ 保留英文
 - **Devlog / 评论里的英文动词描述**（"Right-click → Pin / Unpin"）→ 保留（dev 上下文）
 
 参考：Notion CN 就是这么做的 —— sidebar 大写 `Workspace` header + body 用「工作区」。
@@ -100,21 +100,20 @@ pill（点击后）：
 原文 `Denied · agent 将收到拒绝信号`：
 
 - agent 准确但是英文 token
-- 作者提议改 `已通知 Galley` —— **push back 否决**：Galley 是 UI 壳/传话筒，AI agent 才是 deny 信号的真正接收方
+- 作者提议改 `已通知 Yole` —— **push back 否决**：Yole 是 UI 壳/传话筒，AI agent 才是 deny 信号的真正接收方
 - 落到 **`已通知 AI`**：短 + 准 + 无英文 token
 
 也把原来「将收到信号」改成「已通知」（将来时 → 完成时）+ 干掉「信号」工程师词。
 
-### 8. Workbench → Galley brand polish（11 处 user-facing）
+### 8. Yole → Yole brand polish（11 处 user-facing）
 
-[Galley rename marathon](./2026-05-13-galley-rename-and-features-marathon.md) 当天漏的 11 处全收：
+[Yole rename marathon](./2026-05-13-yole-rename-and-features-marathon.md) 当天漏的 11 处全收：
 
-- useAppStore toast / SettingsRuntime subtitle + hint + version stamp / EditProjectDialog hint / Onboarding StepAttach + StepHealth 两处 + 「进入 Galley」按钮 / ErrorCard 错误标题 / Composer LLM picker hint / demo.ts mock title
+- useAppStore toast / SettingsRuntime subtitle + hint + version stamp / EditProjectDialog hint / Onboarding StepAttach + StepHealth 两处 + 「进入 Yole」按钮 / ErrorCard 错误标题 / Composer LLM picker hint / demo.ts mock title
 
 **保留**（有意识）：
-- About 页 L50「Galley started as a workbench for GenericAgent」—— 小写 common noun + CLAUDE.md 明文规定的品牌起源叙事
-- 代码 identifier（`workbenchVersion` / `workbench_bridge` / `ga-workbench-layout-2col-v2`）
-- 代码注释里的 Workbench
+- 代码 identifier（`yoleVersion` / `yole_bridge` / `ga-yole-layout-2col-v2`）
+- 代码注释里的 Yole
 
 ### 9. GA vs GenericAgent — 长文本展开 / 紧凑 label 缩写
 
@@ -131,7 +130,7 @@ framework：
 
 其它 ~18 处 GA 保留：Sidebar 状态徽章 / Onboarding step nav / Health check item / Command palette action / ApprovalForm reason / ErrorCard 文档 link / About 版本表 dt。
 
-### 10. GitHub repo 重命名 genericagent-workbench → galley
+### 10. GitHub repo 重命名 yole → yole
 
 pre-launch 阶段改成本最低；GitHub auto-redirect 兜底。
 
@@ -144,7 +143,7 @@ pre-launch 阶段改成本最低；GitHub auto-redirect 兜底。
 
 **保留**（temporal authenticity）：
 - [2026-05-13-baseline-regression-and-feature-detection.md](./2026-05-13-baseline-regression-and-feature-detection.md) 里指向 commit `92a48fe` 的历史链接 → devlog 是历史叙事，commit URL 要锚定那一刻
-- `docs/GenericAgent Workbench-handoff/` 整个目录 → rebrand 前的 design handoff 文物，目录名 + 内部 README 都是「彼时彼刻」的快照
+- `docs/Yole-handoff/` 整个目录 → rebrand 前的 design handoff 文物，目录名 + 内部 README 都是「彼时彼刻」的快照
 
 本地目录 `genericagent-webui` 作者决定不改（dev-only，跨设备本来就不一致）。
 
@@ -173,22 +172,22 @@ pre-launch 阶段改成本最低；GitHub auto-redirect 兜底。
 
 这是个有意思的反转：默认应该 push back 过度修饰，但当用户给出比我更清晰的分类理由时要让步。
 
-### 「已通知 Galley」/「已通知 agent」
+### 「已通知 Yole」/「已通知 agent」
 
-- Galley → 语义错（Galley 是 UI 壳，不是接收方）
+- Yole → 语义错（Yole 是 UI 壳，不是接收方）
 - agent → 准确但中英混
 - AI → 短 + 准 + 全中文
 
-### 新 repo 名 `galley-workbench` / `galley-app` / `galley-desktop`
+### 新 repo 名 `yole-yole` / `yole-app` / `yole-desktop`
 
-- `galley-workbench` → 把 Galley 拖回「Galley Workbench」二元品牌，跟 CLAUDE.md 品牌规则冲突
-- `galley-app` / `galley-desktop` → 后缀啰嗦，brand 弱化
-- `galley` → 干净，namespace 没冲突（作者实跑确认可用）
+- `yole-yole` → 把 Yole 拖回「Yole Yole」二元品牌，跟 CLAUDE.md 品牌规则冲突
+- `yole-app` / `yole-desktop` → 后缀啰嗦，brand 弱化
+- `yole` → 干净，namespace 没冲突（作者实跑确认可用）
 
-### 保留 `genericagent-workbench` 不改 repo
+### 保留 `yole` 不改 repo
 
 - pre-launch 不改成本会越来越高（外部 link 累积）
-- About 页显示文本已经写 Galley 但 URL 露馅，半成品感
+- About 页显示文本已经写 Yole 但 URL 露馅，半成品感
 - GitHub redirect 兜底，迁移代价极低
 
 ## Open questions
@@ -196,7 +195,7 @@ pre-launch 阶段改成本最低；GitHub auto-redirect 兜底。
 1. **ApprovalForm 按钮 icon 跟新 copy 框架对应不上**：FolderSimple / Globe 暗示「in this folder / globally」，但新 copy 是「加入白名单」—— Plus 或 Shield 更贴「加入」语义。这次只动 copy 不动 icon，留下次。
 2. **SettingsAbout 还有 SubLabel `Links` / `Also by wangjc683` 是英文**，跟同页「本地优先」中文 SubLabel 不一致 —— 这次未动。
 3. **SettingsRuntime `Re-run health check` + Onboarding StepHealth `Back` 按钮**：扫到但未动。
-4. **demo.ts mock data**：里面还有「Workbench 桌面端」改成了「Galley 桌面端」—— 但 demo data 是 dev-only 还是 prod 也能触发？需要复核。
+4. **demo.ts mock data**：里面还有「Yole 桌面端」改成了「Yole 桌面端」—— 但 demo data 是 dev-only 还是 prod 也能触发？需要复核。
 
 ## Next
 

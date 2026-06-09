@@ -1,15 +1,15 @@
-//! Bundled Galley Supervisor SOP content.
+//! Bundled Yole Supervisor SOP content.
 //!
 //! Settings → Agent exposes this as a copyable document for the
-//! user to hand to any supervisor agent. Galley deliberately does not
+//! user to hand to any supervisor agent. Yole deliberately does not
 //! write it into GenericAgent `memory/`; the user decides where to
 //! paste or install the SOP.
 
-/// SOP body bundled into the Galley binary at build time. The source
+/// SOP body bundled into the Yole binary at build time. The source
 /// file is the same one a developer reads in the repo, so there's no
 /// drift risk: changing the SOP requires editing this document, which
 /// automatically updates the embedded body on the next `cargo build`.
-const SOP_BODY: &str = include_str!("../../docs/integrations/galley-supervisor-sop.md");
+const SOP_BODY: &str = include_str!("../../docs/integrations/yole-supervisor-sop.md");
 
 /// Read the embedded SOP body for preview / copy surfaces.
 pub fn sop_body() -> &'static str {

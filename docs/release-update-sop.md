@@ -1,6 +1,6 @@
 # Release / Update SOP
 
-> Maintainer checklist for shipping a Galley release and promoting the app
+> Maintainer checklist for shipping a Yole release and promoting the app
 > update channel. Use this as the runbook during release day. Use
 > [release workflow](./release-workflow.md) for deeper background and edge
 > cases.
@@ -25,7 +25,7 @@ The default finish line is:
 Only skip promotion when the release owner explicitly marks the release as
 `manual-download only` or `hold updater`. If either exception is used, record it
 in the GitHub Release notes and [project status](./project-status.md), because
-installed users will not see that version through Galley's update UI.
+installed users will not see that version through Yole's update UI.
 
 Do not point the update channel at a draft, untested, or failed build. The
 draft Release `latest.json` is a review artifact, not the live user channel.
@@ -67,8 +67,9 @@ Replace the example value before every release.
 - [ ] GitHub release/update config exists:
   - Secret: `TAURI_SIGNING_PRIVATE_KEY`
   - Secret: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password
-  - Variable: `GALLEY_UPDATER_PUBKEY`
-  - Variable: `GALLEY_UPDATER_ENDPOINT`
+  - Variable: `YOLE_UPDATER_PUBKEY`
+  - Variable: `YOLE_UPDATER_ENDPOINT`
+  - Variable: `YOLE_PROVISIONER_URL`
 - [ ] Update-channel policy is decided:
   - stable / patch release: promote `stable` after publish + smoke
   - tester / early-adopter release: manual download only by default
@@ -78,13 +79,13 @@ Replace the example value before every release.
 Expected default endpoint:
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/stable/latest.json
+https://raw.githubusercontent.com/wangjc683/yole/yole-update-channel/updates/stable/latest.json
 ```
 
 Legacy endpoint kept for older builds:
 
 ```text
-https://raw.githubusercontent.com/wangjc683/galley/galley-update-channel/updates/beta/latest.json
+https://raw.githubusercontent.com/wangjc683/yole/yole-update-channel/updates/beta/latest.json
 ```
 
 ## Dry Run
@@ -94,7 +95,7 @@ It builds the release artifacts without creating a GitHub Release.
 
 ```bash
 gh workflow run release.yml --ref main
-gh run watch --repo wangjc683/galley --exit-status
+gh run watch --repo wangjc683/yole --exit-status
 ```
 
 Pass criteria:
@@ -127,8 +128,8 @@ git push origin main "${RELEASE_TAG}"
 ### 3. Wait For Release Workflow
 
 ```bash
-gh run list --repo wangjc683/galley --workflow release.yml --limit 5
-gh run watch --repo wangjc683/galley --exit-status
+gh run list --repo wangjc683/yole --workflow release.yml --limit 5
+gh run watch --repo wangjc683/yole --exit-status
 ```
 
 Pass criteria:
@@ -173,16 +174,16 @@ Writing rules:
   `Area: user-visible change` in English.
 - For patch releases, 3-5 focused bullets are enough. For larger releases, keep
   the list scannable instead of turning it into a changelog dump.
-- Keep established product terms such as `Galley`, `GA`, `GenericAgent`,
+- Keep established product terms such as `Yole`, `GA`, `GenericAgent`,
   `Agent / CLI`, `Browser Control`, `Channels`, and `ChatGPT / Codex`.
 - Use `内置 GA` in Chinese and `Bundled GA` in English. Do not expose
   `managed GA` in user-facing release notes.
 - Installation links must point directly to GitHub Release assets.
 - Always include the macOS quarantine command and Windows SmartScreen note while
-  Galley is unsigned.
+  Yole is unsigned.
 - Stable / patch release notes should end in the promoted state: after update
   channel promotion, replace any "wait for in-app update" text with a direct
-  "installed users can update in Galley" note. Keep the waiting text only while
+  "installed users can update in Yole" note. Keep the waiting text only while
   reviewing the draft before promotion.
 
 Replace `<TAG>` with the Git tag (for example `v0.2.5`) and `<VERSION>` with
@@ -199,22 +200,22 @@ the package version (for example `0.2.5`).
 
 ### macOS
 
-- [下载 Apple Silicon 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_aarch64.dmg)
-- [下载 Intel 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_x64.dmg)
+- [下载 Apple Silicon 版](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_macOS_aarch64.dmg)
+- [下载 Intel 版](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_macOS_x64.dmg)
 
-如果 macOS 提示无法打开 Galley，可以在终端执行：
+如果 macOS 提示无法打开 Yole，可以在终端执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Yole.app
 ```
 
 ### Windows
 
-- [下载 Windows 版](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_Windows_x64-setup.exe)
+- [下载 Windows 版](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_Windows_x64-setup.exe)
 
 如果 Windows SmartScreen 提示风险，点击「更多信息」->「仍要运行」。
 
-已安装旧版的用户可以在 Galley 里检查更新，升级到 <TAG>。
+已安装旧版的用户可以在 Yole 里检查更新，升级到 <TAG>。
 
 ---
 
@@ -228,24 +229,24 @@ xattr -dr com.apple.quarantine /Applications/Galley.app
 
 ### macOS
 
-- [Download for Apple Silicon](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_aarch64.dmg)
-- [Download for Intel](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_macOS_x64.dmg)
+- [Download for Apple Silicon](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_macOS_aarch64.dmg)
+- [Download for Intel](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_macOS_x64.dmg)
 
-If macOS says Galley cannot be opened, run this in Terminal:
+If macOS says Yole cannot be opened, run this in Terminal:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Yole.app
 ```
 
 ### Windows
 
-- [Download for Windows](https://github.com/wangjc683/galley/releases/download/<TAG>/Galley_<VERSION>_Windows_x64-setup.exe)
+- [Download for Windows](https://github.com/wangjc683/yole/releases/download/<TAG>/Yole_<VERSION>_Windows_x64-setup.exe)
 
 If Windows SmartScreen shows a warning, click "More info" -> "Run anyway".
 
-Existing users can check for updates in Galley and upgrade to <TAG>.
+Existing users can check for updates in Yole and upgrade to <TAG>.
 
-**Full Changelog**: https://github.com/wangjc683/galley/compare/<PREVIOUS_TAG>...<TAG>
+**Full Changelog**: https://github.com/wangjc683/yole/compare/<PREVIOUS_TAG>...<TAG>
 ````
 
 #### Alpha Release Notes Template
@@ -261,33 +262,33 @@ For testers and early adopters. This alpha build is still evolving quickly and m
 ## 请重点测试
 
 - 全新安装后完成 Onboarding，配置模型并进入主界面。
-- 新建对话，确认 Galley 能正常回复。
-- Settings -> IM 接入微信，扫码后从微信给 Galley 发消息。
+- 新建对话，确认 Yole 能正常回复。
+- Settings -> IM 接入微信，扫码后从微信给 Yole 发消息。
 - 浏览器控制扩展安装、连接测试和简单浏览器任务。
-- 退出并重启 Galley，确认模型配置、历史对话和微信接入状态符合预期。
+- 退出并重启 Yole，确认模型配置、历史对话和微信接入状态符合预期。
 
 ## macOS 安装提示
 
 如果 macOS 提示无法打开，可以在终端执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Yole.app
 ```
 
 ## Please Test
 
 - Complete Onboarding after a fresh install, configure a model, and enter the main screen.
-- Start a new conversation and confirm Galley replies normally.
-- Connect WeChat in Settings -> IM, then send a message to Galley from WeChat.
+- Start a new conversation and confirm Yole replies normally.
+- Connect WeChat in Settings -> IM, then send a message to Yole from WeChat.
 - Install the Browser Control extension, test the connection, and run a simple browser task.
-- Quit and relaunch Galley, then confirm model settings, conversation history, and WeChat connection state still look correct.
+- Quit and relaunch Yole, then confirm model settings, conversation history, and WeChat connection state still look correct.
 
 ## macOS Install Note
 
-If macOS says Galley cannot be opened, run this in Terminal:
+If macOS says Yole cannot be opened, run this in Terminal:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Galley.app
+xattr -dr com.apple.quarantine /Applications/Yole.app
 ```
 ````
 
@@ -329,16 +330,16 @@ Also skip only when the release is explicitly marked `manual-download only` or
 
 ```bash
 gh workflow run promote-update-channel.yml \
-  --repo wangjc683/galley \
+  --repo wangjc683/yole \
   --ref main \
   -f tag="${RELEASE_TAG}" \
   -f channel=stable
 
-gh run watch --repo wangjc683/galley --exit-status
+gh run watch --repo wangjc683/yole --exit-status
 ```
 
 The workflow refuses draft releases. It regenerates `latest.json` from the
-published release artifacts and pushes it to the `galley-update-channel`
+published release artifacts and pushes it to the `yole-update-channel`
 branch. Promoting `stable` also writes the same manifest to `updates/beta/` so
 older installed builds that were compiled with the legacy endpoint can still
 update.
@@ -349,7 +350,7 @@ Run the live channel verifier:
 
 ```bash
 node scripts/check-update-channel.mjs \
-  --repo wangjc683/galley \
+  --repo wangjc683/yole \
   --tag "${RELEASE_TAG}" \
   --channel stable \
   --cache-bust
@@ -361,7 +362,7 @@ Check:
 - Platform URLs point at the published GitHub Release assets.
 - `signature` values are inline signature contents, not `.sig` URLs.
 - Platform asset URLs return a successful HTTP status.
-- The manifest changed on `galley-update-channel`.
+- The manifest changed on `yole-update-channel`.
 
 The promote workflow runs the same verifier after it pushes the channel branch.
 It passes `--cache-bust` so GitHub raw CDN cache cannot keep returning a stale
@@ -369,7 +370,7 @@ but valid old manifest. If this step fails, treat the update channel as not
 promoted even if the workflow generated a local `latest.json`.
 
 After verification passes, edit the GitHub Release notes if needed so installed
-users are told they can update in Galley, not that they should wait for the
+users are told they can update in Yole, not that they should wait for the
 update channel.
 
 ### 9. Dogfood App Update
@@ -378,10 +379,10 @@ Use an installed older release build, not `tauri dev`.
 
 Expected path:
 
-1. Launch older Galley.
+1. Launch older Yole.
 2. Settings -> About or Runtime shows update status.
-3. If no session is running, Galley downloads/prepares in the background.
-4. If a session is running, Galley remembers the update and waits.
+3. If no session is running, Yole downloads/prepares in the background.
+4. If a session is running, Yole remembers the update and waits.
 5. After preparation, click restart.
 6. Relaunched app shows the new version.
 
@@ -396,7 +397,7 @@ If the promoted version is bad but an older release is still safe:
 
 ```bash
 gh workflow run promote-update-channel.yml \
-  --repo wangjc683/galley \
+  --repo wangjc683/yole \
   --ref main \
   -f tag=<last-good-tag> \
   -f channel=stable
@@ -413,13 +414,14 @@ Then:
 | Symptom | Likely cause | Action |
 |---|---|---|
 | Release workflow fails at signing config | Missing GitHub secret / variable | Fix repo settings, rerun dry-run |
-| `failed to decode base64 pubkey` | Used decoded minisign text instead of `.pub` file content | Set `GALLEY_UPDATER_PUBKEY` to `updater.key.pub` content |
+| `failed to decode base64 pubkey` | Used decoded minisign text instead of `.pub` file content | Set `YOLE_UPDATER_PUBKEY` to `updater.key.pub` content |
+| Release workflow says `YOLE_PROVISIONER_URL` is missing | Build would not auto-register first-run trial tokens | Deploy the provisioner behind HTTPS, set the repo variable, rerun dry-run |
 | Promote workflow refuses release | Release is still draft | Publish only after smoke, then rerun promote |
 | App says update channel not connected | Build lacks updater compile-time config | Expected in Dev; for release, inspect generated Tauri config |
 | Update downloads during active task | Protection regression | Stop release, fix before promotion |
 | Manifest URL points at wrong version | Wrong tag promoted | Promote the correct tag |
-| Live channel verifier returns 404 | Channel branch was not promoted or raw URL is wrong | Rerun promote, then verify `updates/stable/latest.json` on `galley-update-channel`; for old builds, also verify the `updates/beta/latest.json` alias |
-| Live channel verifier reads previous version | GitHub raw CDN returned stale but valid manifest content | Use `--cache-bust`, keep validation inside verifier retries, and confirm the pushed file on `galley-update-channel` |
+| Live channel verifier returns 404 | Channel branch was not promoted or raw URL is wrong | Rerun promote, then verify `updates/stable/latest.json` on `yole-update-channel`; for old builds, also verify the `updates/beta/latest.json` alias |
+| Live channel verifier reads previous version | GitHub raw CDN returned stale but valid manifest content | Use `--cache-bust`, keep validation inside verifier retries, and confirm the pushed file on `yole-update-channel` |
 
 ## Done Criteria
 

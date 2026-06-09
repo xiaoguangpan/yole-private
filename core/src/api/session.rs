@@ -37,7 +37,7 @@ pub enum SessionStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeKind {
-    /// Galley-owned managed / bundled GA runtime.
+    /// Yole-owned managed / bundled GA runtime.
     Managed,
     /// User-owned attached GenericAgent checkout.
     External,
@@ -46,7 +46,7 @@ pub enum RuntimeKind {
 impl RuntimeKind {
     pub fn label(self) -> &'static str {
         match self {
-            RuntimeKind::Managed => "Galley",
+            RuntimeKind::Managed => "Yole",
             RuntimeKind::External => "Attached GenericAgent",
         }
     }
@@ -55,7 +55,7 @@ impl RuntimeKind {
 /// Summary projection of a session — the fields a sidebar row needs.
 /// "Brief" means: enough to list / display, not enough to render the
 /// full conversation. For history, see [`super::MessageBrief`] plus
-/// [`crate::api::GalleyApi::session_messages`].
+/// [`crate::api::YoleApi::session_messages`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionBrief {
@@ -84,7 +84,7 @@ pub struct SessionBrief {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_llm_index: Option<u32>,
     /// Stable LLM identity for this session. Managed runtime stores
-    /// Galley's `managed_models.id`; external runtime stores GA's raw
+    /// Yole's `managed_models.id`; external runtime stores GA's raw
     /// `agent.list_llms()` name. This survives model reordering.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_llm_key: Option<String>,
@@ -121,7 +121,7 @@ pub struct SessionFilter {
     pub runtime_kind: Option<RuntimeKind>,
 }
 
-/// Payload for [`crate::api::GalleyApi::create_session`].
+/// Payload for [`crate::api::YoleApi::create_session`].
 ///
 /// `id` is **caller-assigned**. The GUI currently mints
 /// `s-<base36-timestamp>-<rand>` (see useAppStore.ts createSession); the

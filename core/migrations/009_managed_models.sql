@@ -1,6 +1,6 @@
 -- 009_managed_models.sql · managed GA M3
 --
--- Managed mode owns Galley's model records. The table stores non-secret
+-- Managed mode owns Yole's model records. The table stores non-secret
 -- metadata only; API keys live in the system credential store and are
 -- referenced by api_key_ref.
 

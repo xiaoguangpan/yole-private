@@ -8,7 +8,7 @@
 
 PRD v0.2 落定后开始进 DESIGN.md 讨论。v0.1 DESIGN.md（dark graphite + cyan-emerald + Linear/Raycast 紧凑驾驶舱）已经写完，但作者表态：
 
-> "我现在希望 GA Workbench 的气质有点像 Notion 和 Claude 的结合"
+> "我现在希望 Yole 的气质有点像 Notion 和 Claude 的结合"
 
 这是**根本方向调整**，不是 patch。讨论从抽象气质开始（"什么是 Notion + Claude 结合"），逐步具体到色板、字体、组件 spec。基础层 9 块对齐用了一个完整 work session。
 

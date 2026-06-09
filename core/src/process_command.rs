@@ -1,4 +1,4 @@
-//! Shared subprocess setup for background commands launched by Galley Core.
+//! Shared subprocess setup for background commands launched by Yole Core.
 
 use tokio::process::Command;
 

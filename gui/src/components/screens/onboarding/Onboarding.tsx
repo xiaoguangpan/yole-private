@@ -44,7 +44,7 @@ export interface OnboardingProps {
    * a top-level Back to Settings escape hatch. `"revisit"` is the Settings →
    * "Re-run Health Check" path: jumps straight to Health step (uses
    * the already-saved GA path), relabels Back → "取消" and
-   * "进入 Galley" → "返回设置", and requires an `onCancel` callback
+   * "进入 Yole" → "返回设置", and requires an `onCancel` callback
    * for the Back button (since there's no Attach step to step back to).
    */
   mode?: "fresh" | "setup" | "revisit";
@@ -350,7 +350,7 @@ export function Onboarding({
               continueLabel={
                 isRevisit
                   ? copy.onboarding.backToSettings
-                  : copy.onboarding.enterGalley
+                  : copy.onboarding.enterYole
               }
             />
           )}

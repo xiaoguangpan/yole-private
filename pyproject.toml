@@ -1,7 +1,7 @@
 [project]
-name = "galley-bridge"
+name = "yole-bridge"
 version = "0.1.0"
-description = "Galley bridge: JSON Lines IPC between GenericAgent subprocesses and the desktop frontend."
+description = "Yole bridge: JSON Lines IPC between GenericAgent subprocesses and the desktop frontend."
 requires-python = ">=3.10"
 dependencies = []
 

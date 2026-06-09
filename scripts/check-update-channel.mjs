@@ -15,14 +15,18 @@ if (args.help) {
   process.exit(0);
 }
 
-const repo = args.repo ?? "wangjc683/galley";
+const repo = args.repo ?? "xiaoguangpan/yole";
 const channel = args.channel ?? "stable";
 const tag = args.tag;
 const expectedVersion = args.version ?? (tag ? tag.replace(/^v/, "") : undefined);
 const manifestUrl =
   args.url ??
-  `https://raw.githubusercontent.com/${repo}/galley-update-channel/updates/${channel}/latest.json`;
+  `https://raw.githubusercontent.com/${repo}/yole-update-channel/updates/${channel}/latest.json`;
 const checkAssets = args["no-asset-check"] !== true;
+const requiredPlatforms = (args.platforms ?? REQUIRED_PLATFORMS.join(","))
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const cacheBust = args["cache-bust"] === true;
 const retries = parsePositiveInt(args.retries ?? "1", "--retries");
 const retryDelayMs = parsePositiveInt(args["retry-delay-ms"] ?? "3000", "--retry-delay-ms");
@@ -44,14 +48,14 @@ async function main() {
   );
 
   if (checkAssets) {
-    for (const platform of REQUIRED_PLATFORMS) {
+    for (const platform of requiredPlatforms) {
       await assertUrlOk(manifest.platforms[platform].url, platform);
     }
   }
 
   console.log(`Update channel OK: ${manifestUrl}`);
   console.log(`version: ${manifest.version}`);
-  console.log(`platforms: ${REQUIRED_PLATFORMS.join(", ")}`);
+  console.log(`platforms: ${requiredPlatforms.join(", ")}`);
 }
 
 function validateManifest(manifest) {
@@ -81,7 +85,7 @@ function validateManifest(manifest) {
     ? `https://github.com/${repo}/releases/download/${encodePathSegment(tag)}/`
     : null;
 
-  for (const platform of REQUIRED_PLATFORMS) {
+  for (const platform of requiredPlatforms) {
     const entry = manifest.platforms[platform];
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`manifest.platforms.${platform} is missing`);
@@ -136,7 +140,7 @@ async function fetchJson(url, options = {}) {
 function withCacheBust(url) {
   const parsed = new URL(url);
   parsed.searchParams.set(
-    "_galley_check",
+    "_yole_check",
     `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   return parsed.toString();
@@ -230,6 +234,7 @@ function printUsage() {
 Options:
   --url <url>                Override the manifest URL.
   --version <version>        Defaults to tag without leading "v".
+  --platforms <csv>          Defaults to darwin-aarch64,darwin-x86_64,windows-x86_64.
   --no-asset-check           Skip HEAD/GET checks for platform asset URLs.
   --cache-bust               Add a per-attempt query param to avoid stale raw CDN reads.
   --retries <count>          Defaults to 1.

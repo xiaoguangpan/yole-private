@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Verify that Galley's bundled Python can import the managed GenericAgent
-# payload and the runtime dependencies Galley owns.
+# Verify that Yole's bundled Python can import the managed GenericAgent
+# payload and the runtime dependencies Yole owns.
 
 set -euo pipefail
 
@@ -40,7 +40,7 @@ python_host_path() {
   fi
 }
 
-SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/galley-bundled-python-smoke.XXXXXX")"
+SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/yole-bundled-python-smoke.XXXXXX")"
 cleanup() {
   rm -rf "$SMOKE_ROOT"
 }
@@ -58,14 +58,14 @@ echo "[bundled-python-managed-ga] python: ${PYTHON_BIN}"
 echo "[bundled-python-managed-ga] managed GA: ${SOURCE_MANAGED_GA_PATH}"
 
 PYTHONDONTWRITEBYTECODE=1 \
-GALLEY_GA_STATE_ROOT="$VERIFY_STATE_ROOT" \
-GALLEY_VERIFY_GA_PATH="$VERIFY_GA_PATH" \
+YOLE_GA_STATE_ROOT="$VERIFY_STATE_ROOT" \
+YOLE_VERIFY_GA_PATH="$VERIFY_GA_PATH" \
 "$PYTHON_BIN" - <<'PY'
 import importlib.util
 import os
 import sys
 
-sys.path.insert(0, os.environ["GALLEY_VERIFY_GA_PATH"])
+sys.path.insert(0, os.environ["YOLE_VERIFY_GA_PATH"])
 
 import agentmain
 import aiohttp

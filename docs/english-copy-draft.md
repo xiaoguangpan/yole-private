@@ -1,9 +1,9 @@
-# Galley English Copy Draft
+# Yole English Copy Draft
 
 > Status: owner review draft. Do not wire this into the UI until the review
 > pass is done.
 
-This draft is written as native English product copy for Galley. It is not a
+This draft is written as native English product copy for Yole. It is not a
 literal translation of the Chinese UI. Shared product concepts stay consistent,
 but sentence shape and tone are adjusted for English.
 
@@ -12,7 +12,7 @@ but sentence shape and tone are adjusted for English.
 - Local-first, precise, calm.
 - Operational rather than promotional.
 - Short labels over explanatory text.
-- Keep product and ecosystem terms as-is: Galley, GenericAgent, GA, Agent,
+- Keep product and ecosystem terms as-is: Yole, GenericAgent, GA, Agent,
   Supervisor, SOP, Runtime, Health Check, CLI, API, MCP, Socket, Python, API
   Key, YOLO, LLM.
 - Use "conversation" for user-facing chats/sessions.
@@ -82,7 +82,7 @@ Recommendation:
 - Keep the visual section anchor `PROJECTS` if it is used as a dense sidebar
   anchor.
 - Do not introduce "chat" unless a specific OS/browser convention requires it.
-  "Conversation" is the Galley term.
+  "Conversation" is the Yole term.
 
 ## Top Bar
 
@@ -119,7 +119,7 @@ Shortcut display:
 | 切换 LLM 不会丢失上下文 | Switching LLMs keeps the conversation context |
 | 运行中无法切换 LLM | Cannot switch LLMs while a run is active |
 | 切换 LLM · 当前 {name} | Switch LLM · Current: {name} |
-| 修改 mykey.py 后重启 Galley 生效 | Restart Galley after editing mykey.py |
+| 修改 mykey.py 后重启 Yole 生效 | Restart Yole after editing mykey.py |
 | 在 Models 调整内置 GA 模型 | Manage bundled GA models in Models |
 | 将创建到 {projectName} | Will be created in {projectName} |
 
@@ -191,7 +191,7 @@ About
 
 | Chinese intent | English copy |
 |---|---|
-| Runtime subtitle | GenericAgent runtime used by Galley |
+| Runtime subtitle | GenericAgent runtime used by Yole |
 | Runtime Mode | Runtime Mode |
 | 内置 GA | Bundled GA |
 | 推荐 | Recommended |
@@ -209,10 +209,10 @@ About
 | 不知道哪儿出问题了？跑一次完整体检 —— 重新探测 Python 解释器、检查 GA 路径和必要文件。 | Not sure what is wrong? Run a full Health Check to re-detect Python, verify the GA folder, and check required files. |
 | 跑一次 Health Check | Run Health Check |
 | Python | Python |
-| Galley 内置 · 已附带 GA 依赖，零配置可用 | Bundled with Galley · GA dependencies included |
+| Yole 内置 · 已附带 GA 依赖，零配置可用 | Bundled with Yole · GA dependencies included |
 | 使用外部 Python… | Use external Python... |
 | 外部 Python · 改变后用下方 Re-run 重新探测 | External Python · Re-run Health Check after changing it |
-| 改回 Galley 内置 Python | Use Galley's bundled Python |
+| 改回 Yole 内置 Python | Use Yole's bundled Python |
 | 高级诊断 | Advanced diagnostics |
 | 当前模式 | Current mode |
 | 内核版本 | Runtime version |
@@ -228,7 +228,7 @@ About
 
 | Chinese intent | English copy |
 |---|---|
-| Models subtitle | Configure model providers and models for Galley |
+| Models subtitle | Configure model providers and models for Yole |
 | 当前使用外部 GA。这里配置的模型只会在内置 GA 中使用，不会修改外部 GA。 | External GA is active. Models configured here are only used by bundled GA and will not change external GA. |
 | 已接入的模型提供商 | Connected model providers |
 | 还没有模型提供商。 | No model providers yet. |
@@ -295,7 +295,7 @@ YOLO activation modal:
 | 其他高风险操作 | Other high-risk actions |
 | 适合：完全信任 Agent + 在沙盒环境工作（个人 repo / 临时虚拟机） | Good for: a trusted Agent in a sandboxed workspace, personal repo, or temporary VM |
 | 不适合：生产代码 / 共享系统 / 不熟悉的 Agent / 敏感数据 | Not for: production code, shared systems, unfamiliar Agents, or sensitive data |
-| 打开后顶部栏会显示闪电图标和 YOLO 标识，随时可一键关闭。 | Galley will show a YOLO indicator in the top bar, and you can turn it off anytime. |
+| 打开后顶部栏会显示闪电图标和 YOLO 标识，随时可一键关闭。 | Yole will show a YOLO indicator in the top bar, and you can turn it off anytime. |
 | 取消 | Cancel |
 | 是的，我知道在做什么 | Yes, I understand the risk |
 
@@ -325,10 +325,10 @@ Approval prompt:
 
 | Chinese intent | English copy |
 |---|---|
-| Agent subtitle | Let Agents inspect and operate Galley |
+| Agent subtitle | Let Agents inspect and operate Yole |
 | Discovery file | Discovery file |
 | Agent SOP | Agent SOP |
-| 复制这份 SOP，发给你信任的 Agent。它就能帮你查看、创建和管理 Galley 对话。 | Copy this SOP for a trusted Agent. It can then inspect, create, and manage Galley conversations. |
+| 复制这份 SOP，发给你信任的 Agent。它就能帮你查看、创建和管理 Yole 对话。 | Copy this SOP for a trusted Agent. It can then inspect, create, and manage Yole conversations. |
 | 命令行快捷入口 | CLI shortcut |
 | API 文档 | API docs |
 | 自己写脚本、Skill 或接入别的 Agent 时看这里。包括 schemaVersion。 | Use this when writing scripts, Skills, or another Agent integration. Includes schemaVersion. |
@@ -360,8 +360,8 @@ Approval prompt:
 
 | Chinese intent | English copy |
 |---|---|
-| About title | Galley |
-| About subtitle | Open-source local Agent workbench built on GenericAgent |
+| About title | Yole |
+| About subtitle | Open-source local Agent orchestrator built on GenericAgent |
 | Links | Links |
 | 反馈建议 | Feedback |
 
@@ -375,13 +375,13 @@ Approval prompt:
 | 帮我安装 GenericAgent | Help me install GenericAgent |
 | 敬请期待 | Coming later |
 | 接入已经安装的 GenericAgent | Connect an existing GenericAgent |
-| Galley 不会修改你的 GenericAgent。删除 Galley 后 GenericAgent 仍可独立运行。 | Galley will not modify your GenericAgent. If you remove Galley, GenericAgent can still run on its own. |
+| Yole 不会修改你的 GenericAgent。删除 Yole 后 GenericAgent 仍可独立运行。 | Yole will not modify your GenericAgent. If you remove Yole, GenericAgent can still run on its own. |
 
 ### Model Setup
 
 | Chinese intent | English copy |
 |---|---|
-| 为 Galley 配置模型 | Set up a model for Galley |
+| 为 Yole 配置模型 | Set up a model for Yole |
 | 填入你的模型 API Key 和 API 地址。 | Enter your model API Key and API URL. |
 | 模型提供商 | Model provider |
 | 模型密钥 | API Key |
@@ -390,7 +390,7 @@ Approval prompt:
 | 自动获取模型列表 | Fetch model list |
 | 选择检测到的模型 | Choose a detected model |
 | 接入已有的 GenericAgent | Connect existing GenericAgent |
-| 测试并开始使用 Galley | Test and start using Galley |
+| 测试并开始使用 Yole | Test and start using Yole |
 | 配置完成 | Setup complete |
 | 找到 {count} 个模型 | Found {count} models |
 | 连接成功，但没有返回模型列表 | Connected, but no model list was returned |
@@ -400,7 +400,7 @@ Approval prompt:
 | Chinese intent | English copy |
 |---|---|
 | 接入已经安装的 GenericAgent | Connect an existing GenericAgent |
-| 指向你本地的 GA 安装目录 · Galley 会用它启动 GA。 | Point Galley to your local GA folder. Galley will use it to start GA. |
+| 指向你本地的 GA 安装目录 · Yole 会用它启动 GA。 | Point Yole to your local GA folder. Yole will use it to start GA. |
 | GA Path | GA Path |
 | 选择 | Choose |
 | 找到 GA 安装 · agentmain.py 可见 | Found GA installation · agentmain.py visible |
@@ -417,10 +417,10 @@ Approval prompt:
 | Chinese intent | English copy |
 |---|---|
 | 检查 GA 运行环境 | Check GA runtime |
-| 全部通过后才能进入主界面 · Galley 不会修改你的 GA。 | All checks must pass before entering Galley. Galley will not modify your GA. |
-| 跳过了 LLM 连接测试以节省费用。第一次发送消息时如有问题会提示具体错误并给出修复路径。 | LLM connection testing is skipped to avoid cost. If the first message fails, Galley will show the specific error and the next step. |
+| 全部通过后才能进入主界面 · Yole 不会修改你的 GA。 | All checks must pass before entering Yole. Yole will not modify your GA. |
+| 跳过了 LLM 连接测试以节省费用。第一次发送消息时如有问题会提示具体错误并给出修复路径。 | LLM connection testing is skipped to avoid cost. If the first message fails, Yole will show the specific error and the next step. |
 | 重新检查 | Re-run checks |
-| 进入 Galley | Enter Galley |
+| 进入 Yole | Enter Yole |
 | 返回设置 | Back to Settings |
 | 取消 | Cancel |
 
@@ -434,7 +434,7 @@ Health Check rows:
 | memory/ 目录可见 | memory/ folder visible |
 | assets/ 目录可见 | assets/ folder visible |
 | Python 解释器 | Python interpreter |
-| Galley 内置 Python | Galley bundled Python |
+| Yole 内置 Python | Yole bundled Python |
 | 查找能加载 GA 的 Python | Find Python that can load GA |
 | GA 入口模块 | GA entry module |
 | LLM 配置文件 | LLM config file |
@@ -463,7 +463,7 @@ Health Check rows:
 | 重试 | Retry |
 | 切换 LLM | Switch LLM |
 | 内置 GA 模型不可用。请在 Models 添加模型，或重新输入 API Key。 | Bundled GA has no usable model. Add a model in Models or re-enter the API Key. |
-| Galley 内置运行时不完整。请重新安装或更新 Galley。 | Galley's bundled runtime is incomplete. Reinstall or update Galley. |
+| Yole 内置运行时不完整。请重新安装或更新 Yole。 | Yole's bundled runtime is incomplete. Reinstall or update Yole. |
 | 接入的 GenericAgent 路径不可用。请到设置的 Runtime 页面重新选择 GA 目录。 | The connected GenericAgent folder is unavailable. Choose the GA folder again in Settings > Runtime. |
 | 更新检查失败。 | Update check failed. |
 | 暂时无法连接更新通道，请稍后重试。 | Could not reach the update channel. Try again later. |
@@ -481,16 +481,16 @@ Health Check rows:
 | 已切换到外部 GA | Switched to external GA |
 | 原来的对话已保留，可切回查看。 | Existing conversations are preserved; you can switch back to view them. |
 | 已保存路径配置 | Path settings saved |
-| 重启 Galley 才能让现有对话生效 | Restart Galley to apply this to existing conversations |
+| 重启 Yole 才能让现有对话生效 | Restart Yole to apply this to existing conversations |
 | 工具已重新注入 | Tools reinjected |
 | 已为本 session 注入 {count} 条工具定义。 | Injected {count} tool definitions into this conversation. |
 | 桌面宠物已启动 | Desktop Pet started |
 | 宠物会实时显示本对话的进展。 | It will show this conversation's progress in real time. |
 | 桌面宠物已关闭 | Desktop Pet closed |
-| 已是最新版本。 | Galley is up to date. |
+| 已是最新版本。 | Yole is up to date. |
 | 正在检查更新 | Checking for updates |
 | 发现新版本，正在后台准备更新 | New version found. Preparing it in the background. |
-| 新版本已下载，重启 Galley 生效 | New version downloaded. Restart Galley to apply it. |
+| 新版本已下载，重启 Yole 生效 | New version downloaded. Restart Yole to apply it. |
 
 ## Project Dialogs And Archives
 

@@ -14,7 +14,7 @@
 After `v0.2.5` was published as a stable GitHub Release, the update channel was
 promoted in a separate step. That was technically correct, but the wording and
 workflow made promotion feel like optional cleanup. For installed users, the
-release is not truly available until Galley's app updater can see it.
+release is not truly available until Yole's app updater can see it.
 
 ## Decision
 
@@ -41,7 +41,7 @@ early-adopter releases still default to manual download only.
 - **Promote every release automatically at publish time** — too aggressive for
   alpha, RC, beta tester, or partially smoked builds.
 - **Leave promotion as an optional follow-up** — easy to forget, and it creates
-  a confusing gap between GitHub Latest and Galley's update UI.
+  a confusing gap between GitHub Latest and Yole's update UI.
 
 ## Next
 

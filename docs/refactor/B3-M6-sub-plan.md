@@ -46,7 +46,7 @@
 
 `useAppStore.hydrateFromDB` (line 288-449) 当前职责（按调用顺序）：
 
-1. `getVersion()` from `@tauri-apps/api/app` → `runtimeStore.patchRuntimeInfo({workbenchVersion})`
+1. `getVersion()` from `@tauri-apps/api/app` → `runtimeStore.patchRuntimeInfo({yoleVersion})`
 2. `deleteEmptyNewSessions()` SQLite cleanup
 3. `deleteDemoSessions()` SQLite cleanup
 4. `useSessionsStore.getState().hydrate()` (M4b 落地)
@@ -281,7 +281,7 @@ export async function hydrateApp(): Promise<void> {
   // 1. App version
   try {
     const v = await getVersion();
-    useRuntimeStore.getState().patchRuntimeInfo({ workbenchVersion: v });
+    useRuntimeStore.getState().patchRuntimeInfo({ yoleVersion: v });
   } catch (e) {
     console.debug("[hydrate] app.getVersion failed.", e);
   }
@@ -494,7 +494,7 @@ Commit body：
 - Onboarding.tsx 内无 useAppStore import
 
 ### V5 · 第一次启动 (fresh install)
-1. 删除 sqlite `~/Library/Application Support/app.galley/galley.db`（或备份）
+1. 删除 sqlite `~/Library/Application Support/app.yole/yole.db`（或备份）
 2. 起 `pnpm tauri dev`
 3. 应进 Onboarding 而非 main
 4. 完成 onboarding（pick gaPath） → main empty state → 设 prefs
@@ -508,7 +508,7 @@ Commit body：
 
 ### V7 · setGAConfig 全 fan-out
 1. Settings → Runtime → 改 GA path (legit 另一 GA repo)
-2. 应弹 toast「已保存路径配置 / 重启 Galley 才能让现有对话生效」
+2. 应弹 toast「已保存路径配置 / 重启 Yole 才能让现有对话生效」
 3. RuntimeInfo 卡片应即时显示新 gaPath + Python display
 4. console 应见新 `__warmup__` bridge spawn（warmup retrigger）
 5. 重启 app → 新 path 持久化 ✓

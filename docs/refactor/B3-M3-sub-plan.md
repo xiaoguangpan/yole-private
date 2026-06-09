@@ -239,10 +239,10 @@ grep -rn "_bridgeClients\|_lruOrder\|_stderrTails\|getBridgeClient\|_lruTouch\|_
 dogfood scenarios：
 - spawn 新 session
 - 主动 shutdown
-- pkill -9 workbench_bridge → onClose toast + state cleanup
+- pkill -9 yole_bridge → onClose toast + state cleanup
 - LRU evict（开 6 session）
 - 多 session 并发 spawn
-- 关 Galley → 所有 bridge 干净退出
+- 关 Yole → 所有 bridge 干净退出
 
 ### T3b.7 · M3b commit + tag
 

@@ -7,12 +7,12 @@
 ## Context
 
 After `v0.2.0-alpha.2` was published, community dogfood quickly surfaced a
-pattern: Galley worked on maintainer macOS setups, but rough edges appeared on
+pattern: Yole worked on maintainer macOS setups, but rough edges appeared on
 Windows, external GA installs, and smaller screens. The fixes in this pass were
 less about adding features and more about removing places where users had to
-understand Galley's internals to recover.
+understand Yole's internals to recover.
 
-The product direction stayed the same: Galley should absorb runtime and setup
+The product direction stayed the same: Yole should absorb runtime and setup
 complexity, while the UI remains quiet once something is configured.
 
 ## Decisions
@@ -31,7 +31,7 @@ complexity, while the UI remains quiet once something is configured.
 - External GA should be probed with the Python that can actually run that user's
   checkout. Bundled Python remains the managed-runtime default, but external
   users may need their own virtualenv or system Python when their GA checkout
-  depends on packages that Galley's bundle does not ship.
+  depends on packages that Yole's bundle does not ship.
 - Model tests keep token cost visible but low weight. The test input is `ping`
   and the output cap is one token; onboarding can spend that tiny cost to avoid
   a worse first-run failure, while Settings labels the action more explicitly.
@@ -47,7 +47,7 @@ complexity, while the UI remains quiet once something is configured.
   required close button or the Composer.
 - The former IM surface is user-facing `Channels`. Chinese Settings keeps the
   English tab label and uses the helper `聊天软件`; the page subtitle stays
-  outcome-oriented: `在常用聊天软件里和 Galley 对话`.
+  outcome-oriented: `在常用聊天软件里和 Yole 对话`.
 - Managed mode gets a quiet TopBar Channels entry that jumps to Settings ->
   Channels. It uses `ChatCircleText` without a status dot because a permanent
   dot on a chat icon reads like unread messages. Error attention can still use a
@@ -55,7 +55,7 @@ complexity, while the UI remains quiet once something is configured.
 - Channels does not go into onboarding yet, and the TopBar does not show a
   hover list of platforms. The first supported platform is WeChat, but the UI is
   a stable entry point for the category, not a platform inventory.
-- While Galley is small, GitHub Issues are primarily the external feedback
+- While Yole is small, GitHub Issues are primarily the external feedback
   entrance. Maintainer-found problems can be handled directly in code and
   devlog without self-filing every internal task as an issue.
 - Release follow-through used `v0.2.0` as the first stable tag, published it as

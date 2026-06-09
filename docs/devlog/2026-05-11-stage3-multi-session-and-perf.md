@@ -6,7 +6,7 @@
 
 ## Context
 
-Session 开局是用户分享了两份新材料让我读完——GA 官方 arXiv 论文（47 页）和 Datawhale 出的 Hello Generic Agent 教程（106 页）。读完之后基于"理解了 GA 原生设计哲学"重新审视了一遍 Workbench 的设计方向，做了一波产品级 brainstorm（5 个 idea）。
+Session 开局是用户分享了两份新材料让我读完——GA 官方 arXiv 论文（47 页）和 Datawhale 出的 Hello Generic Agent 教程（106 页）。读完之后基于"理解了 GA 原生设计哲学"重新审视了一遍 Yole 的设计方向，做了一波产品级 brainstorm（5 个 idea）。
 
 然后从 Stage 3 七件事剩余的 6 件开始推进，按 `tool_events 持久化 → Multi-session → Session 恢复 → Onboarding → Settings → macOS bundle` 顺序。
 
@@ -155,7 +155,7 @@ Task 3 Session Restore 可以直接复用这个协议——把 SQLite `messages`
 
 - 论文 §12.3.1 明确：GA 引导模型在子目标成功 / 故障恢复 / 发现可复用模式时**自主调用** `start_long_term_update`
 - 教程 §4.2 那句"GA 有时会忘记更新 L1"是 GA 模型稳定性问题，应该改 GA prompt/SOP 解决
-- Workbench 加 chip 是补 GA 的窟窿——在 UI 层强化"用户需要提醒"的 anti-pattern，反而把 GA 的自主性降级
+- Yole 加 chip 是补 GA 的窟窿——在 UI 层强化"用户需要提醒"的 anti-pattern，反而把 GA 的自主性降级
 - 违反 non-invasive 原则的精神（虽然不违反字面）
 
 修正版：Memory Inspector 里加温和视图——"最近完成的任务 vs 已沉淀的 Skill"——让用户**能看见**这个 gap 但**不打扰**，不替 GA 做事。

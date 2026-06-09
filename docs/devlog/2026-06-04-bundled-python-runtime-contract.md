@@ -9,18 +9,18 @@
 ## Context
 
 Before the next patch release, we reviewed what "bundled GA" should mean from a
-user's point of view. The product expectation is stricter than "Galley can start
+user's point of view. The product expectation is stricter than "Yole can start
 GenericAgent if the maintainer machine happens to have a good Python venv":
-managed GA must open and run from Galley's own packaged interpreter and
+managed GA must open and run from Yole's own packaged interpreter and
 dependencies. Attach mode should also get that baseline by default, while still
-respecting the boundary that Galley does not modify a user-owned GA checkout.
+respecting the boundary that Yole does not modify a user-owned GA checkout.
 
 ## Decisions
 
-- Managed / bundled GA release builds must use Galley's packaged Python and
+- Managed / bundled GA release builds must use Yole's packaged Python and
   packaged dependencies. Requiring the user's Python for managed GA is a release
   blocker.
-- Attach / external GA release builds also default to Galley's bundled Python.
+- Attach / external GA release builds also default to Yole's bundled Python.
   This gives a user-owned checkout baseline deps without writing into its venv,
   PATH, source, memory, SOP, or state.
 - `gaConfig.useExternalPython = true` remains the explicit escape hatch for
@@ -45,13 +45,13 @@ respecting the boundary that Galley does not modify a user-owned GA checkout.
   installs depend on invisible local environment quality. External Python should
   be a conscious escape hatch, not the normal path.
 - Try to bundle every possible GenericAgent optional dependency: rejected for
-  now. Galley should bundle dependencies for product surfaces it owns; arbitrary
+  now. Yole should bundle dependencies for product surfaces it owns; arbitrary
   user extensions belong behind the external-Python escape hatch.
 
 ## Open questions
 
 - If upstream GenericAgent adds more optional frontends, decide case by case
-  whether Galley owns that surface before adding its dependencies to the
+  whether Yole owns that surface before adding its dependencies to the
   bundled runtime.
 - Future Windows smoke should keep checking that the bundled interpreter can
   import managed GA after installer upgrades, especially around file-lock and

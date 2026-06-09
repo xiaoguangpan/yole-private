@@ -1,7 +1,7 @@
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-export const THEME_PREFERENCE_CACHE_KEY = "galley_theme_preference";
+export const THEME_PREFERENCE_CACHE_KEY = "yole_theme_preference";
 
 export function isThemePreference(value: unknown): value is ThemePreference {
   return value === "system" || value === "light" || value === "dark";

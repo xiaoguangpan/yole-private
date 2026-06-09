@@ -12,9 +12,9 @@ Related: [managed GA runtime](../managed-ga-runtime.md),
 
 Managed / bundled GA reached dogfood before any public release. The Keychain
 design avoided plaintext config, but unsigned macOS builds triggered a scary
-system prompt when `galley-core` read `app.galley.managed-models` during a
+system prompt when `yole-core` read `app.yole.managed-models` during a
 conversation. That prompt interrupts the core path: configure a model, talk to
-Galley.
+Yole.
 
 Because no public release has shipped the managed runtime, there is no real
 user migration burden from the Keychain-backed slice.
@@ -25,7 +25,7 @@ user migration burden from the Keychain-backed slice.
   managed model API keys.
 - `managed_model_secrets` stores encrypted API key payloads by `apiKeyRef`.
 - `managed_model_secret_keys` stores the local beta encryption key in the same
-  DB so normal Galley backups and machine moves preserve model credentials.
+  DB so normal Yole backups and machine moves preserve model credentials.
 - The generated managed model config still contains only `apiKeyRef`, never
   plaintext API keys.
 - Settings and passive list paths can show credential presence from row
@@ -58,12 +58,12 @@ user migration burden from the Keychain-backed slice.
 
 - `cargo fmt --check`
 - `cargo check --workspace`
-- `cargo test -p galley-core --test db_writes_test`
-- `cargo test -p galley-core --test db_test`
+- `cargo test -p yole-core --test db_writes_test`
+- `cargo test -p yole-core --test db_test`
 - `pnpm --dir gui typecheck`
 - `pnpm --dir gui lint`
 
 ## Next
 
-Dogfood an unsigned macOS build: save a Provider key, restart Galley, send a
+Dogfood an unsigned macOS build: save a Provider key, restart Yole, send a
 managed conversation, and confirm no Keychain prompt appears.

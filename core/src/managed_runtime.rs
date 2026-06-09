@@ -1,6 +1,6 @@
 //! Managed / bundled GenericAgent runtime layout.
 //!
-//! This module owns paths and diagnostics for Galley's managed runtime. It
+//! This module owns paths and diagnostics for Yole's managed runtime. It
 //! never reads or writes a user-owned external GenericAgent checkout.
 
 use std::fs;

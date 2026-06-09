@@ -11,26 +11,26 @@
 ## A. v0.1 七件事（必 cover · 8 项）
 
 - [ ] **A1 端到端真跑** — 新建 session、attach GA、选 LLM、发 "写一个 fib(10) 的 python 函数"，verify streaming token 出 + turn_end commit + 文本可选可复制
-- [ ] **A2 审批拦截 + 审计持久化** — 关 YOLO，发一条触发 file_patch 的需求，verify Approval Card 弹 → 选 Approve → tool 执行 → DB `tool_events` 表有新 row（`sqlite3 ~/Library/Application\ Support/app.galley/galley.db 'select * from tool_events order by id desc limit 3'`）
+- [ ] **A2 审批拦截 + 审计持久化** — 关 YOLO，发一条触发 file_patch 的需求，verify Approval Card 弹 → 选 Approve → tool 执行 → DB `tool_events` 表有新 row（`sqlite3 ~/Library/Application\ Support/app.yole/yole.db 'select * from tool_events order by id desc limit 3'`）
 - [ ] **A3 审批 Reject 路径** — 同 A2 但选 Reject，verify tool 跳过 + agent 继续不卡死
 - [ ] **A4 Multi-session N-active** — 同时开 3 个 session，每个发不同任务，verify 三 session 并行流式输出不互相阻塞 / TopBar pill 切换正确
 - [ ] **A5 Multi-session per-session LLM** — 3 session 各选不同 LLM，verify TopBar pill / Composer footer / 实际 LLM 调用一致（look at GA stderr `_record_usage` 行）
-- [ ] **A6 Session Restore** — 跑完一个 session 关 Galley 重开，verify 列表里在、点进去 history 渲染、send 新消息能继续 turn 编号
+- [ ] **A6 Session Restore** — 跑完一个 session 关 Yole 重开，verify 列表里在、点进去 history 渲染、send 新消息能继续 turn 编号
 - [ ] **A7 LRU 5 alive + active 保护** — 开 6 个 session 都进过、第 6 个 active，verify 最早 idle 的被 suspend（status pill 变 `sleeping` 或 stderr 静默 SIGTERM）+ 第 6 个仍 active
-- [ ] **A8 Onboarding fresh** — `rm ~/Library/Application\ Support/app.galley/galley.db` 后启动，verify Onboarding 5 步全跑通（Welcome → Attach → Python 内置 → Health Check 5 项 → Done → MainView）
+- [ ] **A8 Onboarding fresh** — `rm ~/Library/Application\ Support/app.yole/yole.db` 后启动，verify Onboarding 5 步全跑通（Welcome → Attach → Python 内置 → Health Check 5 项 → Done → MainView）
 
 ---
 
 ## B. B2 新加 capability（必 cover · 9 项）
 
-- [ ] **B1 CLI session send happy path** — 启动 Galley GUI，另一终端 `galley session list` 拿 id，`galley session send <id> "hello" --supervisor=jc --reason=test`，verify GUI 内 session 收到 user message + agent 响应；DB `messages` 表 `created_via='cli'`, `supervisor='jc'`, `origin_note='test'`
-- [ ] **B2 CLI session send dispatch=persisted_only** — `pkill -9 workbench_bridge` 干掉该 session 的 bridge 进程，立即跑同样命令，verify response JSON `dispatch: "persisted_only"`、GUI 仍显示 message 但 agent 不响应
-- [ ] **B3 CLI session watch** — 终端 `galley session watch <id>`，GUI 内发一条消息，verify watch stream 收到 NDJSON 事件 (turn_start / turn_progress / turn_end)；Ctrl-C 干净退出（socket 文件 unlink 干净）
-- [ ] **B4 内置 Python spawn (PROD)** — 装 `.dmg` 后启动、prefs `useExternalPython=false`、`pgrep -fl workbench_bridge` 应该看到 spawn 走 `/Applications/Galley.app/Contents/Resources/python/bin/python3`
+- [ ] **B1 CLI session send happy path** — 启动 Yole GUI，另一终端 `yole session list` 拿 id，`yole session send <id> "hello" --supervisor=jc --reason=test`，verify GUI 内 session 收到 user message + agent 响应；DB `messages` 表 `created_via='cli'`, `supervisor='jc'`, `origin_note='test'`
+- [ ] **B2 CLI session send dispatch=persisted_only** — `pkill -9 yole_bridge` 干掉该 session 的 bridge 进程，立即跑同样命令，verify response JSON `dispatch: "persisted_only"`、GUI 仍显示 message 但 agent 不响应
+- [ ] **B3 CLI session watch** — 终端 `yole session watch <id>`，GUI 内发一条消息，verify watch stream 收到 NDJSON 事件 (turn_start / turn_progress / turn_end)；Ctrl-C 干净退出（socket 文件 unlink 干净）
+- [ ] **B4 内置 Python spawn (PROD)** — 装 `.dmg` 后启动、prefs `useExternalPython=false`、`pgrep -fl yole_bridge` 应该看到 spawn 走 `/Applications/Yole.app/Contents/Resources/python/bin/python3`
 - [ ] **B5 外部 Python escape hatch** — Settings → Runtime → "使用外部 Python..." 切到 external、spawn 一个 session，verify bridge 走 user-picker python 路径
-- [ ] **B6 Socket race detection** — 第一个 Galley 跑着、双击 .app 启动第二个，verify 第二个启动失败 / 跳过 socket bind / 不影响第一个 socket / 不互相干扰 stdin
-- [ ] **B7 Socket stale unlink** — `pkill -9 desktop`（强杀 Galley 主进程），再启动 Galley，verify stale `$TMPDIR/galley-$UID.sock` 自动清理 + 新 socket bind 成功
-- [ ] **B8 Bridge crash + abnormal exit toast** — `pkill -9 workbench_bridge`（kill 某 session 的 bridge），verify GUI toast 出 + 显示最后 stderr lines（M2 pull-mode `runner_stderr_tail` 关键 regression 检查）
+- [ ] **B6 Socket race detection** — 第一个 Yole 跑着、双击 .app 启动第二个，verify 第二个启动失败 / 跳过 socket bind / 不影响第一个 socket / 不互相干扰 stdin
+- [ ] **B7 Socket stale unlink** — `pkill -9 desktop`（强杀 Yole 主进程），再启动 Yole，verify stale `$TMPDIR/yole-$UID.sock` 自动清理 + 新 socket bind 成功
+- [ ] **B8 Bridge crash + abnormal exit toast** — `pkill -9 yole_bridge`（kill 某 session 的 bridge），verify GUI toast 出 + 显示最后 stderr lines（M2 pull-mode `runner_stderr_tail` 关键 regression 检查）
 - [ ] **B9 LRU eviction silent UX** — 同 A7 但留意：第 6 session active 时 LRU evict 第 1 session — user 不应感到突兀（GUI 内 session 仍在 sidebar、点进去能 respawn）
 
 ---
@@ -54,12 +54,12 @@
 
 ## D. Edge cases / B2 regression hotspot（兜底 · 6 项）
 
-- [ ] **D1 Socket 90s idle timeout** — `galley session watch <id>` 不发任何消息挂 90s+，verify socket 自动 close + 不影响 GUI 主连接 / 不影响其它 CLI 客户端
+- [ ] **D1 Socket 90s idle timeout** — `yole session watch <id>` 不发任何消息挂 90s+，verify socket 自动 close + 不影响 GUI 主连接 / 不影响其它 CLI 客户端
 - [ ] **D2 Origin tracking GUI 写入** — GUI 发一条消息，verify DB `messages.created_via='gui'`, `supervisor IS NULL`, `origin_note IS NULL`
 - [ ] **D3 availableLLMs 序列化回归** (`b087f22` 抓过) — 启动后 New Chat 看 LLM picker，verify 列出 mykey.py 全部 LLM（不是 `[]`）— acronym serde bug 不复发
 - [ ] **D4 Python capability alias 翻译** (`b087f22` 抓过) — Settings → Runtime → Python 选 brew arm64 alias、spawn 一个 session，verify bridge 起来不报 `no such file: 'python-brew-arm'`
 - [ ] **D5 spawn 错误信息带 path** (`b087f22` 抓过) — 故意把 gaConfig.python 改成 `/nonexistent`、verify stderr toast 显示 `no such file: '/nonexistent' (set Settings → Python or check PATH)`（不是空 errKind）
-- [ ] **D6 GUI quit cleanup** — Galley 跑着 3 个 session、退出 app（Cmd+Q），verify `pgrep -fl workbench_bridge` 没残留 + socket 文件 unlink + DB 没 dangling lock
+- [ ] **D6 GUI quit cleanup** — Yole 跑着 3 个 session、退出 app（Cmd+Q），verify `pgrep -fl yole_bridge` 没残留 + socket 文件 unlink + DB 没 dangling lock
 
 ---
 
@@ -69,7 +69,7 @@
 - E2 conda/pyenv/asdf/uv Python 探测 — 推后续 Rust-side spawn 命令解决
 - E3 Socket 0600 TOCTOU hardening (`umask(0o077)` before bind) — 推 B4 hardening 列表
 - E4 CLI happy-path integration test — 推 B4 polish
-- E5 Multi-Galley-process on same machine — 推 race detection 的 B6 验证暂代
+- E5 Multi-Yole-process on same machine — 推 race detection 的 B6 验证暂代
 
 ---
 

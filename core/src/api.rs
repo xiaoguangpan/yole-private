@@ -1,7 +1,7 @@
-//! # Galley Core API surface (single source of truth)
+//! # Yole Core API surface (single source of truth)
 //!
 //! All commands the GUI, the CLI, and (B4+) Supervisor agents can issue
-//! against Galley Core are defined as [`GalleyApi`] trait methods.
+//! against Yole Core are defined as [`YoleApi`] trait methods.
 //! Both transports — Tauri's `invoke()` and the future Unix-socket /
 //! named-pipe daemon — thin-wrap this trait. See
 //! [invariants.md §I5](../../docs/refactor/invariants.md) for the
@@ -41,7 +41,7 @@ use async_trait::async_trait;
 use crate::error::Result;
 
 #[async_trait]
-pub trait GalleyApi: Send + Sync {
+pub trait YoleApi: Send + Sync {
     /// List sessions matching the filter. Default sort: pinned first,
     /// then `lastActivityAt` desc.
     async fn list_sessions(&self, filter: SessionFilter) -> Result<Vec<SessionBrief>>;
@@ -311,7 +311,7 @@ pub trait GalleyApi: Send + Sync {
     /// dropping it without commit triggers ROLLBACK.
     ///
     /// Exposed on the trait so socket handlers can wrap multiple
-    /// `_in_tx` calls without holding a concrete `SqliteGalley` ref.
+    /// `_in_tx` calls without holding a concrete `SqliteYole` ref.
     async fn begin_tx(&self) -> Result<sqlx::Transaction<'_, sqlx::Sqlite>>;
 
     // ---------------- B4 M1 · generic prefs read ----------------

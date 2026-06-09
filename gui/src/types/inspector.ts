@@ -49,13 +49,13 @@ export interface RuntimeInfo {
    * fallback. Pairs with `gaCommit` for the Settings → Runtime
    * version row. */
   gaCommitDate: string;
-  /** Galley-side tested baseline commit (from docs/ga-baseline.md).
+  /** Yole-side tested baseline commit (from docs/ga-baseline.md).
    * Hardcoded — bumped whenever we re-verify
    * upstream compatibility. */
   gaBaseline: string;
-  /** Workbench app version (e.g. "0.1.0"). */
-  workbenchVersion: string;
-  /** Galley-owned managed GA runtime layout and version diagnostics. */
+  /** Yole app version (e.g. "0.1.0"). */
+  yoleVersion: string;
+  /** Yole-owned managed GA runtime layout and version diagnostics. */
   managedRuntime?: ManagedRuntimeDiagnostics;
 }
 

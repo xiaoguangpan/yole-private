@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>GA Workbench · 关键界面</title>
+<title>Yole · 关键界面</title>
 
 <!-- Google fonts: Newsreader (serif), Inter (sans), JetBrains Mono -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,13 +50,13 @@ function App() {
   return (
     <DesignCanvas>
       <DCSection
-        id="ga-workbench"
-        title="GA Workbench · v0.1 关键界面"
+        id="ga-yole"
+        title="Yole · v0.1 关键界面"
         subtitle="Notion + Claude · light-first · 5 张关键界面，主界面有交互。点 sidebar 切 session、callout 折叠展开、Approval 4 个按钮真有反馈。"
       >
         <DCArtboard id="ab-onboarding" label="01 · Onboarding · Health Check" width={1180} height={780}>
           <div data-screen-label="01 Onboarding">
-            <MacChrome width={1180} height={780} title="GA Workbench · 设置">
+            <MacChrome width={1180} height={780} title="Yole · 设置">
               <Onboarding />
             </MacChrome>
           </div>
@@ -64,7 +64,7 @@ function App() {
 
         <DCArtboard id="ab-empty" label="02 · Empty State · 你想做什么" width={1280} height={820}>
           <div data-screen-label="02 Empty">
-            <MacChrome width={1280} height={820} title="GA Workbench">
+            <MacChrome width={1280} height={820} title="Yole">
               <EmptyState />
             </MacChrome>
           </div>
@@ -72,7 +72,7 @@ function App() {
 
         <DCArtboard id="ab-main" label="03 · 主界面 · coding session 待审批中" width={1480} height={920}>
           <div data-screen-label="03 Main">
-            <MacChrome width={1480} height={920} title="Workbench 桌面端 SQLite schema · GA Workbench">
+            <MacChrome width={1480} height={920} title="Yole 桌面端 SQLite schema · Yole">
               <MainView />
             </MacChrome>
           </div>

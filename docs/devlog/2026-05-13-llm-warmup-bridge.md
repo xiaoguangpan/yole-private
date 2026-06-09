@@ -8,7 +8,7 @@
 
 ## Context
 
-作者报告 bug：「修改 mykey.py 加新模型后重启 Workbench，**New Chat 的 LLM picker 看不到新模型**；但点进任意已有 session 之后，新模型就出现了。」
+作者报告 bug：「修改 mykey.py 加新模型后重启 Yole，**New Chat 的 LLM picker 看不到新模型**；但点进任意已有 session 之后，新模型就出现了。」
 
 排查流程：
 
@@ -113,5 +113,5 @@ if (pendingShutdown) void client.shutdown(5000);
 ## Next
 
 - ✅ Commit + push
-- ⏳ 用户重启 Workbench 验证：改 mykey.py 加模型 → 重启 → New Chat 的 picker 立刻看到新模型
+- ⏳ 用户重启 Yole 验证：改 mykey.py 加模型 → 重启 → New Chat 的 picker 立刻看到新模型
 - ⏳ DevTools console 看 `[warmup]` 日志确认它跑了

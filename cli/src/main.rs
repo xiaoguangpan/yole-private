@@ -1,4 +1,4 @@
-//! Galley CLI — agent-first interface to Galley Core.
+//! Yole CLI — agent-first interface to Yole Core.
 //!
 //! B1 M4 ships six **read-only** commands that all open the local
 //! SQLite database directly (no daemon yet; B4 introduces the
@@ -7,13 +7,13 @@
 //! Output discipline:
 //!   - Success → JSON on stdout. List-returning commands emit
 //!     NDJSON (one object per line) so agents can stream-parse.
-//!   - Error   → JSON on stdout matching `GalleyError`'s
+//!   - Error   → JSON on stdout matching `YoleError`'s
 //!     `{"error": "<category>", "message": "..."}` shape (B4 M6 freeze:
 //!     `message` is flat at the top level, matching the socket
 //!     transport envelope so SOPs parse one shape across both
 //!     transports). **Errors go to stdout, not stderr** — agents read
 //!     one stream. stderr is reserved for unrecoverable runtime panics.
-//!   - Exit code maps `GalleyError` variants to fixed categories
+//!   - Exit code maps `YoleError` variants to fixed categories
 //!     (see [`run`]) so SOPs can branch without parsing.
 
 use std::collections::BTreeMap;
@@ -21,13 +21,13 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use galley_core_lib::api::{
-    GalleyApi, MessageBrief, ProjectBrief, RuntimeKind, SearchScope, SessionBrief, SessionFilter,
+use yole_core_lib::api::{
+    YoleApi, MessageBrief, ProjectBrief, RuntimeKind, SearchScope, SessionBrief, SessionFilter,
     SessionId, SessionStatus,
 };
-use galley_core_lib::db::SqliteGalley;
-use galley_core_lib::error::GalleyError;
-use galley_core_lib::socket_listener::socket_path;
+use yole_core_lib::db::SqliteYole;
+use yole_core_lib::error::YoleError;
+use yole_core_lib::socket_listener::socket_path;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -36,9 +36,9 @@ const PROJECT_FOLLOW_IDLE_QUIET_WINDOW: Duration = Duration::from_millis(1500);
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "galley",
+    name = "yole",
     version,
-    about = "Agent-first interface to Galley (the local agent team orchestrator)."
+    about = "Agent-first interface to Yole (the local agent team orchestrator)."
 )]
 struct Cli {
     /// Pin the schema version the supervisor expects. v0.2 only knows
@@ -81,7 +81,7 @@ enum Command {
 
     /// LLM configuration commands. `llm list` reads the cached
     /// `llm_list` pref that the GUI seeds after a bridge warmup —
-    /// requires Galley GUI to have been opened at least once. `llm set`
+    /// requires Yole GUI to have been opened at least once. `llm set`
     /// persists a per-session pick + best-effort tells any live runner.
     #[command(subcommand)]
     Llm(LlmCmd),
@@ -110,7 +110,7 @@ enum ProjectCmd {
         reason: Option<String>,
     },
     /// List all projects ordered pinned-first then by recency.
-    /// Read-only — opens SQLite directly without requiring Galley Core
+    /// Read-only — opens SQLite directly without requiring Yole Core
     /// to be running.
     List,
     /// One-project rollup for supervisor batch orchestration.
@@ -193,7 +193,7 @@ enum LlmCmd {
     Set {
         /// Session id.
         session_id: String,
-        /// Display name of the LLM as it appears in `galley llm list`
+        /// Display name of the LLM as it appears in `yole llm list`
         /// (case-insensitive).
         llm_name: String,
     },
@@ -253,7 +253,7 @@ enum SessionCmd {
     },
     /// Send a user message into a session (B2 M4). Persists to the
     /// `messages` table with the supplied origin triple + dispatches
-    /// to the live runner subprocess (if one is alive). Requires Galley
+    /// to the live runner subprocess (if one is alive). Requires Yole
     /// Core to be running (exit 4 if the socket isn't reachable).
     Send {
         /// Session id.
@@ -290,7 +290,7 @@ enum SessionCmd {
     /// Create a new session with a first user message (B4 M1). Atomic:
     /// session row + first message commit together or roll back together.
     /// Returns `{session, message, dispatch}` with `dispatch=dispatched`
-    /// after Galley Core starts a runner and sends the first task. Runner
+    /// after Yole Core starts a runner and sends the first task. Runner
     /// start/send failures exit 5 so callers know delegation did not begin.
     New {
         /// First user message. Doubles as the seed for title derivation
@@ -401,14 +401,14 @@ async fn main() -> ExitCode {
     // multi-schema binaries widen this check to a set.
     if let Some(pinned) = cli.schema {
         if pinned != SCHEMA_VERSION {
-            let err = GalleyError::InvalidArgs {
+            let err = YoleError::InvalidArgs {
                 message: format!(
                     "schema_mismatch: client requested schema {pinned}, server speaks {SCHEMA_VERSION}"
                 ),
             };
             println!(
                 "{}",
-                serde_json::to_string(&err).expect("serialize GalleyError")
+                serde_json::to_string(&err).expect("serialize YoleError")
             );
             return ExitCode::from(exit_code_for(&err));
         }
@@ -427,19 +427,19 @@ async fn main() -> ExitCode {
     }
 }
 
-/// Map `GalleyError` variants to stable exit code categories. SOPs can
+/// Map `YoleError` variants to stable exit code categories. SOPs can
 /// branch on these without parsing the error JSON.
-fn exit_code_for(e: &GalleyError) -> u8 {
+fn exit_code_for(e: &YoleError) -> u8 {
     match e {
-        GalleyError::NotFound { .. } => 3,
-        GalleyError::InvalidArgs { .. } => 2,
-        GalleyError::DbUnavailable { .. } => 4,
-        GalleyError::RunnerError { .. } => 5,
-        GalleyError::Internal { .. } => 1,
+        YoleError::NotFound { .. } => 3,
+        YoleError::InvalidArgs { .. } => 2,
+        YoleError::DbUnavailable { .. } => 4,
+        YoleError::RunnerError { .. } => 5,
+        YoleError::Internal { .. } => 1,
     }
 }
 
-async fn run(cli: Cli) -> Result<(), GalleyError> {
+async fn run(cli: Cli) -> Result<(), YoleError> {
     match cli.command {
         Command::Sessions(SessionsCmd::List {
             runtime,
@@ -448,7 +448,7 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             archived,
             all,
         }) => {
-            let galley = SqliteGalley::open().await?;
+            let yole = SqliteYole::open().await?;
             let archived_flag = if all {
                 None
             } else if archived {
@@ -460,9 +460,9 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
                 project_id: project,
                 status: status.as_deref().map(parse_status_arg).transpose()?,
                 archived: archived_flag,
-                runtime_kind: runtime_filter(&galley, runtime).await?,
+                runtime_kind: runtime_filter(&yole, runtime).await?,
             };
-            let rows = galley.list_sessions(filter).await?;
+            let rows = yole.list_sessions(filter).await?;
             // NDJSON — one object per line, so agents can stream-parse.
             for row in rows {
                 emit_json(&row)?;
@@ -474,28 +474,28 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             query,
             all,
         }) => {
-            let galley = SqliteGalley::open().await?;
+            let yole = SqliteYole::open().await?;
             let scope = if all {
                 SearchScope::All
             } else {
                 SearchScope::Active
             };
-            let runtime_kind = runtime_filter(&galley, runtime).await?;
-            let hits = galley.search_messages(query, scope, runtime_kind).await?;
+            let runtime_kind = runtime_filter(&yole, runtime).await?;
+            let hits = yole.search_messages(query, scope, runtime_kind).await?;
             for hit in hits {
                 emit_json(&hit)?;
             }
             Ok(())
         }
         Command::Session(SessionCmd::Brief { id }) => {
-            let galley = SqliteGalley::open().await?;
-            let brief = galley.session_brief(SessionId(id)).await?;
+            let yole = SqliteYole::open().await?;
+            let brief = yole.session_brief(SessionId(id)).await?;
             emit_json(&brief)?;
             Ok(())
         }
         Command::Session(SessionCmd::Show { id, tail }) => {
-            let galley = SqliteGalley::open().await?;
-            let msgs = galley.session_messages(SessionId(id), tail).await?;
+            let yole = SqliteYole::open().await?;
+            let msgs = yole.session_messages(SessionId(id), tail).await?;
             for m in msgs {
                 emit_json(&m)?;
             }
@@ -545,14 +545,14 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             reason,
         }) => session_move(id, to, supervisor, reason).await,
         Command::Status => {
-            let galley = SqliteGalley::open().await?;
-            let s = galley.status().await?;
+            let yole = SqliteYole::open().await?;
+            let s = yole.status().await?;
             emit_json(&s)?;
             Ok(())
         }
         Command::Health => {
-            let galley = SqliteGalley::open().await?;
-            let report = galley.health().await?;
+            let yole = SqliteYole::open().await?;
+            let report = yole.health().await?;
             emit_json(&report)?;
             Ok(())
         }
@@ -560,11 +560,11 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
             #[derive(serde::Serialize)]
             #[serde(rename_all = "camelCase")]
             struct VersionPayload<'a> {
-                galley_version: &'a str,
+                yole_version: &'a str,
                 schema_version: u32,
             }
             emit_json(&VersionPayload {
-                galley_version: env!("CARGO_PKG_VERSION"),
+                yole_version: env!("CARGO_PKG_VERSION"),
                 schema_version: SCHEMA_VERSION,
             })?;
             Ok(())
@@ -606,7 +606,7 @@ async fn run(cli: Cli) -> Result<(), GalleyError> {
     }
 }
 
-fn parse_status_arg(s: &str) -> Result<SessionStatus, GalleyError> {
+fn parse_status_arg(s: &str) -> Result<SessionStatus, YoleError> {
     Ok(match s {
         "idle" => SessionStatus::Idle,
         "connecting" => SessionStatus::Connecting,
@@ -617,7 +617,7 @@ fn parse_status_arg(s: &str) -> Result<SessionStatus, GalleyError> {
         "cancelled" => SessionStatus::Cancelled,
         "archived" => SessionStatus::Archived,
         other => {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: format!(
                     "unknown --status `{other}`. Allowed: idle, connecting, running, \
                      waiting_approval, error, completed, cancelled, archived"
@@ -628,30 +628,30 @@ fn parse_status_arg(s: &str) -> Result<SessionStatus, GalleyError> {
 }
 
 async fn runtime_filter(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     runtime: RuntimeArg,
-) -> Result<Option<RuntimeKind>, GalleyError> {
+) -> Result<Option<RuntimeKind>, YoleError> {
     Ok(match runtime {
-        RuntimeArg::Current => Some(galley.active_runtime_kind().await?),
+        RuntimeArg::Current => Some(yole.active_runtime_kind().await?),
         RuntimeArg::Managed => Some(RuntimeKind::Managed),
         RuntimeArg::External => Some(RuntimeKind::External),
         RuntimeArg::All => None,
     })
 }
 
-fn runtime_arg_for_session_new(runtime: RuntimeArg) -> Result<Option<RuntimeKind>, GalleyError> {
+fn runtime_arg_for_session_new(runtime: RuntimeArg) -> Result<Option<RuntimeKind>, YoleError> {
     match runtime {
         RuntimeArg::Current => Ok(None),
         RuntimeArg::Managed => Ok(Some(RuntimeKind::Managed)),
         RuntimeArg::External => Ok(Some(RuntimeKind::External)),
-        RuntimeArg::All => Err(GalleyError::InvalidArgs {
+        RuntimeArg::All => Err(YoleError::InvalidArgs {
             message: "session new: --runtime all is only valid for list commands".into(),
         }),
     }
 }
 
-fn emit_json<T: serde::Serialize>(value: &T) -> Result<(), GalleyError> {
-    let s = serde_json::to_string(value).map_err(|e| GalleyError::Internal {
+fn emit_json<T: serde::Serialize>(value: &T) -> Result<(), YoleError> {
+    let s = serde_json::to_string(value).map_err(|e| YoleError::Internal {
         message: format!("serialize output: {e}"),
     })?;
     println!("{s}");
@@ -757,14 +757,14 @@ struct ProjectSessionEndPayload {
 }
 
 async fn session_snapshot_payload(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     id: &str,
     phase: &'static str,
     tail: usize,
-) -> Result<SessionSnapshotPayload, GalleyError> {
+) -> Result<SessionSnapshotPayload, YoleError> {
     let session_id = SessionId(id.to_string());
-    let session = galley.session_brief(session_id.clone()).await?;
-    let messages = galley.session_messages(session_id, Some(tail)).await?;
+    let session = yole.session_brief(session_id.clone()).await?;
+    let messages = yole.session_messages(session_id, Some(tail)).await?;
     Ok(SessionSnapshotPayload {
         schema_version: SCHEMA_VERSION,
         stream: "snapshot",
@@ -775,25 +775,25 @@ async fn session_snapshot_payload(
 }
 
 async fn find_project(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     project_id: &str,
-) -> Result<ProjectBrief, GalleyError> {
-    galley
+) -> Result<ProjectBrief, YoleError> {
+    yole
         .list_projects()
         .await?
         .into_iter()
         .find(|p| p.id.as_str() == project_id)
-        .ok_or_else(|| GalleyError::NotFound {
+        .ok_or_else(|| YoleError::NotFound {
             message: format!("project {project_id} not found"),
         })
 }
 
 async fn project_sessions(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     project_id: &str,
     all: bool,
-) -> Result<Vec<SessionBrief>, GalleyError> {
-    galley
+) -> Result<Vec<SessionBrief>, YoleError> {
+    yole
         .list_sessions(SessionFilter {
             project_id: Some(project_id.to_string()),
             status: None,
@@ -866,21 +866,21 @@ fn project_follow_state(
     }
 }
 
-async fn project_has_active_sessions(project_id: &str, all: bool) -> Result<bool, GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    let sessions = project_sessions(&galley, project_id, all).await?;
+async fn project_has_active_sessions(project_id: &str, all: bool) -> Result<bool, YoleError> {
+    let yole = SqliteYole::open().await?;
+    let sessions = project_sessions(&yole, project_id, all).await?;
     Ok(sessions
         .iter()
         .any(|session| is_live_candidate(session.status)))
 }
 
 async fn project_rollup_payload(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     project_id: &str,
     all: bool,
-) -> Result<ProjectRollupPayload, GalleyError> {
-    let project = find_project(galley, project_id).await?;
-    let sessions = project_sessions(galley, project_id, all).await?;
+) -> Result<ProjectRollupPayload, YoleError> {
+    let project = find_project(yole, project_id).await?;
+    let sessions = project_sessions(yole, project_id, all).await?;
     let running_sessions = sessions
         .iter()
         .filter(|s| s.status == SessionStatus::Running)
@@ -897,13 +897,13 @@ async fn project_rollup_payload(
 }
 
 async fn project_session_details(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     sessions: &[SessionBrief],
     tail: usize,
-) -> Result<Vec<ProjectSessionDetail>, GalleyError> {
+) -> Result<Vec<ProjectSessionDetail>, YoleError> {
     let mut details = Vec::with_capacity(sessions.len());
     for session in sessions {
-        let messages = galley
+        let messages = yole
             .session_messages(session.id.clone(), Some(tail))
             .await?;
         details.push(ProjectSessionDetail {
@@ -915,16 +915,16 @@ async fn project_session_details(
 }
 
 async fn project_show_payload(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     project_id: &str,
     tail: usize,
     all: bool,
-) -> Result<ProjectShowPayload, GalleyError> {
-    let project = find_project(galley, project_id).await?;
-    let sessions = project_sessions(galley, project_id, all).await?;
+) -> Result<ProjectShowPayload, YoleError> {
+    let project = find_project(yole, project_id).await?;
+    let sessions = project_sessions(yole, project_id, all).await?;
     let status_counts = status_counts(&sessions);
     let session_count = sessions.len();
-    let details = project_session_details(galley, &sessions, tail).await?;
+    let details = project_session_details(yole, &sessions, tail).await?;
     Ok(ProjectShowPayload {
         schema_version: SCHEMA_VERSION,
         project,
@@ -935,13 +935,13 @@ async fn project_show_payload(
 }
 
 async fn project_snapshot_payload(
-    galley: &SqliteGalley,
+    yole: &SqliteYole,
     project_id: &str,
     phase: &'static str,
     tail: usize,
     all: bool,
-) -> Result<ProjectSnapshotPayload, GalleyError> {
-    let show = project_show_payload(galley, project_id, tail, all).await?;
+) -> Result<ProjectSnapshotPayload, YoleError> {
+    let show = project_show_payload(yole, project_id, tail, all).await?;
     Ok(ProjectSnapshotPayload {
         schema_version: SCHEMA_VERSION,
         stream: "snapshot",
@@ -960,89 +960,89 @@ async fn project_snapshot_payload(
 /// named pipe. Maps connect errors to `DbUnavailable` (exit 4) per the
 /// CLI exit-code contract.
 #[cfg(unix)]
-async fn socket_send_recv(req: serde_json::Value) -> Result<String, GalleyError> {
+async fn socket_send_recv(req: serde_json::Value) -> Result<String, YoleError> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::UnixStream;
     let path = socket_path();
     let stream = UnixStream::connect(&path)
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
-            message: format!("Galley Core not running (socket {}: {})", path.display(), e),
+        .map_err(|e| YoleError::DbUnavailable {
+            message: format!("Yole Core not running (socket {}: {})", path.display(), e),
         })?;
     let (read_half, mut write_half) = stream.into_split();
     let line = serde_json::to_string(&req).unwrap();
     write_half
         .write_all(line.as_bytes())
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("socket write: {e}"),
         })?;
     write_half
         .write_all(b"\n")
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("socket write: {e}"),
         })?;
     write_half
         .flush()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("socket flush: {e}"),
         })?;
     let mut lines = BufReader::new(read_half).lines();
     let resp = lines
         .next_line()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("socket read: {e}"),
         })?
-        .ok_or_else(|| GalleyError::DbUnavailable {
+        .ok_or_else(|| YoleError::DbUnavailable {
             message: "socket EOF before response".into(),
         })?;
     Ok(resp)
 }
 
 #[cfg(windows)]
-async fn socket_send_recv(req: serde_json::Value) -> Result<String, GalleyError> {
+async fn socket_send_recv(req: serde_json::Value) -> Result<String, YoleError> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::windows::named_pipe::ClientOptions;
     let path = socket_path();
-    let path_str = path.to_str().ok_or_else(|| GalleyError::Internal {
+    let path_str = path.to_str().ok_or_else(|| YoleError::Internal {
         message: "named pipe path not UTF-8".into(),
     })?;
     let stream = ClientOptions::new()
         .open(path_str)
-        .map_err(|e| GalleyError::DbUnavailable {
-            message: format!("Galley Core not running (pipe {}: {})", path_str, e),
+        .map_err(|e| YoleError::DbUnavailable {
+            message: format!("Yole Core not running (pipe {}: {})", path_str, e),
         })?;
     let (read_half, mut write_half) = tokio::io::split(stream);
     let line = serde_json::to_string(&req).unwrap();
     write_half
         .write_all(line.as_bytes())
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("pipe write: {e}"),
         })?;
     write_half
         .write_all(b"\n")
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("pipe write: {e}"),
         })?;
     write_half
         .flush()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("pipe flush: {e}"),
         })?;
     let mut lines = BufReader::new(read_half).lines();
     let resp = lines
         .next_line()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("pipe read: {e}"),
         })?
-        .ok_or_else(|| GalleyError::DbUnavailable {
+        .ok_or_else(|| YoleError::DbUnavailable {
             message: "pipe EOF before response".into(),
         })?;
     Ok(resp)
@@ -1057,7 +1057,7 @@ enum WatchFrame {
     End(String),
 }
 
-async fn open_watch_lines(id: &str) -> Result<WatchLines, GalleyError> {
+async fn open_watch_lines(id: &str) -> Result<WatchLines, YoleError> {
     use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
     let req = serde_json::json!({
         "command": "session.watch",
@@ -1074,8 +1074,8 @@ async fn open_watch_lines(id: &str) -> Result<WatchLines, GalleyError> {
         let path = socket_path();
         let stream = UnixStream::connect(&path)
             .await
-            .map_err(|e| GalleyError::DbUnavailable {
-                message: format!("Galley Core not running (socket {}: {})", path.display(), e),
+            .map_err(|e| YoleError::DbUnavailable {
+                message: format!("Yole Core not running (socket {}: {})", path.display(), e),
             })?;
         let (read_half, write_half) = stream.into_split();
         (Box::new(read_half), Box::new(write_half))
@@ -1087,14 +1087,14 @@ async fn open_watch_lines(id: &str) -> Result<WatchLines, GalleyError> {
     ) = {
         use tokio::net::windows::named_pipe::ClientOptions;
         let path = socket_path();
-        let path_str = path.to_str().ok_or_else(|| GalleyError::Internal {
+        let path_str = path.to_str().ok_or_else(|| YoleError::Internal {
             message: "named pipe path not UTF-8".into(),
         })?;
         let stream =
             ClientOptions::new()
                 .open(path_str)
-                .map_err(|e| GalleyError::DbUnavailable {
-                    message: format!("Galley Core not running (pipe {}: {})", path_str, e),
+                .map_err(|e| YoleError::DbUnavailable {
+                    message: format!("Yole Core not running (pipe {}: {})", path_str, e),
                 })?;
         let (read_half, write_half) = tokio::io::split(stream);
         (Box::new(read_half), Box::new(write_half))
@@ -1104,37 +1104,37 @@ async fn open_watch_lines(id: &str) -> Result<WatchLines, GalleyError> {
     write_half
         .write_all(line.as_bytes())
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("watch write: {e}"),
         })?;
     write_half
         .write_all(b"\n")
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("watch write: {e}"),
         })?;
     write_half
         .flush()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("watch flush: {e}"),
         })?;
 
     Ok(BufReader::new(read_half).lines())
 }
 
-async fn read_watch_frame(lines: &mut WatchLines) -> Result<Option<WatchFrame>, GalleyError> {
+async fn read_watch_frame(lines: &mut WatchLines) -> Result<Option<WatchFrame>, YoleError> {
     let Some(line) = lines
         .next_line()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("watch read: {e}"),
         })?
     else {
         return Ok(None);
     };
 
-    let parsed: Value = serde_json::from_str(&line).map_err(|e| GalleyError::Internal {
+    let parsed: Value = serde_json::from_str(&line).map_err(|e| YoleError::Internal {
         message: format!("malformed watch frame: {e}"),
     })?;
     if parsed["ok"] == Value::Bool(false) {
@@ -1162,7 +1162,7 @@ async fn session_send(
     content: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.send",
         "args": {
@@ -1177,7 +1177,7 @@ async fn session_send(
     // Parse + decide whether to surface as success (exit 0) or map to
     // a CLI error (exit code based on the `error` discriminant).
     let parsed: serde_json::Value =
-        serde_json::from_str(&resp_line).map_err(|e| GalleyError::Internal {
+        serde_json::from_str(&resp_line).map_err(|e| YoleError::Internal {
             message: format!("malformed socket response: {e}"),
         })?;
     if parsed["ok"] == serde_json::Value::Bool(true) {
@@ -1192,12 +1192,12 @@ async fn session_send(
     }
 }
 
-async fn session_watch(id: String) -> Result<(), GalleyError> {
+async fn session_watch(id: String) -> Result<(), YoleError> {
     let mut lines = open_watch_lines(&id).await?;
     while let Some(line) = lines
         .next_line()
         .await
-        .map_err(|e| GalleyError::DbUnavailable {
+        .map_err(|e| YoleError::DbUnavailable {
             message: format!("watch read: {e}"),
         })?
     {
@@ -1218,13 +1218,13 @@ async fn session_watch(id: String) -> Result<(), GalleyError> {
     Ok(())
 }
 
-async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    emit_json(&session_snapshot_payload(&galley, &id, "initial", tail).await?)?;
+async fn session_follow(id: String, tail: usize) -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    emit_json(&session_snapshot_payload(&yole, &id, "initial", tail).await?)?;
 
     let mut lines = match open_watch_lines(&id).await {
         Ok(lines) => lines,
-        Err(GalleyError::DbUnavailable { .. }) => {
+        Err(YoleError::DbUnavailable { .. }) => {
             emit_json(&StreamEndPayload {
                 schema_version: SCHEMA_VERSION,
                 stream: "end",
@@ -1244,8 +1244,8 @@ async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
                 data,
             })?,
             Ok(Some(WatchFrame::End(reason))) => {
-                let galley = SqliteGalley::open().await?;
-                emit_json(&session_snapshot_payload(&galley, &id, "final", tail).await?)?;
+                let yole = SqliteYole::open().await?;
+                emit_json(&session_snapshot_payload(&yole, &id, "final", tail).await?)?;
                 emit_json(&StreamEndPayload {
                     schema_version: SCHEMA_VERSION,
                     stream: "end",
@@ -1254,8 +1254,8 @@ async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
                 return Ok(());
             }
             Ok(None) => {
-                let galley = SqliteGalley::open().await?;
-                emit_json(&session_snapshot_payload(&galley, &id, "final", tail).await?)?;
+                let yole = SqliteYole::open().await?;
+                emit_json(&session_snapshot_payload(&yole, &id, "final", tail).await?)?;
                 emit_json(&StreamEndPayload {
                     schema_version: SCHEMA_VERSION,
                     stream: "end",
@@ -1263,7 +1263,7 @@ async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
                 })?;
                 return Ok(());
             }
-            Err(GalleyError::NotFound { .. }) => {
+            Err(YoleError::NotFound { .. }) => {
                 emit_json(&StreamEndPayload {
                     schema_version: SCHEMA_VERSION,
                     stream: "end",
@@ -1280,10 +1280,10 @@ async fn session_follow(id: String, tail: usize) -> Result<(), GalleyError> {
 /// `session.btw`, `session.stop`, `session.archive`, `session.restore`,
 /// `session.move`). All return JSON-shaped success payloads, so we just
 /// pass the `result` field through to stdout.
-async fn unary_command(req: serde_json::Value) -> Result<(), GalleyError> {
+async fn unary_command(req: serde_json::Value) -> Result<(), YoleError> {
     let resp_line = socket_send_recv(req).await?;
     let parsed: serde_json::Value =
-        serde_json::from_str(&resp_line).map_err(|e| GalleyError::Internal {
+        serde_json::from_str(&resp_line).map_err(|e| YoleError::Internal {
             message: format!("malformed socket response: {e}"),
         })?;
     if parsed["ok"] == serde_json::Value::Bool(true) {
@@ -1303,7 +1303,7 @@ async fn session_new(
     runtime: RuntimeArg,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let runtime_kind = runtime_arg_for_session_new(runtime)?;
     let req = serde_json::json!({
         "command": "session.new",
@@ -1325,7 +1325,7 @@ async fn session_btw(
     question: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.btw",
         "args": {
@@ -1343,7 +1343,7 @@ async fn session_stop(
     id: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.stop",
         "args": {
@@ -1360,7 +1360,7 @@ async fn session_archive(
     id: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.archive",
         "args": {
@@ -1377,7 +1377,7 @@ async fn session_restore(
     id: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.restore",
         "args": {
@@ -1395,7 +1395,7 @@ async fn session_move(
     to: Option<String>,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "session.move",
         "args": {
@@ -1418,7 +1418,7 @@ async fn project_create(
     color: Option<String>,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "project.create",
         "args": {
@@ -1436,32 +1436,32 @@ async fn project_create(
 
 /// `project list` bypasses the socket and opens SQLite directly —
 /// inventory-style read, mirror of `sessions list`. Works even when
-/// Galley Core isn't running.
-async fn project_list() -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    let projects = galley.list_projects().await?;
+/// Yole Core isn't running.
+async fn project_list() -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    let projects = yole.list_projects().await?;
     for p in projects {
         emit_json(&p)?;
     }
     Ok(())
 }
 
-async fn project_brief(project_id: String, all: bool) -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    emit_json(&project_rollup_payload(&galley, &project_id, all).await?)?;
+async fn project_brief(project_id: String, all: bool) -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    emit_json(&project_rollup_payload(&yole, &project_id, all).await?)?;
     Ok(())
 }
 
-async fn project_show(project_id: String, tail: usize, all: bool) -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    emit_json(&project_show_payload(&galley, &project_id, tail, all).await?)?;
+async fn project_show(project_id: String, tail: usize, all: bool) -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    emit_json(&project_show_payload(&yole, &project_id, tail, all).await?)?;
     Ok(())
 }
 
 enum ProjectWatchItem {
     Event { session_id: String, data: Value },
     End { session_id: String, reason: String },
-    Error(GalleyError),
+    Error(YoleError),
 }
 
 async fn forward_project_watch(
@@ -1471,7 +1471,7 @@ async fn forward_project_watch(
 ) {
     let mut lines = match open_watch_lines(&session_id).await {
         Ok(lines) => lines,
-        Err(GalleyError::DbUnavailable { .. }) => {
+        Err(YoleError::DbUnavailable { .. }) => {
             if report_initial_failure {
                 let _ = tx.send(ProjectWatchItem::End {
                     session_id,
@@ -1510,7 +1510,7 @@ async fn forward_project_watch(
                 });
                 return;
             }
-            Err(GalleyError::NotFound { .. }) => {
+            Err(YoleError::NotFound { .. }) => {
                 if report_initial_failure {
                     let _ = tx.send(ProjectWatchItem::End {
                         session_id,
@@ -1527,7 +1527,7 @@ async fn forward_project_watch(
     }
 }
 
-fn emit_project_watch_item(item: ProjectWatchItem) -> Result<(), GalleyError> {
+fn emit_project_watch_item(item: ProjectWatchItem) -> Result<(), YoleError> {
     match item {
         ProjectWatchItem::Event { session_id, data } => emit_json(&ProjectEventPayload {
             schema_version: SCHEMA_VERSION,
@@ -1550,10 +1550,10 @@ async fn emit_project_final_snapshot(
     tail: usize,
     all: bool,
     mode: &'static str,
-) -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
+) -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
     let mut final_snapshot =
-        project_snapshot_payload(&galley, project_id, "final", tail, all).await?;
+        project_snapshot_payload(&yole, project_id, "final", tail, all).await?;
     final_snapshot.follow_state = Some(project_follow_state(mode, &final_snapshot.sessions));
     emit_json(&final_snapshot)
 }
@@ -1564,7 +1564,7 @@ async fn project_follow_until_idle(
     all: bool,
     final_show: bool,
     mut rx: tokio::sync::mpsc::UnboundedReceiver<ProjectWatchItem>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let mut saw_stream_item = false;
     let mut quiet_window = Box::pin(tokio::time::sleep(PROJECT_FOLLOW_IDLE_QUIET_WINDOW));
 
@@ -1625,9 +1625,9 @@ async fn project_follow(
     all: bool,
     until_idle: bool,
     final_show: bool,
-) -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    let mut initial = project_snapshot_payload(&galley, &project_id, "initial", tail, all).await?;
+) -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    let mut initial = project_snapshot_payload(&yole, &project_id, "initial", tail, all).await?;
     let mode = if until_idle { "until_idle" } else { "live" };
     let watch_targets = initial
         .sessions
@@ -1700,7 +1700,7 @@ async fn project_delete(
     project_id: String,
     supervisor: Option<String>,
     reason: Option<String>,
-) -> Result<(), GalleyError> {
+) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "project.delete",
         "args": {
@@ -1718,9 +1718,9 @@ async fn project_delete(
 /// the command stays sub-50ms regardless of bridge spawn cost.
 /// `index` is `u32` — guard against bogus pref values by skipping
 /// entries that don't parse cleanly.
-async fn llm_list() -> Result<(), GalleyError> {
-    let galley = SqliteGalley::open().await?;
-    let Some(raw) = galley.get_pref_json("llm_list").await? else {
+async fn llm_list() -> Result<(), YoleError> {
+    let yole = SqliteYole::open().await?;
+    let Some(raw) = yole.get_pref_json("llm_list").await? else {
         return Ok(()); // empty stdout, exit 0 — cache unwarmed
     };
     // Expected shape: `[{"index": <u32>, "name": "<str>"}, ...]`. Other
@@ -1729,7 +1729,7 @@ async fn llm_list() -> Result<(), GalleyError> {
     let arr = match raw {
         Value::Array(xs) => xs,
         other => {
-            return Err(GalleyError::InvalidArgs {
+            return Err(YoleError::InvalidArgs {
                 message: format!("pref llm_list is not an array: {}", other),
             });
         }
@@ -1740,7 +1740,7 @@ async fn llm_list() -> Result<(), GalleyError> {
     Ok(())
 }
 
-async fn llm_set(session_id: String, llm_name: String) -> Result<(), GalleyError> {
+async fn llm_set(session_id: String, llm_name: String) -> Result<(), YoleError> {
     let req = serde_json::json!({
         "command": "llm.set",
         "args": {
@@ -1754,11 +1754,11 @@ async fn llm_set(session_id: String, llm_name: String) -> Result<(), GalleyError
 
 /// Map a server-side error discriminant tag onto the CLI's typed
 /// error so exit_code_for() picks the right exit code.
-fn map_error_tag(tag: &str, msg: String) -> GalleyError {
+fn map_error_tag(tag: &str, msg: String) -> YoleError {
     match tag {
-        "not_found" => GalleyError::NotFound { message: msg },
-        "invalid_args" => GalleyError::InvalidArgs { message: msg },
-        "db_unavailable" => GalleyError::DbUnavailable { message: msg },
+        "not_found" => YoleError::NotFound { message: msg },
+        "invalid_args" => YoleError::InvalidArgs { message: msg },
+        "db_unavailable" => YoleError::DbUnavailable { message: msg },
         "runner_error"
         | "python_not_found"
         | "ga_path_invalid"
@@ -1767,7 +1767,7 @@ fn map_error_tag(tag: &str, msg: String) -> GalleyError {
         | "bridge_cwd_invalid"
         | "path_encoding"
         | "spawn_io"
-        | "pipe_unavailable" => GalleyError::RunnerError { message: msg },
-        _ => GalleyError::Internal { message: msg },
+        | "pipe_unavailable" => YoleError::RunnerError { message: msg },
+        _ => YoleError::Internal { message: msg },
     }
 }

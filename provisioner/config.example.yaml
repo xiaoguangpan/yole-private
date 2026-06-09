@@ -1,0 +1,37 @@
+server:
+  listen: "127.0.0.1:8080"
+  read_timeout_seconds: 15
+  write_timeout_seconds: 30
+
+newapi:
+  base_url: "https://na.itxgp.com"
+  admin_token: "replace-with-admin-system-access-token"
+  admin_user_id: 1
+  public_v1_base_url: "https://na.itxgp.com/v1"
+  request_timeout_seconds: 30
+
+trial:
+  token_prefix: "yole"
+  initial_credit_usd: 50
+  low_balance_usd: 5
+  user_group: "yole"
+  token_group: "yole"
+  default_model: "gpt-5.5"
+  allowed_models:
+    - "gpt-5.5"
+
+contact:
+  wechat_id: "replace-with-wechat-id"
+  wechat_qr_path: "./wechat-qr.png"
+  overseas: "support@example.com"
+
+storage:
+  account_store_path: "./accounts.json"
+
+rate_limit:
+  per_ip_per_hour: 3
+  per_ip_per_day: 10
+
+security:
+  trust_proxy_headers: false
+  client_ip_header: "X-Forwarded-For"

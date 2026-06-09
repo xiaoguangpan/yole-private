@@ -10,7 +10,7 @@
 dense session navigation、自动更新的真实发布链路，以及最后一轮 Settings /
 UI primitive 收口。
 
-核心问题不是单个控件是否好看，而是 Galley 在长任务里如何让用户始终知道：
+核心问题不是单个控件是否好看，而是 Yole 在长任务里如何让用户始终知道：
 
 - agent 正在做事，不是卡住；
 - 中途摘要有价值，但不应该和 final answer 抢权重；
@@ -58,7 +58,7 @@ UI primitive 收口。
 ## Rejected Alternatives
 
 - **立即显示秒数**：过于机械，像计时器而不是工作状态。
-- **粗光扫或明显 breathing**：视觉太抢，和 Galley 的安静工作台气质冲突。
+- **粗光扫或明显 breathing**：视觉太抢，和 Yole 的安静工作台气质冲突。
 - **把中途 summary 折叠进 step header**：省空间，但会让有价值的过程判断不可见。
 - **保留原始 dense dot rail**：点太密时反而降低导航能力。
 - **用户主动跳转下载页更新**：流程太重，不符合"后台检测 -> 准备好 -> 重启"目标体验。

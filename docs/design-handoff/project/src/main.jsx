@@ -297,10 +297,10 @@ function InspectorRuntime() {
       <hr style={{ border: 0, borderTop: '1px solid var(--border-default)', margin: '14px 0' }} />
       <dl style={{ margin: 0 }}>
         <div className="inspector-row"><dt>Bridge PID</dt><dd>48213</dd></div>
-        <div className="inspector-row"><dt>cwd</dt><dd>~/Code/ga-workbench</dd></div>
+        <div className="inspector-row"><dt>cwd</dt><dd>~/Code/ga-yole</dd></div>
         <div className="inspector-row"><dt>LLM</dt><dd>Claude Sonnet 4.5</dd></div>
         <div className="inspector-row"><dt>GA baseline</dt><dd>6a3eecc</dd></div>
-        <div className="inspector-row"><dt>Workbench</dt><dd>v0.1.0</dd></div>
+        <div className="inspector-row"><dt>Yole</dt><dd>v0.1.0</dd></div>
       </dl>
       <button className="btn" style={{ marginTop: 14, width: '100%', justifyContent: 'center' }}>
         <Icon name="arrows-clockwise" size={13} />

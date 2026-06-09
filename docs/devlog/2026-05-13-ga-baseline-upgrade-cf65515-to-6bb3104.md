@@ -49,9 +49,9 @@
 
 **用途**：upstream 用 `len(tool_calls)` 把并行工具数告诉 do_* 工具实现，让它们按数量等比缩减输出长度（`maxlen // tool_num`），避免一轮多工具调用时合并响应 blow up LLM context。
 
-**对我们的影响**：`bridge/handlers.py` 的 `WorkbenchHandler.dispatch` 覆写 `BaseHandler.dispatch`，原签名 `(tool_name, args, response, index=0)` 不接受 `tool_num` —— 升级后 GA 会以 kwarg 形式传入，触发 `TypeError`。
+**对我们的影响**：`bridge/handlers.py` 的 `YoleHandler.dispatch` 覆写 `BaseHandler.dispatch`，原签名 `(tool_name, args, response, index=0)` 不接受 `tool_num` —— 升级后 GA 会以 kwarg 形式传入，触发 `TypeError`。
 
-**适配**：[bridge/handlers.py:178-217](../../bridge/handlers.py#L178) `WorkbenchHandler.dispatch` 加 `tool_num: int = 1` 参数 + 透传给 `super().dispatch(tool_name, args, response, index, tool_num)`。我们自己不读 `tool_num`，仅作直通，让下游 do_* 工具实现照常拿到 `args['_tool_num']`。
+**适配**：[bridge/handlers.py:178-217](../../bridge/handlers.py#L178) `YoleHandler.dispatch` 加 `tool_num: int = 1` 参数 + 透传给 `super().dispatch(tool_name, args, response, index, tool_num)`。我们自己不读 `tool_num`，仅作直通，让下游 do_* 工具实现照常拿到 `args['_tool_num']`。
 
 ### 2. `agent._turn_end_hooks` 字典扩展点 + `hook(locals())` 调用约定 — ✓ 未变
 
@@ -99,7 +99,7 @@
    ✓ "92 commits since 6a3eecc" → "5 commits since cf65515"
 
 6. 真跑测试
-   ⏳ 待用户 dogfood 真实多步任务确认行为无退化（本次为流程演示，dogfood 通常会在下次启动 Workbench 时自然完成）
+   ⏳ 待用户 dogfood 真实多步任务确认行为无退化（本次为流程演示，dogfood 通常会在下次启动 Yole 时自然完成）
 
 7. cd ~/Documents/GenericAgent && git checkout main
    ✓ 恢复用户主分支（仍 behind upstream/main by 3 commits，由用户自行决定何时 git pull）
@@ -119,6 +119,6 @@
 ## Next
 
 - ✅ Commit "Baseline upgrade cf65515 → 6bb3104: 5 commits (dispatch tool_num adapt)"
-- ⏳ 用户下次启动 Workbench 时观察是否有行为退化
+- ⏳ 用户下次启动 Yole 时观察是否有行为退化
 - ⏳ （可选）补一条「显式传 tool_num」的 dispatch 测试
 - ⏳ 用户决定何时 `git pull upstream main` 把自己的 main 跟上（不需要立即做，但 Settings → Runtime → GA Version 会一直显示「你已自行升级」直到他 pull）

@@ -1,4 +1,4 @@
-"""Galley IPC Protocol v0.1 implementation.
+"""Yole IPC Protocol v0.1 implementation.
 
 Source of truth for the wire format is `docs/ipc-protocol.md`. Keep them in sync;
 change the doc first, then the dataclasses here.
@@ -21,7 +21,7 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-# ---------------- Events (bridge -> workbench) ----------------
+# ---------------- Events (bridge -> yole) ----------------
 
 
 @dataclass
@@ -129,7 +129,7 @@ class TurnProgressEvent:
 
     sessionId: str
     delta: str
-    source: str  # GA's source field: "workbench" / "system" / etc
+    source: str  # GA's source field: "yole" / "system" / etc
     timestamp: str = field(default_factory=_now_iso)
     kind: str = "turn_progress"
 
@@ -276,7 +276,7 @@ Event = (
 )
 
 
-# ---------------- Commands (workbench -> bridge) ----------------
+# ---------------- Commands (yole -> bridge) ----------------
 
 
 @dataclass

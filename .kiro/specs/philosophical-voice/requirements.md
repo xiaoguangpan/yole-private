@@ -3,7 +3,7 @@
 > Feature: Philosophical Voice (Part A: Epigraph · Part B: Composer Voice)
 > Spec status: Draft — requirements under review.
 > Owner: JC (philosophy lead) + Kiro.
-> Positioning north star: Galley differentiates from programmer-facing coding
+> Positioning north star: Yole differentiates from programmer-facing coding
 > agents through a quiet, load-bearing philosophical character grounded in
 > later Wittgenstein, with the *Tractatus* "silence as ethics" used only as a
 > single accent. Philosophy must *shape* design; it must not become decorative
@@ -11,9 +11,9 @@
 
 ## Introduction
 
-This feature is the MVP probe for Galley's philosophical brand character. It is
+This feature is the MVP probe for Yole's philosophical brand character. It is
 deliberately small: two coordinated touches that let a user sense, in passing,
-that Galley *thinks* rather than merely *runs* — without a heavyweight new mode,
+that Yole *thinks* rather than merely *runs* — without a heavyweight new mode,
 without disrupting practical users.
 
 It has two parts that share one voice but play different registers:
@@ -45,7 +45,7 @@ with the language-game), not as quotation.
   ethics" as a single accent.
 - Philosophy must be load-bearing (it explains why the design is so), not
   decorative.
-- Galley currently supports two UI languages: Chinese (`zh`) and English (`en`).
+- Yole currently supports two UI languages: Chinese (`zh`) and English (`en`).
   German (`de`) is **content data** for Part A only, never a fourth UI locale.
 - A is the accent (poetic, German-bearing, lives in whitespace). B is the base
   layer (functional first, no German, carries character through phrasing and
@@ -82,9 +82,9 @@ with the language-game), not as quotation.
 
 ### Requirement 1: Epigraph appears in the empty-state whitespace
 
-**User Story:** As a first-time or returning user looking at an empty Galley,
+**User Story:** As a first-time or returning user looking at an empty Yole,
 I want to encounter a single quiet, well-set philosophical line, so that I sense
-Galley has a thoughtful character without being lectured or distracted.
+Yole has a thoughtful character without being lectured or distracted.
 
 #### Acceptance Criteria
 
@@ -172,7 +172,7 @@ discoverable at exactly the moment it is useful.
 ### Requirement 5: Restraint — salt, not decoration; do not disturb practical users
 
 **User Story:** As a practical user who just wants to get work done, I want the
-philosophical character to stay quiet and out of my way, so that Galley still
+philosophical character to stay quiet and out of my way, so that Yole still
 feels like a focused tool rather than a product that performs philosophy.
 
 #### Acceptance Criteria
@@ -191,7 +191,7 @@ feels like a focused tool rather than a product that performs philosophy.
 ### Requirement 6: Localization and content curation discipline
 
 **User Story:** As the maintainer, I want all new copy and quote data to live in
-the established places with translations, so that the feature respects Galley's
+the established places with translations, so that the feature respects Yole's
 i18n conventions and stays easy to curate.
 
 #### Acceptance Criteria
