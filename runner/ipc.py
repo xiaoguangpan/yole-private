@@ -333,12 +333,6 @@ class SetYoloModeCommand:
 
 
 @dataclass
-class SetModelRouteCommand:
-    routeJson: str
-    kind: str = "set_model_route"
-
-
-@dataclass
 class SetLLMCommand:
     llmIndex: int
     kind: str = "set_llm"
@@ -392,7 +386,6 @@ Command = (
     | LoadHistoryCommand
     | SetApprovalRulesCommand
     | SetYoloModeCommand
-    | SetModelRouteCommand
     | SetLLMCommand
     | ShutdownCommand
     | ReinjectToolsCommand
@@ -432,7 +425,6 @@ COMMAND_KINDS: dict[str, type] = {
     "load_history": LoadHistoryCommand,
     "set_approval_rules": SetApprovalRulesCommand,
     "set_yolo_mode": SetYoloModeCommand,
-    "set_model_route": SetModelRouteCommand,
     "set_llm": SetLLMCommand,
     "shutdown": ShutdownCommand,
     "reinject_tools": ReinjectToolsCommand,

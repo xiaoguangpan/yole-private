@@ -140,12 +140,8 @@ func defaultConfig() Config {
 			DefaultModel:     "deepseek-v4-pro",
 			AllowedModels: []string{
 				"deepseek-v4-pro",
-				"deepseek-v4-flash",
-				"qwen3.7-plus",
-				"qwen3.6-plus",
-				"kimi-k2.6",
-				"mimo-v2.5-pro",
 				"gpt-5.5",
+				"qwen3.7-plus",
 				"gpt-image-2",
 			},
 			Group: "yole",
@@ -306,68 +302,41 @@ func (cfg *Config) Validate() error {
 func defaultRoutingConfig() RoutingConfig {
 	enabled := true
 	return RoutingConfig{
-		Version:        "2026-06-14.1",
+		Version:        "2026-06-15.1",
 		DefaultProfile: "yole_standard",
 		Profiles: map[string]RouteProfile{
 			"yole_standard": {
 				NewAPIGroup:     "yole",
-				Conversation:    []string{"deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash", "qwen3.6-plus"},
-				Vision:          []string{"qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
-				ImageGeneration: []string{"gpt-image-2"},
-				ImageEditing:    []string{"gpt-image-2"},
-			},
-			"yole_vip": {
-				NewAPIGroup:     "vip",
-				Conversation:    []string{"gpt-5.5", "deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash"},
-				Vision:          []string{"gpt-5.5", "qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+				Conversation:    []string{"deepseek-v4-pro", "gpt-5.5"},
+				Vision:          []string{"qwen3.7-plus"},
 				ImageGeneration: []string{"gpt-image-2"},
 				ImageEditing:    []string{"gpt-image-2"},
 			},
 		},
 		Models: map[string]ModelMetadata{
 			"deepseek-v4-pro": {
-				InputModalities:  []string{"text"},
-				OutputModalities: []string{"text"},
-				ToolCalling:      true,
-				Enabled:          &enabled,
-			},
-			"deepseek-v4-flash": {
+				DisplayName:      "DeepSeek V4 Pro",
 				InputModalities:  []string{"text"},
 				OutputModalities: []string{"text"},
 				ToolCalling:      true,
 				Enabled:          &enabled,
 			},
 			"qwen3.7-plus": {
+				DisplayName:      "Qwen 3.7 Plus Vision",
 				InputModalities:  []string{"text", "image"},
-				OutputModalities: []string{"text"},
-				ToolCalling:      true,
-				Enabled:          &enabled,
-			},
-			"qwen3.6-plus": {
-				InputModalities:  []string{"text", "image"},
-				OutputModalities: []string{"text"},
-				ToolCalling:      true,
-				Enabled:          &enabled,
-			},
-			"kimi-k2.6": {
-				InputModalities:  []string{"text", "image"},
-				OutputModalities: []string{"text"},
-				ToolCalling:      true,
-				Enabled:          &enabled,
-			},
-			"mimo-v2.5-pro": {
-				InputModalities:  []string{"text"},
 				OutputModalities: []string{"text"},
 				ToolCalling:      true,
 				Enabled:          &enabled,
 			},
 			"gpt-5.5": {
+				DisplayName:      "GPT-5.5",
 				InputModalities:  []string{"text", "image"},
 				OutputModalities: []string{"text"},
 				ToolCalling:      true,
 				Enabled:          &enabled,
 			},
 			"gpt-image-2": {
+				DisplayName:      "GPT Image 2",
 				InputModalities:  []string{"text", "image"},
 				OutputModalities: []string{"image"},
 				Enabled:          &enabled,

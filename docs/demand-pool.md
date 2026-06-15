@@ -72,6 +72,7 @@ then implemented and released together when the package is ready.
 | R-055 | 2026-06-15 | Force managed route and default model refresh after account tier changes. | When an operator promotes or downgrades a user in NewAPI, the next balance refresh or user message should apply the new route without requiring a full Yole quit. | Implemented | 0.0.7 |
 | R-056 | 2026-06-15 | Avoid model, endpoint, and protocol self-disclosure in ordinary chat. | Users can ask what Yole is, but the assistant should answer at product level instead of exposing route aliases, NewAPI endpoints, or API protocols. | Implemented | 0.0.7 |
 | R-057 | 2026-06-15 | Remove avoidable archive-delete stutter. | Deleting archived conversations should not wait for a nonexistent runner shutdown before the lightweight SQLite delete. | Implemented | 0.0.7 |
+| R-058 | 2026-06-15 | Replace hidden VIP routing with explicit model selection. | Users choose DeepSeek V4 Pro or GPT-5.5 directly; NewAPI handles pricing and access, while Yole keeps fixed image-generation and vision-assist models instead of refreshing hidden route state before each request. | Implemented | 0.0.8 |
 
 ## Notes
 

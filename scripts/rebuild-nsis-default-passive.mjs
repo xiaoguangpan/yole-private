@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
+const tauriConfigPath = path.join(repoRoot, "core", "tauri.conf.json");
+const appVersion = readTauriVersion();
 const defaultNsi = path.join(repoRoot, "core", "target", "release", "nsis", "x64", "installer.nsi");
 
 const args = parseArgs(process.argv.slice(2));
@@ -21,7 +23,7 @@ const outputExe = path.resolve(
       "release",
       "bundle",
       "nsis",
-      "Yole_0.0.7_x64-setup-default-passive.exe",
+      `Yole_${appVersion}_default-passive_x64-setup.exe`,
     ),
 );
 
@@ -70,6 +72,16 @@ function parseArgs(raw) {
     }
   }
   return parsed;
+}
+
+function readTauriVersion() {
+  const raw = fs.readFileSync(tauriConfigPath, "utf8");
+  const config = JSON.parse(raw);
+  const version = String(config.version || "").trim();
+  if (!version) {
+    throw new Error(`missing version in ${tauriConfigPath}`);
+  }
+  return version;
 }
 
 function patchInstaller(source, output) {

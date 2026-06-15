@@ -23,7 +23,6 @@ from runner.ipc import (
     RunCompleteEvent,
     SetApprovalRulesCommand,
     SetLLMCommand,
-    SetModelRouteCommand,
     SetYoloModeCommand,
     ShutdownCommand,
     ToolCallEndEvent,
@@ -344,13 +343,6 @@ def test_set_yolo_mode_round_trip_disabled() -> None:
     decoded = decode_command(encode(cmd))
     assert decoded == cmd
     assert decoded.enabled is False
-
-
-def test_set_model_route_round_trip() -> None:
-    cmd = SetModelRouteCommand(routeJson='{"routeVersion":"test","conversation":["a"]}')
-    decoded = decode_command(encode(cmd))
-    assert decoded == cmd
-    assert decoded.routeJson.startswith("{")
 
 
 # ---------------- Error paths ----------------

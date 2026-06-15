@@ -11,7 +11,7 @@ registration. The NewAPI admin credential stays only on the provisioner server.
 ```text
 POST /api/register
 GET  /api/account/status
-GET  /api/runtime/route
+GET  /api/runtime/route        # legacy compatibility for old clients
 GET  /assets/contact/wechat-qr
 GET  /healthz
 ```
@@ -22,7 +22,7 @@ Register request:
 {
   "install_id": "local-random-id",
   "device_id_hash": "optional-device-hash",
-  "app_version": "0.0.7",
+  "app_version": "0.0.8",
   "os": "windows",
   "arch": "x64"
 }
@@ -54,11 +54,11 @@ Register response:
       "top_up_message": "AI 积分不足。联系客服可追加 3000 积分体验额度。微信号：replace-with-wechat-id"
     }
   },
-  "route_version": "2026-06-14.1",
+  "route_version": "2026-06-15.1",
   "model_routing": {
     "schema_version": 1,
     "profile_id": "yole_standard",
-    "conversation": ["deepseek-v4-pro", "qwen3.7-plus"],
+    "conversation": ["deepseek-v4-pro", "gpt-5.5"],
     "vision": ["qwen3.7-plus"],
     "image_generation": ["gpt-image-2"],
     "image_editing": ["gpt-image-2"]
@@ -85,13 +85,13 @@ Required NewAPI settings:
 
 - The admin access token must be valid for `newapi.admin_user_id` and able to
   create/update users, add quota, and read user status.
-- The `yole` user group must exist and be allowed to use the configured route
-  models.
+- The `yole` user group must exist and be allowed to use the configured
+  selectable text models plus the fixed vision/image models.
 - The `yole` token group should exist or be accepted by NewAPI token creation.
-- The configured route models must be available to their intended NewAPI groups:
-  `yole` for standard users and `vip` for VIP users. NewAPI handles same-model
-  upstream fallback; Yole handles cross-model fallback and image-understanding
-  routing.
+- NewAPI handles upstream fallback and pricing. Yole does not do hidden
+  cross-model fallback; the user explicitly chooses the text model in the
+  client. If the selected text model cannot read images, Yole uses the fixed
+  vision model once to summarize the image for that turn.
 - Password login must be enabled for provisioner-created users, because the
   service creates the consumer token through that user's own session.
 

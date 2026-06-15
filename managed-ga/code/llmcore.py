@@ -2,7 +2,7 @@ import os, json, re, time, requests, sys, threading, urllib3, base64, importlib,
 from datetime import datetime
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 _RESP_CACHE_KEY = str(uuid.uuid4())
-_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
+_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path: sys.path.append(_ROOT)
 
@@ -580,6 +580,8 @@ class BaseSession:
         self.yole_api_key_ref = cfg.get('yole_api_key_ref') or ''
         ipc = cfg.get('yole_credential_ipc')
         self.yole_credential_ipc = ipc if isinstance(ipc, dict) else None
+        modalities = cfg.get('input_modalities') or cfg.get('inputModalities') or []
+        self.input_modalities = {str(v).strip().lower() for v in modalities if str(v).strip()} if isinstance(modalities, list) else set()
         default_context_win = 30000
         if 'deepseek' in self.model.lower():
             default_context_win = 70000; self.cut_msg_interval = 25; self.trim_keep_rate = 0.3
@@ -1127,44 +1129,11 @@ def _keep_user_content_block(block):
         return bool(image_url.get("url"))
     return True
 
-def _yole_route_config():
-    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
-    if not raw: return None
-    try:
-        route = json.loads(raw)
-        return route if isinstance(route, dict) else None
-    except Exception as e:
-        print(f"[YoleRoute] invalid route JSON: {e}")
-        return None
-
-def _route_get(route, camel, snake=None, default=None):
-    if not isinstance(route, dict): return default
-    if camel in route: return route.get(camel)
-    if snake and snake in route: return route.get(snake)
-    return default
-
-def _route_models(route):
-    models = _route_get(route, "models", default={})
-    return models if isinstance(models, dict) else {}
-
-def _route_list(route, camel, snake=None):
-    values = _route_get(route, camel, snake, [])
-    return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
-
-def _model_meta(route, model):
-    meta = _route_models(route).get(model, {})
-    return meta if isinstance(meta, dict) else {}
-
-def _model_enabled(route, model):
-    meta = _model_meta(route, model)
-    return bool(meta.get("enabled", True))
-
-def _modalities(meta, camel, snake):
-    values = meta.get(camel, meta.get(snake, []))
-    return {str(v).strip().lower() for v in values if str(v).strip()} if isinstance(values, list) else set()
-
-def _model_supports_image(route, model):
-    return "image" in _modalities(_model_meta(route, model), "inputModalities", "input_modalities")
+def _backend_supports_image(backend):
+    modalities = getattr(backend, "input_modalities", set())
+    if not modalities:
+        return True
+    return "image" in modalities
 
 def _content_has_image(content):
     for block in content or []:
@@ -1202,7 +1171,10 @@ def _without_images_with_note(content, note):
         filtered.append({"type": "text", "text": note})
     return filtered
 
-def _vision_summary_with_route(backend, route, content):
+def _vision_summary_with_model(backend, content):
+    model = (os.environ.get("YOLE_VISION_MODEL") or "").strip()
+    if not model:
+        return None
     prompt = (
         "请理解用户上传的图片，输出给另一个文字模型使用的简洁视觉摘要。"
         "只描述图片中能确定的信息；如果包含界面或文字，请摘出关键文字和布局。"
@@ -1211,82 +1183,33 @@ def _vision_summary_with_route(backend, route, content):
     image_parts = _openai_image_parts([{"type": "text", "text": prompt}, *(content or [])])
     if not any(isinstance(p, dict) and p.get("type") == "image_url" for p in image_parts):
         return None
-    for model in _route_list(route, "vision"):
-        if not _model_enabled(route, model) or not _model_supports_image(route, model):
-            continue
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": image_parts}],
-            "stream": False,
-            "max_tokens": 900,
-        }
-        headers = {"Authorization": f"Bearer {backend.api_key}", "Content-Type": "application/json", "User-Agent": _YOLE_HTTP_USER_AGENT}
-        try:
-            resp = requests.post(
-                auto_make_url(backend.api_base, "chat/completions"),
-                headers=headers,
-                json=payload,
-                timeout=(backend.connect_timeout, min(45, backend.read_timeout)),
-                proxies=backend.proxies,
-                verify=backend.verify,
-            )
-            if resp.status_code >= 400:
-                print(f"[YoleRoute] vision {model} HTTP {resp.status_code}: {resp.text[:160]}")
-                continue
-            data = resp.json()
-            text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-            if text:
-                print(f"[YoleRoute] vision summary by {model}")
-                return text
-        except Exception as e:
-            print(f"[YoleRoute] vision {model} failed: {e}")
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": image_parts}],
+        "stream": False,
+        "max_tokens": 900,
+    }
+    headers = {"Authorization": f"Bearer {backend.api_key}", "Content-Type": "application/json", "User-Agent": _YOLE_HTTP_USER_AGENT}
+    try:
+        resp = requests.post(
+            auto_make_url(backend.api_base, "chat/completions"),
+            headers=headers,
+            json=payload,
+            timeout=(backend.connect_timeout, min(45, backend.read_timeout)),
+            proxies=backend.proxies,
+            verify=backend.verify,
+        )
+        if resp.status_code >= 400:
+            print(f"[YoleVision] {model} HTTP {resp.status_code}: {resp.text[:160]}")
+            return None
+        data = resp.json()
+        text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+        if text:
+            print(f"[YoleVision] summary by {model}")
+            return text
+    except Exception as e:
+        print(f"[YoleVision] {model} failed: {e}")
     return None
-
-def _is_retryable_model_error(chunk):
-    if not isinstance(chunk, str): return False
-    text = chunk.lstrip().lower()
-    retryable_status = re.search(r"\b(?:http\s*)?(?:status\s*)?(?:429|5\d\d)\b", text[:160])
-    return (
-        text.startswith("!!!error:")
-        or text.startswith("[error:")
-        or "rate limit" in text
-        or "too many requests" in text
-        or "quota" in text
-        or "timeout" in text
-        or "timed out" in text
-        or bool(retryable_status)
-    )
-
-def _chunk_has_visible_output(chunk):
-    if not isinstance(chunk, str):
-        return chunk is not None
-    text = chunk.strip()
-    return bool(text) and not _is_retryable_model_error(text)
-
-def _is_retryable_model_exception(exc):
-    if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, TimeoutError, socket.timeout)):
-        return True
-    text = str(exc).lower()
-    return any(marker in text for marker in (
-        "timeout",
-        "timed out",
-        "connection reset",
-        "connection aborted",
-        "temporarily unavailable",
-        "too many requests",
-        "rate limit",
-        "quota",
-        "http 429",
-        "http 500",
-        "http 502",
-        "http 503",
-        "http 504",
-        "status 429",
-        "status 500",
-        "status 502",
-        "status 503",
-        "status 504",
-    ))
 
 class NativeToolClient:
     @staticmethod
@@ -1306,75 +1229,20 @@ class NativeToolClient:
         try:
             gen = self.backend.ask(merged)
         except Exception as e:
-            if _is_retryable_model_exception(e):
-                return {"__yole_retryable_error__": f"!!!Error: {e}"}
-            raise
-        visible_output = False
-        first_error = None
+            yield f"\n!!!Error: {e}"
+            return None
         resp = None
         try:
             while True:
                 chunk = next(gen)
-                if not visible_output:
-                    if _is_retryable_model_error(chunk):
-                        first_error = chunk
-                        try: gen.close()
-                        except Exception: pass
-                        break
-                    visible_output = _chunk_has_visible_output(chunk)
                 yield chunk
         except StopIteration as e:
             resp = e.value
         except Exception as e:
-            error = f"!!!Error: {e}"
-            if not visible_output and _is_retryable_model_exception(e):
-                try: gen.close()
-                except Exception: pass
-                return {"__yole_retryable_error__": error}
-            yield f"\n{error}"
+            yield f"\n!!!Error: {e}"
             return None
-        if first_error is not None:
-            return {"__yole_retryable_error__": first_error}
         if resp: _write_llm_log('Response', resp.raw, self.log_path)
         return resp
-    def _chat_with_yole_route(self, merged, route):
-        content = merged.get("content") if isinstance(merged, dict) else None
-        has_image = _content_has_image(content)
-        candidates = [m for m in _route_list(route, "conversation") if _model_enabled(route, m)]
-        if not candidates:
-            return (yield from self._chat_once(merged))
-        original_model = self.backend.model
-        vision_summary = None
-        vision_attempted = False
-        last_error = None
-        for model in candidates:
-            routed = dict(merged)
-            routed_content = content
-            if has_image and not _model_supports_image(route, model):
-                if not vision_attempted:
-                    vision_attempted = True
-                    vision_summary = _vision_summary_with_route(self.backend, route, content)
-                if vision_summary:
-                    note = f"\n\n【图片理解结果】\n{vision_summary}"
-                else:
-                    note = "\n\n【图片状态】用户上传了图片，但当前无法读取图片内容。请基于用户文字和已有上下文尽量回答；如果必须依赖图片细节，再自然地请用户补充描述。"
-                routed_content = _without_images_with_note(content, note)
-                routed["content"] = routed_content
-            print(f"[YoleRoute] using model {model}")
-            history_snapshot = list(getattr(self.backend, "history", []))
-            self.backend.model = model
-            resp = yield from self._chat_once(routed)
-            if isinstance(resp, dict) and resp.get("__yole_retryable_error__"):
-                last_error = str(resp.get("__yole_retryable_error__") or "")
-                try: self.backend.history = history_snapshot
-                except Exception: pass
-                print(f"[YoleRoute] model {model} failed early, trying fallback")
-                continue
-            return resp
-        self.backend.model = original_model
-        if last_error:
-            yield last_error
-        return None
     def chat(self, messages, tools=None):
         if tools: self.backend.tools = tools
         if not self.backend.history: self._pending_tool_ids = []
@@ -1404,11 +1272,14 @@ class NativeToolClient:
         final_content = tool_result_blocks + filtered_content
         if not final_content: final_content = [{"type": "text", "text": "."}]
         merged = {"role": "user", "content": final_content}
-        route = _yole_route_config()
-        if route:
-            resp = yield from self._chat_with_yole_route(merged, route)
-        else:
-            resp = yield from self._chat_once(merged)
+        if _content_has_image(final_content) and not _backend_supports_image(self.backend):
+            vision_summary = _vision_summary_with_model(self.backend, final_content)
+            if vision_summary:
+                note = f"\n\n【图片理解结果】\n{vision_summary}"
+            else:
+                note = "\n\n【图片状态】用户上传了图片，但当前无法读取图片内容。请基于用户文字和已有上下文尽量回答；如果必须依赖图片细节，再自然地请用户补充描述。"
+            merged["content"] = _without_images_with_note(final_content, note)
+        resp = yield from self._chat_once(merged)
         if resp and hasattr(resp, 'tool_calls') and resp.tool_calls: self._pending_tool_ids = [tc.id for tc in resp.tool_calls]
         return resp
 

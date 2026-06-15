@@ -75,7 +75,7 @@ func newTestHandler(t *testing.T, limiter ratelimit.Limiter) (*Handler, *fakeNew
 			UserGroup:        "yole",
 			TokenGroup:       "yole",
 			DefaultModel:     "deepseek-v4-pro",
-			AllowedModels:    []string{"deepseek-v4-pro", "gpt-5.5", "gpt-image-2"},
+			AllowedModels:    []string{"deepseek-v4-pro", "gpt-5.5", "qwen3.7-plus", "gpt-image-2"},
 		},
 		Contact: ContactConfig{
 			WeChatID: "wx-test",
@@ -145,10 +145,11 @@ func TestRegisterCreatesYoleAccountAndUnlimitedToken(t *testing.T) {
 	if api.provisionReq.UserGroup != "yole" || api.provisionReq.TokenGroup != "yole" {
 		t.Fatalf("unexpected groups: %+v", api.provisionReq)
 	}
-	if len(api.provisionReq.AllowedModels) != 3 ||
+	if len(api.provisionReq.AllowedModels) != 4 ||
 		api.provisionReq.AllowedModels[0] != "deepseek-v4-pro" ||
 		api.provisionReq.AllowedModels[1] != "gpt-5.5" ||
-		api.provisionReq.AllowedModels[2] != "gpt-image-2" {
+		api.provisionReq.AllowedModels[2] != "qwen3.7-plus" ||
+		api.provisionReq.AllowedModels[3] != "gpt-image-2" {
 		t.Fatalf("unexpected models: %+v", api.provisionReq.AllowedModels)
 	}
 }
@@ -175,7 +176,7 @@ func TestRuntimeRouteReturnsNoContentForCurrentVersion(t *testing.T) {
 	}
 }
 
-func TestRuntimeRouteReturnsBodyWhenProfileChangesAtSameVersion(t *testing.T) {
+func TestRuntimeRouteKeepsUnifiedProfileWhenNewAPIGroupChanges(t *testing.T) {
 	handler, api := newTestHandler(t, ratelimit.NewMemoryLimiter(10, 10))
 	body := bytes.NewBufferString(`{"install_id":"install-1"}`)
 	registerResp := httptest.NewRecorder()
@@ -196,44 +197,29 @@ func TestRuntimeRouteReturnsBodyWhenProfileChangesAtSameVersion(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+registered.Account.AccountToken)
 	rr := httptest.NewRecorder()
 	handler.runtimeRoute(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected updated route body, got %d: %s", rr.Code, rr.Body.String())
-	}
-	var route RouteResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &route); err != nil {
-		t.Fatal(err)
-	}
-	if route.ProfileID != "yole_vip" || len(route.Conversation) == 0 || route.Conversation[0] != "gpt-5.5" {
-		t.Fatalf("expected vip route after NewAPI group update: %+v", route)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected unchanged unified route, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
-func TestDefaultRouteProfilesSeparateStandardAndVIPModels(t *testing.T) {
+func TestDefaultRouteProfileExposesExplicitTextModelChoices(t *testing.T) {
 	routing := normalizeRouting(RoutingConfig{})
 	standard := routing.Profiles["yole_standard"]
-	vip := routing.Profiles["yole_vip"]
 
-	if len(standard.Conversation) == 0 || standard.Conversation[0] != "deepseek-v4-pro" {
-		t.Fatalf("standard route should prefer deepseek-v4-pro: %+v", standard.Conversation)
+	if len(standard.Conversation) != 2 ||
+		standard.Conversation[0] != "deepseek-v4-pro" ||
+		standard.Conversation[1] != "gpt-5.5" {
+		t.Fatalf("standard route should expose DeepSeek and GPT choices: %+v", standard.Conversation)
 	}
-	if containsString(standard.Conversation, "gpt-5.5") {
-		t.Fatalf("standard route must not include GPT-5.5: %+v", standard.Conversation)
-	}
-	if len(vip.Conversation) == 0 || vip.Conversation[0] != "gpt-5.5" {
-		t.Fatalf("vip route should prefer GPT-5.5: %+v", vip.Conversation)
-	}
-	if !containsString(vip.Conversation, "deepseek-v4-pro") {
-		t.Fatalf("vip route should fall back to non-GPT models: %+v", vip.Conversation)
-	}
-	if !containsString(vip.Vision, "qwen3.7-plus") {
-		t.Fatalf("vip route should include a non-GPT vision fallback: %+v", vip.Vision)
+	if _, ok := routing.Profiles["yole_vip"]; ok {
+		t.Fatalf("VIP route profile should not exist in unified model selection")
 	}
 	if !containsString(standard.Vision, "qwen3.7-plus") {
 		t.Fatalf("standard route should include a dedicated vision model: %+v", standard.Vision)
 	}
 }
 
-func TestRuntimeRouteSelectsVIPProfileFromStoredGroup(t *testing.T) {
+func TestRuntimeRouteFallsBackToUnifiedProfileForLegacyVIPRecord(t *testing.T) {
 	handler, _ := newTestHandler(t, ratelimit.NewMemoryLimiter(10, 10))
 	handler.routing = normalizeRouting(RoutingConfig{})
 	store, ok := handler.store.(*accountstore.Store)
@@ -263,8 +249,8 @@ func TestRuntimeRouteSelectsVIPProfileFromStoredGroup(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &route); err != nil {
 		t.Fatal(err)
 	}
-	if route.ProfileID != "yole_vip" || len(route.Conversation) == 0 || route.Conversation[0] != "gpt-5.5" {
-		t.Fatalf("unexpected vip route: %+v", route)
+	if route.ProfileID != "yole_standard" || len(route.Conversation) == 0 || route.Conversation[0] != "deepseek-v4-pro" {
+		t.Fatalf("unexpected unified route: %+v", route)
 	}
 }
 

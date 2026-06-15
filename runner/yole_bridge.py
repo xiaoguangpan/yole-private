@@ -53,7 +53,6 @@ from runner.ipc import (
     RunCompleteEvent,
     SetApprovalRulesCommand,
     SetLLMCommand,
-    SetModelRouteCommand,
     SetYoloModeCommand,
     ShutdownCommand,
     SystemMessageEvent,
@@ -117,66 +116,6 @@ def _to_json_safe(obj: Any) -> Any:
     if isinstance(obj, (list, tuple, set, frozenset)):
         return [_to_json_safe(x) for x in obj]
     return str(obj)
-
-
-def _image_model_from_route(route: dict[str, Any]) -> str:
-    image_models = route.get("imageGeneration") or route.get("image_generation") or []
-    if not isinstance(image_models, list) or not image_models:
-        return ""
-    return str(image_models[0]).strip()
-
-
-def _route_primary_conversation_model(route: dict[str, Any]) -> str:
-    models = route.get("conversation") or []
-    if not isinstance(models, list):
-        return ""
-    enabled = route.get("models") if isinstance(route.get("models"), dict) else {}
-    for model in models:
-        name = str(model).strip()
-        if not name:
-            continue
-        meta = enabled.get(name, {}) if isinstance(enabled, dict) else {}
-        if not isinstance(meta, dict) or bool(meta.get("enabled", True)):
-            return name
-    return ""
-
-
-def _normalized_model_identity(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "").strip()).lower()
-
-
-def _route_model_display_name(route: dict[str, Any], model: str) -> str:
-    models = route.get("models") if isinstance(route.get("models"), dict) else {}
-    meta = models.get(model, {}) if isinstance(models, dict) else {}
-    if not isinstance(meta, dict):
-        return ""
-    return str(meta.get("displayName") or meta.get("display_name") or "").strip()
-
-
-def _llm_matches_route_model(
-    agent: Any, index: int, raw_name: str, route: dict[str, Any], model: str
-) -> bool:
-    wanted = {
-        _normalized_model_identity(model),
-        _normalized_model_identity(_route_model_display_name(route, model)),
-    }
-    wanted.discard("")
-
-    values = {
-        _normalized_model_identity(raw_name),
-        _normalized_model_identity(raw_name.split("/", 1)[-1]),
-        _normalized_model_identity(_llm_display_name(raw_name)),
-    }
-    try:
-        client = getattr(agent, "llmclients", [])[index]
-        backend = getattr(client, "backend", None)
-        if backend is not None:
-            values.add(_normalized_model_identity(getattr(backend, "model", "")))
-            values.add(_normalized_model_identity(getattr(backend, "name", "")))
-    except Exception:
-        pass
-    values.discard("")
-    return bool(wanted & values)
 
 
 def _compact_args(args: dict[str, Any], max_len: int = 200) -> str:
@@ -1049,8 +988,6 @@ class Bridge:
             # assignment takes effect on the next tool dispatch — no
             # need to rebuild the handler or notify it explicitly.
             self.state.yolo_mode = cmd.enabled
-        elif isinstance(cmd, SetModelRouteCommand):
-            self._handle_set_model_route(cmd)
         elif isinstance(cmd, SetLLMCommand):
             self._handle_set_llm(cmd)
         elif isinstance(cmd, ReinjectToolsCommand):
@@ -1063,67 +1000,6 @@ class Bridge:
             # Make sure pet subprocess + hook don't leak on shutdown.
             self._handle_detach_pet(silent=True)
             self.shutdown_event.set()
-
-    def _handle_set_model_route(self, cmd: SetModelRouteCommand) -> None:
-        try:
-            route = json.loads(cmd.routeJson)
-            if not isinstance(route, dict):
-                raise ValueError("route must be a JSON object")
-            os.environ["YOLE_MODEL_ROUTE_JSON"] = json.dumps(route, ensure_ascii=False)
-            image_model = _image_model_from_route(route)
-            if image_model:
-                os.environ["YOLE_IMAGE_MODEL"] = image_model
-            else:
-                os.environ.pop("YOLE_IMAGE_MODEL", None)
-            self._switch_to_route_default_model(route)
-        except Exception as e:
-            self._emit_error(
-                f"set_model_route failed: {e}",
-                traceback.format_exc(),
-                category="bridge",
-                severity="warning",
-                context="set_model_route",
-            )
-
-    def _switch_to_route_default_model(self, route: dict[str, Any]) -> None:
-        if self.run_in_progress.is_set():
-            return
-        target = _route_primary_conversation_model(route)
-        if not target:
-            return
-        try:
-            available = list(self.agent.list_llms())
-        except Exception as e:
-            self._emit_error(
-                f"list_llms for route switch failed: {e}",
-                traceback.format_exc(),
-                context="set_model_route",
-            )
-            return
-        for index, raw_name, is_current in available:
-            if not _llm_matches_route_model(self.agent, index, raw_name, route, target):
-                continue
-            if is_current:
-                return
-            try:
-                self.agent.next_llm(index)
-            except Exception as e:
-                self._emit_error(
-                    f"route default switch to {target} failed: {e}",
-                    traceback.format_exc(),
-                    context="set_model_route",
-                )
-                return
-            current_raw = self.agent.get_llm_name()
-            self._emit(
-                LLMChangedEvent(
-                    sessionId=self.session_id,
-                    index=index,
-                    name=current_raw,
-                    displayName=_llm_display_name(current_raw),
-                )
-            )
-            return
 
     def _handle_set_llm(self, cmd: SetLLMCommand) -> None:
         """Switch the agent's active LLM. Should only be called when the

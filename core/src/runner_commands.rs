@@ -276,29 +276,12 @@ pub(crate) async fn prepare_managed_runtime_context(
     .map_err(|e| RunnerSpawnError::ManagedRuntimeInvalid {
         detail: format!("serializing managed runtime model config failed: {e}"),
     })?;
-    let route_config = yole_provisioning::stored_runtime_route_for_current_account()
-        .await
-        .ok()
-        .flatten()
-        .and_then(|route| serde_json::to_string(&route).ok());
-    let image_model = route_config
-        .as_ref()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-        .and_then(|value| {
-            value
-                .get("imageGeneration")
-                .and_then(|models| models.as_array())
-                .and_then(|models| models.first())
-                .and_then(|model| model.as_str())
-                .map(ToOwned::to_owned)
-        });
-
     let bridge_cwd = managed_runtime::bridge_cwd_for_app(app).map_err(|e| {
         RunnerSpawnError::ManagedRuntimeInvalid {
             detail: format!("resolving managed bridge cwd failed: {e}"),
         }
     })?;
-    let mut env = vec![
+    let env = vec![
         ("YOLE_RUNTIME_KIND".into(), "managed".into()),
         ("PYTHONDONTWRITEBYTECODE".into(), "1".into()),
         (
@@ -310,6 +293,14 @@ pub(crate) async fn prepare_managed_runtime_context(
             model_config_path.to_string_lossy().into_owned(),
         ),
         (
+            "YOLE_VISION_MODEL".into(),
+            yole_provisioning::VISION_MODEL.into(),
+        ),
+        (
+            "YOLE_IMAGE_MODEL".into(),
+            yole_provisioning::IMAGE_MODEL.into(),
+        ),
+        (
             "YOLE_RUNTIME_PROMPT_TEXT".into(),
             managed_prompt::RUNTIME_PROMPT.into(),
         ),
@@ -319,12 +310,6 @@ pub(crate) async fn prepare_managed_runtime_context(
         ),
         ("YOLE_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config),
     ];
-    if let Some(route_config) = route_config {
-        env.push(("YOLE_MODEL_ROUTE_JSON".into(), route_config));
-    }
-    if let Some(image_model) = image_model {
-        env.push(("YOLE_IMAGE_MODEL".into(), image_model));
-    }
 
     Ok(ManagedRuntimeProcessContext {
         diagnostics,

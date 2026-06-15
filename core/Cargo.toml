@@ -10,7 +10,7 @@ members = [".", "../cli"]
 
 [package]
 name = "yole-core"
-version = "0.0.7"
+version = "0.0.8"
 description = "Yole Desktop Core"
 authors = ["Yole"]
 edition = "2021"

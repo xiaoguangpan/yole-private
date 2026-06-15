@@ -647,7 +647,7 @@ func normalizePoints(points PointsConfig) PointsConfig {
 
 func normalizeRouting(routing RoutingConfig) RoutingConfig {
 	if strings.TrimSpace(routing.Version) == "" {
-		routing.Version = "2026-06-14.1"
+		routing.Version = "2026-06-15.1"
 	}
 	if strings.TrimSpace(routing.DefaultProfile) == "" {
 		routing.DefaultProfile = "yole_standard"
@@ -678,15 +678,8 @@ func defaultRouteProfiles() map[string]RouteProfile {
 	return map[string]RouteProfile{
 		"yole_standard": {
 			NewAPIGroup:     "yole",
-			Conversation:    []string{"deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash", "qwen3.6-plus"},
-			Vision:          []string{"qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
-			ImageGeneration: []string{"gpt-image-2"},
-			ImageEditing:    []string{"gpt-image-2"},
-		},
-		"yole_vip": {
-			NewAPIGroup:     "vip",
-			Conversation:    []string{"gpt-5.5", "deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash"},
-			Vision:          []string{"gpt-5.5", "qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+			Conversation:    []string{"deepseek-v4-pro", "gpt-5.5"},
+			Vision:          []string{"qwen3.7-plus"},
 			ImageGeneration: []string{"gpt-image-2"},
 			ImageEditing:    []string{"gpt-image-2"},
 		},
@@ -696,14 +689,11 @@ func defaultRouteProfiles() map[string]RouteProfile {
 func defaultRouteModels() map[string]ModelMetadata {
 	enabled := true
 	return map[string]ModelMetadata{
-		"deepseek-v4-pro":   textModel(true, &enabled),
-		"deepseek-v4-flash": textModel(true, &enabled),
-		"mimo-v2.5-pro":     textModel(true, &enabled),
-		"qwen3.7-plus":      visionTextModel(true, &enabled),
-		"qwen3.6-plus":      visionTextModel(true, &enabled),
-		"kimi-k2.6":         visionTextModel(true, &enabled),
-		"gpt-5.5":           visionTextModel(true, &enabled),
+		"deepseek-v4-pro": textModel("DeepSeek V4 Pro", true, &enabled),
+		"qwen3.7-plus":    visionTextModel("Qwen 3.7 Plus Vision", true, &enabled),
+		"gpt-5.5":         visionTextModel("GPT-5.5", true, &enabled),
 		"gpt-image-2": {
+			DisplayName:      "GPT Image 2",
 			InputModalities:  []string{"text", "image"},
 			OutputModalities: []string{"image"},
 			Enabled:          &enabled,
@@ -711,8 +701,9 @@ func defaultRouteModels() map[string]ModelMetadata {
 	}
 }
 
-func textModel(toolCalling bool, enabled *bool) ModelMetadata {
+func textModel(displayName string, toolCalling bool, enabled *bool) ModelMetadata {
 	return ModelMetadata{
+		DisplayName:      displayName,
 		InputModalities:  []string{"text"},
 		OutputModalities: []string{"text"},
 		ToolCalling:      toolCalling,
@@ -720,8 +711,9 @@ func textModel(toolCalling bool, enabled *bool) ModelMetadata {
 	}
 }
 
-func visionTextModel(toolCalling bool, enabled *bool) ModelMetadata {
+func visionTextModel(displayName string, toolCalling bool, enabled *bool) ModelMetadata {
 	return ModelMetadata{
+		DisplayName:      displayName,
 		InputModalities:  []string{"text", "image"},
 		OutputModalities: []string{"text"},
 		ToolCalling:      toolCalling,

@@ -16,7 +16,7 @@ services:
       YOLE_TRIAL_USER_GROUP: "yole"
       YOLE_TRIAL_TOKEN_GROUP: "yole"
       YOLE_TRIAL_DEFAULT_MODEL: "deepseek-v4-pro"
-      YOLE_TRIAL_ALLOWED_MODELS: "deepseek-v4-pro,deepseek-v4-flash,qwen3.7-plus,qwen3.6-plus,kimi-k2.6,mimo-v2.5-pro,gpt-5.5,gpt-image-2"
+      YOLE_TRIAL_ALLOWED_MODELS: "deepseek-v4-pro,gpt-5.5,qwen3.7-plus,gpt-image-2"
       YOLE_POINTS_PER_USD: "100"
       YOLE_POINTS_UNIT: "积分"
       YOLE_CONTACT_WECHAT_ID: "${YOLE_CONTACT_WECHAT_ID:-}"

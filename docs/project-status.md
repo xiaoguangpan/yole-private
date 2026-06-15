@@ -9,9 +9,9 @@ live in [refactor](./refactor/README.md).
 
 ## Current Target
 
-- Package version: `0.0.7`.
-- Git tag / GitHub Release: `v0.0.7` is the current published release line; the
-  current Windows package is served by the VPS-hosted stable update channel.
+- Package version: `0.0.8`.
+- Git tag / GitHub Release: `v0.0.8` is the current release target; the Windows
+  package is served by the VPS-hosted stable update channel.
 - Agent API schema: `schemaVersion: 1`
 - Release tier: VPS stable update channel with a signed Windows update manifest.
 - Product shape: dual-native local agent team orchestrator
@@ -22,7 +22,7 @@ Supervisor automation on the same machine.
 
 ## Current Release State
 
-`v0.0.7` is the current published Windows package line. The signed NSIS package
+`v0.0.8` is the current Windows package target. The signed NSIS package
 is produced locally, copied to the release-package handoff folder, uploaded to
 the VPS-hosted stable update endpoint, and mirrored into the public distribution
 repository release folder.
@@ -30,15 +30,20 @@ repository release folder.
 Current local-test focus:
 
 1. Validate first-run Yole account provisioning through the VPS provisioner.
-2. Confirm the balance entry, low-balance warning, QR/contact support flow, and
+2. Confirm explicit DeepSeek / GPT-5.5 model selection and NewAPI pricing.
+3. Confirm fixed vision assist is used only when a text-only model receives
+   image input.
+4. Confirm the default-passive Windows installer double-clicks, installs, and
+   launches Yole.
+5. Confirm the balance entry, low-balance warning, QR/contact support flow, and
    non-sequential support ID in the chat surface.
-3. Confirm the new Yole window, installer, and tray icons.
-4. Confirm the project sidebar matches the lightweight Codex-style project
+6. Confirm the new Yole window, installer, and tray icons.
+7. Confirm the project sidebar matches the lightweight Codex-style project
    section: label-hover actions, folder-row actions, and compact project chats.
-5. Confirm the balance panel refreshes live account status and shows Yole
+8. Confirm the balance panel refreshes live account status and shows Yole
    points instead of a fake `$0.00` cached placeholder.
-6. Confirm uninstall removes bundled runtime leftovers and selected app data.
-7. Confirm uninstall/reinstall on the same Windows device reuses the prior Yole
+9. Confirm uninstall removes bundled runtime leftovers and selected app data.
+10. Confirm uninstall/reinstall on the same Windows device reuses the prior Yole
    account instead of granting another trial balance.
 
 ## Status Dashboard
@@ -50,8 +55,8 @@ Current local-test focus:
 | Agent surface | Settings -> Agent, copy-first SOP, Claude Skill | [Supervisor SOP](./integrations/yole-supervisor-sop.md) |
 | Managed GA runtime | Bundled runtime remains the current baseline; GUI / CLI split, Provider / Model config, and local encrypted SQLite credentials are active | [managed GA runtime](./managed-ga-runtime.md) |
 | Data migration | Backup mechanism exists; runtime identity and managed model config migrations are in dogfood | [B4 M8](./refactor/B4-M8-sub-plan.md) |
-| Release path | v0.0.7 uses the VPS-hosted Windows download and update endpoints | [release / update SOP](./release-update-sop.md), [demand pool](./demand-pool.md) |
-| Windows | v0.0.7 Windows NSIS package is built locally for manual testing | [Windows checklist](./windows-build-checklist.md) |
+| Release path | v0.0.8 uses the VPS-hosted Windows download and update endpoints | [release / update SOP](./release-update-sop.md), [demand pool](./demand-pool.md) |
+| Windows | v0.0.8 Windows NSIS package is built locally for manual testing | [Windows checklist](./windows-build-checklist.md) |
 | GA baseline | Locked to audited upstream `5d122e20` | [GA baseline](./ga-baseline.md) |
 
 ## Compact Timeline
@@ -75,7 +80,7 @@ Detailed phase narratives are intentionally not duplicated here. Use:
 
 ## Release Version Rules
 
-- Current package metadata uses `0.0.7`. For the next release, update:
+- Current package metadata uses `0.0.8`. For the next release, update:
   - `package.json`
   - `core/tauri.conf.json`
   - `core/Cargo.toml`

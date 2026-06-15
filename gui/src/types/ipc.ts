@@ -340,11 +340,6 @@ export interface SetYoloModeCommand {
   enabled: boolean;
 }
 
-export interface SetModelRouteCommand {
-  kind: "set_model_route";
-  routeJson: string;
-}
-
 export interface SetLLMCommand {
   kind: "set_llm";
   llmIndex: number;
@@ -391,7 +386,6 @@ export type IPCCommand =
   | LoadHistoryCommand
   | SetApprovalRulesCommand
   | SetYoloModeCommand
-  | SetModelRouteCommand
   | SetLLMCommand
   | ShutdownCommand
   | ReinjectToolsCommand

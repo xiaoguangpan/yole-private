@@ -82,8 +82,10 @@ D:\yole\release-package\<version>\
 Current package:
 
 ```text
-D:\yole\release-package\0.0.7\Yole_0.0.7_x64-setup.exe
-D:\yole\release-package\0.0.7\SHA256SUMS.txt
+D:\yole\release-package\0.0.8\Yole_0.0.8_x64-setup.exe
+D:\yole\release-package\0.0.8\Yole_0.0.8_x64-setup.exe.sig
+D:\yole\release-package\0.0.8\latest.json
+D:\yole\release-package\0.0.8\SHA256SUMS.txt
 ```
 
 This folder is convenient for local handoff. It is not the canonical updater

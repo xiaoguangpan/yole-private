@@ -142,25 +142,6 @@ export interface YoleAccountStatus {
   contact: YoleContactInfo;
 }
 
-export interface YoleRouteModel {
-  displayName?: string | null;
-  inputModalities: string[];
-  outputModalities: string[];
-  toolCalling: boolean;
-  enabled: boolean;
-}
-
-export interface YoleModelRoute {
-  schemaVersion: number;
-  routeVersion: string;
-  profileId: string;
-  models: Record<string, YoleRouteModel>;
-  conversation: string[];
-  vision: string[];
-  imageGeneration: string[];
-  imageEditing: string[];
-}
-
 export async function ensureYoleTrialModel(): Promise<YoleProvisioningResult> {
   return invoke<YoleProvisioningResult>("ensure_yole_trial_model");
 }
@@ -173,16 +154,6 @@ export async function getYoleAccountStatus(
 
 export async function getStoredYoleAccountStatus(): Promise<YoleAccountStatus | null> {
   return invoke<YoleAccountStatus | null>("get_stored_yole_account_status");
-}
-
-export async function refreshYoleRuntimeRoute(
-  force = false,
-): Promise<YoleModelRoute | null> {
-  return invoke<YoleModelRoute | null>("refresh_yole_runtime_route", { force });
-}
-
-export async function getStoredYoleRuntimeRoute(): Promise<YoleModelRoute | null> {
-  return invoke<YoleModelRoute | null>("get_stored_yole_runtime_route");
 }
 
 export function normalizeTelegramUsername(value?: string | null): string {

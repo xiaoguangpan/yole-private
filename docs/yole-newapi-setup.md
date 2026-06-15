@@ -16,7 +16,7 @@ NewAPI public v1 URL: https://na.itxgp.com/v1
 Default model: deepseek-v4-pro
 Yole user group: yole
 Yole token group: yole
-Yole route version: 2026-06-14.1
+Yole route version: 2026-06-15.1
 Initial NewAPI balance: 30 = 15,000,000 NewAPI quota units
 Yole points: 1 NewAPI balance = 100 points; 30 balance = 3000 points
 Low balance threshold: 3 NewAPI balance = 300 points
@@ -53,13 +53,13 @@ provisioner server.
 - `newapi.admin_user_id` must point at a NewAPI admin/root user.
 - The admin access token must be able to create users, update user group, add
   quota, and read user status.
-- The `yole` user group must exist and be allowed to use the configured model.
+- The `yole` user group must exist and be allowed to use DeepSeek, GPT-5.5,
+  the fixed vision model, and the fixed image model.
 - The `yole` token group should exist or be accepted by NewAPI token creation.
-- The configured Yole route models must be available to the intended NewAPI
-  groups. Standard users use `yole`; VIP users use `vip`.
-- Same-model upstream fallback is handled inside NewAPI. Cross-model fallback
-  and image-understanding routing are handled by Yole's provisioner / managed
-  runtime.
+- Same-model upstream fallback is handled inside NewAPI. Yole does not do
+  hidden cross-model fallback; the desktop client exposes the text model choice
+  directly. If a selected text model is text-only and the user sends images,
+  the managed runtime calls the fixed vision model once to summarize the image.
 - Password login must be enabled for provisioner-created users, because the
   service creates the consumer token through that user's own session.
 
@@ -70,8 +70,7 @@ If NewAPI denies chat with `403`, check group access first. If it returns
 
 Custom Yole model aliases must have explicit NewAPI pricing entries. If they
 are missing from `ModelRatio`, NewAPI can fall back to a high default ratio;
-on 2026-06-15 this made `deepseek-v4-pro` bill at `model_ratio = 37.5`, much
-more expensive than the VIP `gpt-5.5` route.
+on 2026-06-15 this made `deepseek-v4-pro` bill at `model_ratio = 37.5`.
 
 Current VPS pricing baseline:
 
@@ -79,40 +78,29 @@ Current VPS pricing baseline:
 {
   "ModelRatio": {
     "deepseek-v4-pro": 1,
-    "deepseek-v4-flash": 1,
     "qwen3.7-plus": 1,
-    "qwen3.6-plus": 1,
-    "kimi-k2.6": 1,
-    "mimo-v2.5-pro": 1,
     "gpt-5.5": 5,
     "gpt-image-2": 5
   },
   "CompletionRatio": {
     "deepseek-v4-pro": 1,
-    "deepseek-v4-flash": 1,
     "qwen3.7-plus": 1,
-    "qwen3.6-plus": 1,
-    "kimi-k2.6": 1,
-    "mimo-v2.5-pro": 1,
     "gpt-5.5": 6,
     "gpt-image-2": 1
   },
   "CacheRatio": {
     "deepseek-v4-pro": 0.1,
-    "deepseek-v4-flash": 0.1,
     "qwen3.7-plus": 0.1,
-    "qwen3.6-plus": 0.1,
-    "kimi-k2.6": 0.1,
-    "mimo-v2.5-pro": 0.1,
     "gpt-5.5": 0.1,
     "gpt-image-2": 0.1
   }
 }
 ```
 
-Keep standard route aliases at a simple 1x ratio unless upstream cost changes
-require an operator decision. VIP models can still be more expensive through
-their own ratio entries; `gpt-5.5` is currently 5x input / 6x completion.
+Keep DeepSeek and fixed auxiliary models at a simple 1x ratio unless upstream
+cost changes require an operator decision. `gpt-5.5` is currently 5x input /
+6x completion so users can choose it explicitly and see the higher spend in
+their Yole points.
 
 ## Admin Access Token
 
@@ -166,12 +154,8 @@ trial:
   default_model: "deepseek-v4-pro"
   allowed_models:
     - "deepseek-v4-pro"
-    - "deepseek-v4-flash"
-    - "qwen3.7-plus"
-    - "qwen3.6-plus"
-    - "kimi-k2.6"
-    - "mimo-v2.5-pro"
     - "gpt-5.5"
+    - "qwen3.7-plus"
     - "gpt-image-2"
 
 points:
@@ -179,27 +163,15 @@ points:
   unit: "积分"
 
 model_routing:
-  version: "2026-06-14.1"
+  version: "2026-06-15.1"
   default_profile: "yole_standard"
   profiles:
     yole_standard:
       newapi_group: "yole"
       conversation:
         - "deepseek-v4-pro"
-        - "qwen3.7-plus"
-      vision:
-        - "qwen3.7-plus"
-      image_generation:
-        - "gpt-image-2"
-      image_editing:
-        - "gpt-image-2"
-    yole_vip:
-      newapi_group: "vip"
-      conversation:
         - "gpt-5.5"
-        - "deepseek-v4-pro"
       vision:
-        - "gpt-5.5"
         - "qwen3.7-plus"
       image_generation:
         - "gpt-image-2"

@@ -1263,7 +1263,7 @@ function App() {
                     selectLLMForNewSession(idx);
                   }}
                   onOpenLLMSwitcher={openLLMSwitcherFallback}
-                  hideModelPicker={simplifiedUi}
+                  hideModelPicker={false}
                   onSubmit={(t, images = []) => {
                     if (requiresManagedModelConfig) {
                       openModelsForMissingConfig();
@@ -1319,7 +1319,7 @@ function App() {
                     }
                   }}
                   onOpenLLMSwitcher={openLLMSwitcherFallback}
-                  hideModelPicker={simplifiedUi}
+                  hideModelPicker={false}
                   pendingApprovals={pendingApprovals}
                   approvalDecisions={approvalDecisions}
                   onSubmit={(t, images = []) => {

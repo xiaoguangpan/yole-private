@@ -7,7 +7,6 @@ that don't need a GA subprocess: error classification and LLM display names.
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
 import pytest
 
@@ -15,11 +14,8 @@ from runner.yole_bridge import (
     Bridge,
     _classify_error,
     _FenceFilter,
-    _image_model_from_route,
     _llm_display_name,
-    _llm_matches_route_model,
     _managed_model_config_from_env,
-    _route_primary_conversation_model,
 )
 
 # ---------------- _classify_error ----------------
@@ -188,58 +184,6 @@ def test_managed_model_config_maps_codex_oauth_to_ga_config(
     assert cfg["reasoning_effort"] == "medium"
     assert cfg["yole_api_key_ref"] == "managed-provider:mp_chatgpt_codex"
     assert cfg["yole_credential_ipc"]["token"] == "secret"
-
-
-def test_image_model_from_route_accepts_camel_and_snake_case() -> None:
-    assert _image_model_from_route({"imageGeneration": ["gpt-image-2"]}) == "gpt-image-2"
-    assert _image_model_from_route({"image_generation": ["image-fallback"]}) == "image-fallback"
-
-
-def test_image_model_from_route_ignores_missing_or_blank_values() -> None:
-    assert _image_model_from_route({}) == ""
-    assert _image_model_from_route({"imageGeneration": []}) == ""
-    assert _image_model_from_route({"imageGeneration": ["  "]}) == ""
-
-
-def test_route_primary_conversation_model_skips_disabled() -> None:
-    assert (
-        _route_primary_conversation_model(
-            {
-                "models": {
-                    "gpt-5.5": {"enabled": False},
-                    "deepseek-v4-pro": {"enabled": True},
-                },
-                "conversation": ["gpt-5.5", "deepseek-v4-pro"],
-            }
-        )
-        == "deepseek-v4-pro"
-    )
-
-
-def test_llm_matches_route_model_uses_backend_model_and_display_name() -> None:
-    agent = SimpleNamespace(
-        llmclients=[
-            SimpleNamespace(
-                backend=SimpleNamespace(
-                    model="deepseek-v4-pro",
-                    name="DeepSeek V4 Pro",
-                )
-            )
-        ]
-    )
-    route = {
-        "models": {
-            "deepseek-v4-pro": {"displayName": "DeepSeek V4 Pro"},
-        }
-    }
-
-    assert _llm_matches_route_model(
-        agent,
-        0,
-        "NativeOAISession/DeepSeek V4 Pro",
-        route,
-        "deepseek-v4-pro",
-    )
 
 
 # ---------------- _extract_ask_user ----------------

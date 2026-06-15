@@ -15,16 +15,20 @@ use crate::error::{Result, YoleError};
 
 const PROVIDER_ID: &str = "yole";
 const MODEL_ID: &str = "yole-default";
+const GPT_MODEL_ID: &str = "yole-gpt-5-5";
 const PROVIDER_DISPLAY_NAME: &str = "Yole";
-const MODEL_DISPLAY_NAME: &str = "Yole";
+const MODEL_DISPLAY_NAME: &str = "DeepSeek V4 Pro";
+const GPT_MODEL_DISPLAY_NAME: &str = "GPT-5.5";
+const DEFAULT_TEXT_MODEL: &str = "deepseek-v4-pro";
+const GPT_TEXT_MODEL: &str = "gpt-5.5";
+pub const VISION_MODEL: &str = "qwen3.7-plus";
+pub const IMAGE_MODEL: &str = "gpt-image-2";
 const DEFAULT_PROVISIONER_URL: &str = "https://na.itxgp.com/yole-provisioner";
 const PROVISIONER_URL_PREF: &str = "yole_provisioner_url";
 const INSTALL_ID_PREF: &str = "yole_install_id";
 const ACCOUNT_PREF: &str = "yole_account";
-pub const ROUTE_PREF: &str = "yole_model_route";
 const ACCOUNT_TOKEN_REF: &str = "yole-account:token";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
-const ROUTE_TIMEOUT_MILLIS: u64 = 2_500;
 const DEFAULT_POINTS_PER_USD: f64 = 100.0;
 const DEFAULT_POINTS_UNIT: &str = "积分";
 
@@ -187,7 +191,9 @@ struct ProvisionerAccountResponse {
 
 pub async fn ensure_trial_model<R: Runtime>(app: &AppHandle<R>) -> Result<YoleProvisioningResult> {
     let yole = SqliteYole::open().await?;
-    if !yole.list_managed_models().await?.is_empty() {
+    let existing_models = yole.list_managed_models().await?;
+    if !existing_models.is_empty() {
+        ensure_existing_yole_catalog_models(&yole, &existing_models).await?;
         return Ok(YoleProvisioningResult::SkippedExistingModel);
     }
 
@@ -209,6 +215,51 @@ pub async fn ensure_trial_model<R: Runtime>(app: &AppHandle<R>) -> Result<YolePr
     .await?;
 
     persist_yole_model(&yole, response).await
+}
+
+async fn ensure_existing_yole_catalog_models(
+    yole: &SqliteYole,
+    existing_models: &[ManagedModelRecord],
+) -> Result<()> {
+    let Some(provider) = yole
+        .list_managed_model_providers()
+        .await?
+        .into_iter()
+        .find(|provider| provider.id == PROVIDER_ID)
+    else {
+        return Ok(());
+    };
+
+    let any_default = existing_models.iter().any(|model| model.is_default);
+    let deepseek_default = existing_models
+        .iter()
+        .any(|model| model.id == MODEL_ID && model.is_default)
+        || !any_default;
+    let gpt_default = existing_models
+        .iter()
+        .any(|model| model.id == GPT_MODEL_ID && model.is_default);
+
+    upsert_yole_text_model(
+        yole,
+        &provider.id,
+        MODEL_ID,
+        MODEL_DISPLAY_NAME,
+        DEFAULT_TEXT_MODEL,
+        &["text"],
+        deepseek_default,
+    )
+    .await?;
+    upsert_yole_text_model(
+        yole,
+        &provider.id,
+        GPT_MODEL_ID,
+        GPT_MODEL_DISPLAY_NAME,
+        GPT_TEXT_MODEL,
+        &["text", "image"],
+        gpt_default,
+    )
+    .await?;
+    Ok(())
 }
 
 async fn configured_provisioner_url(yole: &SqliteYole) -> Result<Option<String>> {
@@ -288,50 +339,6 @@ pub async fn stored_account_status_for_current_account() -> Result<Option<YoleAc
     stored_account_status(&yole).await
 }
 
-pub async fn refresh_runtime_route() -> Result<Option<YoleModelRoute>> {
-    refresh_runtime_route_with_force(false).await
-}
-
-pub async fn refresh_runtime_route_with_force(force: bool) -> Result<Option<YoleModelRoute>> {
-    let yole = SqliteYole::open().await?;
-    let stored = stored_runtime_route(&yole).await?;
-    let Some(provisioner_url) = configured_provisioner_url(&yole).await? else {
-        return Ok(stored);
-    };
-    let account_token = match credential_store::get_secret(&yole, ACCOUNT_TOKEN_REF).await {
-        Ok(token) => token,
-        Err(_) => return Ok(stored),
-    };
-    let version = (!force)
-        .then(|| stored.as_ref().map(|route| route.route_version.as_str()))
-        .flatten();
-    let profile = (!force)
-        .then(|| stored.as_ref().map(|route| route.profile_id.as_str()))
-        .flatten();
-    match runtime_route(&provisioner_url, &account_token, version, profile).await {
-        Ok(Some(route)) => {
-            persist_route(&yole, &route).await?;
-            Ok(Some(route))
-        }
-        Ok(None) => Ok(stored),
-        Err(err) => {
-            if force {
-                return Err(err);
-            }
-            if stored.is_some() {
-                Ok(stored)
-            } else {
-                Err(err)
-            }
-        }
-    }
-}
-
-pub async fn stored_runtime_route_for_current_account() -> Result<Option<YoleModelRoute>> {
-    let yole = SqliteYole::open().await?;
-    stored_runtime_route(&yole).await
-}
-
 async fn register(base_url: &str, request: RegisterRequest) -> Result<RegisterResponse> {
     let endpoint = register_endpoint(base_url)?;
     let client = reqwest::Client::builder()
@@ -400,64 +407,18 @@ async fn account_status(base_url: &str, account_token: &str) -> Result<Provision
     })
 }
 
-async fn runtime_route(
-    base_url: &str,
-    account_token: &str,
-    version: Option<&str>,
-    profile: Option<&str>,
-) -> Result<Option<YoleModelRoute>> {
-    let endpoint = runtime_route_url(base_url, version, profile)?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(ROUTE_TIMEOUT_MILLIS))
-        .build()
-        .map_err(|e| YoleError::Internal {
-            message: format!("building Yole route HTTP client failed: {e}"),
-        })?;
-    let resp = client
-        .get(endpoint)
-        .bearer_auth(account_token)
-        .send()
-        .await
-        .map_err(|e| YoleError::RunnerError {
-            message: format!("Yole runtime route request failed: {e}"),
-        })?;
-    let status = resp.status();
-    if status == reqwest::StatusCode::NO_CONTENT {
-        return Ok(None);
-    }
-    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
-        message: format!("reading Yole runtime route response failed: {e}"),
-    })?;
-    if !status.is_success() {
-        return Err(YoleError::RunnerError {
-            message: format!(
-                "Yole runtime route returned HTTP {}: {}",
-                status.as_u16(),
-                compact_body(&body)
-            ),
-        });
-    }
-    serde_json::from_str::<YoleModelRoute>(&body)
-        .map(Some)
-        .map_err(|e| YoleError::RunnerError {
-            message: format!("Yole runtime route response is invalid JSON: {e}"),
-        })
-}
-
 async fn persist_yole_model(
     yole: &SqliteYole,
     response: RegisterResponse,
 ) -> Result<YoleProvisioningResult> {
     let api_base = nonempty(response.newapi_base_url, "newapi_base_url")?;
     let token = nonempty(response.token, "token")?;
-    let model_name = nonempty(response.default_model, "default_model")?;
+    let _model_name = nonempty(response.default_model, "default_model")?;
+    let _model_routing = response.model_routing.as_ref();
     let api_key_ref = credential_store::managed_provider_api_key_ref(PROVIDER_ID);
 
     credential_store::set_secret(yole, &api_key_ref, &token).await?;
     persist_account(yole, &response.account).await?;
-    if let Some(route) = response.model_routing.as_ref() {
-        persist_route(yole, route).await?;
-    }
     let provider = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: PROVIDER_ID.into(),
@@ -468,16 +429,26 @@ async fn persist_yole_model(
             api_key_ref,
         })
         .await?;
-    let model = yole
-        .upsert_managed_model_metadata(UpsertManagedModelMetadata {
-            id: MODEL_ID.into(),
-            provider_id: PROVIDER_ID.into(),
-            display_name: MODEL_DISPLAY_NAME.into(),
-            model: model_name,
-            advanced_options: crate::managed_model_advanced_defaults(ManagedModelProtocol::Openai),
-            make_default: true,
-        })
-        .await?;
+    let model = upsert_yole_text_model(
+        yole,
+        &provider.id,
+        MODEL_ID,
+        MODEL_DISPLAY_NAME,
+        DEFAULT_TEXT_MODEL,
+        &["text"],
+        true,
+    )
+    .await?;
+    upsert_yole_text_model(
+        yole,
+        &provider.id,
+        GPT_MODEL_ID,
+        GPT_MODEL_DISPLAY_NAME,
+        GPT_TEXT_MODEL,
+        &["text", "image"],
+        false,
+    )
+    .await?;
 
     Ok(YoleProvisioningResult::Provisioned {
         provider,
@@ -485,6 +456,39 @@ async fn persist_yole_model(
         expires_at: response.expires_at,
         account: response.account.into_status(),
     })
+}
+
+async fn upsert_yole_text_model(
+    yole: &SqliteYole,
+    provider_id: &str,
+    id: &str,
+    display_name: &str,
+    model: &str,
+    input_modalities: &[&str],
+    make_default: bool,
+) -> Result<ManagedModelRecord> {
+    yole.upsert_managed_model_metadata(UpsertManagedModelMetadata {
+        id: id.into(),
+        provider_id: provider_id.into(),
+        display_name: display_name.into(),
+        model: model.into(),
+        advanced_options: yole_text_model_advanced_options(input_modalities),
+        make_default,
+    })
+    .await
+}
+
+fn yole_text_model_advanced_options(input_modalities: &[&str]) -> serde_json::Value {
+    let mut options = crate::managed_model_advanced_defaults(ManagedModelProtocol::Openai);
+    if let Some(map) = options.as_object_mut() {
+        map.insert(
+            "input_modalities".into(),
+            serde_json::json!(input_modalities),
+        );
+        map.insert("output_modalities".into(), serde_json::json!(["text"]));
+        map.insert("tool_calling".into(), serde_json::json!(true));
+    }
+    options
 }
 
 async fn persist_account(yole: &SqliteYole, account: &ProvisionerAccountResponse) -> Result<()> {
@@ -513,16 +517,6 @@ async fn persist_account(yole: &SqliteYole, account: &ProvisionerAccountResponse
         ACCOUNT_PREF,
         serde_json::to_value(metadata).map_err(|e| YoleError::Internal {
             message: format!("serializing Yole account metadata failed: {e}"),
-        })?,
-    )
-    .await
-}
-
-async fn persist_route(yole: &SqliteYole, route: &YoleModelRoute) -> Result<()> {
-    yole.set_pref_json(
-        ROUTE_PREF,
-        serde_json::to_value(route).map_err(|e| YoleError::Internal {
-            message: format!("serializing Yole model route failed: {e}"),
         })?,
     )
     .await
@@ -563,17 +557,6 @@ async fn stored_account_status(yole: &SqliteYole) -> Result<Option<YoleAccountSt
     }))
 }
 
-async fn stored_runtime_route(yole: &SqliteYole) -> Result<Option<YoleModelRoute>> {
-    let Some(value) = yole.get_pref_json(ROUTE_PREF).await? else {
-        return Ok(None);
-    };
-    serde_json::from_value::<YoleModelRoute>(value)
-        .map(Some)
-        .map_err(|e| YoleError::Internal {
-            message: format!("stored Yole model route is invalid: {e}"),
-        })
-}
-
 fn register_endpoint(base_url: &str) -> Result<String> {
     let trimmed = base_url.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -600,39 +583,6 @@ fn account_status_endpoint(base_url: &str) -> Result<String> {
     } else {
         Ok(format!("{trimmed}/api/account/status"))
     }
-}
-
-fn runtime_route_endpoint(base_url: &str) -> Result<String> {
-    let trimmed = base_url.trim().trim_end_matches('/');
-    if trimmed.is_empty() {
-        return Err(YoleError::InvalidArgs {
-            message: "Yole provisioner URL is empty".into(),
-        });
-    }
-    if trimmed.ends_with("/api/runtime/route") {
-        Ok(trimmed.to_string())
-    } else {
-        Ok(format!("{trimmed}/api/runtime/route"))
-    }
-}
-
-fn runtime_route_url(
-    base_url: &str,
-    version: Option<&str>,
-    profile: Option<&str>,
-) -> Result<reqwest::Url> {
-    let mut endpoint = reqwest::Url::parse(&runtime_route_endpoint(base_url)?).map_err(|e| {
-        YoleError::InvalidArgs {
-            message: format!("Yole runtime route URL is invalid: {e}"),
-        }
-    })?;
-    if let Some(version) = version.map(str::trim).filter(|s| !s.is_empty()) {
-        endpoint.query_pairs_mut().append_pair("version", version);
-    }
-    if let Some(profile) = profile.map(str::trim).filter(|s| !s.is_empty()) {
-        endpoint.query_pairs_mut().append_pair("profile", profile);
-    }
-    Ok(endpoint)
 }
 
 fn nonempty(value: String, field: &str) -> Result<String> {
@@ -901,7 +851,7 @@ mod tests {
             r#"{
                 "newapi_base_url":"https://na.itxgp.com/v1",
                 "token":"sk-test",
-                "default_model":"gpt-5.5",
+                "default_model":"deepseek-v4-pro",
                 "route_version":"2026-06-14.1",
                 "model_routing":{
                     "schema_version":1,
@@ -915,7 +865,7 @@ mod tests {
                             "enabled":true
                         }
                     },
-                    "conversation":["deepseek-v4-pro"],
+                    "conversation":["deepseek-v4-pro","gpt-5.5"],
                     "vision":[],
                     "image_generation":["gpt-image-2"],
                     "image_editing":["gpt-image-2"]
@@ -943,7 +893,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(response.newapi_base_url, "https://na.itxgp.com/v1");
-        assert_eq!(response.default_model, "gpt-5.5");
+        assert_eq!(response.default_model, "deepseek-v4-pro");
         assert_eq!(response.expires_at, None);
         assert_eq!(response.account.support_id, "yole-42");
         assert_eq!(response.account.balance_usd, 30.0);
@@ -961,32 +911,6 @@ mod tests {
         assert_eq!(
             response.account.contact.wechat_id.as_deref(),
             Some("wx-test")
-        );
-    }
-
-    #[test]
-    fn runtime_route_endpoint_accepts_base_or_exact_endpoint() {
-        assert_eq!(
-            runtime_route_endpoint("https://provisioner.example").unwrap(),
-            "https://provisioner.example/api/runtime/route"
-        );
-        assert_eq!(
-            runtime_route_endpoint("https://provisioner.example/api/runtime/route").unwrap(),
-            "https://provisioner.example/api/runtime/route"
-        );
-    }
-
-    #[test]
-    fn runtime_route_url_includes_version_and_profile_cache_keys() {
-        let url = runtime_route_url(
-            "https://provisioner.example/yole-provisioner",
-            Some("2026-06-14.1"),
-            Some("yole_standard"),
-        )
-        .unwrap();
-        assert_eq!(
-            url.as_str(),
-            "https://provisioner.example/yole-provisioner/api/runtime/route?version=2026-06-14.1&profile=yole_standard"
         );
     }
 

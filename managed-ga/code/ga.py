@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from agent_loop import BaseHandler, StepOutcome, json_default
 script_dir = os.path.dirname(os.path.abspath(__file__))
 state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
-YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
+YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):
@@ -21,20 +21,6 @@ def auto_make_url(api_base, path):
     if base.endswith("/v1"):
         return f"{base}/{path}"
     return f"{base}/v1/{path}"
-
-def yole_image_model_from_route():
-    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
-    if not raw:
-        return ""
-    try:
-        route = json.loads(raw)
-        values = route.get("imageGeneration") or route.get("image_generation") or []
-        if isinstance(values, list) and values:
-            return str(values[0]).strip()
-    except Exception:
-        return ""
-    return ""
-
 
 def safe_print(*args, **kwargs):
     try: print(*args, **kwargs)
@@ -369,7 +355,7 @@ class GenericAgentHandler(BaseHandler):
         prompt = (args.get("prompt") or args.get("description") or "").strip()
         if not prompt:
             return StepOutcome("[Error] prompt is required for image generation.", next_prompt="\n")
-        model = (args.get("model") or os.environ.get("YOLE_IMAGE_MODEL") or yole_image_model_from_route() or "gpt-image-2").strip()
+        model = (args.get("model") or os.environ.get("YOLE_IMAGE_MODEL") or "gpt-image-2").strip()
         size = (args.get("size") or "1024x1024").strip()
         quality = (args.get("quality") or "").strip()
         try:

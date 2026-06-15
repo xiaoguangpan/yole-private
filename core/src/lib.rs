@@ -700,23 +700,6 @@ async fn get_stored_yole_account_status(
         .map_err(stringify_error)
 }
 
-#[tauri::command]
-async fn refresh_yole_runtime_route(
-    force: Option<bool>,
-) -> std::result::Result<Option<yole_provisioning::YoleModelRoute>, String> {
-    yole_provisioning::refresh_runtime_route_with_force(force.unwrap_or(false))
-        .await
-        .map_err(stringify_error)
-}
-
-#[tauri::command]
-async fn get_stored_yole_runtime_route(
-) -> std::result::Result<Option<yole_provisioning::YoleModelRoute>, String> {
-    yole_provisioning::stored_runtime_route_for_current_account()
-        .await
-        .map_err(stringify_error)
-}
-
 async fn sync_managed_model_config(
     app: &tauri::AppHandle,
     yole: &SqliteYole,
@@ -1334,8 +1317,6 @@ pub fn run() {
             ensure_yole_trial_model,
             get_yole_account_status,
             get_stored_yole_account_status,
-            refresh_yole_runtime_route,
-            get_stored_yole_runtime_route,
             list_sessions,
             // B3 M4a session writes
             create_session,
