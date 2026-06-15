@@ -55,8 +55,7 @@ use crate::api::message::MessageBrief;
 use crate::api::project::{CreateProjectInput, ProjectBrief, ProjectId};
 use crate::api::session::{CreateSessionInput, SessionBrief};
 use crate::api::{
-    YoleApi, ManagedModelCredentialStatus, Origin, OriginVia, RuntimeKind, SessionFilter,
-    SessionId,
+    ManagedModelCredentialStatus, Origin, OriginVia, RuntimeKind, SessionFilter, SessionId, YoleApi,
 };
 use crate::db::SqliteYole;
 use crate::ipc::{IpcCommand, SetLlmCommand, UserMessageCommand};

@@ -14,6 +14,7 @@ export function SidebarTimelineBuckets({
   projects,
   petAttachedSessionId,
   collapseEarlier = true,
+  hideBucketLabels = false,
   onSelectSession,
   onArchiveSession,
   onTogglePinSession,
@@ -29,6 +30,7 @@ export function SidebarTimelineBuckets({
   projects: Project[];
   petAttachedSessionId?: string | null;
   collapseEarlier?: boolean;
+  hideBucketLabels?: boolean;
   onSelectSession?: (id: string) => void;
   onArchiveSession?: (id: string) => void;
   onTogglePinSession?: (id: string) => void;
@@ -64,6 +66,7 @@ export function SidebarTimelineBuckets({
             key={bucket}
             bucket={bucket}
             sessions={buckets[bucket]}
+            hideLabel={hideBucketLabels}
             activeId={activeId}
             projects={projects}
             petAttachedSessionId={petAttachedSessionId}
@@ -86,6 +89,7 @@ export function SidebarTimelineBuckets({
 function SidebarBucket({
   bucket,
   sessions,
+  hideLabel,
   activeId,
   projects,
   petAttachedSessionId,
@@ -100,6 +104,7 @@ function SidebarBucket({
 }: {
   bucket: SessionBucket;
   sessions: Session[];
+  hideLabel?: boolean;
   activeId?: string;
   projects: Project[];
   petAttachedSessionId?: string | null;
@@ -130,7 +135,7 @@ function SidebarBucket({
   };
   return (
     <>
-      <SidebarSectionLabel>{bucketLabel[bucket]}</SidebarSectionLabel>
+      {!hideLabel && <SidebarSectionLabel>{bucketLabel[bucket]}</SidebarSectionLabel>}
       {sessions.map((s) => (
         <SidebarSessionRow
           key={s.id}

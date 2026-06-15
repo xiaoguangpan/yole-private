@@ -1,5 +1,6 @@
 server:
   listen: "127.0.0.1:8080"
+  public_base_url: "https://na.itxgp.com/yole-provisioner"
   read_timeout_seconds: 15
   write_timeout_seconds: 30
 
@@ -12,13 +13,97 @@ newapi:
 
 trial:
   token_prefix: "yole"
-  initial_credit_usd: 50
-  low_balance_usd: 5
+  initial_credit_usd: 30
+  low_balance_usd: 3
   user_group: "yole"
   token_group: "yole"
-  default_model: "gpt-5.5"
+  default_model: "deepseek-v4-pro"
   allowed_models:
+    - "deepseek-v4-pro"
+    - "deepseek-v4-flash"
+    - "qwen3.7-plus"
+    - "qwen3.6-plus"
+    - "kimi-k2.6"
+    - "mimo-v2.5-pro"
     - "gpt-5.5"
+    - "gpt-image-2"
+
+points:
+  per_usd: 100
+  unit: "积分"
+
+model_routing:
+  version: "2026-06-14.1"
+  default_profile: "yole_standard"
+  profiles:
+    yole_standard:
+      newapi_group: "yole"
+      conversation:
+        - "deepseek-v4-pro"
+        - "qwen3.7-plus"
+        - "kimi-k2.6"
+        - "mimo-v2.5-pro"
+        - "deepseek-v4-flash"
+        - "qwen3.6-plus"
+      vision:
+        - "qwen3.7-plus"
+        - "kimi-k2.6"
+        - "qwen3.6-plus"
+      image_generation:
+        - "gpt-image-2"
+      image_editing:
+        - "gpt-image-2"
+    yole_vip:
+      newapi_group: "vip"
+      conversation:
+        - "gpt-5.5"
+        - "deepseek-v4-pro"
+        - "qwen3.7-plus"
+        - "kimi-k2.6"
+        - "mimo-v2.5-pro"
+        - "deepseek-v4-flash"
+      vision:
+        - "gpt-5.5"
+        - "qwen3.7-plus"
+        - "kimi-k2.6"
+        - "qwen3.6-plus"
+      image_generation:
+        - "gpt-image-2"
+      image_editing:
+        - "gpt-image-2"
+  models:
+    deepseek-v4-pro:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+      tool_calling: true
+    deepseek-v4-flash:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+      tool_calling: true
+    qwen3.7-plus:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+      tool_calling: true
+    qwen3.6-plus:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+      tool_calling: true
+    kimi-k2.6:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+      tool_calling: true
+    mimo-v2.5-pro:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+      tool_calling: true
+    gpt-5.5:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+      tool_calling: true
+    gpt-image-2:
+      input_modalities: ["text", "image"]
+      output_modalities: ["image"]
+      tool_calling: false
 
 contact:
   wechat_id: "replace-with-wechat-id"

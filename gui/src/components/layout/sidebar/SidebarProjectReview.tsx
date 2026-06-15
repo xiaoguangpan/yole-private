@@ -1,64 +1,67 @@
-import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Fragment, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
+  ArrowDown,
+  ArrowsInLineVertical,
+  ArrowsOutLineVertical,
+  CaretDown,
   CaretRight,
+  Check,
+  Clock,
+  DotsThree,
   Folder,
   FolderOpen,
+  FolderPlus,
+  ListBullets,
+  PencilSimple,
   Plus,
   PushPin,
   PushPinSlash,
+  SortAscending,
   Trash,
 } from "@phosphor-icons/react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import type { ReactNode } from "react";
 
 import { IconTooltip } from "@/components/ui/tooltip";
 import { useCopy } from "@/lib/i18n";
-import { effectiveProjectActivityAt } from "@/lib/projects";
-import { groupSessions } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
 import type { Project, Session } from "@/types/session";
 
-import { SidebarSectionLabel, SidebarTimelineBuckets } from "./SidebarTimeline";
-import { PROJECT_ACTIVE_WINDOW_MS, type ProjectScopePhase } from "./types";
+import { SidebarSessionRow } from "./SidebarSessionRow";
+import type { ProjectScopePhase } from "./types";
 
 export function SidebarProjectReviewPresence({
   phase,
   children,
 }: {
   phase: ProjectScopePhase;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "grid overflow-hidden motion-reduce:transition-none",
-        "transition-[grid-template-rows,opacity,transform]",
-        phase === "entered" &&
-          "grid-rows-[1fr] translate-y-0 opacity-100 duration-200 ease-out",
-        phase === "entering" &&
-          "grid-rows-[0fr] -translate-y-1 opacity-0 duration-200 ease-out",
-        phase === "exiting" &&
-          "grid-rows-[0fr] -translate-y-1 opacity-0 duration-150 ease-in",
+        "transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none",
+        phase === "entered" && "translate-y-0 opacity-100",
+        phase === "entering" && "-translate-y-1 opacity-0",
+        phase === "exiting" && "-translate-y-1 opacity-0",
       )}
     >
-      <div className="min-h-0 overflow-hidden">{children}</div>
+      {children}
     </div>
   );
 }
 
-/**
- * Project Review is a sidebar mode, not a filter banner. It hides the
- * ordinary timeline and turns projects into collapsible peers of the
- * timeline buckets, so users can keep several project drawers open
- * while monitoring running work.
- */
 export function SidebarProjectReview({
   projects,
   sessionsByProjectId,
-  activeProjectFilter,
+  open,
+  allProjectSessionsExpanded,
   expandedProjectIds,
-  reviewNowMs,
   activeId,
   petAttachedSessionId,
+  onToggleOpen,
+  onToggleAllProjectSessions,
+  onNewProject,
   onToggleProjectExpanded,
   onStartProjectConversation,
   onSelectSession,
@@ -75,11 +78,14 @@ export function SidebarProjectReview({
 }: {
   projects: Project[];
   sessionsByProjectId: Map<string, Session[]>;
-  activeProjectFilter?: string;
+  open: boolean;
+  allProjectSessionsExpanded: boolean;
   expandedProjectIds: Set<string>;
-  reviewNowMs: number;
   activeId?: string;
   petAttachedSessionId?: string | null;
+  onToggleOpen?: () => void;
+  onToggleAllProjectSessions?: () => void;
+  onNewProject?: () => void;
   onToggleProjectExpanded?: (id: string) => void;
   onStartProjectConversation?: (id: string) => void;
   onSelectSession?: (id: string) => void;
@@ -98,139 +104,236 @@ export function SidebarProjectReview({
   onDeleteProject?: (id: string) => void;
 }) {
   const copy = useCopy();
-  const [olderProjectsOpen, setOlderProjectsOpen] = useState(false);
-  const activeProjects: Project[] = [];
-  const olderProjects: Project[] = [];
-  const cutoffMs = reviewNowMs - PROJECT_ACTIVE_WINDOW_MS;
-
-  for (const project of projects) {
-    const activityAt = effectiveProjectActivityAt(
-      project,
-      sessionsByProjectId.get(project.id) ?? [],
-    );
-    const activityMs = Date.parse(activityAt);
-    const recentlyActive =
-      Number.isFinite(activityMs) && activityMs >= cutoffMs;
-    if (project.pinned || recentlyActive) activeProjects.push(project);
-    else olderProjects.push(project);
-  }
-
-  const renderProject = (project: Project) => {
-    const expanded = expandedProjectIds.has(project.id);
-    return (
-      <Fragment key={project.id}>
-        <SidebarProjectRow
-          project={project}
-          active={project.id === activeProjectFilter || expanded}
-          expanded={expanded}
-          onClick={() => onToggleProjectExpanded?.(project.id)}
-          onStartConversation={
-            onStartProjectConversation
-              ? () => onStartProjectConversation(project.id)
-              : undefined
-          }
-          onTogglePin={
-            onTogglePinProject
-              ? () => onTogglePinProject(project.id)
-              : undefined
-          }
-          onEdit={onEditProject ? () => onEditProject(project.id) : undefined}
-          onDelete={
-            onDeleteProject ? () => onDeleteProject(project.id) : undefined
-          }
-        />
-        <SidebarProjectDrawer
-          expanded={expanded}
-          project={project}
-          sessions={sessionsByProjectId.get(project.id) ?? []}
-          activeId={activeId}
-          projects={projects}
-          petAttachedSessionId={petAttachedSessionId}
-          onSelectSession={onSelectSession}
-          onArchiveSession={onArchiveSession}
-          onTogglePinSession={onTogglePinSession}
-          onAssignSessionToProject={onAssignSessionToProject}
-          editingSessionId={editingSessionId}
-          onStartProjectConversation={
-            onStartProjectConversation
-              ? () => onStartProjectConversation(project.id)
-              : undefined
-          }
-          onRequestRename={onRequestRename}
-          onConfirmRename={onConfirmRename}
-          onCancelRename={onCancelRename}
-        />
-      </Fragment>
-    );
-  };
+  const toggleAllLabel = allProjectSessionsExpanded
+    ? copy.sidebar.collapseProjectConversations
+    : copy.sidebar.expandProjectConversations;
+  const ToggleAllIcon = allProjectSessionsExpanded
+    ? ArrowsInLineVertical
+    : ArrowsOutLineVertical;
 
   return (
     <section className="pb-2 pt-1">
-      {projects.length === 0 ? (
-        <div className="px-5 py-5 text-[12px] italic text-ink-muted">
-          {copy.sidebar.noProjects}
+      <div className="group/project-header flex h-8 items-center gap-1 px-3">
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          aria-expanded={open}
+          className={cn(
+            "flex min-w-0 items-center gap-1 rounded-sm py-1 text-left text-[12px] font-medium text-ink-muted",
+            "transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+          )}
+        >
+          <span>{copy.sidebar.projects}</span>
+          <CaretDown
+            size={11}
+            weight="bold"
+            className={cn("transition-transform", !open && "-rotate-90")}
+          />
+        </button>
+        <div
+          className={cn(
+            "ml-auto flex items-center gap-0.5 opacity-0 transition-opacity",
+            "group-hover/project-header:opacity-100 focus-within:opacity-100",
+          )}
+        >
+          <IconTooltip text={toggleAllLabel}>
+            <button
+              type="button"
+              onClick={onToggleAllProjectSessions}
+              disabled={!open || projects.length === 0}
+              aria-label={toggleAllLabel}
+              className={cn(
+                "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors",
+                "hover:bg-hover hover:text-ink disabled:cursor-default disabled:opacity-40",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+              )}
+            >
+              <ToggleAllIcon size={13} weight="thin" />
+            </button>
+          </IconTooltip>
+          <ProjectMoreMenu />
+          <IconTooltip text={copy.sidebar.newProject}>
+            <button
+              type="button"
+              onClick={onNewProject}
+              aria-label={copy.sidebar.newProject}
+              className={cn(
+                "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors",
+                "hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+              )}
+            >
+              <FolderPlus size={14} weight="thin" />
+            </button>
+          </IconTooltip>
         </div>
-      ) : (
-        <>
-          {activeProjects.length > 0 && (
-            <>
-              <SidebarSectionLabel>
-                {copy.sidebar.activeProjects}
-              </SidebarSectionLabel>
-              {activeProjects.map(renderProject)}
-            </>
-          )}
-          {olderProjects.length > 0 && (
-            <>
-              <SidebarProjectGroupToggle
-                label={copy.sidebar.olderProjects}
-                count={olderProjects.length}
-                open={olderProjectsOpen}
-                onToggle={() => setOlderProjectsOpen((open) => !open)}
-              />
-              {olderProjectsOpen && olderProjects.map(renderProject)}
-            </>
-          )}
-        </>
-      )}
+      </div>
+
+      {open &&
+        (projects.length === 0 ? (
+          <div className="px-5 py-2 text-[12px] italic text-ink-muted">
+            {copy.sidebar.noProjects}
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {projects.map((project) => {
+              const expanded = expandedProjectIds.has(project.id);
+              return (
+                <div key={project.id}>
+                  <SidebarProjectRow
+                    project={project}
+                    expanded={expanded}
+                    onClick={() => onToggleProjectExpanded?.(project.id)}
+                    onStartConversation={
+                      onStartProjectConversation
+                        ? () => onStartProjectConversation(project.id)
+                        : undefined
+                    }
+                    onTogglePin={
+                      onTogglePinProject
+                        ? () => onTogglePinProject(project.id)
+                        : undefined
+                    }
+                    onEdit={
+                      onEditProject ? () => onEditProject(project.id) : undefined
+                    }
+                    onDelete={
+                      onDeleteProject
+                        ? () => onDeleteProject(project.id)
+                        : undefined
+                    }
+                  />
+                  <SidebarProjectSessionList
+                    expanded={expanded}
+                    project={project}
+                    projects={projects}
+                    sessions={sessionsByProjectId.get(project.id) ?? []}
+                    activeId={activeId}
+                    petAttachedSessionId={petAttachedSessionId}
+                    onSelectSession={onSelectSession}
+                    onArchiveSession={onArchiveSession}
+                    onTogglePinSession={onTogglePinSession}
+                    onAssignSessionToProject={onAssignSessionToProject}
+                    editingSessionId={editingSessionId}
+                    onStartProjectConversation={
+                      onStartProjectConversation
+                        ? () => onStartProjectConversation(project.id)
+                        : undefined
+                    }
+                    onRequestRename={onRequestRename}
+                    onConfirmRename={onConfirmRename}
+                    onCancelRename={onCancelRename}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
     </section>
   );
 }
 
+function ProjectMoreMenu() {
+  const copy = useCopy();
+  const itemClass = cn(
+    "flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-[12.5px] text-ink-soft outline-none transition-colors",
+    "data-[highlighted]:bg-hover data-[highlighted]:text-ink",
+  );
+  const subContentClass =
+    "z-50 min-w-[160px] rounded-md border border-line bg-elevated p-1 shadow-elevated";
 
-function SidebarProjectGroupToggle({
-  label,
-  count,
-  open,
-  onToggle,
-}: {
-  label: string;
-  count: number;
-  open: boolean;
-  onToggle: () => void;
-}) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      className="mx-1.5 mt-3 flex w-[calc(100%-12px)] cursor-pointer items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-hover hover:text-ink-soft"
-    >
-      <CaretRight
-        size={10}
-        weight="thin"
-        className={cn("transition-transform", open && "rotate-90")}
-      />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="text-[10px] font-medium tracking-normal">{count}</span>
-    </button>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={copy.sidebar.projectMenu}
+          className={cn(
+            "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors",
+            "hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+            "data-[state=open]:bg-hover data-[state=open]:text-ink",
+          )}
+        >
+          <DotsThree size={16} weight="bold" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={5}
+          className="z-50 min-w-[176px] rounded-md border border-line bg-elevated p-1 shadow-elevated"
+        >
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger
+              className={cn(
+                itemClass,
+                "data-[state=open]:bg-hover data-[state=open]:text-ink",
+              )}
+            >
+              <ListBullets size={13} weight="thin" />
+              {copy.sidebar.organizeSidebar}
+              <CaretRight size={10} weight="thin" className="ml-auto" />
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                sideOffset={4}
+                className={subContentClass}
+              >
+                <DropdownMenu.Item className={itemClass}>
+                  <Folder size={13} weight="thin" />
+                  {copy.sidebar.organizeByProject}
+                  <Check size={11} weight="bold" className="ml-auto" />
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemClass}>
+                  <FolderOpen size={13} weight="thin" />
+                  {copy.sidebar.organizeRecentProjects}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemClass}>
+                  <Clock size={13} weight="thin" />
+                  {copy.sidebar.organizeByTime}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemClass}>
+                  <ArrowDown size={13} weight="thin" />
+                  {copy.sidebar.organizeMoveDown}
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Sub>
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger
+              className={cn(
+                itemClass,
+                "data-[state=open]:bg-hover data-[state=open]:text-ink",
+              )}
+            >
+              <SortAscending size={13} weight="thin" />
+              {copy.sidebar.sortSidebar}
+              <CaretRight size={10} weight="thin" className="ml-auto" />
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                sideOffset={4}
+                className={subContentClass}
+              >
+                <DropdownMenu.Item className={itemClass}>
+                  <Clock size={13} weight="thin" />
+                  {copy.sidebar.sortByCreatedAt}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemClass}>
+                  <Clock size={13} weight="thin" />
+                  {copy.sidebar.sortByUpdatedAt}
+                  <Check size={11} weight="bold" className="ml-auto" />
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Sub>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
-
 function SidebarProjectRow({
   project,
-  active,
   expanded,
   onClick,
   onStartConversation,
@@ -239,16 +342,11 @@ function SidebarProjectRow({
   onDelete,
 }: {
   project: Project;
-  active: boolean;
   expanded?: boolean;
   onClick?: () => void;
   onStartConversation?: () => void;
   onTogglePin?: () => void;
   onEdit?: () => void;
-  /** Right-click → Delete project. Sits below a separator + uses
-   * destructive (red) styling to make accidental clicks harder. The
-   * actual confirm dialog still runs in the parent — this just
-   * opens it. */
   onDelete?: () => void;
 }) {
   const copy = useCopy();
@@ -256,7 +354,8 @@ function SidebarProjectRow({
   const newConversationTitle = copy.sidebar.newConversationInProjectTitle(
     project.name,
   );
-  const row = (
+
+  return (
     <div
       role="button"
       tabIndex={0}
@@ -269,119 +368,150 @@ function SidebarProjectRow({
         }
       }}
       className={cn(
-        "group mx-1.5 flex w-[calc(100%-12px)] cursor-pointer items-center gap-2.5 rounded-sm px-3 py-1.5 text-left text-[13px] outline-none",
-        "transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-brand/30",
-        active ? "bg-selected text-ink" : "text-ink hover:bg-hover",
+        "group/project-row mx-1.5 grid min-h-8 w-[calc(100%-12px)] cursor-pointer grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1",
+        "text-left text-[13px] text-ink-soft outline-none transition-[background-color,color]",
+        "hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/30",
       )}
     >
       <ProjectIcon
-        size={14}
+        size={15}
         weight="thin"
         className={cn(
           "shrink-0 transition-colors",
-          expanded ? "text-brand-strong" : "text-ink-muted",
+          expanded ? "text-ink-soft" : "text-ink-muted",
         )}
       />
-      <span className="min-w-0 flex-1 truncate">{project.name}</span>
-      {project.pinned && (
-        <PushPin
-          size={10}
-          weight="fill"
-          className="shrink-0 text-ink-muted"
-          aria-label="pinned"
+      <span className="min-w-0 truncate">{project.name}</span>
+      <div
+        className={cn(
+          "flex items-center gap-0.5 opacity-0 transition-opacity",
+          "group-hover/project-row:opacity-100 focus-within:opacity-100",
+        )}
+      >
+        <ProjectRowMenu
+          project={project}
+          onTogglePin={onTogglePin}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
-      )}
-      {onStartConversation && (
-        <IconTooltip text={newConversationTitle}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartConversation();
-            }}
-            aria-label={newConversationTitle}
-            className={cn(
-              "-mr-2 inline-flex size-[32px] shrink-0 items-center justify-center rounded-sm",
-              "pointer-events-none text-ink-muted opacity-0 transition-[background-color,color,opacity] duration-75",
-              "group-hover:pointer-events-auto group-hover:text-ink-soft group-hover:opacity-100",
-              "hover:bg-hover hover:text-ink active:bg-selected/60",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
-              active && "pointer-events-auto text-ink-soft opacity-100",
-            )}
-          >
-            <Plus size={13} weight="thin" />
-          </button>
-        </IconTooltip>
-      )}
+        {onStartConversation && (
+          <IconTooltip text={newConversationTitle}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartConversation();
+              }}
+              aria-label={newConversationTitle}
+              className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-selected hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+            >
+              <PencilSimple size={13} weight="thin" />
+            </button>
+          </IconTooltip>
+        )}
+      </div>
     </div>
   );
+}
 
-  if (!onTogglePin && !onEdit && !onDelete) return row;
-
+function ProjectRowMenu({
+  project,
+  onTogglePin,
+  onEdit,
+  onDelete,
+}: {
+  project: Project;
+  onTogglePin?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  const copy = useCopy();
   const itemClass = cn(
     "flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-[12.5px] text-ink-soft outline-none transition-colors",
     "data-[highlighted]:bg-hover data-[highlighted]:text-ink",
+    "data-[disabled]:cursor-default data-[disabled]:opacity-45",
   );
   const destructiveItemClass = cn(
     "flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-[12.5px] text-error outline-none transition-colors",
     "data-[highlighted]:bg-error/10 data-[highlighted]:text-error",
   );
+  const openProjectFolder = () => {
+    const rootPath = project.rootPath?.trim();
+    if (!rootPath) return;
+    void revealItemInDir(rootPath);
+  };
 
   return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>{row}</ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={copy.sidebar.projectMenu}
+          onClick={(e) => e.stopPropagation()}
           className={cn(
-            "z-50 min-w-[160px] rounded-md border border-line bg-elevated p-1 shadow-elevated",
+            "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted transition-colors",
+            "hover:bg-selected hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
+            "data-[state=open]:bg-selected data-[state=open]:text-ink",
           )}
         >
+          <DotsThree size={16} weight="bold" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={5}
+          onClick={(e) => e.stopPropagation()}
+          className="z-50 min-w-[176px] rounded-md border border-line bg-elevated p-1 shadow-elevated"
+        >
           {onTogglePin && (
-            <ContextMenu.Item onSelect={onTogglePin} className={itemClass}>
+            <DropdownMenu.Item onSelect={onTogglePin} className={itemClass}>
               {project.pinned ? (
-                <>
-                  <PushPinSlash size={13} weight="thin" />
-                  {copy.sidebar.unpin}
-                </>
+                <PushPinSlash size={13} weight="thin" />
               ) : (
-                <>
-                  <PushPin size={13} weight="thin" />
-                  {copy.sidebar.pin}
-                </>
+                <PushPin size={13} weight="thin" />
               )}
-            </ContextMenu.Item>
+              {project.pinned ? copy.sidebar.unpinProject : copy.sidebar.pinProject}
+            </DropdownMenu.Item>
           )}
+          <DropdownMenu.Item
+            onSelect={openProjectFolder}
+            disabled={!project.rootPath?.trim()}
+            className={itemClass}
+          >
+            <FolderOpen size={13} weight="thin" />
+            {copy.sidebar.openProjectInExplorer}
+          </DropdownMenu.Item>
           {onEdit && (
-            <ContextMenu.Item onSelect={onEdit} className={itemClass}>
-              <FolderOpen size={13} weight="thin" />
-              {copy.sidebar.editProject}
-            </ContextMenu.Item>
+            <DropdownMenu.Item onSelect={onEdit} className={itemClass}>
+              <PencilSimple size={13} weight="thin" />
+              {copy.sidebar.renameProject}
+            </DropdownMenu.Item>
           )}
           {onDelete && (
             <>
-              <ContextMenu.Separator className="my-1 h-px bg-line" />
-              <ContextMenu.Item
+              <DropdownMenu.Separator className="my-1 h-px bg-line" />
+              <DropdownMenu.Item
                 onSelect={onDelete}
                 className={destructiveItemClass}
               >
                 <Trash size={13} weight="thin" />
-                {copy.sidebar.deleteProject}
-              </ContextMenu.Item>
+                {copy.sidebar.removeProject}
+              </DropdownMenu.Item>
             </>
           )}
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
-
-function SidebarProjectDrawer({
+function SidebarProjectSessionList({
   expanded,
   project,
+  projects,
   sessions,
   activeId,
-  projects,
   petAttachedSessionId,
   onSelectSession,
   onArchiveSession,
@@ -395,9 +525,9 @@ function SidebarProjectDrawer({
 }: {
   expanded: boolean;
   project: Project;
+  projects: Project[];
   sessions: Session[];
   activeId?: string;
-  projects: Project[];
   petAttachedSessionId?: string | null;
   onSelectSession?: (id: string) => void;
   onArchiveSession?: (id: string) => void;
@@ -412,55 +542,69 @@ function SidebarProjectDrawer({
   onConfirmRename: (id: string, newTitle: string) => void;
   onCancelRename: () => void;
 }) {
-  const projectBuckets = groupSessions(sessions);
-  const projectEmpty = sessions.length === 0;
-
   return (
     <div
       className={cn(
-        "grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-        expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr] duration-150 ease-in",
+        "grid overflow-hidden transition-[grid-template-rows] duration-150 ease-out motion-reduce:transition-none",
+        expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
       )}
     >
       <div className="min-h-0 overflow-hidden">
         <div
           className={cn(
-            "ml-6 mr-1.5 border-l border-brand/35 pb-2 pl-1",
-            "transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none",
-            expanded
-              ? "translate-y-0 opacity-100 delay-[35ms]"
-              : "-translate-y-1 opacity-0",
-            !expanded && "pointer-events-none delay-0 duration-100 ease-in",
+            "pb-1",
+            "transition-opacity duration-100",
+            expanded ? "opacity-100" : "pointer-events-none opacity-0",
           )}
         >
-          {projectEmpty ? (
+          {sessions.length === 0 ? (
             <SidebarProjectEmptyHint
               project={project}
               onStartProjectConversation={onStartProjectConversation}
             />
           ) : (
-            <SidebarTimelineBuckets
-              buckets={projectBuckets}
-              activeId={activeId}
-              projects={projects}
-              petAttachedSessionId={petAttachedSessionId}
-              onSelectSession={onSelectSession}
-              onArchiveSession={onArchiveSession}
-              onTogglePinSession={onTogglePinSession}
-              onAssignSessionToProject={onAssignSessionToProject}
-              editingSessionId={editingSessionId}
-              collapseEarlier={false}
-              onRequestRename={onRequestRename}
-              onConfirmRename={onConfirmRename}
-              onCancelRename={onCancelRename}
-            />
+            sessions.map((session) => (
+              <SidebarSessionRow
+                key={session.id}
+                session={session}
+                active={session.id === activeId}
+                petAttached={session.id === petAttachedSessionId}
+                projects={projects}
+                nestedProject
+                onClick={() => onSelectSession?.(session.id)}
+                onArchive={
+                  onArchiveSession
+                    ? () => onArchiveSession(session.id)
+                    : undefined
+                }
+                onTogglePin={
+                  onTogglePinSession
+                    ? () => onTogglePinSession(session.id)
+                    : undefined
+                }
+                onRemoveFromProject={
+                  onAssignSessionToProject
+                    ? () => onAssignSessionToProject(session.id, null)
+                    : undefined
+                }
+                isEditing={editingSessionId === session.id}
+                onRequestRename={
+                  onRequestRename
+                    ? () => onRequestRename(session.id)
+                    : undefined
+                }
+                onConfirmRename={(newTitle) =>
+                  onConfirmRename(session.id, newTitle)
+                }
+                onCancelRename={onCancelRename}
+              />
+            ))
           )}
         </div>
       </div>
     </div>
   );
 }
-
 
 function SidebarProjectEmptyHint({
   project,
@@ -476,7 +620,7 @@ function SidebarProjectEmptyHint({
   );
   if (!onStartProjectConversation) {
     return (
-      <div className="mx-1.5 mt-3 flex w-[calc(100%-12px)] items-center gap-2 rounded-sm border border-line/70 bg-elevated/55 px-3 py-2 text-[12px] font-medium text-ink-muted">
+      <div className="mx-1.5 flex h-8 w-[calc(100%-12px)] items-center gap-2 rounded-md py-1 pl-8 pr-2.5 text-[12px] text-ink-muted">
         <Plus size={12} weight="thin" className="shrink-0" />
         <span className="min-w-0 flex-1 truncate">{label}</span>
       </div>
@@ -490,9 +634,8 @@ function SidebarProjectEmptyHint({
         onClick={onStartProjectConversation}
         aria-label={newConversationTitle}
         className={cn(
-          "mx-1.5 mt-3 flex w-[calc(100%-12px)] cursor-pointer items-center gap-2 rounded-sm border border-line/70 bg-elevated/55 px-3 py-2 text-left",
-          "text-[12px] font-medium text-ink-soft transition-[background-color,border-color,color]",
-          "hover:border-brand/35 hover:bg-selected/70 hover:text-ink",
+          "mx-1.5 flex h-8 w-[calc(100%-12px)] cursor-pointer items-center gap-2 rounded-md py-1 pl-8 pr-2.5 text-left",
+          "text-[12px] font-medium text-ink-muted transition-colors hover:bg-hover hover:text-ink",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30",
         )}
       >

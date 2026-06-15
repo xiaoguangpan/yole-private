@@ -197,6 +197,11 @@ Rules:
 - The success test must be deterministic and model-free: verify extension
   layout, bridge connection, tab discovery, and a minimal JavaScript execution
   such as reading `document.title`.
+- Browser Control probes must tolerate Chromium MV3 service-worker wake-up and
+  reconnect timing, especially on Windows. Do not collapse the probe window
+  back to a few seconds unless the extension has an equivalent immediate
+  wake-up path. Fast recovery should come from an in-worker retry while it is
+  awake; `chrome.alarms` is only a 30-second-level fallback.
 - After the test succeeds, Yole may offer a beginner demo. In Chinese UI,
   use Baidu for the weather-search demo to avoid making Google reachability
   part of the setup experience. The demo should validate the managed GA browser
@@ -796,8 +801,14 @@ Recommended source strategy:
 managed-ga/manifest.json        # pinned upstream baseline
 managed-ga/code/                # generated code-only payload
 managed-ga/patches/
-  0001-yole-prompt-composition.patch
-  0002-yole-managed-state-dir.patch
+  0001-managed-state-root.patch
+  0002-repair-windows-path-tool-json.patch
+  0003-normalize-asset-path-joins.patch
+  0004-managed-wechat-state-paths.patch
+  0005-code-run-noninteractive-stdin.patch
+  0006-managed-browser-control-recovery.patch
+  0007-managed-codex-backend.patch
+  0008-yole-multimodal-routing-and-image-tools.patch
 managed-ga/patches/manifest.md
 scripts/build-managed-ga.sh
 ```
@@ -1027,7 +1038,12 @@ Current implementation slice:
   the pinned baseline. `mykey.py`, `mykey.json`, `memory`, `skills`, `temp`, and
   `model_responses` are excluded.
 - `scripts/build-managed-ga.sh` reapplies `managed-ga/patches/*.patch` after
-  copying the upstream baseline, so Yole-managed changes are replayable.
+  copying and normalizing the upstream baseline, so Yole-managed changes are
+  replayable.
+- `scripts/check-managed-ga-replay.mjs` verifies that the normalized
+  `managed-ga/code` payload matches the pinned upstream checkout plus the
+  registered patch stack. It requires a clean GenericAgent checkout at the
+  manifest commit and catches unregistered direct edits.
 - `0001-managed-state-root.patch` redirects managed GA memory, temp, model
   response logs, and `/continue` log lookup to `YOLE_GA_STATE_ROOT`.
 - GUI bridge spawns now include `runtimeKind`; managed spawns are resolved in
@@ -1243,6 +1259,8 @@ Scope:
 Acceptance:
 
 - Local release-prep can run `node scripts/check-managed-ga-payload.mjs`.
+- Local managed-runtime prep can run
+  `node scripts/check-managed-ga-replay.mjs <GenericAgent checkout>`.
 - Local package-prep can run
   `node scripts/check-managed-ga-app-bundle.mjs <Yole.app>`.
 - `check.yml` runs the managed GA payload gate on macOS and Windows.
@@ -1272,6 +1290,10 @@ Current implementation slice:
   recursively rejects generated / local / secret / user-state artifacts.
   It also verifies `state-seed/memory` contains the critical GA memory/SOP
   defaults and does not contain generated long-term memory files.
+- `scripts/check-managed-ga-replay.mjs` copies a clean GenericAgent checkout at
+  the pinned manifest commit into a temporary directory, normalizes text files,
+  applies the registered patch stack, and compares the normalized result with
+  `managed-ga/code`.
 - `scripts/prepare-cli-sidecar.sh` builds `yole-cli` for the target triple
   and places it at the Tauri `externalBin` source path.
 - `scripts/check-managed-ga-app-bundle.mjs` inspects the finished macOS

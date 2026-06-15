@@ -13,10 +13,13 @@ import (
 
 type Record struct {
 	InstallID    string `json:"install_id"`
+	DeviceIDHash string `json:"device_id_hash,omitempty"`
 	AccountToken string `json:"account_token"`
 	SupportID    string `json:"support_id"`
 	UserID       int    `json:"user_id"`
 	Username     string `json:"username"`
+	UserGroup    string `json:"user_group,omitempty"`
+	RouteProfile string `json:"route_profile,omitempty"`
 	ConsumerKey  string `json:"consumer_key"`
 	TokenID      int    `json:"token_id"`
 	CreatedAt    string `json:"created_at"`
@@ -45,6 +48,17 @@ func (s *Store) GetByInstallID(installID string) (Record, bool) {
 	defer s.mu.Unlock()
 	rec, ok := s.data[installID]
 	return rec, ok
+}
+
+func (s *Store) GetByDeviceIDHash(deviceIDHash string) (Record, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, rec := range s.data {
+		if rec.DeviceIDHash == deviceIDHash {
+			return rec, true
+		}
+	}
+	return Record{}, false
 }
 
 func (s *Store) GetByAccountToken(token string) (Record, bool) {

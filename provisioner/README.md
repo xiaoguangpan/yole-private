@@ -11,6 +11,7 @@ registration. The NewAPI admin credential stays only on the provisioner server.
 ```text
 POST /api/register
 GET  /api/account/status
+GET  /api/runtime/route
 GET  /assets/contact/wechat-qr
 GET  /healthz
 ```
@@ -21,7 +22,7 @@ Register request:
 {
   "install_id": "local-random-id",
   "device_id_hash": "optional-device-hash",
-  "app_version": "0.2.7",
+  "app_version": "0.0.7",
   "os": "windows",
   "arch": "x64"
 }
@@ -33,21 +34,34 @@ Register response:
 {
   "newapi_base_url": "https://na.itxgp.com/v1",
   "token": "sk-...",
-  "default_model": "gpt-5.5",
+  "default_model": "deepseek-v4-pro",
   "account": {
     "account_token": "yole_acct_...",
-    "support_id": "yole-42",
+    "support_id": "yole_abcd1234",
     "user_id": 42,
     "username": "yole_abcd1234",
-    "balance_usd": 50,
-    "quota_points": 25000000,
+    "balance_usd": 30,
+    "quota_points": 15000000,
+    "balance_points": 3000,
+    "initial_grant_points": 3000,
+    "low_balance_points": 300,
+    "points_unit": "积分",
     "low_balance": false,
     "contact": {
       "wechat_id": "replace-with-wechat-id",
       "wechat_qr_url": "https://example.com/assets/contact/wechat-qr",
       "overseas": "support@example.com",
-      "top_up_message": "AI 余额不足。联系客服可追加 50 美元体验额度。微信号：replace-with-wechat-id"
+      "top_up_message": "AI 积分不足。联系客服可追加 3000 积分体验额度。微信号：replace-with-wechat-id"
     }
+  },
+  "route_version": "2026-06-14.1",
+  "model_routing": {
+    "schema_version": 1,
+    "profile_id": "yole_standard",
+    "conversation": ["deepseek-v4-pro", "qwen3.7-plus"],
+    "vision": ["qwen3.7-plus"],
+    "image_generation": ["gpt-image-2"],
+    "image_editing": ["gpt-image-2"]
   }
 }
 ```
@@ -62,7 +76,8 @@ The provisioner uses an admin/system access token to:
 
 1. Create a NewAPI user for the Yole install.
 2. Move that user into the `yole` group.
-3. Add `$50` of trial balance (`25,000,000` quota points).
+3. Add 3000 Yole points worth of trial balance (30 NewAPI balance units,
+   internally `15,000,000` quota points).
 4. Log in as that user and create one default token with:
    `unlimited_quota: true`, `expired_time: -1`, and `group: yole`.
 
@@ -70,10 +85,13 @@ Required NewAPI settings:
 
 - The admin access token must be valid for `newapi.admin_user_id` and able to
   create/update users, add quota, and read user status.
-- The `yole` user group must exist and be allowed to use the configured model.
+- The `yole` user group must exist and be allowed to use the configured route
+  models.
 - The `yole` token group should exist or be accepted by NewAPI token creation.
-- The configured model, currently `gpt-5.5`, must be available to the `yole`
-  group and have pricing configured in NewAPI.
+- The configured route models must be available to their intended NewAPI groups:
+  `yole` for standard users and `vip` for VIP users. NewAPI handles same-model
+  upstream fallback; Yole handles cross-model fallback and image-understanding
+  routing.
 - Password login must be enabled for provisioner-created users, because the
   service creates the consumer token through that user's own session.
 
@@ -93,6 +111,7 @@ Environment variables override config values:
 
 ```text
 YOLE_PROVISIONER_LISTEN
+YOLE_PUBLIC_BASE_URL
 YOLE_NEWAPI_BASE_URL
 YOLE_NEWAPI_ADMIN_TOKEN
 YOLE_NEWAPI_ADMIN_USER_ID
@@ -104,6 +123,8 @@ YOLE_TRIAL_USER_GROUP
 YOLE_TRIAL_TOKEN_GROUP
 YOLE_TRIAL_DEFAULT_MODEL
 YOLE_TRIAL_ALLOWED_MODELS
+YOLE_POINTS_PER_USD
+YOLE_POINTS_UNIT
 YOLE_CONTACT_WECHAT_ID
 YOLE_CONTACT_WECHAT_QR_PATH
 YOLE_CONTACT_OVERSEAS

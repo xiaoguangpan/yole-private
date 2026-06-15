@@ -10,7 +10,7 @@ use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use ring::rand::{SecureRandom, SystemRandom};
 
 use crate::db::{ManagedModelSecretRow, SqliteYole};
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 
 const KEY_ID: &str = "local-sqlite-v1";
 const ALGORITHM: &str = "aes-256-gcm";
@@ -29,8 +29,7 @@ pub async fn set_secret(yole: &SqliteYole, api_key_ref: &str, secret: &str) -> R
     let key_material = ensure_local_key(yole).await?;
     let nonce = random_nonce()?;
     let ciphertext = encrypt(&key_material, &nonce, api_key_ref, secret.as_bytes())?;
-    yole
-        .upsert_managed_model_secret(api_key_ref, KEY_ID, ALGORITHM, &nonce, &ciphertext)
+    yole.upsert_managed_model_secret(api_key_ref, KEY_ID, ALGORITHM, &nonce, &ciphertext)
         .await
 }
 
@@ -63,8 +62,7 @@ async fn ensure_local_key(yole: &SqliteYole) -> Result<Vec<u8>> {
     }
 
     let candidate = random_key()?;
-    yole
-        .insert_managed_model_secret_key(KEY_ID, &candidate)
+    yole.insert_managed_model_secret_key(KEY_ID, &candidate)
         .await?;
     let stored = yole
         .managed_model_secret_key(KEY_ID)

@@ -212,6 +212,7 @@ def test_default_approval_tools_set() -> None:
             "code_run",
             "file_write",
             "file_patch",
+            "yole_image_generate",
             "start_long_term_update",
         }
     )

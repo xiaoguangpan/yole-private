@@ -1,0 +1,660 @@
+diff --git a/README.md b/README.md
+index 3b8b06d..8bcabde 100644
+--- a/README.md
++++ b/README.md
+@@ -388,12 +388,6 @@ Thanks to the **LinuxDo** community for the support!
+ 
+ [![LinuxDo](https://img.shields.io/badge/Community-LinuxDo-blue?style=for-the-badge)](https://linux.do/)
+ 
+-**Community GUIs** *(independent open-source projects)*:
+-
+-- [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
+-- [wangjc683/galley](https://github.com/wangjc683/galley)
+-- [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
+-
+ ---
+ 
+ ## 📄 License
+@@ -762,12 +756,6 @@ GenericAgent 通过 **分层记忆 × 最小工具集 × 自主执行循环** 
+ 
+ [![LinuxDo](https://img.shields.io/badge/社区-LinuxDo-blue?style=for-the-badge)](https://linux.do/)
+ 
+-**社区 GUI 客户端** *（独立开源项目）*：
+-
+-- [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
+-- [wangjc683/galley](https://github.com/wangjc683/galley)
+-- [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
+-
+ ---
+ 
+ ## 📄 许可
+diff --git a/TMWebDriver.py b/TMWebDriver.py
+index 4322f61..cca9a69 100644
+--- a/TMWebDriver.py
++++ b/TMWebDriver.py
+@@ -102,6 +102,10 @@ class TMWebDriver:
+                     return json.dumps({'r': result}, ensure_ascii=False)
+                 except Exception as e:
+                     return json.dumps({'r': {'error': str(e)}}, ensure_ascii=False)
++            if data.get('cmd') == 'create_tab':
++                url = data.get('url')
++                active = data.get('active', True)
++                return json.dumps({'r': self.create_tab(url, active=active)}, ensure_ascii=False)
+             return 'ok'
+         def run():
+             from wsgiref.simple_server import make_server, WSGIServer, WSGIRequestHandler
+@@ -252,6 +256,29 @@ class TMWebDriver:
+         if newtabs: rr['newTabs'] = newtabs
+         return rr
+ 
++    def create_tab(self, url, active=True, timeout=10):
++        if self.is_remote:
++            response = self._remote_cmd({"cmd": "create_tab", "url": url, "active": active}).get('r', {})
++            if response.get('error'): raise Exception(response['error'])
++            return response
++        if not self.extension_client:
++            raise RuntimeError("Browser extension is not connected")
++        exec_id = str(uuid.uuid4())
++        payload = json.dumps({
++            'id': exec_id,
++            'code': json.dumps({'cmd': 'tabs', 'method': 'create', 'url': url, 'active': active})
++        })
++        self.extension_client.send_message(payload)
++        start_time = time.time()
++        while exec_id not in self.results:
++            time.sleep(0.2)
++            if time.time() - start_time > timeout:
++                raise TimeoutError("No response creating browser tab")
++        result = self.results.pop(exec_id)
++        if exec_id in self.acks: self.acks.pop(exec_id)
++        if not result['success']: raise Exception(result['data'])
++        return {'data': result['data'], 'newTabs': result.get('newTabs', [])}
++
+     def _remote_cmd(self, cmd):
+         try: return requests.post(self.remote, headers={"Content-Type": "application/json"}, json=cmd, timeout=30).json()
+         except (ConnectionError, requests.exceptions.ConnectionError):
+@@ -299,7 +326,13 @@ class TMWebDriver:
+         print(f"成功设置默认会话: {self.default_session_id}: {info['url']}")
+         return self.default_session_id
+ 
+-    def jump(self, url, timeout=10): self.execute_js(f"window.location.href='{url}'", timeout=timeout)
++    def jump(self, url, timeout=10):
++        try:
++            return self.create_tab(url, active=True, timeout=timeout)
++        except Exception as e:
++            print(f"Create-tab failed, replacing current tab instead: {e}")
++            safe_url = json.dumps(str(url))
++            return self.execute_js(f"window.location.href={safe_url}", timeout=timeout)
+ 
+ if __name__ == "__main__":
+     driver = TMWebDriver(host='127.0.0.1', port=18765)
+diff --git a/agentmain.py b/agentmain.py
+index bee4051..d4274e0 100644
+--- a/agentmain.py
++++ b/agentmain.py
+@@ -1,4 +1,4 @@
+-import os, sys, threading, queue, time, json, re, random, locale
++import os, sys, threading, queue, time, json, re, random, locale, base64, mimetypes
+ os.environ.setdefault('GA_LANG', 'zh' if any(k in (locale.getlocale()[0] or '').lower() for k in ('zh', 'chinese')) else 'en')
+ if sys.stdout is None: sys.stdout = open(os.devnull, "w")
+ elif hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(errors='replace')
+@@ -48,6 +48,30 @@ def get_system_prompt():
+     prompt += get_global_memory()
+     return prompt
+ 
++def build_user_content(text, images=None):
++    images = [str(p).strip() for p in (images or []) if str(p).strip()]
++    if not images:
++        return None
++    parts = [{"type": "text", "text": text}]
++    for image_path in images:
++        try:
++            if not os.path.isfile(image_path):
++                continue
++            mime = mimetypes.guess_type(image_path)[0] or "image/png"
++            with open(image_path, "rb") as f:
++                data = base64.b64encode(f.read()).decode("ascii")
++            parts.append({
++                "type": "image",
++                "source": {
++                    "type": "base64",
++                    "media_type": mime,
++                    "data": data,
++                },
++            })
++        except Exception as e:
++            parts.append({"type": "text", "text": f"[Image unavailable: {image_path} ({e})]"})
++    return parts if len(parts) > 1 else None
++
+ class GenericAgent:
+     def __init__(self):
+         os.makedirs(state_path('temp'), exist_ok=True)
+@@ -138,11 +162,13 @@ class GenericAgent:
+             task = self.task_queue.get()
+             if isinstance(task, str): break
+             raw_query, source, display_queue = task["query"], task["source"], task["output"]
++            images = task.get("images") or []
+             raw_query = self._handle_slash_cmd(raw_query, display_queue)
+             if raw_query is None:
+                 self.task_queue.task_done(); continue
+             self.is_running = True
+-            if len(raw_query) > 1500:
++            initial_user_content = build_user_content(raw_query, images)
++            if initial_user_content is None and len(raw_query) > 1500:
+                 task_file = state_path('temp', f'user_prompt_{int(time.time())}.md')
+                 with open(task_file, 'w', encoding='utf-8') as f: f.write(raw_query)
+                 raw_query = f'Long user prompt saved to {task_file}. Read and execute.'
+@@ -164,7 +190,9 @@ class GenericAgent:
+                 self.llmclient.backend.stream = False
+                 self.llmclient.backend.read_timeout = max(self.llmclient.backend.read_timeout, 1200)
+             gen = agent_runner_loop(self.llmclient, sys_prompt, raw_query, handler, TOOLS_SCHEMA,
+-                                    max_turns=80, verbose=self.verbose, yield_info=True)
++                                    max_turns=80, verbose=self.verbose,
++                                    initial_user_content=initial_user_content,
++                                    yield_info=True)
+             try:
+                 full_resp = ""; last_pos = 0; curr_turn = 0; turn_resps = []
+                 for chunk in gen:
+diff --git a/assets/sys_prompt.txt b/assets/sys_prompt.txt
+index de0fc7f..4fb6d00 100644
+--- a/assets/sys_prompt.txt
++++ b/assets/sys_prompt.txt
+@@ -4,3 +4,4 @@
+ 调用工具前先推演：当前阶段、上步结果是否符合预期、下步策略，必须在回复文本中用<summary>输出极简总结。
+ - 探测优先：失败时先充分获取信息（日志/状态/上下文），关键信息存入工作记忆，再决定重试或换方案。不可逆操作先询问用户。
+ - 失败升级：1次→读错误理解原因，2次→探测环境状态，3次→深度分析后换方案或问用户。禁止无新信息的重复操作。
++- 图片优先直接理解：用户通过 Yole 输入框发送的图片已经进入多模态上下文时，先基于视觉内容直接回答；只有小字精确摘录、视觉不确定、或确实需要机器校验时，才补充 OCR / 文件工具。
+diff --git a/assets/sys_prompt_en.txt b/assets/sys_prompt_en.txt
+index 9c4c875..36f040e 100644
+--- a/assets/sys_prompt_en.txt
++++ b/assets/sys_prompt_en.txt
+@@ -5,3 +5,4 @@ Summarize and reply in user's language or follow user's prompt.
+ Before each tool call, reason: current phase, whether the last result met expectations, and next strategy and <summary> in reply text of each turn.
+ - Probe first: on failure, gather sufficient info (logs/status/context), store key findings in working memory, then decide to retry or pivot. Ask the user before irreversible operations.
+ - Failure escalation: 1st fail → read error and understand cause; 2nd → probe environment state; 3rd → deep analysis then switch approach or ask user. Never repeat an action without new information.
++- Images first: when the user sends images through the Yole composer and they are present in the multimodal context, inspect the image directly before using OCR or file tools. Use OCR/tools only for tiny text, exact transcription, uncertainty, or explicit verification.
+diff --git a/assets/tools_schema.json b/assets/tools_schema.json
+index 06a5294..e72e17d 100644
+--- a/assets/tools_schema.json
++++ b/assets/tools_schema.json
+@@ -52,6 +52,16 @@
+       "no_monitor": {"type": "boolean", "description": "Skip page change monitoring, saves 2-3s. Only for reads, not for page actions"},
+       "switch_tab_id": {"type": "string", "description": "[Optional] Tab ID to switch to before executing"}}}
+   }},
++  {"type": "function", "function": {
++    "name": "yole_image_generate",
++    "description": "Generate real raster images with Yole's configured image model. Use when the user asks to create images, visual assets, product/ecommerce images, website illustrations, posters, logos drafts, or when a website/app task needs original imagery instead of local placeholder drawing",
++    "parameters": {"type": "object", "properties": {
++      "prompt": {"type": "string", "description": "Detailed image prompt. Include subject, style, composition, colors, text constraints, and intended use"},
++      "size": {"type": "string", "enum": ["1024x1024", "1024x1536", "1536x1024"], "description": "Image size", "default": "1024x1024"},
++      "quality": {"type": "string", "description": "Optional provider quality value"},
++      "n": {"type": "integer", "description": "Number of images, 1-4", "default": 1},
++      "model": {"type": "string", "description": "Optional image model override; default is configured by Yole"}}}
++  }},
+   {"type": "function", "function": {
+     "name": "update_working_checkpoint",
+     "description": "Short-term working notepad, auto-injected each turn to prevent info loss in long tasks. Call during early/mid stages, not at end. When: (1) after reading SOP, store user needs & key constraints (skip for simple 1-2 step tasks); (2) before subtask switch or context flush; (3) after repeated failures, re-read SOP and must store new findings; (4) on new task, update content, clear old progress but keep valid constraints.\n\nDon't call: simple tasks (1-2 steps), task completed (use long-term memory tool)",
+diff --git a/assets/tools_schema_cn.json b/assets/tools_schema_cn.json
+index 1362edc..3c94e7a 100644
+--- a/assets/tools_schema_cn.json
++++ b/assets/tools_schema_cn.json
+@@ -52,6 +52,16 @@
+       "no_monitor": {"type": "boolean", "description": "跳过页面变更监控，省2-3秒。仅在纯读取信息时设置，页面操作时不要设置"},
+       "switch_tab_id": {"type": "string", "description": "可选的标签页 ID，切换到该标签页执行"}}}
+   }},
++  {"type": "function", "function": {
++    "name": "yole_image_generate",
++    "description": "使用 Yole 配置的图片模型生成真实位图图片。用户要求做图、视觉素材、电商图、官网配图、海报、Logo 草案，或网站/应用需要原创配图而不是本地占位绘制时使用",
++    "parameters": {"type": "object", "properties": {
++      "prompt": {"type": "string", "description": "详细图片提示词，包含主体、风格、构图、色彩、文字限制和用途"},
++      "size": {"type": "string", "enum": ["1024x1024", "1024x1536", "1536x1024"], "description": "图片尺寸", "default": "1024x1024"},
++      "quality": {"type": "string", "description": "可选的服务商质量参数"},
++      "n": {"type": "integer", "description": "生成数量，1-4", "default": 1},
++      "model": {"type": "string", "description": "可选图片模型覆盖；默认由 Yole 配置"}}}
++  }},
+   {"type": "function", "function": {
+     "name": "update_working_checkpoint",
+     "description": "短期工作便签，每轮自动注入上下文，防长任务信息丢失。前中期调用，非结束时。何时调用：(1)任务开始读SOP后，存用户需求和关键约束/参数（简单1-2步任务除外）；(2)子任务切换或上下文即将被冲刷前；(3)多次重试失败后，重读SOP并必须调用存储新发现；(4)切换新任务时更新内容，清旧进度但保留仍有效的约束。\n\n何时不调用：简单任务（1-2步且无严重约束）、任务已完成时（应当用长期结算工具）",
+diff --git a/ga.py b/ga.py
+index 67c072c..c53f040 100644
+--- a/ga.py
++++ b/ga.py
+@@ -1,4 +1,4 @@
+-import sys, os, re, json, time, threading, importlib
++import sys, os, re, json, time, threading, importlib, base64, uuid, requests
+ from datetime import datetime
+ from pathlib import Path
+ import tempfile, traceback, subprocess, itertools, collections, difflib, shutil
+@@ -9,11 +9,32 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+ from agent_loop import BaseHandler, StepOutcome, json_default
+ script_dir = os.path.dirname(os.path.abspath(__file__))
+ state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
++YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
+ def state_path(*parts):
+     return os.path.join(state_dir, *parts)
+ def asset_path(*parts):
+     return os.path.join(script_dir, 'assets', *parts)
+ 
++def auto_make_url(api_base, path):
++    base = str(api_base or "").rstrip("/")
++    path = str(path or "").lstrip("/")
++    if base.endswith("/v1"):
++        return f"{base}/{path}"
++    return f"{base}/v1/{path}"
++
++def yole_image_model_from_route():
++    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
++    if not raw:
++        return ""
++    try:
++        route = json.loads(raw)
++        values = route.get("imageGeneration") or route.get("image_generation") or []
++        if isinstance(values, list) and values:
++            return str(values[0]).strip()
++    except Exception:
++        return ""
++    return ""
++
+ 
+ def safe_print(*args, **kwargs):
+     try: print(*args, **kwargs)
+@@ -343,6 +364,73 @@ class GenericAgentHandler(BaseHandler):
+         yield f"Waiting for your answer ...\n"
+         return StepOutcome(result, next_prompt="", should_exit=True)
+ 
++    def do_yole_image_generate(self, args, response):
++        '''使用 Yole 配置的图片模型生成图片，保存到本地并返回 Markdown 链接。'''
++        prompt = (args.get("prompt") or args.get("description") or "").strip()
++        if not prompt:
++            return StepOutcome("[Error] prompt is required for image generation.", next_prompt="\n")
++        model = (args.get("model") or os.environ.get("YOLE_IMAGE_MODEL") or yole_image_model_from_route() or "gpt-image-2").strip()
++        size = (args.get("size") or "1024x1024").strip()
++        quality = (args.get("quality") or "").strip()
++        try:
++            n = int(args.get("n", 1))
++        except Exception:
++            n = 1
++        n = max(1, min(n, 4))
++        backend = getattr(self.parent.llmclient, "backend", None)
++        if backend is None:
++            return StepOutcome("[Error] no active LLM backend for image generation.", next_prompt="\n")
++        api_key = getattr(backend, "api_key", "")
++        api_base = getattr(backend, "api_base", "")
++        if not api_key or not api_base:
++            return StepOutcome("[Error] missing API credentials for image generation.", next_prompt="\n")
++        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": YOLE_HTTP_USER_AGENT}
++        payload = {"model": model, "prompt": prompt, "n": n, "size": size}
++        if quality:
++            payload["quality"] = quality
++        url = auto_make_url(api_base, "images/generations")
++        yield f"[Action] Generating image with {model} ({size})\n"
++        try:
++            resp = requests.post(url, headers=headers, json=payload, timeout=(30, 300))
++            if resp.status_code >= 400:
++                body = resp.text.strip()[:500]
++                return StepOutcome(f"[Error] Image generation HTTP {resp.status_code}: {body}", next_prompt="\n")
++            data = resp.json()
++        except Exception as e:
++            return StepOutcome(f"[Error] Image generation failed: {e}", next_prompt="\n")
++        out_dir = state_path("temp", "generated_images")
++        os.makedirs(out_dir, exist_ok=True)
++        saved = []
++        for item in data.get("data", []) or []:
++            b64 = item.get("b64_json")
++            remote_url = item.get("url")
++            image_id = uuid.uuid4().hex[:10]
++            try:
++                if b64:
++                    raw = base64.b64decode(b64)
++                    path = os.path.join(out_dir, f"yole_image_{image_id}.png")
++                    with open(path, "wb") as f:
++                        f.write(raw)
++                    saved.append(path)
++                elif remote_url:
++                    r = requests.get(remote_url, headers={"User-Agent": YOLE_HTTP_USER_AGENT}, timeout=120)
++                    r.raise_for_status()
++                    path = os.path.join(out_dir, f"yole_image_{image_id}.png")
++                    with open(path, "wb") as f:
++                        f.write(r.content)
++                    saved.append(path)
++            except Exception as e:
++                saved.append(f"[download failed: {e}]")
++        if not saved:
++            return StepOutcome("[Error] Image generation returned no image data.", next_prompt="\n")
++        lines = ["生成的图片已保存："]
++        for path in saved:
++            if path.startswith("["):
++                lines.append(path)
++            else:
++                lines.append(f"![generated image]({path})\n\n`{path}`")
++        return StepOutcome("\n\n".join(lines), next_prompt="\n")
++
+     def do_web_scan(self, args, response):
+         '''获取当前页面内容和标签页列表。也可用于切换标签页。
+         注意：HTML经过简化，边栏/浮动元素等可能被过滤。如需查看被过滤的内容请用execute_js。
+diff --git a/llmcore.py b/llmcore.py
+index 67416c5..324bff4 100644
+--- a/llmcore.py
++++ b/llmcore.py
+@@ -2,6 +2,7 @@ import os, json, re, time, requests, sys, threading, urllib3, base64, importlib,
+ from datetime import datetime
+ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+ _RESP_CACHE_KEY = str(uuid.uuid4())
++_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
+ _ROOT = os.path.dirname(os.path.abspath(__file__))
+ if _ROOT not in sys.path: sys.path.append(_ROOT)
+ 
+@@ -445,7 +446,7 @@ def _openai_stream(sess, messages):
+     account_id = None
+     if getattr(sess, 'codex_backend', False):
+         api_key, account_id = _yole_codex_access_token(sess)
+-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
++    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream", "User-Agent": _YOLE_HTTP_USER_AGENT}
+     if getattr(sess, 'codex_backend', False):
+         headers.update({"User-Agent": "codex_cli_rs/0.0.0 (Yole)", "originator": "codex_cli_rs"})
+         account_id = account_id or _codex_account_id_from_jwt(api_key)
+@@ -508,6 +509,11 @@ def _to_responses_input(messages):
+                 elif ptype == "image_url":
+                     url = (part.get("image_url") or {}).get("url", "")
+                     if url and role != "assistant": parts.append({"type": "input_image", "image_url": url})
++                elif ptype == "image":
++                    src = part.get("source") or {}
++                    if role != "assistant" and src.get("type") == "base64" and src.get("data"):
++                        mime = src.get("media_type", "image/png")
++                        parts.append({"type": "input_image", "image_url": f"data:{mime};base64,{src.get('data', '')}"})
+         if len(parts) == 0: parts = [{"type": text_type, "text": str(content) if not isinstance(content, list) else '[empty]'}]
+         result.append({"role": role, "content": parts})
+         pending = []
+@@ -1107,6 +1113,181 @@ The reply body should first include a minimal one-line (<30 words) physical snap
+ \n**If the user's request is not yet complete, tool calls are required!**
+ """.strip()
+ 
++def _keep_user_content_block(block):
++    if not isinstance(block, dict):
++        return bool(str(block).strip())
++    ptype = block.get("type")
++    if ptype == "text":
++        return bool(str(block.get("text", "")).strip())
++    if ptype == "image":
++        src = block.get("source") or {}
++        return bool(src.get("data") or src.get("url"))
++    if ptype == "image_url":
++        image_url = block.get("image_url") or {}
++        return bool(image_url.get("url"))
++    return True
++
++def _yole_route_config():
++    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
++    if not raw: return None
++    try:
++        route = json.loads(raw)
++        return route if isinstance(route, dict) else None
++    except Exception as e:
++        print(f"[YoleRoute] invalid route JSON: {e}")
++        return None
++
++def _route_get(route, camel, snake=None, default=None):
++    if not isinstance(route, dict): return default
++    if camel in route: return route.get(camel)
++    if snake and snake in route: return route.get(snake)
++    return default
++
++def _route_models(route):
++    models = _route_get(route, "models", default={})
++    return models if isinstance(models, dict) else {}
++
++def _route_list(route, camel, snake=None):
++    values = _route_get(route, camel, snake, [])
++    return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
++
++def _model_meta(route, model):
++    meta = _route_models(route).get(model, {})
++    return meta if isinstance(meta, dict) else {}
++
++def _model_enabled(route, model):
++    meta = _model_meta(route, model)
++    return bool(meta.get("enabled", True))
++
++def _modalities(meta, camel, snake):
++    values = meta.get(camel, meta.get(snake, []))
++    return {str(v).strip().lower() for v in values if str(v).strip()} if isinstance(values, list) else set()
++
++def _model_supports_image(route, model):
++    return "image" in _modalities(_model_meta(route, model), "inputModalities", "input_modalities")
++
++def _content_has_image(content):
++    for block in content or []:
++        if not isinstance(block, dict): continue
++        if block.get("type") in ("image", "image_url"): return True
++    return False
++
++def _openai_image_parts(content):
++    parts = []
++    for block in content or []:
++        if not isinstance(block, dict): continue
++        btype = block.get("type")
++        if btype == "text" and block.get("text"):
++            parts.append({"type": "text", "text": block.get("text", "")})
++        elif btype == "image":
++            src = block.get("source") or {}
++            if src.get("type") == "base64" and src.get("data"):
++                mime = src.get("media_type", "image/png")
++                parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{src.get('data', '')}"}})
++        elif btype == "image_url":
++            parts.append(block)
++    return parts
++
++def _without_images_with_note(content, note):
++    filtered = []
++    inserted = False
++    for block in content or []:
++        if isinstance(block, dict) and block.get("type") in ("image", "image_url"):
++            if not inserted:
++                filtered.append({"type": "text", "text": note})
++                inserted = True
++            continue
++        filtered.append(block)
++    if not inserted:
++        filtered.append({"type": "text", "text": note})
++    return filtered
++
++def _vision_summary_with_route(backend, route, content):
++    prompt = (
++        "请理解用户上传的图片，输出给另一个文字模型使用的简洁视觉摘要。"
++        "只描述图片中能确定的信息；如果包含界面或文字，请摘出关键文字和布局。"
++        "不要回答用户最终问题，不要编造看不清的内容。"
++    )
++    image_parts = _openai_image_parts([{"type": "text", "text": prompt}, *(content or [])])
++    if not any(isinstance(p, dict) and p.get("type") == "image_url" for p in image_parts):
++        return None
++    for model in _route_list(route, "vision"):
++        if not _model_enabled(route, model) or not _model_supports_image(route, model):
++            continue
++        payload = {
++            "model": model,
++            "messages": [{"role": "user", "content": image_parts}],
++            "stream": False,
++            "max_tokens": 900,
++        }
++        headers = {"Authorization": f"Bearer {backend.api_key}", "Content-Type": "application/json", "User-Agent": _YOLE_HTTP_USER_AGENT}
++        try:
++            resp = requests.post(
++                auto_make_url(backend.api_base, "chat/completions"),
++                headers=headers,
++                json=payload,
++                timeout=(backend.connect_timeout, min(45, backend.read_timeout)),
++                proxies=backend.proxies,
++                verify=backend.verify,
++            )
++            if resp.status_code >= 400:
++                print(f"[YoleRoute] vision {model} HTTP {resp.status_code}: {resp.text[:160]}")
++                continue
++            data = resp.json()
++            text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
++            if text:
++                print(f"[YoleRoute] vision summary by {model}")
++                return text
++        except Exception as e:
++            print(f"[YoleRoute] vision {model} failed: {e}")
++    return None
++
++def _is_retryable_model_error(chunk):
++    if not isinstance(chunk, str): return False
++    text = chunk.lstrip().lower()
++    retryable_status = re.search(r"\b(?:http\s*)?(?:status\s*)?(?:429|5\d\d)\b", text[:160])
++    return (
++        text.startswith("!!!error:")
++        or text.startswith("[error:")
++        or "rate limit" in text
++        or "too many requests" in text
++        or "quota" in text
++        or "timeout" in text
++        or "timed out" in text
++        or bool(retryable_status)
++    )
++
++def _chunk_has_visible_output(chunk):
++    if not isinstance(chunk, str):
++        return chunk is not None
++    text = chunk.strip()
++    return bool(text) and not _is_retryable_model_error(text)
++
++def _is_retryable_model_exception(exc):
++    if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, TimeoutError, socket.timeout)):
++        return True
++    text = str(exc).lower()
++    return any(marker in text for marker in (
++        "timeout",
++        "timed out",
++        "connection reset",
++        "connection aborted",
++        "temporarily unavailable",
++        "too many requests",
++        "rate limit",
++        "quota",
++        "http 429",
++        "http 500",
++        "http 502",
++        "http 503",
++        "http 504",
++        "status 429",
++        "status 500",
++        "status 502",
++        "status 503",
++        "status 504",
++    ))
++
+ class NativeToolClient:
+     @staticmethod
+     def _thinking_prompt(): return THINKING_PROMPT_EN if os.environ.get('GA_LANG') == 'en' else THINKING_PROMPT_ZH
+@@ -1120,6 +1301,80 @@ class NativeToolClient:
+         combined = f"{extra_system}\n\n{self._thinking_prompt()}" if extra_system else self._thinking_prompt()
+         if combined != self.backend.system: print(f"[Debug] Updated system prompt, length {len(combined)} chars.")
+         self.backend.system = combined
++    def _chat_once(self, merged):
++        _write_llm_log('Prompt', json.dumps(merged, ensure_ascii=False, indent=2), self.log_path)
++        try:
++            gen = self.backend.ask(merged)
++        except Exception as e:
++            if _is_retryable_model_exception(e):
++                return {"__yole_retryable_error__": f"!!!Error: {e}"}
++            raise
++        visible_output = False
++        first_error = None
++        resp = None
++        try:
++            while True:
++                chunk = next(gen)
++                if not visible_output:
++                    if _is_retryable_model_error(chunk):
++                        first_error = chunk
++                        try: gen.close()
++                        except Exception: pass
++                        break
++                    visible_output = _chunk_has_visible_output(chunk)
++                yield chunk
++        except StopIteration as e:
++            resp = e.value
++        except Exception as e:
++            error = f"!!!Error: {e}"
++            if not visible_output and _is_retryable_model_exception(e):
++                try: gen.close()
++                except Exception: pass
++                return {"__yole_retryable_error__": error}
++            yield f"\n{error}"
++            return None
++        if first_error is not None:
++            return {"__yole_retryable_error__": first_error}
++        if resp: _write_llm_log('Response', resp.raw, self.log_path)
++        return resp
++    def _chat_with_yole_route(self, merged, route):
++        content = merged.get("content") if isinstance(merged, dict) else None
++        has_image = _content_has_image(content)
++        candidates = [m for m in _route_list(route, "conversation") if _model_enabled(route, m)]
++        if not candidates:
++            return (yield from self._chat_once(merged))
++        original_model = self.backend.model
++        vision_summary = None
++        vision_attempted = False
++        last_error = None
++        for model in candidates:
++            routed = dict(merged)
++            routed_content = content
++            if has_image and not _model_supports_image(route, model):
++                if not vision_attempted:
++                    vision_attempted = True
++                    vision_summary = _vision_summary_with_route(self.backend, route, content)
++                if vision_summary:
++                    note = f"\n\n【图片理解结果】\n{vision_summary}"
++                else:
++                    note = "\n\n【图片状态】用户上传了图片，但当前无法读取图片内容。请基于用户文字和已有上下文尽量回答；如果必须依赖图片细节，再自然地请用户补充描述。"
++                routed_content = _without_images_with_note(content, note)
++                routed["content"] = routed_content
++            print(f"[YoleRoute] using model {model}")
++            history_snapshot = list(getattr(self.backend, "history", []))
++            self.backend.model = model
++            resp = yield from self._chat_once(routed)
++            if isinstance(resp, dict) and resp.get("__yole_retryable_error__"):
++                last_error = str(resp.get("__yole_retryable_error__") or "")
++                try: self.backend.history = history_snapshot
++                except Exception: pass
++                print(f"[YoleRoute] model {model} failed early, trying fallback")
++                continue
++            return resp
++        self.backend.model = original_model
++        if last_error:
++            yield last_error
++        return None
+     def chat(self, messages, tools=None):
+         if tools: self.backend.tools = tools
+         if not self.backend.history: self._pending_tool_ids = []
+@@ -1140,18 +1395,20 @@ class NativeToolClient:
+         for tid in self._pending_tool_ids:
+             if tid not in tr_id_set: tool_result_blocks.append({"type": "tool_result", "tool_use_id": tid, "content": ""})
+         self._pending_tool_ids = []
+-        # Filter whitespace-only text blocks that cause 400 on strict API proxies
+-        filtered_content = [c for c in combined_content if c.get("text", "").strip()]
++        # Filter whitespace-only text blocks that cause 400 on strict API
++        # proxies, but keep non-text multimodal blocks. The previous
++        # text-only predicate dropped image blocks before they reached the
++        # backend, making Yole pasted images visible in the UI but invisible to
++        # the LLM.
++        filtered_content = [c for c in combined_content if _keep_user_content_block(c)]
+         final_content = tool_result_blocks + filtered_content
+         if not final_content: final_content = [{"type": "text", "text": "."}]
+         merged = {"role": "user", "content": final_content}
+-        _write_llm_log('Prompt', json.dumps(merged, ensure_ascii=False, indent=2), self.log_path)
+-        gen = self.backend.ask(merged)
+-        try:
+-            while True:
+-                chunk = next(gen); yield chunk
+-        except StopIteration as e: resp = e.value
+-        if resp: _write_llm_log('Response', resp.raw, self.log_path)
++        route = _yole_route_config()
++        if route:
++            resp = yield from self._chat_with_yole_route(merged, route)
++        else:
++            resp = yield from self._chat_once(merged)
+         if resp and hasattr(resp, 'tool_calls') and resp.tool_calls: self._pending_tool_ids = [tc.id for tc in resp.tool_calls]
+         return resp
+ 

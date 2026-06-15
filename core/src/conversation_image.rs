@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use tauri::{AppHandle, Runtime};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chrono::Utc;
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
 const MAX_IMAGE_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_PASTED_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 
 #[tauri::command]
 pub async fn save_conversation_image(
@@ -17,6 +20,44 @@ pub async fn save_conversation_image(
         ConversationImageSource::Remote(url) => save_remote_image(url, &destination).await,
         ConversationImageSource::Local(path) => save_local_image(path, &destination).await,
     }
+}
+
+#[tauri::command]
+pub async fn save_pasted_conversation_image<R: Runtime>(
+    app: AppHandle<R>,
+    mime: String,
+    data_base64: String,
+) -> Result<String, String> {
+    let ext = extension_for_mime(&mime)?;
+    let compact = data_base64.trim();
+    if compact.is_empty() {
+        return Err("pasted_image_empty".to_string());
+    }
+    let bytes = STANDARD
+        .decode(compact)
+        .map_err(|e| format!("pasted_image_decode_failed: {e}"))?;
+    if bytes.len() > MAX_PASTED_IMAGE_BYTES {
+        return Err("pasted_image_too_large".to_string());
+    }
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(format_image_error)?
+        .join("pasted-images");
+    tokio::fs::create_dir_all(&base)
+        .await
+        .map_err(format_image_error)?;
+    let filename = format!(
+        "{}-{}.{}",
+        Utc::now().format("%Y%m%dT%H%M%S%.3fZ"),
+        random_suffix(),
+        ext
+    );
+    let path = base.join(filename);
+    tokio::fs::write(&path, bytes)
+        .await
+        .map_err(format_image_error)?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -139,6 +180,26 @@ fn ensure_supported_image_extension(path: impl AsRef<Path>) -> Result<(), String
     }
 }
 
+fn extension_for_mime(mime: &str) -> Result<&'static str, String> {
+    match mime.trim().to_ascii_lowercase().as_str() {
+        "image/png" => Ok("png"),
+        "image/jpeg" | "image/jpg" => Ok("jpg"),
+        "image/webp" => Ok("webp"),
+        "image/gif" => Ok("gif"),
+        _ => Err("unsupported_pasted_image_type".to_string()),
+    }
+}
+
+fn random_suffix() -> String {
+    use ring::rand::{SecureRandom, SystemRandom};
+    let rng = SystemRandom::new();
+    let mut bytes = [0u8; 4];
+    if rng.fill(&mut bytes).is_err() {
+        return "fallback".to_string();
+    }
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn format_image_error(error: impl std::fmt::Display) -> String {
     format!("image_io_error: {error}")
 }
@@ -166,5 +227,16 @@ mod tests {
         let err = parse_source("remote", "https://example.com/index.html")
             .expect_err("html is not a supported image");
         assert_eq!(err, "unsupported_image_extension");
+    }
+
+    #[test]
+    fn maps_supported_pasted_image_mimes() {
+        assert_eq!(extension_for_mime("image/png").unwrap(), "png");
+        assert_eq!(extension_for_mime("image/jpeg").unwrap(), "jpg");
+        assert_eq!(extension_for_mime("image/webp").unwrap(), "webp");
+        assert_eq!(
+            extension_for_mime("application/octet-stream").unwrap_err(),
+            "unsupported_pasted_image_type"
+        );
     }
 }

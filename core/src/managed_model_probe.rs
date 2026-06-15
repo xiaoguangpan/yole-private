@@ -10,14 +10,13 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::api::{
-    ManagedModelAuthKind,
-    ManagedModelConnectionResult, ManagedModelListResult, ManagedModelProbeInput,
-    ManagedModelProtocol,
+    ManagedModelAuthKind, ManagedModelConnectionResult, ManagedModelListResult,
+    ManagedModelProbeInput, ManagedModelProtocol,
 };
 use crate::codex_oauth;
 use crate::credential_store;
 use crate::db::SqliteYole;
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 
 const PROBE_TIMEOUT_SECS: u64 = 20;
 
@@ -177,8 +176,7 @@ async fn resolve_api_key_ref(input: &ManagedModelProbeInput) -> Result<String> {
             message: "managed provider id is required before testing this provider".into(),
         })?;
     let yole = SqliteYole::open().await?;
-    yole
-        .list_managed_model_providers()
+    yole.list_managed_model_providers()
         .await?
         .into_iter()
         .find(|provider| provider.id == id)

@@ -53,6 +53,16 @@
       "switch_tab_id": {"type": "string", "description": "可选的标签页 ID，切换到该标签页执行"}}}
   }},
   {"type": "function", "function": {
+    "name": "yole_image_generate",
+    "description": "使用 Yole 配置的图片模型生成真实位图图片。用户要求做图、视觉素材、电商图、官网配图、海报、Logo 草案，或网站/应用需要原创配图而不是本地占位绘制时使用",
+    "parameters": {"type": "object", "properties": {
+      "prompt": {"type": "string", "description": "详细图片提示词，包含主体、风格、构图、色彩、文字限制和用途"},
+      "size": {"type": "string", "enum": ["1024x1024", "1024x1536", "1536x1024"], "description": "图片尺寸", "default": "1024x1024"},
+      "quality": {"type": "string", "description": "可选的服务商质量参数"},
+      "n": {"type": "integer", "description": "生成数量，1-4", "default": 1},
+      "model": {"type": "string", "description": "可选图片模型覆盖；默认由 Yole 配置"}}}
+  }},
+  {"type": "function", "function": {
     "name": "update_working_checkpoint",
     "description": "短期工作便签，每轮自动注入上下文，防长任务信息丢失。前中期调用，非结束时。何时调用：(1)任务开始读SOP后，存用户需求和关键约束/参数（简单1-2步任务除外）；(2)子任务切换或上下文即将被冲刷前；(3)多次重试失败后，重读SOP并必须调用存储新发现；(4)切换新任务时更新内容，清旧进度但保留仍有效的约束。\n\n何时不调用：简单任务（1-2步且无严重约束）、任务已完成时（应当用长期结算工具）",
     "parameters": {"type": "object", "properties": {

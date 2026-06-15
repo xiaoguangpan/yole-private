@@ -2,7 +2,7 @@
 
 Patch stack id: `yole-managed-ga-patches-v1`
 
-Last replay verified: `2026-06-04` against upstream
+Last replay verified: `2026-06-14` against upstream
 `5d122e20ea7e9dfd7941998acb902fbac4a2bc9a`.
 
 Current patches:
@@ -14,8 +14,9 @@ Current patches:
 | `0003-normalize-asset-path-joins.patch` | `agentmain.py`, `ga.py` | Join managed GA bundled asset paths with platform path segments so Windows verbatim paths never mix `\\?\` with `/`. | Low: only wraps existing `assets` reads behind an `asset_path` helper. | Remove when upstream stops using slash-containing asset path strings under `script_dir`. |
 | `0004-managed-wechat-state-paths.patch` | `frontends/wechatapp.py` | Let Yole's managed IM launcher keep WeChat token and temp files under Yole managed state instead of `~/.wxbot` / bundled code paths. | Low: two path constants near module startup. | Remove when upstream WeChat frontend supports explicit token/temp paths. |
 | `0005-code-run-noninteractive-stdin.patch` | `ga.py` | Keep managed `code_run` non-interactive by closing child-process stdin, avoiding inherited runner IPC stdin handles that can block Python subprocesses on Windows. | Low: touches only `code_run` subprocess creation. | Remove when GenericAgent upstream closes stdin for non-interactive tool execution. |
-| `0006-managed-browser-control-recovery.patch` | `TMWebDriver.py`, `ga.py`, `assets/tmwd_cdp_bridge/background.js`, `assets/tmwd_cdp_bridge/content.js` | Preserve Yole's managed Browser Control recovery semantics: extension-connected/no-tabs diagnostics, page wake-up messages, and MV3 service-worker keepalive behavior. | Medium: upstream frequently touches the browser bridge service-worker loop. | Remove when upstream exposes equivalent extension status and recovery hints. |
+| `0006-managed-browser-control-recovery.patch` | `TMWebDriver.py`, `ga.py`, `assets/tmwd_cdp_bridge/background.js`, `assets/tmwd_cdp_bridge/content.js` | Preserve Yole's managed Browser Control recovery semantics: extension-connected/no-tabs diagnostics, page wake-up messages, and MV3 service-worker keepalive / fast reconnect behavior. | Medium: upstream frequently touches the browser bridge service-worker loop. | Remove when upstream exposes equivalent extension status and recovery hints. |
 | `0007-managed-codex-backend.patch` | `llmcore.py` | Preserve Yole's ChatGPT / Codex managed model backend, including credential IPC refresh, account header propagation, Codex-specific Responses payload shape, and forced streaming. | Medium: upstream OpenAI request assembly changes can alter nearby contexts. | Remove when upstream supports Yole's Codex credential and request contract directly. |
+| `0008-yole-multimodal-routing-and-image-tools.patch` | `README.md`, `TMWebDriver.py`, `agentmain.py`, `ga.py`, `llmcore.py`, `assets/sys_prompt*.txt`, `assets/tools_schema*.json` | Preserve Yole's product runtime additions: shipped README white-label trim, new-tab browser navigation, composer image blocks, server-managed model fallback / vision routing, and the real image-generation tool. | Medium-high: touches request assembly, multimodal content shape, and tool schema; rebase must verify image input, fallback, and generated-image paths. | Remove or split when GenericAgent upstream provides equivalent multimodal routing, image tools, and safe tab creation extension seams. |
 
 Rules:
 

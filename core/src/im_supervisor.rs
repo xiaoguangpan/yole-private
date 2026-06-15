@@ -655,8 +655,7 @@ async fn read_pref(platform: &str) -> ImSupervisorPref {
 async fn write_pref(platform: &str, pref: ImSupervisorPref) -> Result<(), String> {
     let yole = SqliteYole::open().await.map_err(|e| e.to_string())?;
     let key = pref_key(platform).ok_or_else(|| format!("unsupported IM platform: {platform}"))?;
-    yole
-        .set_pref_json(key, json!(pref))
+    yole.set_pref_json(key, json!(pref))
         .await
         .map_err(|e| e.to_string())
 }

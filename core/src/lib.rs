@@ -28,10 +28,10 @@ pub mod yole_provisioning;
 extern "C" {}
 
 use api::{
-    CreateProjectInput, CreateSessionInput, YoleApi, ManagedModelAuthKind,
-    ManagedModelProbeInput, Origin, ProjectBrief, ProjectId, ProjectPatch,
-    ReorderManagedModelsInput, RuntimeKind, SaveManagedModelInput, SaveManagedProviderInput,
-    SessionBrief, SessionFilter, SessionId,
+    CreateProjectInput, CreateSessionInput, ManagedModelAuthKind, ManagedModelProbeInput, Origin,
+    ProjectBrief, ProjectId, ProjectPatch, ReorderManagedModelsInput, RuntimeKind,
+    SaveManagedModelInput, SaveManagedProviderInput, SessionBrief, SessionFilter, SessionId,
+    YoleApi,
 };
 use db::{
     MessageSearchHit, PersistAssistantMessage, PersistToolEventPending, PersistedMessageRow,
@@ -425,8 +425,7 @@ async fn restart_enabled_im_supervisors(
 async fn list_managed_model_providers(
 ) -> std::result::Result<Vec<api::ManagedModelProviderRecord>, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .list_managed_model_providers()
+    yole.list_managed_model_providers()
         .await
         .map_err(stringify_error)
 }
@@ -584,8 +583,7 @@ async fn delete_managed_model(
             message: "managed model id must not be empty".into(),
         }));
     }
-    yole
-        .delete_managed_model_metadata(id)
+    yole.delete_managed_model_metadata(id)
         .await
         .map_err(stringify_error)?;
     sync_managed_model_config(&app, &yole).await?;
@@ -598,8 +596,7 @@ async fn reorder_managed_models(
     input: ReorderManagedModelsInput,
 ) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .reorder_managed_models(input.model_ids)
+    yole.reorder_managed_models(input.model_ids)
         .await
         .map_err(stringify_error)?;
     sync_managed_model_config(&app, &yole).await?;
@@ -688,8 +685,34 @@ async fn ensure_yole_trial_model(
 
 #[tauri::command]
 async fn get_yole_account_status(
+    force: Option<bool>,
 ) -> std::result::Result<Option<yole_provisioning::YoleAccountStatus>, String> {
-    yole_provisioning::get_account_status()
+    yole_provisioning::get_account_status_with_force(force.unwrap_or(false))
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn get_stored_yole_account_status(
+) -> std::result::Result<Option<yole_provisioning::YoleAccountStatus>, String> {
+    yole_provisioning::stored_account_status_for_current_account()
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn refresh_yole_runtime_route(
+    force: Option<bool>,
+) -> std::result::Result<Option<yole_provisioning::YoleModelRoute>, String> {
+    yole_provisioning::refresh_runtime_route_with_force(force.unwrap_or(false))
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn get_stored_yole_runtime_route(
+) -> std::result::Result<Option<yole_provisioning::YoleModelRoute>, String> {
+    yole_provisioning::stored_runtime_route_for_current_account()
         .await
         .map_err(stringify_error)
 }
@@ -699,23 +722,19 @@ async fn sync_managed_model_config(
     yole: &SqliteYole,
 ) -> std::result::Result<(), String> {
     let diagnostics = managed_runtime::ensure_for_app(app).map_err(|e| e.to_string())?;
-    let models = yole
-        .list_managed_models()
-        .await
-        .map_err(stringify_error)?;
+    let models = yole.list_managed_models().await.map_err(stringify_error)?;
     managed_model_config::write_nonsecret_config(
         std::path::Path::new(&diagnostics.paths.model_config_dir),
         &models,
     )
     .map_err(stringify_error)?;
     let revision = managed_model_config::new_revision();
-    yole
-        .set_pref_json(
-            managed_model_config::REVISION_PREF_KEY,
-            serde_json::json!(revision),
-        )
-        .await
-        .map_err(stringify_error)?;
+    yole.set_pref_json(
+        managed_model_config::REVISION_PREF_KEY,
+        serde_json::json!(revision),
+    )
+    .await
+    .map_err(stringify_error)?;
     {
         use tauri::Manager;
         if let Some(manager) = app.try_state::<std::sync::Arc<im_supervisor::ImSupervisorManager>>()
@@ -795,8 +814,7 @@ async fn create_session(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .create_session(input, origin)
+    yole.create_session(input, origin)
         .await
         .map_err(stringify_error)
 }
@@ -807,8 +825,7 @@ async fn archive_session(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .archive_session(id, origin)
+    yole.archive_session(id, origin)
         .await
         .map_err(stringify_error)
 }
@@ -819,8 +836,7 @@ async fn unarchive_session(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .unarchive_session(id, origin)
+    yole.unarchive_session(id, origin)
         .await
         .map_err(stringify_error)
 }
@@ -832,8 +848,7 @@ async fn rename_session(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .rename_session(id, title, origin)
+    yole.rename_session(id, title, origin)
         .await
         .map_err(stringify_error)
 }
@@ -845,8 +860,7 @@ async fn set_session_pinned(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .set_session_pinned(id, pinned, origin)
+    yole.set_session_pinned(id, pinned, origin)
         .await
         .map_err(stringify_error)
 }
@@ -854,8 +868,7 @@ async fn set_session_pinned(
 #[tauri::command]
 async fn delete_session(id: SessionId, origin: Origin) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .delete_session(id, origin)
+    yole.delete_session(id, origin)
         .await
         .map_err(stringify_error)
 }
@@ -867,8 +880,7 @@ async fn assign_session_to_project(
     origin: Origin,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .assign_session_to_project(session_id, project_id, origin)
+    yole.assign_session_to_project(session_id, project_id, origin)
         .await
         .map_err(stringify_error)
 }
@@ -881,8 +893,7 @@ async fn set_session_llm(
     display_name: Option<String>,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .set_session_llm(id, index, key, display_name)
+    yole.set_session_llm(id, index, key, display_name)
         .await
         .map_err(stringify_error)
 }
@@ -895,8 +906,7 @@ async fn bump_session_after_turn(
     mark_unread: bool,
 ) -> std::result::Result<SessionBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .bump_session_after_turn(id, summary, step_number, mark_unread)
+    yole.bump_session_after_turn(id, summary, step_number, mark_unread)
         .await
         .map_err(stringify_error)
 }
@@ -904,10 +914,7 @@ async fn bump_session_after_turn(
 #[tauri::command]
 async fn clear_session_unread(id: SessionId) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .clear_session_unread(id)
-        .await
-        .map_err(stringify_error)
+    yole.clear_session_unread(id).await.map_err(stringify_error)
 }
 
 #[tauri::command]
@@ -915,8 +922,7 @@ async fn session_message_rows(
     session_id: SessionId,
 ) -> std::result::Result<Vec<PersistedMessageRow>, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .persisted_message_rows(&session_id)
+    yole.persisted_message_rows(&session_id)
         .await
         .map_err(stringify_error)
 }
@@ -929,8 +935,20 @@ async fn persist_user_message(
     origin: Origin,
 ) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .persist_gui_user_message(session_id, turn_index, content, origin)
+    yole.persist_gui_user_message(session_id, turn_index, content, origin)
+        .await
+        .map_err(stringify_error)
+}
+
+#[tauri::command]
+async fn replace_user_message_from_turn(
+    session_id: SessionId,
+    turn_index: u32,
+    content: String,
+    origin: Origin,
+) -> std::result::Result<SessionBrief, String> {
+    let yole = SqliteYole::open().await.map_err(stringify_error)?;
+    yole.replace_gui_user_message_from_turn(session_id, turn_index, content, origin)
         .await
         .map_err(stringify_error)
 }
@@ -954,27 +972,25 @@ async fn persist_assistant_message(
     input: PersistAssistantMessageInput,
 ) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .persist_gui_assistant_message(PersistAssistantMessage {
-            session_id: input.session_id,
-            turn_index: input.turn_index,
-            content: input.content,
-            tool_calls: input.tool_calls,
-            tool_results: input.tool_results,
-            thinking: input.thinking,
-            final_answer: input.final_answer,
-            summary: input.summary,
-            preamble: input.preamble,
-        })
-        .await
-        .map_err(stringify_error)
+    yole.persist_gui_assistant_message(PersistAssistantMessage {
+        session_id: input.session_id,
+        turn_index: input.turn_index,
+        content: input.content,
+        tool_calls: input.tool_calls,
+        tool_results: input.tool_results,
+        thinking: input.thinking,
+        final_answer: input.final_answer,
+        summary: input.summary,
+        preamble: input.preamble,
+    })
+    .await
+    .map_err(stringify_error)
 }
 
 #[tauri::command]
 async fn delete_empty_new_sessions() -> std::result::Result<u32, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .delete_empty_new_sessions()
+    yole.delete_empty_new_sessions()
         .await
         .map_err(stringify_error)
 }
@@ -988,10 +1004,7 @@ async fn delete_demo_sessions() -> std::result::Result<u32, String> {
 #[tauri::command]
 async fn backfill_fts_if_empty() -> std::result::Result<u32, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .backfill_fts_if_empty()
-        .await
-        .map_err(stringify_error)
+    yole.backfill_fts_if_empty().await.map_err(stringify_error)
 }
 
 #[tauri::command]
@@ -1001,8 +1014,7 @@ async fn search_messages(
     runtime_kind: Option<RuntimeKind>,
 ) -> std::result::Result<Vec<MessageSearchHit>, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .search_message_hits(query, limit, runtime_kind)
+    yole.search_message_hits(query, limit, runtime_kind)
         .await
         .map_err(stringify_error)
 }
@@ -1025,19 +1037,18 @@ async fn persist_tool_event_pending(
     input: PersistToolEventPendingInput,
 ) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .persist_tool_event_pending(PersistToolEventPending {
-            approval_id: input.approval_id,
-            session_id: input.session_id,
-            turn_index: input.turn_index,
-            tool_name: input.tool_name,
-            args: input.args,
-            args_preview: input.args_preview,
-            risk_level: input.risk_level,
-            started_at: input.started_at,
-        })
-        .await
-        .map_err(stringify_error)
+    yole.persist_tool_event_pending(PersistToolEventPending {
+        approval_id: input.approval_id,
+        session_id: input.session_id,
+        turn_index: input.turn_index,
+        tool_name: input.tool_name,
+        args: input.args,
+        args_preview: input.args_preview,
+        risk_level: input.risk_level,
+        started_at: input.started_at,
+    })
+    .await
+    .map_err(stringify_error)
 }
 
 #[tauri::command]
@@ -1047,8 +1058,7 @@ async fn persist_tool_event_approval_decision(
     decided_at: String,
 ) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .persist_tool_event_approval_decision(&approval_id, &decision, &decided_at)
+    yole.persist_tool_event_approval_decision(&approval_id, &decision, &decided_at)
         .await
         .map_err(stringify_error)
 }
@@ -1058,8 +1068,7 @@ async fn load_tool_events_by_session(
     session_id: SessionId,
 ) -> std::result::Result<Vec<ToolEventRow>, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .tool_event_rows_by_session(&session_id)
+    yole.tool_event_rows_by_session(&session_id)
         .await
         .map_err(stringify_error)
 }
@@ -1073,8 +1082,7 @@ async fn get_pref_json(key: String) -> std::result::Result<Option<serde_json::Va
 #[tauri::command]
 async fn set_pref_json(key: String, value: serde_json::Value) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .set_pref_json(&key, value)
+    yole.set_pref_json(&key, value)
         .await
         .map_err(stringify_error)
 }
@@ -1106,8 +1114,7 @@ async fn bulk_archive_sessions(
     origin: Origin,
 ) -> std::result::Result<u32, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .bulk_archive_sessions(ids, origin)
+    yole.bulk_archive_sessions(ids, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1118,8 +1125,7 @@ async fn bulk_unarchive_sessions(
     origin: Origin,
 ) -> std::result::Result<u32, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .bulk_unarchive_sessions(ids, origin)
+    yole.bulk_unarchive_sessions(ids, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1130,8 +1136,7 @@ async fn bulk_delete_sessions(
     origin: Origin,
 ) -> std::result::Result<u32, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .bulk_delete_sessions(ids, origin)
+    yole.bulk_delete_sessions(ids, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1148,8 +1153,7 @@ async fn create_project(
     origin: Origin,
 ) -> std::result::Result<ProjectBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .create_project(input, origin)
+    yole.create_project(input, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1161,8 +1165,7 @@ async fn update_project(
     origin: Origin,
 ) -> std::result::Result<ProjectBrief, String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .update_project(id, patch, origin)
+    yole.update_project(id, patch, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1170,8 +1173,7 @@ async fn update_project(
 #[tauri::command]
 async fn delete_project(id: ProjectId, origin: Origin) -> std::result::Result<(), String> {
     let yole = SqliteYole::open().await.map_err(stringify_error)?;
-    yole
-        .delete_project(id, origin)
+    yole.delete_project(id, origin)
         .await
         .map_err(stringify_error)
 }
@@ -1301,6 +1303,7 @@ pub fn run() {
             app_update::check_app_update,
             app_update::install_app_update,
             conversation_image::save_conversation_image,
+            conversation_image::save_pasted_conversation_image,
             conversation_image::open_conversation_image,
             check_path_install_status,
             install_yole_to_path,
@@ -1330,6 +1333,9 @@ pub fn run() {
             logout_chatgpt_codex_provider,
             ensure_yole_trial_model,
             get_yole_account_status,
+            get_stored_yole_account_status,
+            refresh_yole_runtime_route,
+            get_stored_yole_runtime_route,
             list_sessions,
             // B3 M4a session writes
             create_session,
@@ -1344,6 +1350,7 @@ pub fn run() {
             clear_session_unread,
             session_message_rows,
             persist_user_message,
+            replace_user_message_from_turn,
             persist_assistant_message,
             delete_empty_new_sessions,
             delete_demo_sessions,

@@ -111,6 +111,14 @@ function ToastFrame({
               }
             : undefined
         }
+        onInstallAppUpdate={
+          actions.onInstallAppUpdate
+            ? () => {
+                onDismiss(toast.id);
+                actions.onInstallAppUpdate?.();
+              }
+            : undefined
+        }
       />
     </div>
   );

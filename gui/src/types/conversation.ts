@@ -78,6 +78,13 @@ export interface Origin {
 export interface UserTurn {
   role: "user";
   content: string;
+  /** Absolute SQLite turn_index for edit/resend flows. */
+  turnIndex?: number;
+  /** Local image paths attached to this user turn. Live-only for now:
+   * images are passed to GA as multimodal content, while persisted
+   * history stores only the text so local file paths do not leak back
+   * into future prompts. */
+  imagePaths?: string[];
   /** Audit origin for the user message. When `origin.via ===
    * "supervisor"`, MessageUser renders a small provenance icon (B4 M7).
    * Absent / `gui` means the local user typed it directly. */

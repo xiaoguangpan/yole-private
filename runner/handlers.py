@@ -58,6 +58,7 @@ DEFAULT_APPROVAL_TOOLS: frozenset[str] = frozenset(
         "code_run",
         "file_write",
         "file_patch",
+        "yole_image_generate",
         "start_long_term_update",
     }
 )
@@ -68,6 +69,7 @@ RISK_LEVELS: dict[str, str] = {
     "code_run": "high",
     "file_write": "medium",
     "file_patch": "medium",
+    "yole_image_generate": "medium",
     "start_long_term_update": "high",
 }
 
@@ -77,6 +79,7 @@ APPROVAL_REASONS: dict[str, str] = {
     "code_run": "Executes arbitrary code; can modify files, processes, and network.",
     "file_write": "Writes to disk; can overwrite existing files.",
     "file_patch": "Modifies file content in place.",
+    "yole_image_generate": "Calls the configured image model and consumes Yole points.",
     "start_long_term_update": "Updates GA's long-term memory files.",
 }
 

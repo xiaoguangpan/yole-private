@@ -10,7 +10,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::api::ManagedModelRecord;
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 
 pub const GENERATED_CONFIG_FILENAME: &str = "managed-models.json";
 pub const REVISION_PREF_KEY: &str = "managed_model_config_revision";

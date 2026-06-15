@@ -16,6 +16,8 @@ type Config struct {
 	Server    ServerConfig    `yaml:"server"`
 	NewAPI    NewAPIConfig    `yaml:"newapi"`
 	Trial     TrialConfig     `yaml:"trial"`
+	Points    PointsConfig    `yaml:"points"`
+	Routing   RoutingConfig   `yaml:"model_routing"`
 	Contact   ContactConfig   `yaml:"contact"`
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
 	Security  SecurityConfig  `yaml:"security"`
@@ -24,6 +26,7 @@ type Config struct {
 
 type ServerConfig struct {
 	Listen              string `yaml:"listen"`
+	PublicBaseURL       string `yaml:"public_base_url"`
 	ReadTimeoutSeconds  int    `yaml:"read_timeout_seconds"`
 	WriteTimeoutSeconds int    `yaml:"write_timeout_seconds"`
 }
@@ -49,6 +52,34 @@ type TrialConfig struct {
 	Quota      int    `yaml:"quota"`
 	ExpireDays int    `yaml:"expire_days"`
 	Group      string `yaml:"group"`
+}
+
+type PointsConfig struct {
+	PerUSD float64 `yaml:"per_usd"`
+	Unit   string  `yaml:"unit"`
+}
+
+type RoutingConfig struct {
+	Version        string                   `yaml:"version"`
+	DefaultProfile string                   `yaml:"default_profile"`
+	Profiles       map[string]RouteProfile  `yaml:"profiles"`
+	Models         map[string]ModelMetadata `yaml:"models"`
+}
+
+type RouteProfile struct {
+	NewAPIGroup     string   `yaml:"newapi_group"`
+	Conversation    []string `yaml:"conversation"`
+	Vision          []string `yaml:"vision"`
+	ImageGeneration []string `yaml:"image_generation"`
+	ImageEditing    []string `yaml:"image_editing"`
+}
+
+type ModelMetadata struct {
+	DisplayName      string   `yaml:"display_name"`
+	InputModalities  []string `yaml:"input_modalities"`
+	OutputModalities []string `yaml:"output_modalities"`
+	ToolCalling      bool     `yaml:"tool_calling"`
+	Enabled          *bool    `yaml:"enabled"`
 }
 
 type ContactConfig struct {
@@ -102,14 +133,28 @@ func defaultConfig() Config {
 		},
 		Trial: TrialConfig{
 			TokenPrefix:      "yole",
-			InitialCreditUSD: 50,
-			LowBalanceUSD:    5,
+			InitialCreditUSD: 30,
+			LowBalanceUSD:    3,
 			UserGroup:        "yole",
 			TokenGroup:       "yole",
-			DefaultModel:     "gpt-5.5",
-			AllowedModels:    []string{"gpt-5.5"},
-			Group:            "yole",
+			DefaultModel:     "deepseek-v4-pro",
+			AllowedModels: []string{
+				"deepseek-v4-pro",
+				"deepseek-v4-flash",
+				"qwen3.7-plus",
+				"qwen3.6-plus",
+				"kimi-k2.6",
+				"mimo-v2.5-pro",
+				"gpt-5.5",
+				"gpt-image-2",
+			},
+			Group: "yole",
 		},
+		Points: PointsConfig{
+			PerUSD: 100,
+			Unit:   "积分",
+		},
+		Routing: defaultRoutingConfig(),
 		RateLimit: RateLimitConfig{
 			PerIPPerHour: 3,
 			PerIPPerDay:  10,
@@ -125,6 +170,7 @@ func defaultConfig() Config {
 
 func applyEnv(cfg *Config) {
 	setString(&cfg.Server.Listen, "YOLE_PROVISIONER_LISTEN")
+	setString(&cfg.Server.PublicBaseURL, "YOLE_PUBLIC_BASE_URL")
 	setString(&cfg.NewAPI.BaseURL, "YOLE_NEWAPI_BASE_URL")
 	setString(&cfg.NewAPI.AdminToken, "YOLE_NEWAPI_ADMIN_TOKEN")
 	setInt(&cfg.NewAPI.AdminUserID, "YOLE_NEWAPI_ADMIN_USER_ID")
@@ -133,6 +179,8 @@ func applyEnv(cfg *Config) {
 	setString(&cfg.Trial.TokenPrefix, "YOLE_TRIAL_TOKEN_PREFIX")
 	setFloat(&cfg.Trial.InitialCreditUSD, "YOLE_TRIAL_INITIAL_CREDIT_USD")
 	setFloat(&cfg.Trial.LowBalanceUSD, "YOLE_TRIAL_LOW_BALANCE_USD")
+	setFloat(&cfg.Points.PerUSD, "YOLE_POINTS_PER_USD")
+	setString(&cfg.Points.Unit, "YOLE_POINTS_UNIT")
 	setString(&cfg.Trial.UserGroup, "YOLE_TRIAL_USER_GROUP")
 	setString(&cfg.Trial.TokenGroup, "YOLE_TRIAL_TOKEN_GROUP")
 	setString(&cfg.Trial.DefaultModel, "YOLE_TRIAL_DEFAULT_MODEL")
@@ -192,6 +240,11 @@ func (cfg *Config) Validate() error {
 	if cfg.Server.Listen == "" {
 		return errors.New("server.listen is required")
 	}
+	if strings.TrimSpace(cfg.Server.PublicBaseURL) != "" {
+		if err := validateHTTPURL("server.public_base_url", cfg.Server.PublicBaseURL); err != nil {
+			return err
+		}
+	}
 	if err := validateHTTPURL("newapi.base_url", cfg.NewAPI.BaseURL); err != nil {
 		return err
 	}
@@ -216,6 +269,12 @@ func (cfg *Config) Validate() error {
 	if cfg.Trial.LowBalanceUSD < 0 {
 		return errors.New("trial.low_balance_usd must be non-negative")
 	}
+	if cfg.Points.PerUSD <= 0 {
+		return errors.New("points.per_usd must be positive")
+	}
+	if strings.TrimSpace(cfg.Points.Unit) == "" {
+		cfg.Points.Unit = "积分"
+	}
 	if strings.TrimSpace(cfg.Trial.UserGroup) == "" {
 		cfg.Trial.UserGroup = nonemptyFallback(cfg.Trial.Group, "yole")
 	}
@@ -228,6 +287,7 @@ func (cfg *Config) Validate() error {
 	if len(cfg.Trial.AllowedModels) == 0 {
 		cfg.Trial.AllowedModels = []string{cfg.Trial.DefaultModel}
 	}
+	normalizeRoutingConfig(cfg)
 	if cfg.RateLimit.PerIPPerHour <= 0 {
 		return errors.New("rate_limit.per_ip_per_hour must be positive")
 	}
@@ -241,6 +301,94 @@ func (cfg *Config) Validate() error {
 		cfg.Storage.AccountStorePath = "accounts.json"
 	}
 	return nil
+}
+
+func defaultRoutingConfig() RoutingConfig {
+	enabled := true
+	return RoutingConfig{
+		Version:        "2026-06-14.1",
+		DefaultProfile: "yole_standard",
+		Profiles: map[string]RouteProfile{
+			"yole_standard": {
+				NewAPIGroup:     "yole",
+				Conversation:    []string{"deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash", "qwen3.6-plus"},
+				Vision:          []string{"qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+				ImageGeneration: []string{"gpt-image-2"},
+				ImageEditing:    []string{"gpt-image-2"},
+			},
+			"yole_vip": {
+				NewAPIGroup:     "vip",
+				Conversation:    []string{"gpt-5.5", "deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash"},
+				Vision:          []string{"gpt-5.5", "qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+				ImageGeneration: []string{"gpt-image-2"},
+				ImageEditing:    []string{"gpt-image-2"},
+			},
+		},
+		Models: map[string]ModelMetadata{
+			"deepseek-v4-pro": {
+				InputModalities:  []string{"text"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"deepseek-v4-flash": {
+				InputModalities:  []string{"text"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"qwen3.7-plus": {
+				InputModalities:  []string{"text", "image"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"qwen3.6-plus": {
+				InputModalities:  []string{"text", "image"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"kimi-k2.6": {
+				InputModalities:  []string{"text", "image"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"mimo-v2.5-pro": {
+				InputModalities:  []string{"text"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"gpt-5.5": {
+				InputModalities:  []string{"text", "image"},
+				OutputModalities: []string{"text"},
+				ToolCalling:      true,
+				Enabled:          &enabled,
+			},
+			"gpt-image-2": {
+				InputModalities:  []string{"text", "image"},
+				OutputModalities: []string{"image"},
+				Enabled:          &enabled,
+			},
+		},
+	}
+}
+
+func normalizeRoutingConfig(cfg *Config) {
+	if strings.TrimSpace(cfg.Routing.Version) == "" {
+		cfg.Routing.Version = defaultRoutingConfig().Version
+	}
+	if strings.TrimSpace(cfg.Routing.DefaultProfile) == "" {
+		cfg.Routing.DefaultProfile = "yole_standard"
+	}
+	if len(cfg.Routing.Profiles) == 0 {
+		cfg.Routing.Profiles = defaultRoutingConfig().Profiles
+	}
+	if len(cfg.Routing.Models) == 0 {
+		cfg.Routing.Models = defaultRoutingConfig().Models
+	}
 }
 
 func validateHTTPURL(name string, raw string) error {

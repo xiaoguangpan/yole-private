@@ -16,10 +16,8 @@ import { cn } from "@/lib/utils";
  * which we prefer over centred 30px buttons floating in a taller bar).
  * Buttons touch each other with no gap.
  *
- * Hover: gray for min/max, red for close — Yole's `bg-danger` token
- * rather than literal Win 11 red so the chrome stays inside our
- * design system. Close hover also swaps the icon to `bg-elevated`
- * (light) for contrast on the red fill.
+ * Hover: gray for min/max, error red for close. Close hover uses
+ * white text for stable contrast in both light and dark themes.
  *
  * Maximize-state tracking: subscribe to `onResized` and re-poll
  * `isMaximized()` after every resize event (Tauri 2 doesn't surface a
@@ -137,7 +135,7 @@ function ControlButton({
       className={cn(
         "flex h-11 w-[46px] shrink-0 items-center justify-center text-ink-soft transition-colors",
         variant === "default" && "hover:bg-hover hover:text-ink",
-        variant === "close" && "hover:bg-danger hover:text-elevated",
+        variant === "close" && "hover:bg-error hover:text-white",
       )}
     >
       {children}

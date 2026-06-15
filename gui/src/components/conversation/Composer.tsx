@@ -3,9 +3,12 @@ import {
   ArrowUp,
   CaretUp,
   Check,
+  CircleNotch,
   Cube,
   Gear,
+  Image,
   Stop,
+  X,
 } from "@phosphor-icons/react";
 import {
   forwardRef,
@@ -15,7 +18,9 @@ import {
   useState,
 } from "react";
 
+import { ImageLightbox } from "@/components/conversation/ImageLightbox";
 import { TooltipLabel } from "@/components/ui/tooltip";
+import { savePastedImageFile } from "@/lib/conversation-images";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +83,14 @@ const PASTE_FOLD_THRESHOLD_LINES = 10;
  */
 const PASTE_PLACEHOLDER_RE = /\[Pasted text #(\d+) \+\d+ lines\]/g;
 
+const IMAGE_ONLY_PROMPT = "请分析这张图片。";
+
+interface ComposerImageAttachment {
+  id: string;
+  path: string;
+  previewUrl: string;
+}
+
 const COMPOSER_ACTION_BUTTON = cn(
   "flex size-8 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow,transform]",
   "duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:duration-[45ms]",
@@ -118,7 +131,7 @@ export interface ComposerProps {
 
   /** Submit handler. Triggered by Enter (without Shift) or clicking the
    * submit button. Receives the trimmed text. */
-  onSubmit?: (text: string) => void;
+  onSubmit?: (text: string, images?: string[]) => void;
 
   /** When true, hide submit and show the deep-amber stop button. */
   stopMode?: boolean;
@@ -159,6 +172,9 @@ export interface ComposerProps {
    * provided. Today the only caller using this path is the dev-toggle
    * harness; production wires `llms` + `onSelectLLM`. */
   onOpenLLMSwitcher?: () => void;
+  /** Commercial Yole hides model switching/config affordances from
+   * ordinary users; managed provisioning owns the model choice. */
+  hideModelPicker?: boolean;
 }
 
 /**
@@ -188,6 +204,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       onConfigureModels,
       requiresModelConfig = false,
       onOpenLLMSwitcher,
+      hideModelPicker = false,
     },
     ref,
   ) {
@@ -198,6 +215,14 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
     // Avoid syncing prop -> internal in an effect (React 19 / Compiler
     // flags that as cascading-render-prone) — derive on render instead.
     const [internal, setInternal] = useState("");
+    const [imageAttachments, setImageAttachments] = useState<
+      ComposerImageAttachment[]
+    >([]);
+    const [previewImage, setPreviewImage] =
+      useState<ComposerImageAttachment | null>(null);
+    const [imagePasteBusy, setImagePasteBusy] = useState(false);
+    const [imagePasteError, setImagePasteError] = useState<string | null>(null);
+    const [imageDragActive, setImageDragActive] = useState(false);
     const isControlled = value !== undefined;
     const text = isControlled ? value : internal;
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -305,7 +330,42 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
         return full !== undefined ? full : match;
       });
 
+    const saveImageFiles = async (files: File[]) => {
+      if (files.length === 0) return;
+      setImagePasteBusy(true);
+      setImagePasteError(null);
+      try {
+        const saved = await Promise.all(
+          files.map(async (file) => {
+            const image = await savePastedImageFile(file);
+            return {
+              id: crypto.randomUUID(),
+              path: image.path,
+              previewUrl: image.previewUrl,
+            };
+          }),
+        );
+        setImageAttachments((current) => [...current, ...saved]);
+      } catch (e) {
+        console.warn("[Composer] pasted image save failed", e);
+        setImagePasteError(copy.composer.imagePasteFailed);
+      } finally {
+        setImagePasteBusy(false);
+      }
+    };
+
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const imageFiles = Array.from(e.clipboardData.items)
+        .filter(
+          (item) => item.kind === "file" && item.type.startsWith("image/"),
+        )
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        void saveImageFiles(imageFiles);
+        return;
+      }
       // Controlled callers manage their own state; can't intercept
       // paste without their cooperation, so fall through to default.
       if (isControlled) return;
@@ -330,6 +390,31 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
       onChange?.(next);
     };
 
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+      if (!dataTransferHasImage(e.dataTransfer)) return;
+      e.preventDefault();
+      setImageDragActive(true);
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      if (!dataTransferHasImage(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setImageDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      setImageDragActive(false);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      if (!dataTransferHasImage(e.dataTransfer)) return;
+      e.preventDefault();
+      setImageDragActive(false);
+      void saveImageFiles(imageFilesFromDataTransfer(e.dataTransfer));
+    };
+
     // `/btw` side questions deliberately bypass the stopMode gate
     // below — they're the explicit "ask while agent is running"
     // affordance. Detection lives at this level (not at the
@@ -343,16 +428,21 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
     const handleSubmit = () => {
       const expanded = expandPastePlaceholders(text);
       const trimmed = expanded.trim();
-      if (!trimmed || disabled) return;
+      const imagePaths = imageAttachments.map((image) => image.path);
+      const submitText =
+        trimmed || (imagePaths.length > 0 ? IMAGE_ONLY_PROMPT : "");
+      if ((!submitText && imagePaths.length === 0) || disabled) return;
       if (requiresModelConfig) {
         onConfigureModels?.();
         return;
       }
       // Allow /btw through stopMode; everything else stays gated.
       if (stopMode && !isSideQuestion) return;
-      onSubmit?.(trimmed);
+      onSubmit?.(submitText, imagePaths);
       if (!isControlled) {
         setInternal("");
+        setImageAttachments([]);
+        setImagePasteError(null);
         // Reset paste registry: monotonic counter restart + clear map
         // so #1 reappears in the next session. Avoids the counter
         // creeping into 4-digit territory across a long workday.
@@ -370,12 +460,77 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
 
     return (
       <div
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
           "rounded-md border border-line bg-elevated px-3.5 pb-2 pt-3.5 shadow-card transition-all",
           "focus-within:border-brand focus-within:ring-[3px] focus-within:ring-brand/20",
+          imageDragActive && "border-brand ring-[3px] ring-brand/20",
           disabled && "opacity-60",
         )}
       >
+        {(imageAttachments.length > 0 || imagePasteBusy || imagePasteError) && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {imageAttachments.map((image, index) => (
+              <div
+                key={image.id}
+                className="group/image relative size-14 overflow-hidden rounded-sm border border-line bg-app"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(image)}
+                  className="block size-full cursor-zoom-in"
+                  aria-label={copy.composer.previewPastedImage}
+                >
+                  <img
+                    src={image.previewUrl}
+                    alt={copy.composer.pastedImageAlt(index + 1)}
+                    className="size-full object-cover"
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setImageAttachments((current) =>
+                      current.filter((item) => item.id !== image.id),
+                    )
+                  }
+                  className={cn(
+                    "absolute right-1 top-1 inline-flex size-5 items-center justify-center rounded-sm",
+                    "bg-elevated/90 text-ink-muted opacity-0 shadow-card transition-opacity",
+                    "hover:text-ink group-hover/image:opacity-100",
+                  )}
+                  aria-label={copy.composer.removePastedImage}
+                >
+                  <X size={11} weight="bold" />
+                </button>
+              </div>
+            ))}
+            {imagePasteBusy && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-app px-2 py-1 text-[11.5px] text-ink-muted">
+                <CircleNotch size={12} weight="thin" className="spin" />
+                {copy.composer.savingImage}
+              </span>
+            )}
+            {imagePasteError && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm border border-warning/30 bg-warning/10 px-2 py-1 text-[11.5px] text-warning">
+                <Image size={12} weight="thin" />
+                {imagePasteError}
+                <button
+                  type="button"
+                  onClick={() => setImagePasteError(null)}
+                  className="ml-0.5 inline-flex size-4 items-center justify-center rounded-sm text-warning/80 hover:bg-warning/15 hover:text-warning"
+                  aria-label={copy.common.close}
+                >
+                  <X size={10} weight="bold" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           rows={2}
@@ -394,16 +549,18 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
         />
 
         <div className="mt-2 flex items-center gap-2">
-          <LLMPill
-            llmDisplayName={llmDisplayName}
-            llms={llms}
-            onSelectLLM={onSelectLLM}
-            llmConfigHint={llmConfigHint}
-            onConfigureModels={onConfigureModels}
-            onOpenLLMSwitcher={onOpenLLMSwitcher}
-            disabled={disabled || stopMode}
-            stopMode={stopMode}
-          />
+          {!hideModelPicker && (
+            <LLMPill
+              llmDisplayName={llmDisplayName}
+              llms={llms}
+              onSelectLLM={onSelectLLM}
+              llmConfigHint={llmConfigHint}
+              onConfigureModels={onConfigureModels}
+              onOpenLLMSwitcher={onOpenLLMSwitcher}
+              disabled={disabled || stopMode}
+              stopMode={stopMode}
+            />
+          )}
 
           <span
             key={`composer-action-${submitAckTick}`}
@@ -436,7 +593,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
                   onClick={handleSubmit}
                   disabled={
                     disabled ||
-                    !text?.trim() ||
+                    (!text?.trim() && imageAttachments.length === 0) ||
                     (requiresModelConfig && !onConfigureModels)
                   }
                   aria-label={
@@ -449,7 +606,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
                       ? COMPOSER_CONFIG_BUTTON
                       : COMPOSER_SEND_BUTTON,
                     (disabled ||
-                      !text?.trim() ||
+                      (!text?.trim() && imageAttachments.length === 0) ||
                       (requiresModelConfig && !onConfigureModels)) &&
                       "cursor-not-allowed opacity-50 hover:translate-y-0 hover:shadow-none",
                   )}
@@ -464,10 +621,43 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(
             )}
           </span>
         </div>
+        <ImageLightbox
+          src={previewImage?.previewUrl ?? ""}
+          alt={copy.composer.previewPastedImage}
+          open={previewImage !== null}
+          onOpenChange={(open) => {
+            if (!open) setPreviewImage(null);
+          }}
+        />
       </div>
     );
   },
 );
+
+function dataTransferHasImage(dataTransfer: DataTransfer): boolean {
+  return imageFilesFromDataTransfer(dataTransfer).length > 0;
+}
+
+function imageFilesFromDataTransfer(dataTransfer: DataTransfer): File[] {
+  return Array.from(dataTransfer.items)
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file))
+    .filter(
+      (file) => file.type.startsWith("image/") || isImageFileName(file.name),
+    );
+}
+
+function isImageFileName(name: string): boolean {
+  const ext = name.trim().toLowerCase().split(".").pop();
+  return (
+    ext === "png" ||
+    ext === "jpg" ||
+    ext === "jpeg" ||
+    ext === "webp" ||
+    ext === "gif"
+  );
+}
 
 /**
  * LLM pill — clickable label showing the current model, opens a

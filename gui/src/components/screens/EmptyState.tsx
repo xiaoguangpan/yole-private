@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export interface EmptyStateProps {
   llmDisplayName: string;
-  onSubmit?: (text: string) => void;
+  onSubmit?: (text: string, images?: string[]) => void;
   /** LLM list for the Composer's inline picker. Drives the popover
    * under the model pill — see Composer's LLMPill. */
   llms?: ComposerLLMOption[];
@@ -26,6 +26,8 @@ export interface EmptyStateProps {
   requiresModelConfig?: boolean;
   /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
+  /** Hide model switching/config affordances for simplified commercial UI. */
+  hideModelPicker?: boolean;
   /**
    * Width mode from the TopBar toggle. EmptyState's hero block tracks
    * the same setting so the toggle has a visible effect even when no
@@ -62,6 +64,7 @@ export function EmptyState({
   onConfigureModels,
   requiresModelConfig = false,
   onOpenLLMSwitcher,
+  hideModelPicker = false,
   conversationWidth = "compact",
   projectName,
   focusTick = 0,
@@ -98,6 +101,7 @@ export function EmptyState({
           onConfigureModels={onConfigureModels}
           requiresModelConfig={requiresModelConfig}
           onOpenLLMSwitcher={onOpenLLMSwitcher}
+          hideModelPicker={hideModelPicker}
         />
 
         {projectName && (

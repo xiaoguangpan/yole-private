@@ -53,6 +53,16 @@
       "switch_tab_id": {"type": "string", "description": "[Optional] Tab ID to switch to before executing"}}}
   }},
   {"type": "function", "function": {
+    "name": "yole_image_generate",
+    "description": "Generate real raster images with Yole's configured image model. Use when the user asks to create images, visual assets, product/ecommerce images, website illustrations, posters, logos drafts, or when a website/app task needs original imagery instead of local placeholder drawing",
+    "parameters": {"type": "object", "properties": {
+      "prompt": {"type": "string", "description": "Detailed image prompt. Include subject, style, composition, colors, text constraints, and intended use"},
+      "size": {"type": "string", "enum": ["1024x1024", "1024x1536", "1536x1024"], "description": "Image size", "default": "1024x1024"},
+      "quality": {"type": "string", "description": "Optional provider quality value"},
+      "n": {"type": "integer", "description": "Number of images, 1-4", "default": 1},
+      "model": {"type": "string", "description": "Optional image model override; default is configured by Yole"}}}
+  }},
+  {"type": "function", "function": {
     "name": "update_working_checkpoint",
     "description": "Short-term working notepad, auto-injected each turn to prevent info loss in long tasks. Call during early/mid stages, not at end. When: (1) after reading SOP, store user needs & key constraints (skip for simple 1-2 step tasks); (2) before subtask switch or context flush; (3) after repeated failures, re-read SOP and must store new findings; (4) on new task, update content, clear old progress but keep valid constraints.\n\nDon't call: simple tasks (1-2 steps), task completed (use long-term memory tool)",
     "parameters": {"type": "object", "properties": {

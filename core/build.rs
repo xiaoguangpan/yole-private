@@ -41,7 +41,8 @@ fn compile_windows_test_manifest() {
     )
     .expect("write Windows test manifest resource");
 
-    let rc = embed_resource::find_windows_sdk_tool("rc.exe").unwrap_or_else(|| PathBuf::from("rc.exe"));
+    let rc =
+        embed_resource::find_windows_sdk_tool("rc.exe").unwrap_or_else(|| PathBuf::from("rc.exe"));
     let status = Command::new(&rc)
         .arg("/nologo")
         .arg("/fo")

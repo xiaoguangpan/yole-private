@@ -60,9 +60,7 @@ export async function hydrateApp(): Promise<void> {
   let realVersion: string | null = null;
   try {
     realVersion = await getVersion();
-    useRuntimeStore
-      .getState()
-      .patchRuntimeInfo({ yoleVersion: realVersion });
+    useRuntimeStore.getState().patchRuntimeInfo({ yoleVersion: realVersion });
   } catch (e) {
     console.debug("[hydrate] app.getVersion failed.", e);
   }
@@ -107,6 +105,7 @@ export async function hydrateApp(): Promise<void> {
       console.warn("[hydrate] Yole trial model provisioning failed.", e);
       pushYoleProvisioningFailedToast(e);
     }
+    void useYoleAccountStore.getState().loadCached();
     void useYoleAccountStore.getState().refresh();
   }
   // Startup reads only metadata and local credential presence, never the
@@ -118,12 +117,9 @@ export async function hydrateApp(): Promise<void> {
   // Core so a slow direct-SQL housekeeping pass cannot leave the
   // sidebar blank on Dev hot restarts.
   await useSessionsStore.getState().hydrate();
-  // Update auto-prepare is deliberately after sessions hydrate. If a
-  // dev reload preserves an in-flight task in messagesStore, the updater
-  // guard can see it and defer install work until the session is idle.
-  void useAppUpdateStore
-    .getState()
-    .check({ silent: true, downloadIfAvailable: true });
+  // Startup checks only. Download/install is always user-initiated so
+  // the app never surprises the user with a sudden updater run.
+  void useAppUpdateStore.getState().check({ silent: true });
 
   // 6. Non-critical SQLite housekeeping + FTS backfill. Fire-and-forget:
   // these are nice cleanup/indexing tasks, not requirements for first paint.

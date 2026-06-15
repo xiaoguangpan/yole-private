@@ -1,4 +1,4 @@
-import sys, os, re, json, time, threading, importlib
+import sys, os, re, json, time, threading, importlib, base64, uuid, requests
 from datetime import datetime
 from pathlib import Path
 import tempfile, traceback, subprocess, itertools, collections, difflib, shutil
@@ -9,10 +9,31 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from agent_loop import BaseHandler, StepOutcome, json_default
 script_dir = os.path.dirname(os.path.abspath(__file__))
 state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
+YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):
     return os.path.join(script_dir, 'assets', *parts)
+
+def auto_make_url(api_base, path):
+    base = str(api_base or "").rstrip("/")
+    path = str(path or "").lstrip("/")
+    if base.endswith("/v1"):
+        return f"{base}/{path}"
+    return f"{base}/v1/{path}"
+
+def yole_image_model_from_route():
+    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
+    if not raw:
+        return ""
+    try:
+        route = json.loads(raw)
+        values = route.get("imageGeneration") or route.get("image_generation") or []
+        if isinstance(values, list) and values:
+            return str(values[0]).strip()
+    except Exception:
+        return ""
+    return ""
 
 
 def safe_print(*args, **kwargs):
@@ -342,6 +363,73 @@ class GenericAgentHandler(BaseHandler):
         result = ask_user(question, candidates)
         yield f"Waiting for your answer ...\n"
         return StepOutcome(result, next_prompt="", should_exit=True)
+
+    def do_yole_image_generate(self, args, response):
+        '''使用 Yole 配置的图片模型生成图片，保存到本地并返回 Markdown 链接。'''
+        prompt = (args.get("prompt") or args.get("description") or "").strip()
+        if not prompt:
+            return StepOutcome("[Error] prompt is required for image generation.", next_prompt="\n")
+        model = (args.get("model") or os.environ.get("YOLE_IMAGE_MODEL") or yole_image_model_from_route() or "gpt-image-2").strip()
+        size = (args.get("size") or "1024x1024").strip()
+        quality = (args.get("quality") or "").strip()
+        try:
+            n = int(args.get("n", 1))
+        except Exception:
+            n = 1
+        n = max(1, min(n, 4))
+        backend = getattr(self.parent.llmclient, "backend", None)
+        if backend is None:
+            return StepOutcome("[Error] no active LLM backend for image generation.", next_prompt="\n")
+        api_key = getattr(backend, "api_key", "")
+        api_base = getattr(backend, "api_base", "")
+        if not api_key or not api_base:
+            return StepOutcome("[Error] missing API credentials for image generation.", next_prompt="\n")
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": YOLE_HTTP_USER_AGENT}
+        payload = {"model": model, "prompt": prompt, "n": n, "size": size}
+        if quality:
+            payload["quality"] = quality
+        url = auto_make_url(api_base, "images/generations")
+        yield f"[Action] Generating image with {model} ({size})\n"
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=(30, 300))
+            if resp.status_code >= 400:
+                body = resp.text.strip()[:500]
+                return StepOutcome(f"[Error] Image generation HTTP {resp.status_code}: {body}", next_prompt="\n")
+            data = resp.json()
+        except Exception as e:
+            return StepOutcome(f"[Error] Image generation failed: {e}", next_prompt="\n")
+        out_dir = state_path("temp", "generated_images")
+        os.makedirs(out_dir, exist_ok=True)
+        saved = []
+        for item in data.get("data", []) or []:
+            b64 = item.get("b64_json")
+            remote_url = item.get("url")
+            image_id = uuid.uuid4().hex[:10]
+            try:
+                if b64:
+                    raw = base64.b64decode(b64)
+                    path = os.path.join(out_dir, f"yole_image_{image_id}.png")
+                    with open(path, "wb") as f:
+                        f.write(raw)
+                    saved.append(path)
+                elif remote_url:
+                    r = requests.get(remote_url, headers={"User-Agent": YOLE_HTTP_USER_AGENT}, timeout=120)
+                    r.raise_for_status()
+                    path = os.path.join(out_dir, f"yole_image_{image_id}.png")
+                    with open(path, "wb") as f:
+                        f.write(r.content)
+                    saved.append(path)
+            except Exception as e:
+                saved.append(f"[download failed: {e}]")
+        if not saved:
+            return StepOutcome("[Error] Image generation returned no image data.", next_prompt="\n")
+        lines = ["生成的图片已保存："]
+        for path in saved:
+            if path.startswith("["):
+                lines.append(path)
+            else:
+                lines.append(f"![generated image]({path})\n\n`{path}`")
+        return StepOutcome("\n\n".join(lines), next_prompt="\n")
 
     def do_web_scan(self, args, response):
         '''获取当前页面内容和标签页列表。也可用于切换标签页。

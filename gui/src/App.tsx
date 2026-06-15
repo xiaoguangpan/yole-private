@@ -25,6 +25,7 @@ import {
 import { CopyProvider, copyForLanguage } from "@/lib/i18n";
 import { useImSupervisorStatus } from "@/hooks/useImSupervisorStatus";
 import { pushCloseHintCopy } from "@/lib/close-hint";
+import { replaceUserMessageFromTurn } from "@/lib/db";
 import { restartEnabledImSupervisors } from "@/lib/im-supervisor";
 import { ensureHistoryReplayComplete } from "@/lib/ipc-handlers";
 import { resolveLanguagePreference } from "@/lib/language";
@@ -57,6 +58,7 @@ import { useUiStore } from "@/stores/ui";
 import { useYoleAccountStore } from "@/stores/yole-account";
 import { hydrateApp } from "@/lib/hydrate";
 import { makeAppError } from "@/types/app-error";
+import type { UserTurn } from "@/types/conversation";
 
 /**
  * V0.1 Stage 2 #8 — App entry.
@@ -201,11 +203,13 @@ function App() {
   const dismissToast = useUiStore((s) => s.dismissToast);
   const yoleAccount = useYoleAccountStore((s) => s.status);
   const yoleAccountLoading = useYoleAccountStore((s) => s.loading);
+  const yoleAccountError = useYoleAccountStore((s) => s.error);
   const refreshYoleAccount = useYoleAccountStore((s) => s.refresh);
   const notifyYoleLowBalance = useYoleAccountStore(
     (s) => s.notifyLowBalanceInActiveChat,
   );
   const checkForAppUpdate = useAppUpdateStore((s) => s.check);
+  const downloadAppUpdate = useAppUpdateStore((s) => s.downloadAndInstall);
   const restartAppUpdate = useAppUpdateStore((s) => s.restart);
   const [emptyComposerFocusTick, setEmptyComposerFocusTick] = useState(0);
 
@@ -276,10 +280,12 @@ function App() {
   };
   const openModelsForMissingConfig = () => openSettings("models");
   const openModelConfigFromSwitcher =
-    activeRuntimeKind === "managed" ? () => openSettings("models") : undefined;
+    activeRuntimeKind === "managed" && !simplifiedUi
+      ? () => openSettings("models")
+      : undefined;
   const openLLMSwitcherFallback = () => {
     if (activeRuntimeKind === "managed") {
-      openSettings("models");
+      if (!simplifiedUi) openSettings("models");
       return;
     }
     setPaletteOpen(true);
@@ -358,9 +364,17 @@ function App() {
   const appendSideQuestionUserTurn = useMessagesStore(
     (s) => s.appendSideQuestionUserTurn,
   );
+  const replaceUserTurnFrom = useMessagesStore((s) => s.replaceUserTurnFrom);
   const removePendingApproval = useMessagesStore(
     (s) => s.removePendingApproval,
   );
+  const rewindSessionAfterUserEdit = useSessionsStore(
+    (s) => s.rewindSessionAfterUserEdit,
+  );
+  const pendingUserMessageEditRef = useRef<{
+    sessionId: string;
+    turnIndex: number;
+  } | null>(null);
 
   const reportUserSendFailure = (sid: string, context: string, e: unknown) => {
     const message = e instanceof Error ? e.message : String(e);
@@ -798,10 +812,6 @@ function App() {
   const activeProject = activeProjectFilter
     ? projects.find((p) => p.id === activeProjectFilter)
     : undefined;
-  const activeSessionBusy =
-    screen === "main" &&
-    (isRunning || pendingApprovals.length > 0 || pendingAskUser !== null);
-
   // Archived dialog open state — local UI state, no need to live in
   // the global store. Persisting across reloads would be confusing
   // (user expects modals to be closed on app re-open).
@@ -814,21 +824,20 @@ function App() {
     () => visibleSessions.filter((s) => bucketSession(s) === "earlier"),
     [visibleSessions],
   );
-  const [projectViewOpen, setProjectViewOpen] = useState(false);
+  const [projectViewOpen, setProjectViewOpen] = useState(true);
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
-  const [projectReviewNowMs, setProjectReviewNowMs] = useState(0);
   const toggleProjectView = () => {
     if (projectViewOpen) {
-      setActiveProjectFilter(undefined);
       setProjectViewOpen(false);
       return;
     }
-    setExpandedProjectIds([]);
-    setProjectReviewNowMs(Date.now());
     setProjectViewOpen(true);
   };
+
+  useEffect(() => {
+    pendingUserMessageEditRef.current = null;
+  }, [activeSessionId, screen]);
   const openProjectInSidebar = (projectId: string) => {
-    setProjectReviewNowMs(Date.now());
     setProjectViewOpen(true);
     setExpandedProjectIds((ids) =>
       ids.includes(projectId) ? ids : [...ids, projectId],
@@ -836,7 +845,6 @@ function App() {
   };
   const toggleProjectExpanded = (projectId: string) => {
     if (!projectViewOpen) {
-      setProjectReviewNowMs(Date.now());
       setExpandedProjectIds([projectId]);
       setProjectViewOpen(true);
       return;
@@ -847,9 +855,19 @@ function App() {
         : [...ids, projectId],
     );
   };
+  const toggleAllProjectSessions = () => {
+    if (!projectViewOpen) {
+      setProjectViewOpen(true);
+      return;
+    }
+    const projectIds = projects.map((project) => project.id);
+    const allExpanded =
+      projectIds.length > 0 &&
+      projectIds.every((projectId) => expandedProjectIds.includes(projectId));
+    setExpandedProjectIds(allExpanded ? [] : projectIds);
+  };
   const startProjectConversation = (projectId: string) => {
     setActiveProjectFilter(projectId);
-    if (activeSessionBusy) return;
     setActiveSession(undefined);
     setScreen("empty");
     setEmptyComposerFocusTick((tick) => tick + 1);
@@ -1079,8 +1097,12 @@ function App() {
                 ? () => openSettings("im")
                 : undefined
             }
+            showYoleAccount={activeRuntimeKind === "managed"}
             yoleAccount={activeRuntimeKind === "managed" ? yoleAccount : null}
             yoleAccountLoading={yoleAccountLoading}
+            yoleAccountError={
+              activeRuntimeKind === "managed" ? yoleAccountError : null
+            }
             onRefreshYoleAccount={() => {
               void refreshYoleAccount();
             }}
@@ -1095,48 +1117,56 @@ function App() {
             onChangeThemePreference={(preference) => {
               void setThemePreference(preference);
             }}
-            onReinjectTools={() => {
-              // Reinject targets the currently active session — that's
-              // the conversation the user is reading when they notice
-              // tool drift. No-op if no active session (button is
-              // available but does nothing rather than throwing).
-              if (!activeSessionId) return;
-              if (bridgeStatus !== "connected") return;
-              void sendIPCCommand(activeSessionId, {
-                kind: "reinject_tools",
-              });
-            }}
-            onTogglePet={() => {
-              // Three cases (see devlog 2026-05-14 pet UX overhaul):
-              //   1. Active session HOLDS the pet → detach (close).
-              //   2. Pet on another session → implicit migrate:
-              //      detach old + stash target; the pet_detached IPC
-              //      handler fires the follow-up attach once the
-              //      port is released.
-              //   3. No pet anywhere → attach to active.
-              // The sidebar Cat badge tells the user where the pet
-              // currently lives, so the menu's "桌面宠物" always
-              // reads as "I want it here" without surprise.
-              if (!activeSessionId) return;
-              if (petAttachedSessionId === activeSessionId) {
-                void sendIPCCommand(activeSessionId, {
-                  kind: "detach_pet",
-                });
-                return;
-              }
-              if (bridgeStatus !== "connected") return;
-              if (petAttachedSessionId) {
-                setPendingPetMigration(activeSessionId);
-                void sendIPCCommand(petAttachedSessionId, {
-                  kind: "detach_pet",
-                });
-                return;
-              }
-              void sendIPCCommand(activeSessionId, {
-                kind: "attach_pet",
-                port: 41983,
-              });
-            }}
+            onReinjectTools={
+              simplifiedUi
+                ? undefined
+                : () => {
+                    // Reinject targets the currently active session — that's
+                    // the conversation the user is reading when they notice
+                    // tool drift. No-op if no active session (button is
+                    // available but does nothing rather than throwing).
+                    if (!activeSessionId) return;
+                    if (bridgeStatus !== "connected") return;
+                    void sendIPCCommand(activeSessionId, {
+                      kind: "reinject_tools",
+                    });
+                  }
+            }
+            onTogglePet={
+              simplifiedUi
+                ? undefined
+                : () => {
+                    // Three cases (see devlog 2026-05-14 pet UX overhaul):
+                    //   1. Active session HOLDS the pet → detach (close).
+                    //   2. Pet on another session → implicit migrate:
+                    //      detach old + stash target; the pet_detached IPC
+                    //      handler fires the follow-up attach once the
+                    //      port is released.
+                    //   3. No pet anywhere → attach to active.
+                    // The sidebar Cat badge tells the user where the pet
+                    // currently lives, so the menu's "桌面宠物" always
+                    // reads as "I want it here" without surprise.
+                    if (!activeSessionId) return;
+                    if (petAttachedSessionId === activeSessionId) {
+                      void sendIPCCommand(activeSessionId, {
+                        kind: "detach_pet",
+                      });
+                      return;
+                    }
+                    if (bridgeStatus !== "connected") return;
+                    if (petAttachedSessionId) {
+                      setPendingPetMigration(activeSessionId);
+                      void sendIPCCommand(petAttachedSessionId, {
+                        kind: "detach_pet",
+                      });
+                      return;
+                    }
+                    void sendIPCCommand(activeSessionId, {
+                      kind: "attach_pet",
+                      port: 41983,
+                    });
+                  }
+            }
             currentSessionHasPet={
               !!activeSessionId && petAttachedSessionId === activeSessionId
             }
@@ -1192,10 +1222,10 @@ function App() {
             activeProjectFilter={activeProjectFilter}
             projectViewOpen={projectViewOpen}
             expandedProjectIds={expandedProjectIds}
-            projectReviewNowMs={projectReviewNowMs || undefined}
             onNewProject={() => setCreateProjectOpen(true)}
             onToggleProjectView={toggleProjectView}
             onToggleProjectExpanded={toggleProjectExpanded}
+            onToggleAllProjectSessions={toggleAllProjectSessions}
             onStartProjectConversation={startProjectConversation}
             onAssignSessionToProject={assignSessionToProjectWithToast}
             onTogglePinProject={(id) => {
@@ -1233,13 +1263,15 @@ function App() {
                     selectLLMForNewSession(idx);
                   }}
                   onOpenLLMSwitcher={openLLMSwitcherFallback}
-                  onSubmit={(t) => {
+                  hideModelPicker={simplifiedUi}
+                  onSubmit={(t, images = []) => {
                     if (requiresManagedModelConfig) {
                       openModelsForMissingConfig();
                       return;
                     }
                     void submitOnEmpty(
                       t,
+                      images,
                       activeSessionId,
                       createSession,
                       activateSession,
@@ -1287,9 +1319,10 @@ function App() {
                     }
                   }}
                   onOpenLLMSwitcher={openLLMSwitcherFallback}
+                  hideModelPicker={simplifiedUi}
                   pendingApprovals={pendingApprovals}
                   approvalDecisions={approvalDecisions}
-                  onSubmit={(t) => {
+                  onSubmit={(t, images = []) => {
                     if (requiresManagedModelConfig) {
                       openModelsForMissingConfig();
                       return;
@@ -1337,6 +1370,50 @@ function App() {
                     };
                     const reportSendFailure = (e: unknown) =>
                       reportUserSendFailure(sid, "send_user_message", e);
+                    const edit = pendingUserMessageEditRef.current;
+                    if (
+                      edit?.sessionId === sid &&
+                      edit.turnIndex > 0 &&
+                      pendingAskUser === null
+                    ) {
+                      void (async () => {
+                        try {
+                          await shutdownBridge(sid);
+                          await replaceUserMessageFromTurn({
+                            sessionId: sid,
+                            turnIndex: edit.turnIndex,
+                            content: t,
+                          });
+                          rewindSessionAfterUserEdit(sid, edit.turnIndex - 1);
+                          replaceUserTurnFrom(sid, edit.turnIndex, t, images);
+                          pendingUserMessageEditRef.current = null;
+                          await activateSession(sid);
+                          let historyReady =
+                            await ensureHistoryReplayComplete(sid);
+                          if (!historyReady) {
+                            console.warn(
+                              "[main] edited-message history replay did not confirm; restarting bridge.",
+                              { sid },
+                            );
+                            await shutdownBridge(sid);
+                            await activateSession(sid);
+                            historyReady =
+                              await ensureHistoryReplayComplete(sid);
+                            if (!historyReady) {
+                              throw new Error(copy.app.restoreTimeout);
+                            }
+                          }
+                          await sendIPCCommand(sid, {
+                            kind: "user_message",
+                            text: t,
+                            images,
+                          });
+                        } catch (e) {
+                          reportSendFailure(e);
+                        }
+                      })();
+                      return;
+                    }
                     // `/btw` is a side question (interruption-free,
                     // not a main-agent turn). Route to the transient
                     // user-turn path so it doesn't disturb the main
@@ -1345,11 +1422,11 @@ function App() {
                     // independently of the task queue.
                     const trimmed = t.trimStart();
                     if (trimmed === "/btw" || trimmed.startsWith("/btw ")) {
-                      appendSideQuestionUserTurn(sid, t);
+                      appendSideQuestionUserTurn(sid, t, images);
                       void ensureBridgeThenSend({
                         kind: "user_message",
                         text: t,
-                        images: [],
+                        images,
                       }).catch(reportSendFailure);
                       return;
                     }
@@ -1362,8 +1439,8 @@ function App() {
                     // "this user message was a reply to a specific
                     // question" vs "this was a fresh prompt".
                     const wasAskUser = pendingAskUser !== null;
-                    appendUserTurn(sid, t);
-                    if (wasAskUser) {
+                    appendUserTurn(sid, t, images);
+                    if (wasAskUser && images.length === 0) {
                       void ensureBridgeThenSend({
                         kind: "ask_user_response",
                         text: t,
@@ -1372,9 +1449,18 @@ function App() {
                       void ensureBridgeThenSend({
                         kind: "user_message",
                         text: t,
-                        images: [],
+                        images,
                       }).catch(reportSendFailure);
                     }
+                  }}
+                  onBeginEditLastUserMessage={(turn: UserTurn) => {
+                    if (!activeSessionId || turn.turnIndex === undefined) {
+                      return;
+                    }
+                    pendingUserMessageEditRef.current = {
+                      sessionId: activeSessionId,
+                      turnIndex: turn.turnIndex,
+                    };
                   }}
                   onApprove={(approvalId, decision) => {
                     if (!activeSessionId) return;
@@ -1666,6 +1752,9 @@ function App() {
         onRestartAppUpdate={() => {
           void restartAppUpdate();
         }}
+        onInstallAppUpdate={() => {
+          void downloadAppUpdate();
+        }}
       />
 
       <YoloIntroDialog
@@ -1680,7 +1769,10 @@ function App() {
 
 export default App;
 
-function normalizeSettingsTab(tab: SettingsTab, simplifiedUi: boolean): SettingsTab {
+function normalizeSettingsTab(
+  tab: SettingsTab,
+  simplifiedUi: boolean,
+): SettingsTab {
   if (
     simplifiedUi &&
     (tab === "models" || tab === "integration" || tab === "shortcuts")
@@ -1712,10 +1804,11 @@ function normalizeSettingsTab(tab: SettingsTab, simplifiedUi: boolean): Settings
  */
 async function submitOnEmpty(
   text: string,
+  images: string[],
   existingId: string | undefined,
   createSession: (projectId?: string) => string,
   activateSession: (id: string) => Promise<void>,
-  appendUserTurn: (sessionId: string, text: string) => void,
+  appendUserTurn: (sessionId: string, text: string, images?: string[]) => void,
   sendIPCCommand: (
     sessionId: string,
     cmd: { kind: "user_message"; text: string; images?: string[] },
@@ -1738,12 +1831,12 @@ async function submitOnEmpty(
     await activateSession(id);
   }
   setScreen("main");
-  appendUserTurn(id, text);
+  appendUserTurn(id, text, images);
   try {
     await sendIPCCommand(id, {
       kind: "user_message",
       text,
-      images: [],
+      images,
     });
   } catch (e) {
     reportSendFailure(id, "send_user_message", e);

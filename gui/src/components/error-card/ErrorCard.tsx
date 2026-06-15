@@ -16,7 +16,10 @@ import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { useCopy, type AppCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { YoleAccountStatus } from "@/lib/managed-models";
+import {
+  normalizeTelegramUsername,
+  type YoleAccountStatus,
+} from "@/lib/managed-models";
 import type {
   AppError,
   AppErrorHint,
@@ -38,6 +41,8 @@ export interface ErrorCardActions {
   onRestartChannels?: () => void;
   /** Restart Yole after an app update has been prepared. */
   onRestartAppUpdate?: () => void;
+  /** Download and prepare an available app update. */
+  onInstallAppUpdate?: () => void;
 }
 
 interface ErrorCardProps extends ErrorCardActions {
@@ -74,13 +79,14 @@ export function ErrorCard({
   onViewProject,
   onRestartChannels,
   onRestartAppUpdate,
+  onInstallAppUpdate,
   yoleAccount,
 }: ErrorCardProps) {
   const copy = useCopy();
   const [open, setOpen] = useState(false);
-  const [copiedContact, setCopiedContact] = useState<"wechat" | "support" | null>(
-    null,
-  );
+  const [copiedContact, setCopiedContact] = useState<
+    "wechat" | "support" | "telegram" | null
+  >(null);
   const isInline = variant === "inline";
   const sev = SEVERITY_CONFIG[error.severity];
   const hintCfg = error.hint ? hintConfig(copy)[error.hint] : null;
@@ -94,11 +100,12 @@ export function ErrorCard({
   //   3. defaultTitle(error) — category-flavored fallback.
   const title =
     error.title ??
-    (isYoleQuota ? "AI 余额不足" : hintCfg?.title) ??
+    (isYoleQuota ? "AI 积分不足" : hintCfg?.title) ??
     defaultTitle(error, copy);
   const brief = isYoleQuota
-    ? yoleAccount?.contact.topUpMessage ??
-      "AI 余额不足。联系客服可追加 50 美元体验额度。"
+    ? yoleAccount
+      ? yoleAccount.contact.topUpMessage ?? yoleQuotaBrief(yoleAccount)
+      : "AI 积分不足。联系客服可追加 3000 积分体验额度。"
     : hintCfg?.brief ?? error.message;
   const hasDetails = hasDiagnosticDetails(error);
   const isCompactInfoToast = variant === "toast" && error.severity === "info";
@@ -115,10 +122,14 @@ export function ErrorCard({
         onViewProject,
         onRestartChannels,
         onRestartAppUpdate,
+        onInstallAppUpdate,
       }),
   );
 
-  const copyContactValue = (kind: "wechat" | "support", value: string) => {
+  const copyContactValue = (
+    kind: "wechat" | "support" | "telegram",
+    value: string,
+  ) => {
     void copyTextToClipboard(value).then(() => {
       setCopiedContact(kind);
       window.setTimeout(() => setCopiedContact(null), 1400);
@@ -173,6 +184,7 @@ export function ErrorCard({
                 onViewProject={onViewProject}
                 onRestartChannels={onRestartChannels}
                 onRestartAppUpdate={onRestartAppUpdate}
+                onInstallAppUpdate={onInstallAppUpdate}
                 onToggleDetails={() => setOpen((v) => !v)}
                 detailsOpen={open}
               />
@@ -225,6 +237,7 @@ export function ErrorCard({
               onViewProject={onViewProject}
               onRestartChannels={onRestartChannels}
               onRestartAppUpdate={onRestartAppUpdate}
+              onInstallAppUpdate={onInstallAppUpdate}
               onToggleDetails={() => setOpen((v) => !v)}
               detailsOpen={open}
             />
@@ -273,6 +286,7 @@ interface ActionDef {
     | "onViewProject"
     | "onRestartChannels"
     | "onRestartAppUpdate"
+    | "onInstallAppUpdate"
     | "copyDetails"
     | "toggleDetails";
 }
@@ -390,18 +404,35 @@ function yoleQuotaActions(copy: AppCopy): ActionDef[] {
   ];
 }
 
+function yoleQuotaBrief(account: YoleAccountStatus): string {
+  const unit = account.pointsUnit?.trim() || "积分";
+  const grant = formatPointAmount(account.initialGrantPoints || 3000);
+  return `AI ${unit}不足。联系客服可追加 ${grant} ${unit}体验额度。`;
+}
+
+function formatPointAmount(value: number): string {
+  if (!Number.isFinite(value)) return "3000";
+  if (Math.abs(value - Math.round(value)) < 0.05) {
+    return Math.round(value).toLocaleString("zh-CN");
+  }
+  return value.toLocaleString("zh-CN", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
 function YoleSupportPanel({
   account,
   copied,
   onCopy,
 }: {
   account: YoleAccountStatus;
-  copied: "wechat" | "support" | null;
-  onCopy: (kind: "wechat" | "support", value: string) => void;
+  copied: "wechat" | "support" | "telegram" | null;
+  onCopy: (kind: "wechat" | "support" | "telegram", value: string) => void;
 }) {
   const wechatId = account.contact.wechatId?.trim();
   const qrUrl = account.contact.wechatQrUrl?.trim();
-  const overseas = account.contact.overseas?.trim();
+  const telegram = normalizeTelegramUsername(account.contact.overseas);
 
   return (
     <div className="mt-3 rounded-sm border border-line bg-app p-3">
@@ -446,10 +477,24 @@ function YoleSupportPanel({
             )}
           </button>
         </div>
-        {overseas && (
-          <div>
-            <div className="text-[11px] text-ink-muted">海外联系方式</div>
-            <div className="break-all font-medium text-ink">{overseas}</div>
+        {telegram && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[11px] text-ink-muted">Telegram</div>
+              <div className="break-all font-medium text-ink">{telegram}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCopy("telegram", telegram)}
+              className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+              aria-label="复制 Telegram"
+            >
+              {copied === "telegram" ? (
+                <Check size={13} weight="thin" />
+              ) : (
+                <Copy size={13} weight="thin" />
+              )}
+            </button>
           </div>
         )}
       </div>
@@ -508,6 +553,14 @@ function defaultActions(error: AppError, copy: AppCopy): ActionDef[] {
       handler: "onRestartAppUpdate",
     });
   }
+  if (error.action?.kind === "install_app_update") {
+    actions.push({
+      id: "install-app-update",
+      label: error.action.label,
+      kind: "primary",
+      handler: "onInstallAppUpdate",
+    });
+  }
   if (error.retryable) {
     actions.push({
       id: "retry",
@@ -539,6 +592,7 @@ function isActionAvailable(
     | "onViewProject"
     | "onRestartChannels"
     | "onRestartAppUpdate"
+    | "onInstallAppUpdate"
   >,
 ): boolean {
   switch (action.handler) {
@@ -564,6 +618,11 @@ function isActionAvailable(
         error.action?.kind === "restart_app_update" &&
         Boolean(handlers.onRestartAppUpdate)
       );
+    case "onInstallAppUpdate":
+      return (
+        error.action?.kind === "install_app_update" &&
+        Boolean(handlers.onInstallAppUpdate)
+      );
     case "copyDetails":
       return hasDiagnosticDetails(error);
     case "toggleDetails":
@@ -587,6 +646,7 @@ function ActionButton({
   onViewProject,
   onRestartChannels,
   onRestartAppUpdate,
+  onInstallAppUpdate,
   onToggleDetails,
   detailsOpen,
 }: {
@@ -599,6 +659,7 @@ function ActionButton({
   onViewProject?: (projectId: string) => void;
   onRestartChannels?: () => void;
   onRestartAppUpdate?: () => void;
+  onInstallAppUpdate?: () => void;
   onToggleDetails: () => void;
   detailsOpen: boolean;
 }) {
@@ -632,6 +693,11 @@ function ActionButton({
           return undefined;
         }
         return onRestartAppUpdate;
+      case "onInstallAppUpdate":
+        if (error.action?.kind !== "install_app_update") {
+          return undefined;
+        }
+        return onInstallAppUpdate;
       case "copyDetails":
         return () => {
           void copyTextToClipboard(formatErrorDetails(error)).then(() => {
@@ -678,6 +744,7 @@ const ACTION_ICONS: Partial<Record<ActionDef["handler"], typeof Cube>> = {
   onOpenMyKey: FileCode,
   onOpenGADocs: ArrowSquareOut,
   onViewProject: FolderOpen,
+  onInstallAppUpdate: ArrowSquareOut,
   copyDetails: FileCode,
   toggleDetails: CaretDown,
 };

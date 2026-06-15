@@ -2,6 +2,7 @@ import os, json, re, time, requests, sys, threading, urllib3, base64, importlib,
 from datetime import datetime
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 _RESP_CACHE_KEY = str(uuid.uuid4())
+_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.7 (managed-ga)")
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path: sys.path.append(_ROOT)
 
@@ -445,7 +446,7 @@ def _openai_stream(sess, messages):
     account_id = None
     if getattr(sess, 'codex_backend', False):
         api_key, account_id = _yole_codex_access_token(sess)
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream", "User-Agent": _YOLE_HTTP_USER_AGENT}
     if getattr(sess, 'codex_backend', False):
         headers.update({"User-Agent": "codex_cli_rs/0.0.0 (Yole)", "originator": "codex_cli_rs"})
         account_id = account_id or _codex_account_id_from_jwt(api_key)
@@ -508,6 +509,11 @@ def _to_responses_input(messages):
                 elif ptype == "image_url":
                     url = (part.get("image_url") or {}).get("url", "")
                     if url and role != "assistant": parts.append({"type": "input_image", "image_url": url})
+                elif ptype == "image":
+                    src = part.get("source") or {}
+                    if role != "assistant" and src.get("type") == "base64" and src.get("data"):
+                        mime = src.get("media_type", "image/png")
+                        parts.append({"type": "input_image", "image_url": f"data:{mime};base64,{src.get('data', '')}"})
         if len(parts) == 0: parts = [{"type": text_type, "text": str(content) if not isinstance(content, list) else '[empty]'}]
         result.append({"role": role, "content": parts})
         pending = []
@@ -1107,6 +1113,181 @@ The reply body should first include a minimal one-line (<30 words) physical snap
 \n**If the user's request is not yet complete, tool calls are required!**
 """.strip()
 
+def _keep_user_content_block(block):
+    if not isinstance(block, dict):
+        return bool(str(block).strip())
+    ptype = block.get("type")
+    if ptype == "text":
+        return bool(str(block.get("text", "")).strip())
+    if ptype == "image":
+        src = block.get("source") or {}
+        return bool(src.get("data") or src.get("url"))
+    if ptype == "image_url":
+        image_url = block.get("image_url") or {}
+        return bool(image_url.get("url"))
+    return True
+
+def _yole_route_config():
+    raw = os.environ.get("YOLE_MODEL_ROUTE_JSON", "").strip()
+    if not raw: return None
+    try:
+        route = json.loads(raw)
+        return route if isinstance(route, dict) else None
+    except Exception as e:
+        print(f"[YoleRoute] invalid route JSON: {e}")
+        return None
+
+def _route_get(route, camel, snake=None, default=None):
+    if not isinstance(route, dict): return default
+    if camel in route: return route.get(camel)
+    if snake and snake in route: return route.get(snake)
+    return default
+
+def _route_models(route):
+    models = _route_get(route, "models", default={})
+    return models if isinstance(models, dict) else {}
+
+def _route_list(route, camel, snake=None):
+    values = _route_get(route, camel, snake, [])
+    return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
+
+def _model_meta(route, model):
+    meta = _route_models(route).get(model, {})
+    return meta if isinstance(meta, dict) else {}
+
+def _model_enabled(route, model):
+    meta = _model_meta(route, model)
+    return bool(meta.get("enabled", True))
+
+def _modalities(meta, camel, snake):
+    values = meta.get(camel, meta.get(snake, []))
+    return {str(v).strip().lower() for v in values if str(v).strip()} if isinstance(values, list) else set()
+
+def _model_supports_image(route, model):
+    return "image" in _modalities(_model_meta(route, model), "inputModalities", "input_modalities")
+
+def _content_has_image(content):
+    for block in content or []:
+        if not isinstance(block, dict): continue
+        if block.get("type") in ("image", "image_url"): return True
+    return False
+
+def _openai_image_parts(content):
+    parts = []
+    for block in content or []:
+        if not isinstance(block, dict): continue
+        btype = block.get("type")
+        if btype == "text" and block.get("text"):
+            parts.append({"type": "text", "text": block.get("text", "")})
+        elif btype == "image":
+            src = block.get("source") or {}
+            if src.get("type") == "base64" and src.get("data"):
+                mime = src.get("media_type", "image/png")
+                parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{src.get('data', '')}"}})
+        elif btype == "image_url":
+            parts.append(block)
+    return parts
+
+def _without_images_with_note(content, note):
+    filtered = []
+    inserted = False
+    for block in content or []:
+        if isinstance(block, dict) and block.get("type") in ("image", "image_url"):
+            if not inserted:
+                filtered.append({"type": "text", "text": note})
+                inserted = True
+            continue
+        filtered.append(block)
+    if not inserted:
+        filtered.append({"type": "text", "text": note})
+    return filtered
+
+def _vision_summary_with_route(backend, route, content):
+    prompt = (
+        "请理解用户上传的图片，输出给另一个文字模型使用的简洁视觉摘要。"
+        "只描述图片中能确定的信息；如果包含界面或文字，请摘出关键文字和布局。"
+        "不要回答用户最终问题，不要编造看不清的内容。"
+    )
+    image_parts = _openai_image_parts([{"type": "text", "text": prompt}, *(content or [])])
+    if not any(isinstance(p, dict) and p.get("type") == "image_url" for p in image_parts):
+        return None
+    for model in _route_list(route, "vision"):
+        if not _model_enabled(route, model) or not _model_supports_image(route, model):
+            continue
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": image_parts}],
+            "stream": False,
+            "max_tokens": 900,
+        }
+        headers = {"Authorization": f"Bearer {backend.api_key}", "Content-Type": "application/json", "User-Agent": _YOLE_HTTP_USER_AGENT}
+        try:
+            resp = requests.post(
+                auto_make_url(backend.api_base, "chat/completions"),
+                headers=headers,
+                json=payload,
+                timeout=(backend.connect_timeout, min(45, backend.read_timeout)),
+                proxies=backend.proxies,
+                verify=backend.verify,
+            )
+            if resp.status_code >= 400:
+                print(f"[YoleRoute] vision {model} HTTP {resp.status_code}: {resp.text[:160]}")
+                continue
+            data = resp.json()
+            text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            if text:
+                print(f"[YoleRoute] vision summary by {model}")
+                return text
+        except Exception as e:
+            print(f"[YoleRoute] vision {model} failed: {e}")
+    return None
+
+def _is_retryable_model_error(chunk):
+    if not isinstance(chunk, str): return False
+    text = chunk.lstrip().lower()
+    retryable_status = re.search(r"\b(?:http\s*)?(?:status\s*)?(?:429|5\d\d)\b", text[:160])
+    return (
+        text.startswith("!!!error:")
+        or text.startswith("[error:")
+        or "rate limit" in text
+        or "too many requests" in text
+        or "quota" in text
+        or "timeout" in text
+        or "timed out" in text
+        or bool(retryable_status)
+    )
+
+def _chunk_has_visible_output(chunk):
+    if not isinstance(chunk, str):
+        return chunk is not None
+    text = chunk.strip()
+    return bool(text) and not _is_retryable_model_error(text)
+
+def _is_retryable_model_exception(exc):
+    if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, TimeoutError, socket.timeout)):
+        return True
+    text = str(exc).lower()
+    return any(marker in text for marker in (
+        "timeout",
+        "timed out",
+        "connection reset",
+        "connection aborted",
+        "temporarily unavailable",
+        "too many requests",
+        "rate limit",
+        "quota",
+        "http 429",
+        "http 500",
+        "http 502",
+        "http 503",
+        "http 504",
+        "status 429",
+        "status 500",
+        "status 502",
+        "status 503",
+        "status 504",
+    ))
+
 class NativeToolClient:
     @staticmethod
     def _thinking_prompt(): return THINKING_PROMPT_EN if os.environ.get('GA_LANG') == 'en' else THINKING_PROMPT_ZH
@@ -1120,6 +1301,80 @@ class NativeToolClient:
         combined = f"{extra_system}\n\n{self._thinking_prompt()}" if extra_system else self._thinking_prompt()
         if combined != self.backend.system: print(f"[Debug] Updated system prompt, length {len(combined)} chars.")
         self.backend.system = combined
+    def _chat_once(self, merged):
+        _write_llm_log('Prompt', json.dumps(merged, ensure_ascii=False, indent=2), self.log_path)
+        try:
+            gen = self.backend.ask(merged)
+        except Exception as e:
+            if _is_retryable_model_exception(e):
+                return {"__yole_retryable_error__": f"!!!Error: {e}"}
+            raise
+        visible_output = False
+        first_error = None
+        resp = None
+        try:
+            while True:
+                chunk = next(gen)
+                if not visible_output:
+                    if _is_retryable_model_error(chunk):
+                        first_error = chunk
+                        try: gen.close()
+                        except Exception: pass
+                        break
+                    visible_output = _chunk_has_visible_output(chunk)
+                yield chunk
+        except StopIteration as e:
+            resp = e.value
+        except Exception as e:
+            error = f"!!!Error: {e}"
+            if not visible_output and _is_retryable_model_exception(e):
+                try: gen.close()
+                except Exception: pass
+                return {"__yole_retryable_error__": error}
+            yield f"\n{error}"
+            return None
+        if first_error is not None:
+            return {"__yole_retryable_error__": first_error}
+        if resp: _write_llm_log('Response', resp.raw, self.log_path)
+        return resp
+    def _chat_with_yole_route(self, merged, route):
+        content = merged.get("content") if isinstance(merged, dict) else None
+        has_image = _content_has_image(content)
+        candidates = [m for m in _route_list(route, "conversation") if _model_enabled(route, m)]
+        if not candidates:
+            return (yield from self._chat_once(merged))
+        original_model = self.backend.model
+        vision_summary = None
+        vision_attempted = False
+        last_error = None
+        for model in candidates:
+            routed = dict(merged)
+            routed_content = content
+            if has_image and not _model_supports_image(route, model):
+                if not vision_attempted:
+                    vision_attempted = True
+                    vision_summary = _vision_summary_with_route(self.backend, route, content)
+                if vision_summary:
+                    note = f"\n\n【图片理解结果】\n{vision_summary}"
+                else:
+                    note = "\n\n【图片状态】用户上传了图片，但当前无法读取图片内容。请基于用户文字和已有上下文尽量回答；如果必须依赖图片细节，再自然地请用户补充描述。"
+                routed_content = _without_images_with_note(content, note)
+                routed["content"] = routed_content
+            print(f"[YoleRoute] using model {model}")
+            history_snapshot = list(getattr(self.backend, "history", []))
+            self.backend.model = model
+            resp = yield from self._chat_once(routed)
+            if isinstance(resp, dict) and resp.get("__yole_retryable_error__"):
+                last_error = str(resp.get("__yole_retryable_error__") or "")
+                try: self.backend.history = history_snapshot
+                except Exception: pass
+                print(f"[YoleRoute] model {model} failed early, trying fallback")
+                continue
+            return resp
+        self.backend.model = original_model
+        if last_error:
+            yield last_error
+        return None
     def chat(self, messages, tools=None):
         if tools: self.backend.tools = tools
         if not self.backend.history: self._pending_tool_ids = []
@@ -1140,18 +1395,20 @@ class NativeToolClient:
         for tid in self._pending_tool_ids:
             if tid not in tr_id_set: tool_result_blocks.append({"type": "tool_result", "tool_use_id": tid, "content": ""})
         self._pending_tool_ids = []
-        # Filter whitespace-only text blocks that cause 400 on strict API proxies
-        filtered_content = [c for c in combined_content if c.get("text", "").strip()]
+        # Filter whitespace-only text blocks that cause 400 on strict API
+        # proxies, but keep non-text multimodal blocks. The previous
+        # text-only predicate dropped image blocks before they reached the
+        # backend, making Yole pasted images visible in the UI but invisible to
+        # the LLM.
+        filtered_content = [c for c in combined_content if _keep_user_content_block(c)]
         final_content = tool_result_blocks + filtered_content
         if not final_content: final_content = [{"type": "text", "text": "."}]
         merged = {"role": "user", "content": final_content}
-        _write_llm_log('Prompt', json.dumps(merged, ensure_ascii=False, indent=2), self.log_path)
-        gen = self.backend.ask(merged)
-        try:
-            while True:
-                chunk = next(gen); yield chunk
-        except StopIteration as e: resp = e.value
-        if resp: _write_llm_log('Response', resp.raw, self.log_path)
+        route = _yole_route_config()
+        if route:
+            resp = yield from self._chat_with_yole_route(merged, route)
+        else:
+            resp = yield from self._chat_once(merged)
         if resp and hasattr(resp, 'tool_calls') and resp.tool_calls: self._pending_tool_ids = [tc.id for tc in resp.tool_calls]
         return resp
 

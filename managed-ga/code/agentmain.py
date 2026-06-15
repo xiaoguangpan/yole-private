@@ -1,4 +1,4 @@
-import os, sys, threading, queue, time, json, re, random, locale
+import os, sys, threading, queue, time, json, re, random, locale, base64, mimetypes
 os.environ.setdefault('GA_LANG', 'zh' if any(k in (locale.getlocale()[0] or '').lower() for k in ('zh', 'chinese')) else 'en')
 if sys.stdout is None: sys.stdout = open(os.devnull, "w")
 elif hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(errors='replace')
@@ -47,6 +47,30 @@ def get_system_prompt():
     prompt += f"\nToday: {time.strftime('%Y-%m-%d %a')}\n"
     prompt += get_global_memory()
     return prompt
+
+def build_user_content(text, images=None):
+    images = [str(p).strip() for p in (images or []) if str(p).strip()]
+    if not images:
+        return None
+    parts = [{"type": "text", "text": text}]
+    for image_path in images:
+        try:
+            if not os.path.isfile(image_path):
+                continue
+            mime = mimetypes.guess_type(image_path)[0] or "image/png"
+            with open(image_path, "rb") as f:
+                data = base64.b64encode(f.read()).decode("ascii")
+            parts.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": mime,
+                    "data": data,
+                },
+            })
+        except Exception as e:
+            parts.append({"type": "text", "text": f"[Image unavailable: {image_path} ({e})]"})
+    return parts if len(parts) > 1 else None
 
 class GenericAgent:
     def __init__(self):
@@ -138,11 +162,13 @@ class GenericAgent:
             task = self.task_queue.get()
             if isinstance(task, str): break
             raw_query, source, display_queue = task["query"], task["source"], task["output"]
+            images = task.get("images") or []
             raw_query = self._handle_slash_cmd(raw_query, display_queue)
             if raw_query is None:
                 self.task_queue.task_done(); continue
             self.is_running = True
-            if len(raw_query) > 1500:
+            initial_user_content = build_user_content(raw_query, images)
+            if initial_user_content is None and len(raw_query) > 1500:
                 task_file = state_path('temp', f'user_prompt_{int(time.time())}.md')
                 with open(task_file, 'w', encoding='utf-8') as f: f.write(raw_query)
                 raw_query = f'Long user prompt saved to {task_file}. Read and execute.'
@@ -164,7 +190,9 @@ class GenericAgent:
                 self.llmclient.backend.stream = False
                 self.llmclient.backend.read_timeout = max(self.llmclient.backend.read_timeout, 1200)
             gen = agent_runner_loop(self.llmclient, sys_prompt, raw_query, handler, TOOLS_SCHEMA,
-                                    max_turns=80, verbose=self.verbose, yield_info=True)
+                                    max_turns=80, verbose=self.verbose,
+                                    initial_user_content=initial_user_content,
+                                    yield_info=True)
             try:
                 full_resp = ""; last_pos = 0; curr_turn = 0; turn_resps = []
                 for chunk in gen:

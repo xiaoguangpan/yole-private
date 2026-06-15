@@ -13,12 +13,17 @@ returned by the provisioner.
 ```text
 NewAPI base URL: https://na.itxgp.com
 NewAPI public v1 URL: https://na.itxgp.com/v1
-Default model: gpt-5.5
+Default model: deepseek-v4-pro
 Yole user group: yole
 Yole token group: yole
-Initial credit: $50 = 25,000,000 quota points
-Low balance threshold: $5
+Yole route version: 2026-06-14.1
+Initial NewAPI balance: 30 = 15,000,000 NewAPI quota units
+Yole points: 1 NewAPI balance = 100 points; 30 balance = 3000 points
+Low balance threshold: 3 NewAPI balance = 300 points
 ```
+
+NewAPI's built-in UI calls this balance an amount / dollar value, but Yole
+treats it as an internal quota unit. Ordinary users only see Yole points.
 
 Do not commit the NewAPI admin/system access token. Put it in
 `provisioner/config.yaml` on the server, or inject it with
@@ -34,7 +39,7 @@ Yole uses one NewAPI user per Yole client install:
 3. For a new install, the provisioner creates a NewAPI user named like
    `yole_<random>`.
 4. The provisioner moves that user into the `yole` group.
-5. The provisioner adds `$50` of user balance (`25,000,000` quota points).
+5. The provisioner adds 30 NewAPI balance units (`15,000,000` quota units).
 6. The provisioner logs in as the new user and creates one default token:
    `unlimited_quota: true`, `expired_time: -1`, token group `yole`.
 7. The desktop stores only the consumer token and a provisioner account token.
@@ -50,13 +55,64 @@ provisioner server.
   quota, and read user status.
 - The `yole` user group must exist and be allowed to use the configured model.
 - The `yole` token group should exist or be accepted by NewAPI token creation.
-- `gpt-5.5` must be available to the `yole` group, have a working upstream
-  channel, and have pricing configured in NewAPI.
+- The configured Yole route models must be available to the intended NewAPI
+  groups. Standard users use `yole`; VIP users use `vip`.
+- Same-model upstream fallback is handled inside NewAPI. Cross-model fallback
+  and image-understanding routing are handled by Yole's provisioner / managed
+  runtime.
 - Password login must be enabled for provisioner-created users, because the
   service creates the consumer token through that user's own session.
 
 If NewAPI denies chat with `403`, check group access first. If it returns
-`model_price_error`, configure NewAPI pricing for `gpt-5.5`.
+`model_price_error`, configure NewAPI pricing for the route-selected model.
+
+## Required NewAPI Pricing
+
+Custom Yole model aliases must have explicit NewAPI pricing entries. If they
+are missing from `ModelRatio`, NewAPI can fall back to a high default ratio;
+on 2026-06-15 this made `deepseek-v4-pro` bill at `model_ratio = 37.5`, much
+more expensive than the VIP `gpt-5.5` route.
+
+Current VPS pricing baseline:
+
+```json
+{
+  "ModelRatio": {
+    "deepseek-v4-pro": 1,
+    "deepseek-v4-flash": 1,
+    "qwen3.7-plus": 1,
+    "qwen3.6-plus": 1,
+    "kimi-k2.6": 1,
+    "mimo-v2.5-pro": 1,
+    "gpt-5.5": 5,
+    "gpt-image-2": 5
+  },
+  "CompletionRatio": {
+    "deepseek-v4-pro": 1,
+    "deepseek-v4-flash": 1,
+    "qwen3.7-plus": 1,
+    "qwen3.6-plus": 1,
+    "kimi-k2.6": 1,
+    "mimo-v2.5-pro": 1,
+    "gpt-5.5": 6,
+    "gpt-image-2": 1
+  },
+  "CacheRatio": {
+    "deepseek-v4-pro": 0.1,
+    "deepseek-v4-flash": 0.1,
+    "qwen3.7-plus": 0.1,
+    "qwen3.6-plus": 0.1,
+    "kimi-k2.6": 0.1,
+    "mimo-v2.5-pro": 0.1,
+    "gpt-5.5": 0.1,
+    "gpt-image-2": 0.1
+  }
+}
+```
+
+Keep standard route aliases at a simple 1x ratio unless upstream cost changes
+require an operator decision. VIP models can still be more expensive through
+their own ratio entries; `gpt-5.5` is currently 5x input / 6x completion.
 
 ## Admin Access Token
 
@@ -103,13 +159,52 @@ newapi:
 
 trial:
   token_prefix: "yole"
-  initial_credit_usd: 50
-  low_balance_usd: 5
+  initial_credit_usd: 30
+  low_balance_usd: 3
   user_group: "yole"
   token_group: "yole"
-  default_model: "gpt-5.5"
+  default_model: "deepseek-v4-pro"
   allowed_models:
+    - "deepseek-v4-pro"
+    - "deepseek-v4-flash"
+    - "qwen3.7-plus"
+    - "qwen3.6-plus"
+    - "kimi-k2.6"
+    - "mimo-v2.5-pro"
     - "gpt-5.5"
+    - "gpt-image-2"
+
+points:
+  per_usd: 100
+  unit: "积分"
+
+model_routing:
+  version: "2026-06-14.1"
+  default_profile: "yole_standard"
+  profiles:
+    yole_standard:
+      newapi_group: "yole"
+      conversation:
+        - "deepseek-v4-pro"
+        - "qwen3.7-plus"
+      vision:
+        - "qwen3.7-plus"
+      image_generation:
+        - "gpt-image-2"
+      image_editing:
+        - "gpt-image-2"
+    yole_vip:
+      newapi_group: "vip"
+      conversation:
+        - "gpt-5.5"
+        - "deepseek-v4-pro"
+      vision:
+        - "gpt-5.5"
+        - "qwen3.7-plus"
+      image_generation:
+        - "gpt-image-2"
+      image_editing:
+        - "gpt-image-2"
 
 contact:
   wechat_id: "replace-with-wechat-id"
@@ -218,8 +313,8 @@ After NewAPI settings are fixed:
 2. `GET /healthz` should return `{"status":"ok"}`.
 3. `POST /api/register` should return `newapi_base_url`, `token`,
    `default_model`, and `account`.
-4. Confirm NewAPI shows a new user in the `yole` group with `$50` worth of
-   quota points.
+4. Confirm NewAPI shows a new user in the `yole` group with 30 balance units
+   (3000 Yole points) worth of quota.
 5. Confirm the created token is unlimited and does not expire.
 6. Use the returned token against `https://na.itxgp.com/v1/chat/completions`.
 7. `GET /api/account/status` with the returned account token should show the

@@ -1,26 +1,32 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
+use ring::digest::{digest, SHA256};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Runtime};
 
 use crate::api::{
-    YoleApi, ManagedModelAuthKind, ManagedModelProtocol, ManagedModelProviderRecord,
-    ManagedModelRecord,
+    ManagedModelAuthKind, ManagedModelProtocol, ManagedModelProviderRecord, ManagedModelRecord,
+    YoleApi,
 };
 use crate::credential_store;
 use crate::db::{SqliteYole, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata};
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 
 const PROVIDER_ID: &str = "yole";
 const MODEL_ID: &str = "yole-default";
 const PROVIDER_DISPLAY_NAME: &str = "Yole";
 const MODEL_DISPLAY_NAME: &str = "Yole";
+const DEFAULT_PROVISIONER_URL: &str = "https://na.itxgp.com/yole-provisioner";
 const PROVISIONER_URL_PREF: &str = "yole_provisioner_url";
 const INSTALL_ID_PREF: &str = "yole_install_id";
 const ACCOUNT_PREF: &str = "yole_account";
+pub const ROUTE_PREF: &str = "yole_model_route";
 const ACCOUNT_TOKEN_REF: &str = "yole-account:token";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
+const ROUTE_TIMEOUT_MILLIS: u64 = 2_500;
+const DEFAULT_POINTS_PER_USD: f64 = 100.0;
+const DEFAULT_POINTS_UNIT: &str = "积分";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(
@@ -39,7 +45,7 @@ pub enum YoleProvisioningResult {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YoleContactInfo {
     pub wechat_id: Option<String>,
@@ -58,6 +64,10 @@ pub struct YoleAccountStatus {
     pub username: String,
     pub balance_usd: f64,
     pub quota_points: i64,
+    pub balance_points: f64,
+    pub initial_grant_points: f64,
+    pub low_balance_points: f64,
+    pub points_unit: String,
     pub low_balance: bool,
     pub contact: YoleContactInfo,
 }
@@ -68,6 +78,58 @@ struct YoleAccountMetadata {
     support_id: String,
     user_id: i64,
     username: String,
+    #[serde(default)]
+    balance_usd: Option<f64>,
+    #[serde(default)]
+    quota_points: Option<i64>,
+    #[serde(default)]
+    balance_points: Option<f64>,
+    #[serde(default)]
+    initial_grant_points: Option<f64>,
+    #[serde(default)]
+    low_balance_points: Option<f64>,
+    #[serde(default)]
+    points_unit: Option<String>,
+    #[serde(default)]
+    low_balance: Option<bool>,
+    #[serde(default)]
+    contact: Option<YoleContactInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YoleModelRoute {
+    #[serde(default, alias = "schema_version")]
+    pub schema_version: u32,
+    #[serde(default, alias = "route_version")]
+    pub route_version: String,
+    #[serde(default, alias = "profile_id")]
+    pub profile_id: String,
+    #[serde(default)]
+    pub models: HashMap<String, YoleRouteModel>,
+    #[serde(default)]
+    pub conversation: Vec<String>,
+    #[serde(default)]
+    pub vision: Vec<String>,
+    #[serde(default, alias = "image_generation")]
+    pub image_generation: Vec<String>,
+    #[serde(default, alias = "image_editing")]
+    pub image_editing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YoleRouteModel {
+    #[serde(default, alias = "display_name")]
+    pub display_name: Option<String>,
+    #[serde(default, alias = "input_modalities")]
+    pub input_modalities: Vec<String>,
+    #[serde(default, alias = "output_modalities")]
+    pub output_modalities: Vec<String>,
+    #[serde(default, alias = "tool_calling")]
+    pub tool_calling: bool,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -86,6 +148,8 @@ struct RegisterResponse {
     newapi_base_url: String,
     token: String,
     default_model: String,
+    #[serde(default)]
+    model_routing: Option<YoleModelRoute>,
     #[serde(default)]
     expires_at: Option<String>,
     account: ProvisionerAccountResponse,
@@ -109,6 +173,14 @@ struct ProvisionerAccountResponse {
     username: String,
     balance_usd: f64,
     quota_points: i64,
+    #[serde(default)]
+    balance_points: Option<f64>,
+    #[serde(default)]
+    initial_grant_points: Option<f64>,
+    #[serde(default)]
+    low_balance_points: Option<f64>,
+    #[serde(default)]
+    points_unit: Option<String>,
     low_balance: bool,
     contact: ProvisionerContactResponse,
 }
@@ -128,7 +200,7 @@ pub async fn ensure_trial_model<R: Runtime>(app: &AppHandle<R>) -> Result<YolePr
         &provisioner_url,
         RegisterRequest {
             install_id,
-            device_id_hash: String::new(),
+            device_id_hash: device_id_hash(),
             app_version: app.package_info().version.to_string(),
             os: std::env::consts::OS.to_string(),
             arch: std::env::consts::ARCH.to_string(),
@@ -148,7 +220,7 @@ async fn configured_provisioner_url(yole: &SqliteYole) -> Result<Option<String>>
     if let Some(url) = runtime_or_build_env("YOLE_PROVISIONER_URL") {
         return Ok(Some(url));
     }
-    Ok(None)
+    Ok(Some(DEFAULT_PROVISIONER_URL.to_string()))
 }
 
 fn runtime_or_build_env(name: &str) -> Option<String> {
@@ -174,24 +246,90 @@ async fn ensure_install_id(yole: &SqliteYole) -> Result<String> {
         }
     }
     let id = format!("yole-install-{}", random_hex(16)?);
-    yole
-        .set_pref_json(INSTALL_ID_PREF, serde_json::json!(id))
+    yole.set_pref_json(INSTALL_ID_PREF, serde_json::json!(id))
         .await?;
     Ok(id)
 }
 
 pub async fn get_account_status() -> Result<Option<YoleAccountStatus>> {
+    get_account_status_with_force(false).await
+}
+
+pub async fn get_account_status_with_force(force: bool) -> Result<Option<YoleAccountStatus>> {
     let yole = SqliteYole::open().await?;
+    let stored = stored_account_status(&yole).await?;
     let Some(provisioner_url) = configured_provisioner_url(&yole).await? else {
-        return Ok(stored_account_status(&yole).await?);
+        return Ok(stored);
     };
     let account_token = match credential_store::get_secret(&yole, ACCOUNT_TOKEN_REF).await {
         Ok(token) => token,
-        Err(_) => return Ok(stored_account_status(&yole).await?),
+        Err(_) => return Ok(stored),
     };
-    let response = account_status(&provisioner_url, &account_token).await?;
-    persist_account(&yole, &response).await?;
-    Ok(Some(response.into_status()))
+    match account_status(&provisioner_url, &account_token).await {
+        Ok(response) => {
+            persist_account(&yole, &response).await?;
+            Ok(Some(response.into_status()))
+        }
+        Err(err) => {
+            if force {
+                return Err(err);
+            }
+            if stored.is_some() {
+                Ok(stored)
+            } else {
+                Err(err)
+            }
+        }
+    }
+}
+
+pub async fn stored_account_status_for_current_account() -> Result<Option<YoleAccountStatus>> {
+    let yole = SqliteYole::open().await?;
+    stored_account_status(&yole).await
+}
+
+pub async fn refresh_runtime_route() -> Result<Option<YoleModelRoute>> {
+    refresh_runtime_route_with_force(false).await
+}
+
+pub async fn refresh_runtime_route_with_force(force: bool) -> Result<Option<YoleModelRoute>> {
+    let yole = SqliteYole::open().await?;
+    let stored = stored_runtime_route(&yole).await?;
+    let Some(provisioner_url) = configured_provisioner_url(&yole).await? else {
+        return Ok(stored);
+    };
+    let account_token = match credential_store::get_secret(&yole, ACCOUNT_TOKEN_REF).await {
+        Ok(token) => token,
+        Err(_) => return Ok(stored),
+    };
+    let version = (!force)
+        .then(|| stored.as_ref().map(|route| route.route_version.as_str()))
+        .flatten();
+    let profile = (!force)
+        .then(|| stored.as_ref().map(|route| route.profile_id.as_str()))
+        .flatten();
+    match runtime_route(&provisioner_url, &account_token, version, profile).await {
+        Ok(Some(route)) => {
+            persist_route(&yole, &route).await?;
+            Ok(Some(route))
+        }
+        Ok(None) => Ok(stored),
+        Err(err) => {
+            if force {
+                return Err(err);
+            }
+            if stored.is_some() {
+                Ok(stored)
+            } else {
+                Err(err)
+            }
+        }
+    }
+}
+
+pub async fn stored_runtime_route_for_current_account() -> Result<Option<YoleModelRoute>> {
+    let yole = SqliteYole::open().await?;
+    stored_runtime_route(&yole).await
 }
 
 async fn register(base_url: &str, request: RegisterRequest) -> Result<RegisterResponse> {
@@ -257,11 +395,53 @@ async fn account_status(base_url: &str, account_token: &str) -> Result<Provision
             ),
         });
     }
-    serde_json::from_str::<ProvisionerAccountResponse>(&body).map_err(|e| {
-        YoleError::RunnerError {
-            message: format!("Yole account status response is invalid JSON: {e}"),
-        }
+    serde_json::from_str::<ProvisionerAccountResponse>(&body).map_err(|e| YoleError::RunnerError {
+        message: format!("Yole account status response is invalid JSON: {e}"),
     })
+}
+
+async fn runtime_route(
+    base_url: &str,
+    account_token: &str,
+    version: Option<&str>,
+    profile: Option<&str>,
+) -> Result<Option<YoleModelRoute>> {
+    let endpoint = runtime_route_url(base_url, version, profile)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(ROUTE_TIMEOUT_MILLIS))
+        .build()
+        .map_err(|e| YoleError::Internal {
+            message: format!("building Yole route HTTP client failed: {e}"),
+        })?;
+    let resp = client
+        .get(endpoint)
+        .bearer_auth(account_token)
+        .send()
+        .await
+        .map_err(|e| YoleError::RunnerError {
+            message: format!("Yole runtime route request failed: {e}"),
+        })?;
+    let status = resp.status();
+    if status == reqwest::StatusCode::NO_CONTENT {
+        return Ok(None);
+    }
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
+        message: format!("reading Yole runtime route response failed: {e}"),
+    })?;
+    if !status.is_success() {
+        return Err(YoleError::RunnerError {
+            message: format!(
+                "Yole runtime route returned HTTP {}: {}",
+                status.as_u16(),
+                compact_body(&body)
+            ),
+        });
+    }
+    serde_json::from_str::<YoleModelRoute>(&body)
+        .map(Some)
+        .map_err(|e| YoleError::RunnerError {
+            message: format!("Yole runtime route response is invalid JSON: {e}"),
+        })
 }
 
 async fn persist_yole_model(
@@ -275,6 +455,9 @@ async fn persist_yole_model(
 
     credential_store::set_secret(yole, &api_key_ref, &token).await?;
     persist_account(yole, &response.account).await?;
+    if let Some(route) = response.model_routing.as_ref() {
+        persist_route(yole, route).await?;
+    }
     let provider = yole
         .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
             id: PROVIDER_ID.into(),
@@ -317,15 +500,32 @@ async fn persist_account(yole: &SqliteYole, account: &ProvisionerAccountResponse
         support_id: account.support_id.clone(),
         user_id: account.user_id,
         username: account.username.clone(),
+        balance_usd: Some(account.balance_usd),
+        quota_points: Some(account.quota_points),
+        balance_points: Some(account.balance_points()),
+        initial_grant_points: Some(account.initial_grant_points()),
+        low_balance_points: Some(account.low_balance_points()),
+        points_unit: Some(account.points_unit()),
+        low_balance: Some(account.low_balance),
+        contact: Some(account.contact.clone().into_contact()),
     };
-    yole
-        .set_pref_json(
-            ACCOUNT_PREF,
-            serde_json::to_value(metadata).map_err(|e| YoleError::Internal {
-                message: format!("serializing Yole account metadata failed: {e}"),
-            })?,
-        )
-        .await
+    yole.set_pref_json(
+        ACCOUNT_PREF,
+        serde_json::to_value(metadata).map_err(|e| YoleError::Internal {
+            message: format!("serializing Yole account metadata failed: {e}"),
+        })?,
+    )
+    .await
+}
+
+async fn persist_route(yole: &SqliteYole, route: &YoleModelRoute) -> Result<()> {
+    yole.set_pref_json(
+        ROUTE_PREF,
+        serde_json::to_value(route).map_err(|e| YoleError::Internal {
+            message: format!("serializing Yole model route failed: {e}"),
+        })?,
+    )
+    .await
 }
 
 async fn stored_account_status(yole: &SqliteYole) -> Result<Option<YoleAccountStatus>> {
@@ -336,20 +536,42 @@ async fn stored_account_status(yole: &SqliteYole) -> Result<Option<YoleAccountSt
         serde_json::from_value(value).map_err(|e| YoleError::Internal {
             message: format!("stored Yole account metadata is invalid: {e}"),
         })?;
+    let Some(balance_usd) = metadata.balance_usd else {
+        return Ok(None);
+    };
     Ok(Some(YoleAccountStatus {
         support_id: metadata.support_id,
         user_id: metadata.user_id,
         username: metadata.username,
-        balance_usd: 0.0,
-        quota_points: 0,
-        low_balance: false,
-        contact: YoleContactInfo {
-            wechat_id: None,
-            wechat_qr_url: None,
-            overseas: None,
-            top_up_message: None,
-        },
+        balance_usd,
+        quota_points: metadata.quota_points.unwrap_or_default(),
+        balance_points: metadata
+            .balance_points
+            .unwrap_or_else(|| points_from_usd(balance_usd)),
+        initial_grant_points: metadata
+            .initial_grant_points
+            .unwrap_or_else(|| points_from_usd(30.0)),
+        low_balance_points: metadata
+            .low_balance_points
+            .unwrap_or_else(|| points_from_usd(3.0)),
+        points_unit: metadata
+            .points_unit
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_POINTS_UNIT.into()),
+        low_balance: metadata.low_balance.unwrap_or(false),
+        contact: metadata.contact.unwrap_or_default(),
     }))
+}
+
+async fn stored_runtime_route(yole: &SqliteYole) -> Result<Option<YoleModelRoute>> {
+    let Some(value) = yole.get_pref_json(ROUTE_PREF).await? else {
+        return Ok(None);
+    };
+    serde_json::from_value::<YoleModelRoute>(value)
+        .map(Some)
+        .map_err(|e| YoleError::Internal {
+            message: format!("stored Yole model route is invalid: {e}"),
+        })
 }
 
 fn register_endpoint(base_url: &str) -> Result<String> {
@@ -380,6 +602,39 @@ fn account_status_endpoint(base_url: &str) -> Result<String> {
     }
 }
 
+fn runtime_route_endpoint(base_url: &str) -> Result<String> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err(YoleError::InvalidArgs {
+            message: "Yole provisioner URL is empty".into(),
+        });
+    }
+    if trimmed.ends_with("/api/runtime/route") {
+        Ok(trimmed.to_string())
+    } else {
+        Ok(format!("{trimmed}/api/runtime/route"))
+    }
+}
+
+fn runtime_route_url(
+    base_url: &str,
+    version: Option<&str>,
+    profile: Option<&str>,
+) -> Result<reqwest::Url> {
+    let mut endpoint = reqwest::Url::parse(&runtime_route_endpoint(base_url)?).map_err(|e| {
+        YoleError::InvalidArgs {
+            message: format!("Yole runtime route URL is invalid: {e}"),
+        }
+    })?;
+    if let Some(version) = version.map(str::trim).filter(|s| !s.is_empty()) {
+        endpoint.query_pairs_mut().append_pair("version", version);
+    }
+    if let Some(profile) = profile.map(str::trim).filter(|s| !s.is_empty()) {
+        endpoint.query_pairs_mut().append_pair("profile", profile);
+    }
+    Ok(endpoint)
+}
+
 fn nonempty(value: String, field: &str) -> Result<String> {
     let value = value.trim().to_string();
     if value.is_empty() {
@@ -403,15 +658,47 @@ impl ProvisionerContactResponse {
 
 impl ProvisionerAccountResponse {
     fn into_status(self) -> YoleAccountStatus {
+        let balance_points = self.balance_points();
+        let initial_grant_points = self.initial_grant_points();
+        let low_balance_points = self.low_balance_points();
+        let points_unit = self.points_unit();
         YoleAccountStatus {
             support_id: self.support_id,
             user_id: self.user_id,
             username: self.username,
             balance_usd: self.balance_usd,
             quota_points: self.quota_points,
+            balance_points,
+            initial_grant_points,
+            low_balance_points,
+            points_unit,
             low_balance: self.low_balance,
             contact: self.contact.into_contact(),
         }
+    }
+
+    fn balance_points(&self) -> f64 {
+        self.balance_points
+            .unwrap_or_else(|| points_from_usd(self.balance_usd))
+    }
+
+    fn initial_grant_points(&self) -> f64 {
+        self.initial_grant_points
+            .unwrap_or_else(|| points_from_usd(30.0))
+    }
+
+    fn low_balance_points(&self) -> f64 {
+        self.low_balance_points
+            .unwrap_or_else(|| points_from_usd(3.0))
+    }
+
+    fn points_unit(&self) -> String {
+        self.points_unit
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(DEFAULT_POINTS_UNIT)
+            .to_string()
     }
 }
 
@@ -419,6 +706,17 @@ fn normalize_optional(value: Option<String>) -> Option<String> {
     value
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+fn points_from_usd(usd: f64) -> f64 {
+    if usd <= 0.0 {
+        return 0.0;
+    }
+    (usd * DEFAULT_POINTS_PER_USD * 10.0).round() / 10.0
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn random_hex(len: usize) -> Result<String> {
@@ -429,6 +727,106 @@ fn random_hex(len: usize) -> Result<String> {
             message: "generating Yole install id failed".into(),
         })?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn device_id_hash() -> String {
+    let Some(source) = device_id_source() else {
+        return String::new();
+    };
+    sha256_hex(format!("yole-device-v1|{}|{source}", std::env::consts::OS).as_bytes())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    digest(&SHA256, bytes)
+        .as_ref()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn device_id_source() -> Option<String> {
+    let output = std::process::Command::new("reg")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Cryptography",
+            "/v",
+            "MachineGuid",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_windows_machine_guid(&String::from_utf8_lossy(&output.stdout))
+        .map(|guid| format!("machine-guid:{guid}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn device_id_source() -> Option<String> {
+    let output = std::process::Command::new("ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_macos_platform_uuid(&String::from_utf8_lossy(&output.stdout))
+        .map(|uuid| format!("io-platform-uuid:{uuid}"))
+}
+
+#[cfg(target_os = "linux")]
+fn device_id_source() -> Option<String> {
+    read_first_nonempty_path(&[
+        "/etc/machine-id",
+        "/var/lib/dbus/machine-id",
+        "/sys/class/dmi/id/product_uuid",
+    ])
+    .map(|id| format!("linux-machine-id:{id}"))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn device_id_source() -> Option<String> {
+    None
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn read_first_nonempty_path(paths: &[&str]) -> Option<String> {
+    paths.iter().find_map(|path| {
+        std::fs::read_to_string(path)
+            .ok()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn parse_windows_machine_guid(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if !trimmed.to_ascii_lowercase().starts_with("machineguid") {
+            return None;
+        }
+        let mut parts = trimmed.split_whitespace();
+        let _name = parts.next()?;
+        let _kind = parts.next()?;
+        parts.next().map(|value| value.trim().to_ascii_lowercase())
+    })
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn parse_macos_platform_uuid(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if !trimmed.contains("\"IOPlatformUUID\"") {
+            return None;
+        }
+        trimmed
+            .split_once('=')
+            .map(|(_, value)| value.trim().trim_matches('"').to_ascii_lowercase())
+            .filter(|value| !value.is_empty())
+    })
 }
 
 fn compact_body(body: &str) -> String {
@@ -504,19 +902,41 @@ mod tests {
                 "newapi_base_url":"https://na.itxgp.com/v1",
                 "token":"sk-test",
                 "default_model":"gpt-5.5",
+                "route_version":"2026-06-14.1",
+                "model_routing":{
+                    "schema_version":1,
+                    "route_version":"2026-06-14.1",
+                    "profile_id":"yole_standard",
+                    "models":{
+                        "deepseek-v4-pro":{
+                            "input_modalities":["text"],
+                            "output_modalities":["text"],
+                            "tool_calling":true,
+                            "enabled":true
+                        }
+                    },
+                    "conversation":["deepseek-v4-pro"],
+                    "vision":[],
+                    "image_generation":["gpt-image-2"],
+                    "image_editing":["gpt-image-2"]
+                },
                 "account":{
                     "account_token":"yole_acct_test",
                     "support_id":"yole-42",
                     "user_id":42,
                     "username":"yole_abcd",
-                    "balance_usd":50,
-                    "quota_points":25000000,
+                    "balance_usd":30,
+                    "quota_points":15000000,
+                    "balance_points":3000,
+                    "initial_grant_points":3000,
+                    "low_balance_points":300,
+                    "points_unit":"积分",
                     "low_balance":false,
                     "contact":{
                         "wechat_id":"wx-test",
                         "wechat_qr_url":"https://example.test/assets/contact/wechat-qr",
                         "overseas":"support@example.com",
-                        "top_up_message":"AI 余额不足。联系客服可追加 50 美元体验额度。微信号：wx-test"
+                        "top_up_message":"AI 积分不足。联系客服可追加 3000 积分体验额度。微信号：wx-test"
                     }
                 }
             }"#,
@@ -526,11 +946,96 @@ mod tests {
         assert_eq!(response.default_model, "gpt-5.5");
         assert_eq!(response.expires_at, None);
         assert_eq!(response.account.support_id, "yole-42");
-        assert_eq!(response.account.balance_usd, 50.0);
-        assert_eq!(response.account.quota_points, 25_000_000);
+        assert_eq!(response.account.balance_usd, 30.0);
+        assert_eq!(response.account.quota_points, 15_000_000);
+        assert_eq!(response.account.balance_points(), 3000.0);
+        assert_eq!(response.account.low_balance_points(), 300.0);
+        assert_eq!(
+            response
+                .model_routing
+                .as_ref()
+                .and_then(|route| route.conversation.first())
+                .map(String::as_str),
+            Some("deepseek-v4-pro")
+        );
         assert_eq!(
             response.account.contact.wechat_id.as_deref(),
             Some("wx-test")
+        );
+    }
+
+    #[test]
+    fn runtime_route_endpoint_accepts_base_or_exact_endpoint() {
+        assert_eq!(
+            runtime_route_endpoint("https://provisioner.example").unwrap(),
+            "https://provisioner.example/api/runtime/route"
+        );
+        assert_eq!(
+            runtime_route_endpoint("https://provisioner.example/api/runtime/route").unwrap(),
+            "https://provisioner.example/api/runtime/route"
+        );
+    }
+
+    #[test]
+    fn runtime_route_url_includes_version_and_profile_cache_keys() {
+        let url = runtime_route_url(
+            "https://provisioner.example/yole-provisioner",
+            Some("2026-06-14.1"),
+            Some("yole_standard"),
+        )
+        .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://provisioner.example/yole-provisioner/api/runtime/route?version=2026-06-14.1&profile=yole_standard"
+        );
+    }
+
+    #[test]
+    fn device_hash_uses_sha256_hex() {
+        let hash = sha256_hex(b"yole-device-v1|windows|machine-guid:test-guid");
+        assert_eq!(hash.len(), 64);
+        assert_eq!(
+            hash,
+            "2c72664729bc9c4f8fc8d2fee0adb8ea18b6ec76c5726b5cd89e858156fe6b39"
+        );
+    }
+
+    #[test]
+    fn parses_windows_machine_guid_from_reg_output() {
+        let output = r#"
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography
+    MachineGuid    REG_SZ    00112233-4455-6677-8899-aabbccddeeff
+"#;
+        assert_eq!(
+            parse_windows_machine_guid(output).as_deref(),
+            Some("00112233-4455-6677-8899-aabbccddeeff")
+        );
+    }
+
+    #[test]
+    fn parses_macos_platform_uuid_from_ioreg_output() {
+        let output = r#"
+    | |   "IOPlatformUUID" = "A1B2C3D4-E5F6-7788-9900-AABBCCDDEEFF"
+"#;
+        assert_eq!(
+            parse_macos_platform_uuid(output).as_deref(),
+            Some("a1b2c3d4-e5f6-7788-9900-aabbccddeeff")
+        );
+    }
+
+    #[test]
+    fn read_first_nonempty_path_skips_blank_files() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let blank = dir.path().join("blank");
+        let id = dir.path().join("machine-id");
+        std::fs::write(&blank, "\n").unwrap();
+        std::fs::write(&id, "ABCDEF\n").unwrap();
+        let blank = blank.to_string_lossy().to_string();
+        let id = id.to_string_lossy().to_string();
+
+        assert_eq!(
+            read_first_nonempty_path(&[&blank, &id]).as_deref(),
+            Some("abcdef")
         );
     }
 }

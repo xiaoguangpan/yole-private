@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Yole",
-  "version": "0.0.1",
+  "version": "0.0.7",
   "identifier": "app.yole",
   "build": {
     "beforeDevCommand": "node scripts/prepare-cli-sidecar.mjs --profile debug && pnpm --dir gui dev",

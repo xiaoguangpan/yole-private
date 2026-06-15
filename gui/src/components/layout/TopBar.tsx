@@ -1,24 +1,20 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import {
   ArrowRight,
   ArrowsClockwise,
   ArrowsInLineHorizontal,
   ArrowsOutLineHorizontal,
-  CaretDown,
-  Cat,
   Check,
   ChatCircleText,
   CircleNotch,
   Copy,
   Gear,
   Lightning,
-  PencilSimple,
   PuzzlePiece,
   QrCode,
   Warning,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -33,7 +29,10 @@ import type { ResolvedTheme, ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import type { BrowserControlStatus } from "@/lib/browser-control";
 import type { ImSupervisorState } from "@/lib/im-supervisor";
-import type { YoleAccountStatus } from "@/lib/managed-models";
+import {
+  normalizeTelegramUsername,
+  type YoleAccountStatus,
+} from "@/lib/managed-models";
 
 import { WindowControls } from "./WindowControls";
 
@@ -61,8 +60,10 @@ export interface TopBarProps {
   channelsState?: ImSupervisorState | null;
   channelsLoadError?: string | null;
   onOpenChannelsSettings?: () => void;
+  showYoleAccount?: boolean;
   yoleAccount?: YoleAccountStatus | null;
   yoleAccountLoading?: boolean;
+  yoleAccountError?: string | null;
   onRefreshYoleAccount?: () => void;
   /**
    * Conversation column width mode. "compact" = 760px (default), "wide"
@@ -74,27 +75,7 @@ export interface TopBarProps {
   themePreference?: ThemePreference;
   resolvedTheme?: ResolvedTheme;
   onChangeThemePreference?: (preference: ThemePreference) => void;
-  /**
-   * Session-level overflow menu items (`⋯` button). The menu holds
-   * actions that operate on the current session and don't deserve a
-   * dedicated TopBar slot:
-   *
-   *   - Reinject Tools: re-injects GA's tool definitions into the
-   *     active session's LLM history. Low-frequency power-user fix
-   *     for "agent forgot its tools" after long runs.
-   *   - Desktop Pet: launches GA's `desktop_pet_v2.pyw` subprocess
-   *     and attaches a turn_end hook to a session. Clicking from a
-   *     non-holder session implicitly migrates the pet here (the
-   *     parent's onTogglePet handles the detach/attach sequence).
-   *
-   * `currentSessionHasPet` = pet is attached to the session whose
-   * title this menu represents. Drives the 2-state label:
-   *   true  → "关闭桌面宠物"
-   *   false → "桌面宠物"
-   * Whether a pet exists ON ANOTHER session is conveyed by the
-   * Sidebar's Cat badge; the menu intentionally doesn't surface
-   * that distinction.
-   */
+  /** Kept for older hosts; commercial Yole does not render a top-title menu. */
   onReinjectTools?: () => void;
   onTogglePet?: () => void;
   currentSessionHasPet?: boolean;
@@ -168,18 +149,16 @@ export function TopBar({
   channelsState = null,
   channelsLoadError = null,
   onOpenChannelsSettings,
+  showYoleAccount = false,
   yoleAccount = null,
   yoleAccountLoading = false,
+  yoleAccountError = null,
   onRefreshYoleAccount,
   conversationWidth = "compact",
   onToggleConversationWidth,
   themePreference = "system",
   resolvedTheme = "light",
   onChangeThemePreference,
-  onReinjectTools,
-  onTogglePet,
-  currentSessionHasPet = false,
-  onRenameSession,
   trafficLightPadding = isMac ? 70 : 12,
 }: TopBarProps) {
   const copy = useCopy();
@@ -213,47 +192,12 @@ export function TopBar({
         style={{ width: trafficLightPadding }}
       />
 
-      {/* Center: title-as-dropdown trigger. The title text + caret
-          form a single button that opens session-scoped actions
-          (Reinject Tools / Desktop Pet, plus Rename when V0.1 #3
-          lands). Notion / Linear / Arc convention — clicking the
-          document name opens its menu.
-
-          History: previously a bare title `<span>` with a separate
-          `⋯` button next to it. Visually the trailing dots read as
-          CSS text-overflow ellipsis, not as an affordance — users
-          didn't realize it was a menu. Folding the menu into the
-          title makes "this is interactive" unambiguous (caret +
-          hover fill) and gives a future home for inline rename.
-
-          Empty state ("新对话" placeholder): non-interactive, draggable
-          span. Same "affordance only when usable" rule applied
-          elsewhere (ApprovalDock / Composer Stop / AskUserBubble).
-
-          Drag region: the wrapping div is draggable so the empty
-          spaces left/right of the title still drag the window. The
-          button itself is auto-excluded by Tauri (buttons don't
-          trigger drag), so clicks open the menu instead of dragging. */}
+      {/* Center: hidden title only. Long titles and session actions live in the sidebar. */}
       <div
         data-tauri-drag-region
         className="flex min-w-0 flex-1 items-center justify-center px-3"
       >
-        {sessionTitle ? (
-          <SessionTitleMenu
-            title={sessionTitle}
-            onReinjectTools={onReinjectTools}
-            onTogglePet={onTogglePet}
-            currentSessionHasPet={currentSessionHasPet}
-            onRename={onRenameSession}
-          />
-        ) : (
-          <span
-            data-tauri-drag-region
-            className="truncate text-[13px] italic text-ink-muted"
-          >
-            {copy.topbar.newConversation}
-          </span>
-        )}
+        {sessionTitle && <span className="sr-only">{sessionTitle}</span>}
       </div>
 
       {/* Right: action cluster. Global controls only — session-level
@@ -289,10 +233,11 @@ export function TopBar({
               onOpen={onOpenChannelsSettings}
             />
           )}
-          {yoleAccount && (
-            <YoleBalanceIndicator
+          {showYoleAccount && (
+            <YoleBalanceIndicatorSafe
               account={yoleAccount}
               loading={yoleAccountLoading}
+              error={yoleAccountError}
               onRefresh={onRefreshYoleAccount}
             />
           )}
@@ -358,21 +303,33 @@ function ChannelsIndicator({
   );
 }
 
-function YoleBalanceIndicator({
+function YoleBalanceIndicatorSafe({
   account,
   loading,
+  error,
   onRefresh,
 }: {
-  account: YoleAccountStatus;
+  account: YoleAccountStatus | null;
   loading?: boolean;
+  error?: string | null;
   onRefresh?: () => void;
 }) {
-  const [copied, setCopied] = useState<"support" | "wechat" | null>(null);
-  const wechatId = account.contact.wechatId?.trim();
-  const qrUrl = account.contact.wechatQrUrl?.trim();
-  const overseas = account.contact.overseas?.trim();
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<
+    "support" | "wechat" | "telegram" | null
+  >(null);
+  const wechatId = account?.contact.wechatId?.trim();
+  const qrUrl = account?.contact.wechatQrUrl?.trim();
+  const telegram = normalizeTelegramUsername(account?.contact.overseas);
+  const points = account
+    ? formatYolePoints(account.balancePoints, account.pointsUnit)
+    : "AI 积分";
+  const needsAttention = Boolean(error) || Boolean(account?.lowBalance);
 
-  const copyValue = (kind: "support" | "wechat", value: string) => {
+  const copyValue = (
+    kind: "support" | "wechat" | "telegram",
+    value: string,
+  ) => {
     void copyTextToClipboard(value).then(() => {
       setCopied(kind);
       window.setTimeout(() => setCopied(null), 1400);
@@ -382,10 +339,10 @@ function YoleBalanceIndicator({
   return (
     <Popover.Root
       onOpenChange={(open) => {
-        if (open) onRefresh?.();
+        setOpen(open);
       }}
     >
-      <TooltipLabel text="AI 余额" side="bottom">
+      <TooltipLabel text="AI 积分" side="bottom">
         <Popover.Trigger asChild>
           <button
             type="button"
@@ -393,20 +350,15 @@ function YoleBalanceIndicator({
               "flex h-7 items-center gap-1.5 rounded-sm border px-2 text-[12px]",
               "transition-[background-color,border-color,color,transform] duration-[120ms]",
               "active:translate-y-[0.5px]",
-              account.lowBalance
-                ? "border-warning/40 bg-warning/15 font-medium text-warning hover:bg-warning/25"
-                : "border-line bg-elevated text-ink-soft hover:bg-hover hover:text-ink",
+              open
+                ? "border-line bg-elevated text-ink shadow-card"
+                : needsAttention
+                  ? "border-transparent bg-transparent font-medium text-warning hover:bg-hover"
+                  : "border-transparent bg-transparent text-ink-soft hover:bg-hover hover:text-ink",
             )}
-            aria-label={`AI 余额 ${formatUSD(account.balanceUsd)}`}
+            aria-label={`AI 积分 ${points}`}
           >
-            {loading ? (
-              <CircleNotch size={13} weight="thin" className="spin" />
-            ) : account.lowBalance ? (
-              <Warning size={13} weight="thin" />
-            ) : (
-              <span className="text-[13px] leading-none">$</span>
-            )}
-            <span>{formatUSD(account.balanceUsd)}</span>
+            <span>{points}</span>
           </button>
         </Popover.Trigger>
       </TooltipLabel>
@@ -420,20 +372,20 @@ function YoleBalanceIndicator({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[12px] text-ink-muted">AI 余额</div>
+              <div className="text-[12px] text-ink-muted">AI 积分</div>
               <div className="mt-0.5 text-[22px] font-semibold leading-none text-ink">
-                {formatUSD(account.balanceUsd)}
+                {points}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              {account.lowBalance && (
+              {account?.lowBalance && (
                 <span className="rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
-                  余额较低
+                  积分较低
                 </span>
               )}
               {onRefresh && (
                 <TooltipLabel
-                  text={loading ? "正在刷新余额" : "刷新余额"}
+                  text={loading ? "正在刷新积分" : "刷新积分"}
                   side="top"
                 >
                   <button
@@ -444,7 +396,7 @@ function YoleBalanceIndicator({
                       "inline-flex size-6 items-center justify-center rounded-sm text-ink-muted",
                       "hover:bg-hover hover:text-ink disabled:cursor-default disabled:opacity-60",
                     )}
-                    aria-label="刷新余额"
+                    aria-label="刷新积分"
                   >
                     <ArrowsClockwise
                       size={13}
@@ -457,40 +409,71 @@ function YoleBalanceIndicator({
             </div>
           </div>
 
-          <div className="mt-3 space-y-2 text-[12px]">
-            <YoleAccountRow label="支持ID" value={account.supportId}>
-              <button
-                type="button"
-                onClick={() => copyValue("support", account.supportId)}
-                className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
-                aria-label="复制支持ID"
-              >
-                {copied === "support" ? (
-                  <Check size={13} weight="thin" />
-                ) : (
-                  <Copy size={13} weight="thin" />
-                )}
-              </button>
-            </YoleAccountRow>
-            <YoleAccountRow label="账号" value={account.username} />
-            {wechatId && (
-              <YoleAccountRow label="微信号" value={wechatId}>
+          {error && (
+            <div
+              title={error}
+              className="mt-3 rounded-sm border border-warning/30 bg-warning/10 px-2.5 py-2 text-[12px] leading-relaxed text-warning"
+            >
+              积分刷新失败，请稍后再试。
+            </div>
+          )}
+
+          {!account && !error && (
+            <div className="mt-3 rounded-sm border border-line bg-app px-2.5 py-2 text-[12px] leading-relaxed text-ink-muted">
+              暂未读取到积分状态，可点击刷新重试。
+            </div>
+          )}
+
+          {account && (
+            <div className="mt-3 space-y-2 text-[12px]">
+              <YoleAccountRow label="支持ID" value={account.supportId}>
                 <button
                   type="button"
-                  onClick={() => copyValue("wechat", wechatId)}
+                  onClick={() => copyValue("support", account.supportId)}
                   className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
-                  aria-label="复制微信号"
+                  aria-label="复制支持ID"
                 >
-                  {copied === "wechat" ? (
+                  {copied === "support" ? (
                     <Check size={13} weight="thin" />
                   ) : (
                     <Copy size={13} weight="thin" />
                   )}
                 </button>
               </YoleAccountRow>
-            )}
-            {overseas && <YoleAccountRow label="海外" value={overseas} />}
-          </div>
+              {wechatId && (
+                <YoleAccountRow label="微信号" value={wechatId}>
+                  <button
+                    type="button"
+                    onClick={() => copyValue("wechat", wechatId)}
+                    className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+                    aria-label="复制微信号"
+                  >
+                    {copied === "wechat" ? (
+                      <Check size={13} weight="thin" />
+                    ) : (
+                      <Copy size={13} weight="thin" />
+                    )}
+                  </button>
+                </YoleAccountRow>
+              )}
+              {telegram && (
+                <YoleAccountRow label="Telegram" value={telegram}>
+                  <button
+                    type="button"
+                    onClick={() => copyValue("telegram", telegram)}
+                    className="inline-flex size-6 items-center justify-center rounded-sm text-ink-muted hover:bg-hover hover:text-ink"
+                    aria-label="复制 Telegram"
+                  >
+                    {copied === "telegram" ? (
+                      <Check size={13} weight="thin" />
+                    ) : (
+                      <Copy size={13} weight="thin" />
+                    )}
+                  </button>
+                </YoleAccountRow>
+              )}
+            </div>
+          )}
 
           {qrUrl && (
             <div className="mt-3 rounded-sm border border-line bg-app p-2">
@@ -531,9 +514,17 @@ function YoleAccountRow({
   );
 }
 
-function formatUSD(value: number): string {
-  if (!Number.isFinite(value)) return "$0.00";
-  return `$${value.toFixed(2)}`;
+function formatYolePoints(value: number, unit?: string | null): string {
+  const normalized = Number.isFinite(value) ? value : 0;
+  const label = unit?.trim() || "积分";
+  const amount =
+    Math.abs(normalized - Math.round(normalized)) < 0.05
+      ? Math.round(normalized).toLocaleString("zh-CN")
+      : normalized.toLocaleString("zh-CN", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        });
+  return `${amount} ${label}`;
 }
 
 function channelsTopbarStatus(
@@ -576,9 +567,9 @@ function BrowserControlIndicator({
       ? copy.browserControlNoTabsTitle
       : offline
         ? copy.browserControlOfflineTitle
-      : error
-        ? copy.browserControlErrorTitle
-        : copy.browserControlPendingTitle;
+        : error
+          ? copy.browserControlErrorTitle
+          : copy.browserControlPendingTitle;
   if (bridgeReady || offline) {
     return (
       <TooltipLabel text={title}>
@@ -662,7 +653,7 @@ function YoloIndicator({
             )}
           >
             <Lightning size={14} weight="thin" />
-            YOLO
+            自动执行
           </button>
         </Popover.Trigger>
       </TooltipLabel>
@@ -708,284 +699,6 @@ function YoloIndicator({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-/**
- * Title-as-dropdown trigger for session-scoped actions. The session
- * title text and a caret form a single button; clicking opens a menu
- * with low-frequency / power-user actions attached to "this current
- * session":
- *
- *   - Reinject Tools: one-shot — re-injects GA's
- *     tool definitions into the active session's LLM history.
- *   - Desktop Pet: 2-state toggle. Label is
- *     "关闭桌面宠物" when this session holds the pet and "桌面宠物"
- *     otherwise; clicking "桌面宠物" from a non-holder session
- *     implicitly migrates the pet here. "Where is the pet right
- *     now" lives in the Sidebar Cat badge, not in this label.
- *
- * Future V0.2 entries (`/branch`, `/rewind`) slot in here too — see
- * discussion thread 2026-05-13.
- *
- * Why title-as-trigger instead of a sibling `⋯` button: a bare title +
- * trailing dots reads as CSS text-overflow ellipsis. The whole-block
- * trigger removes that ambiguity and gives the rename affordance a
- * natural home (V0.1 #3).
- */
-function SessionTitleMenu({
-  title,
-  onReinjectTools,
-  onTogglePet,
-  currentSessionHasPet,
-  onRename,
-}: {
-  title: string;
-  onReinjectTools?: () => void;
-  onTogglePet?: () => void;
-  currentSessionHasPet?: boolean;
-  onRename?: (newTitle: string) => void;
-}) {
-  const copy = useCopy();
-  const petHere = !!currentSessionHasPet;
-  const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const titleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Tracks whether the menu close was triggered by "重命名" so we can
-  // suppress Radix's default focus-return-to-trigger (the trigger is
-  // about to be replaced by the input). Without this, Radix focuses
-  // the about-to-unmount button and the input never wins focus on
-  // mount — user has to click again.
-  const renameRequestedRef = useRef(false);
-
-  const clearTitleClickTimer = () => {
-    if (!titleClickTimerRef.current) return;
-    clearTimeout(titleClickTimerRef.current);
-    titleClickTimerRef.current = null;
-  };
-
-  useEffect(() => {
-    return () => {
-      if (titleClickTimerRef.current) {
-        clearTimeout(titleClickTimerRef.current);
-      }
-    };
-  }, []);
-
-  const beginRename = () => {
-    if (!onRename) return;
-    clearTitleClickTimer();
-    renameRequestedRef.current = true;
-    setMenuOpen(false);
-    setEditing(true);
-  };
-
-  if (editing && onRename) {
-    return (
-      <SessionTitleEditor
-        initial={title}
-        onCommit={(next) => {
-          onRename(next);
-          setEditing(false);
-        }}
-        onCancel={() => setEditing(false)}
-      />
-    );
-  }
-
-  return (
-    <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          aria-label={copy.topbar.moreConversationActions(title)}
-          onPointerDown={(e) => {
-            if (!onRename) return;
-            if (e.button !== 0 || e.ctrlKey) return;
-            e.preventDefault();
-          }}
-          onClick={(e) => {
-            if (!onRename) return;
-            if (e.detail > 1) {
-              clearTitleClickTimer();
-              return;
-            }
-            if (e.detail !== 1) return;
-            clearTitleClickTimer();
-            if (menuOpen) {
-              setMenuOpen(false);
-              return;
-            }
-            titleClickTimerRef.current = setTimeout(() => {
-              setMenuOpen(true);
-              titleClickTimerRef.current = null;
-            }, 160);
-          }}
-          onDoubleClick={(e) => {
-            if (!onRename) return;
-            e.preventDefault();
-            e.stopPropagation();
-            beginRename();
-          }}
-          className={cn(
-            "group inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1",
-            "transition-colors hover:bg-hover data-[state=open]:bg-hover",
-          )}
-        >
-          <span className="truncate font-medium text-ink">{title}</span>
-          <CaretDown
-            size={11}
-            weight="bold"
-            className={cn(
-              "shrink-0 text-ink-muted transition-transform",
-              "group-hover:text-ink-soft",
-              "group-data-[state=open]:rotate-180 group-data-[state=open]:text-ink-soft",
-            )}
-          />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="center"
-          sideOffset={6}
-          onCloseAutoFocus={(e) => {
-            if (renameRequestedRef.current) {
-              renameRequestedRef.current = false;
-              e.preventDefault();
-            }
-          }}
-          className={cn(
-            // z-[70] is above the dev-toggle panel (z-[60] in
-            // App.tsx) — without this, the menu opens BEHIND the
-            // dev INTRO/EMPTY/MAIN/+toast/+mock buttons in dev mode.
-            // Production build has no dev panel so z-50 would
-            // suffice, but the higher value is harmless there.
-            "z-[70] min-w-[200px] rounded-md border border-line bg-elevated p-1",
-            "text-[13px] text-ink shadow-elevated",
-          )}
-        >
-          {onRename && (
-            <>
-              <DropdownMenu.Item
-                onSelect={beginRename}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 outline-none",
-                  "data-[highlighted]:bg-hover",
-                )}
-              >
-                <PencilSimple
-                  size={14}
-                  weight="thin"
-                  className="text-ink-soft"
-                />
-                <span>{copy.topbar.rename}</span>
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator className="my-1 h-px bg-line" />
-            </>
-          )}
-          <DropdownMenu.Item
-            onSelect={() => onReinjectTools?.()}
-            className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 outline-none",
-              "data-[highlighted]:bg-hover",
-            )}
-          >
-            <ArrowsClockwise
-              size={14}
-              weight="thin"
-              className="text-ink-soft"
-            />
-            <span>{copy.topbar.reinjectTools}</span>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item
-            onSelect={() => onTogglePet?.()}
-            className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 outline-none",
-              "data-[highlighted]:bg-hover",
-            )}
-          >
-            <Cat
-              size={14}
-              weight="thin"
-              className={petHere ? "text-brand" : "text-ink-soft"}
-            />
-            <span className="text-ink">
-              {petHere ? copy.topbar.closeDesktopPet : copy.topbar.desktopPet}
-            </span>
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
-
-/**
- * Inline title editor — appears when the user picks "重命名" from the
- * title menu. Mirrors the Sidebar inline-edit pattern:
- *
- *   - autofocus + select-all on mount
- *   - Enter commits, Escape cancels, blur commits ("click outside
- *     doesn't lose work" — matches Sidebar)
- *   - settledRef guards against the Enter-then-blur double-fire
- *
- * Tauri-specific: the wrapping TopBar div is `data-tauri-drag-region`,
- * which captures mousedown for window dragging. Per-element opt-out
- * via `data-tauri-drag-region="false"` lets the input receive
- * mousedown / focus normally — without this, clicking the input drags
- * the window instead of moving the cursor.
- */
-function SessionTitleEditor({
-  initial,
-  onCommit,
-  onCancel,
-}: {
-  initial: string;
-  onCommit: (newTitle: string) => void;
-  onCancel: () => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState(initial);
-  const settledRef = useRef(false);
-
-  useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
-  }, []);
-
-  const commit = () => {
-    if (settledRef.current) return;
-    settledRef.current = true;
-    onCommit(value);
-  };
-  const cancel = () => {
-    if (settledRef.current) return;
-    settledRef.current = true;
-    onCancel();
-  };
-
-  return (
-    <input
-      ref={ref}
-      type="text"
-      value={value}
-      data-tauri-drag-region="false"
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commit();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancel();
-        }
-      }}
-      onBlur={commit}
-      className={cn(
-        "w-full max-w-[480px] min-w-0 rounded-md bg-app px-2 py-1 text-[13px] font-medium text-ink",
-        "border border-line outline-none ring-2 ring-brand/30 focus:border-brand",
-      )}
-    />
   );
 }
 

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ type NewAPIClient interface {
 
 type AccountStore interface {
 	GetByInstallID(installID string) (accountstore.Record, bool)
+	GetByDeviceIDHash(deviceIDHash string) (accountstore.Record, bool)
 	GetByAccountToken(token string) (accountstore.Record, bool)
 	Upsert(rec accountstore.Record) error
 }
@@ -36,7 +38,10 @@ type HandlerConfig struct {
 	Store             AccountStore
 	Limiter           ratelimit.Limiter
 	PublicBase        string
+	PublicServerBase  string
 	Trial             TrialConfig
+	Points            PointsConfig
+	Routing           RoutingConfig
 	Contact           ContactConfig
 	TrustProxyHeaders bool
 	ClientIPHeader    string
@@ -52,6 +57,34 @@ type TrialConfig struct {
 	AllowedModels    []string
 }
 
+type PointsConfig struct {
+	PerUSD float64
+	Unit   string
+}
+
+type RoutingConfig struct {
+	Version        string
+	DefaultProfile string
+	Profiles       map[string]RouteProfile
+	Models         map[string]ModelMetadata
+}
+
+type RouteProfile struct {
+	NewAPIGroup     string
+	Conversation    []string
+	Vision          []string
+	ImageGeneration []string
+	ImageEditing    []string
+}
+
+type ModelMetadata struct {
+	DisplayName      string
+	InputModalities  []string
+	OutputModalities []string
+	ToolCalling      bool
+	Enabled          *bool
+}
+
 type ContactConfig struct {
 	WeChatID     string
 	WeChatQRPath string
@@ -63,7 +96,10 @@ type Handler struct {
 	store             AccountStore
 	limiter           ratelimit.Limiter
 	publicBase        string
+	publicServerBase  string
 	trial             TrialConfig
+	points            PointsConfig
+	routing           RoutingConfig
 	contact           ContactConfig
 	trustProxyHeaders bool
 	clientIPHeader    string
@@ -81,18 +117,24 @@ type RegisterResponse struct {
 	NewAPIBaseURL string          `json:"newapi_base_url"`
 	Token         string          `json:"token"`
 	DefaultModel  string          `json:"default_model"`
+	RouteVersion  string          `json:"route_version,omitempty"`
+	ModelRouting  *RouteResponse  `json:"model_routing,omitempty"`
 	Account       AccountResponse `json:"account"`
 }
 
 type AccountResponse struct {
-	AccountToken string          `json:"account_token,omitempty"`
-	SupportID    string          `json:"support_id"`
-	UserID       int             `json:"user_id"`
-	Username     string          `json:"username"`
-	BalanceUSD   float64         `json:"balance_usd"`
-	QuotaPoints  int             `json:"quota_points"`
-	LowBalance   bool            `json:"low_balance"`
-	Contact      ContactResponse `json:"contact"`
+	AccountToken       string          `json:"account_token,omitempty"`
+	SupportID          string          `json:"support_id"`
+	UserID             int             `json:"user_id"`
+	Username           string          `json:"username"`
+	BalanceUSD         float64         `json:"balance_usd"`
+	QuotaPoints        int             `json:"quota_points"`
+	BalancePoints      float64         `json:"balance_points"`
+	InitialGrantPoints float64         `json:"initial_grant_points"`
+	LowBalancePoints   float64         `json:"low_balance_points"`
+	PointsUnit         string          `json:"points_unit"`
+	LowBalance         bool            `json:"low_balance"`
+	Contact            ContactResponse `json:"contact"`
 }
 
 type ContactResponse struct {
@@ -100,6 +142,25 @@ type ContactResponse struct {
 	WeChatQRURL  string `json:"wechat_qr_url,omitempty"`
 	Overseas     string `json:"overseas,omitempty"`
 	TopUpMessage string `json:"top_up_message,omitempty"`
+}
+
+type RouteResponse struct {
+	SchemaVersion   uint32                   `json:"schema_version"`
+	RouteVersion    string                   `json:"route_version"`
+	ProfileID       string                   `json:"profile_id"`
+	Models          map[string]ModelResponse `json:"models"`
+	Conversation    []string                 `json:"conversation"`
+	Vision          []string                 `json:"vision"`
+	ImageGeneration []string                 `json:"image_generation"`
+	ImageEditing    []string                 `json:"image_editing"`
+}
+
+type ModelResponse struct {
+	DisplayName      string   `json:"display_name,omitempty"`
+	InputModalities  []string `json:"input_modalities"`
+	OutputModalities []string `json:"output_modalities"`
+	ToolCalling      bool     `json:"tool_calling"`
+	Enabled          bool     `json:"enabled"`
 }
 
 type errorResponse struct {
@@ -112,7 +173,10 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		store:             cfg.Store,
 		limiter:           cfg.Limiter,
 		publicBase:        strings.TrimRight(cfg.PublicBase, "/"),
+		publicServerBase:  strings.TrimRight(cfg.PublicServerBase, "/"),
 		trial:             cfg.Trial,
+		points:            normalizePoints(cfg.Points),
+		routing:           normalizeRouting(cfg.Routing),
 		contact:           cfg.Contact,
 		trustProxyHeaders: cfg.TrustProxyHeaders,
 		clientIPHeader:    cfg.ClientIPHeader,
@@ -123,6 +187,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", h.health)
 	mux.HandleFunc("POST /api/register", h.register)
 	mux.HandleFunc("GET /api/account/status", h.accountStatus)
+	mux.HandleFunc("GET /api/runtime/route", h.runtimeRoute)
 	mux.HandleFunc("GET /assets/contact/wechat-qr", h.wechatQR)
 }
 
@@ -161,6 +226,12 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rec, ok := h.store.GetByInstallID(req.InstallID); ok {
+		rec = h.recordWithDeviceHash(rec, req)
+		if err := h.store.Upsert(rec); err != nil {
+			log.Printf("account store device hash update failed install=%s user=%d: %v", req.InstallID, rec.UserID, err)
+			writeError(w, http.StatusInternalServerError, "account_store_write_failed")
+			return
+		}
 		resp, err := h.registerResponse(r, rec)
 		if err != nil {
 			log.Printf("account status failed for existing install=%s user=%d: %v", req.InstallID, rec.UserID, err)
@@ -169,6 +240,25 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, resp)
 		return
+	}
+
+	if reqDeviceIDHash := strings.TrimSpace(req.DeviceIDHash); reqDeviceIDHash != "" {
+		if rec, ok := h.store.GetByDeviceIDHash(reqDeviceIDHash); ok {
+			rec = h.recordWithInstallID(rec, req)
+			if err := h.store.Upsert(rec); err != nil {
+				log.Printf("account store reinstall link failed old_install=%s new_install=%s user=%d: %v", rec.InstallID, req.InstallID, rec.UserID, err)
+				writeError(w, http.StatusInternalServerError, "account_store_write_failed")
+				return
+			}
+			resp, err := h.registerResponse(r, rec)
+			if err != nil {
+				log.Printf("account status failed for existing device=%s user=%d: %v", reqDeviceIDHash, rec.UserID, err)
+				writeError(w, http.StatusBadGateway, "account_status_failed")
+				return
+			}
+			writeJSON(w, http.StatusOK, resp)
+			return
+		}
 	}
 
 	clientIP := h.clientIP(r)
@@ -208,10 +298,13 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 
 	rec := accountstore.Record{
 		InstallID:    req.InstallID,
+		DeviceIDHash: strings.TrimSpace(req.DeviceIDHash),
 		AccountToken: accountToken,
-		SupportID:    supportID(provisioned.User.ID, provisioned.User.Username),
+		SupportID:    supportID(provisioned.User.Username),
 		UserID:       provisioned.User.ID,
 		Username:     provisioned.User.Username,
+		UserGroup:    nonempty(provisioned.User.Group, h.trial.UserGroup),
+		RouteProfile: h.profileForGroup(nonempty(provisioned.User.Group, h.trial.UserGroup)),
 		ConsumerKey:  ensureSKPrefix(provisioned.ConsumerKey),
 		TokenID:      provisioned.Token.ID,
 	}
@@ -261,6 +354,44 @@ func (h *Handler) accountStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func (h *Handler) runtimeRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if h.store == nil {
+		writeError(w, http.StatusInternalServerError, "account_store_not_configured")
+		return
+	}
+	token := bearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		token = strings.TrimSpace(r.URL.Query().Get("account_token"))
+	}
+	if token == "" {
+		writeError(w, http.StatusUnauthorized, "account_token_required")
+		return
+	}
+	rec, ok := h.store.GetByAccountToken(token)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "account_token_invalid")
+		return
+	}
+	rec = h.refreshRecordFromNewAPI(r.Context(), rec)
+	route := h.routeForRecord(rec)
+	requestedVersion := strings.TrimSpace(r.URL.Query().Get("version"))
+	requestedProfile := strings.TrimSpace(r.URL.Query().Get("profile"))
+	if requestedProfile == "" {
+		requestedProfile = strings.TrimSpace(r.URL.Query().Get("profile_id"))
+	}
+	if requestedVersion == h.routing.Version &&
+		requestedProfile != "" &&
+		requestedProfile == route.ProfileID {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, route)
+}
+
 func (h *Handler) wechatQR(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -307,6 +438,21 @@ func (h *Handler) tokenName(req RegisterRequest) string {
 	return fmt.Sprintf("%s_%s_%s_%s", prefix, date, osName, randomSuffix())
 }
 
+func (h *Handler) recordWithDeviceHash(rec accountstore.Record, req RegisterRequest) accountstore.Record {
+	if strings.TrimSpace(rec.DeviceIDHash) == "" && strings.TrimSpace(req.DeviceIDHash) != "" {
+		rec.DeviceIDHash = strings.TrimSpace(req.DeviceIDHash)
+	}
+	return rec
+}
+
+func (h *Handler) recordWithInstallID(rec accountstore.Record, req RegisterRequest) accountstore.Record {
+	rec.InstallID = req.InstallID
+	if strings.TrimSpace(rec.DeviceIDHash) == "" {
+		rec.DeviceIDHash = strings.TrimSpace(req.DeviceIDHash)
+	}
+	return rec
+}
+
 func (h *Handler) username() string {
 	prefix := security.SafeTokenNamePart(h.trial.TokenPrefix, 8)
 	return fmt.Sprintf("%s_%s", prefix, randomSuffix())
@@ -320,9 +466,23 @@ func (h *Handler) registerResponse(r *http.Request, rec accountstore.Record) (Re
 	return RegisterResponse{
 		NewAPIBaseURL: h.publicBase,
 		Token:         rec.ConsumerKey,
-		DefaultModel:  h.trial.DefaultModel,
+		DefaultModel:  h.defaultModelForRecord(rec),
+		RouteVersion:  h.routing.Version,
+		ModelRouting:  h.routeForRecord(rec),
 		Account:       account,
 	}, nil
+}
+
+func (h *Handler) defaultModelForRecord(rec accountstore.Record) string {
+	route := h.routeForRecord(rec)
+	if route != nil {
+		for _, model := range route.Conversation {
+			if strings.TrimSpace(model) != "" {
+				return strings.TrimSpace(model)
+			}
+		}
+	}
+	return h.trial.DefaultModel
 }
 
 func (h *Handler) accountResponse(r *http.Request, rec accountstore.Record, includeToken bool) (AccountResponse, error) {
@@ -330,21 +490,33 @@ func (h *Handler) accountResponse(r *http.Request, rec accountstore.Record, incl
 	if err != nil {
 		return AccountResponse{}, err
 	}
+	rec = h.recordWithNewAPIUser(rec, user)
 	token := ""
 	if includeToken {
 		token = rec.AccountToken
 	}
 	quota := user.Quota
 	balance := newapi.USDFromQuota(quota)
+	balancePoints := h.pointsFromUSD(balance)
+	lowBalancePoints := h.pointsFromUSD(h.trial.LowBalanceUSD)
+	initialGrantPoints := h.pointsFromUSD(h.trial.InitialCreditUSD)
+	username := strings.TrimSpace(rec.Username)
+	if username == "" {
+		username = strings.TrimSpace(user.Username)
+	}
 	return AccountResponse{
-		AccountToken: token,
-		SupportID:    nonempty(rec.SupportID, supportID(rec.UserID, rec.Username)),
-		UserID:       rec.UserID,
-		Username:     rec.Username,
-		BalanceUSD:   balance,
-		QuotaPoints:  quota,
-		LowBalance:   balance <= h.trial.LowBalanceUSD,
-		Contact:      h.contactResponse(r),
+		AccountToken:       token,
+		SupportID:          supportID(username),
+		UserID:             rec.UserID,
+		Username:           username,
+		BalanceUSD:         balance,
+		QuotaPoints:        quota,
+		BalancePoints:      balancePoints,
+		InitialGrantPoints: initialGrantPoints,
+		LowBalancePoints:   lowBalancePoints,
+		PointsUnit:         h.points.Unit,
+		LowBalance:         balancePoints <= lowBalancePoints,
+		Contact:            h.contactResponse(r),
 	}, nil
 }
 
@@ -358,21 +530,62 @@ func (h *Handler) contactResponse(r *http.Request) ContactResponse {
 		WeChatID:     wechat,
 		WeChatQRURL:  qrURL,
 		Overseas:     strings.TrimSpace(h.contact.Overseas),
-		TopUpMessage: topUpMessage(h.trial.InitialCreditUSD, wechat),
+		TopUpMessage: topUpMessage(h.pointsFromUSD(h.trial.InitialCreditUSD), h.points.Unit, wechat),
 	}
 }
 
 func (h *Handler) absoluteURL(r *http.Request, path string) string {
+	if h.publicServerBase != "" {
+		return h.publicServerBase + path
+	}
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
 	}
+	prefix := ""
 	if h.trustProxyHeaders {
 		if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
 			scheme = strings.Split(forwarded, ",")[0]
 		}
+		if forwardedPrefix := strings.TrimSpace(r.Header.Get("X-Forwarded-Prefix")); forwardedPrefix != "" {
+			prefix = "/" + strings.Trim(strings.Split(forwardedPrefix, ",")[0], "/")
+		}
 	}
-	return scheme + "://" + r.Host + path
+	return scheme + "://" + r.Host + prefix + path
+}
+
+func (h *Handler) refreshRecordFromNewAPI(ctx context.Context, rec accountstore.Record) accountstore.Record {
+	if h.newAPI == nil || rec.UserID <= 0 {
+		return rec
+	}
+	user, err := h.newAPI.GetUser(ctx, rec.UserID)
+	if err != nil {
+		log.Printf("newapi user refresh failed user=%d: %v", rec.UserID, err)
+		return rec
+	}
+	return h.recordWithNewAPIUser(rec, user)
+}
+
+func (h *Handler) recordWithNewAPIUser(rec accountstore.Record, user newapi.UserRecord) accountstore.Record {
+	updated := false
+	if username := strings.TrimSpace(user.Username); username != "" && strings.TrimSpace(rec.Username) == "" {
+		rec.Username = username
+		updated = true
+	}
+	if userGroup := strings.TrimSpace(user.Group); userGroup != "" {
+		routeProfile := h.profileForGroup(userGroup)
+		if rec.UserGroup != userGroup || rec.RouteProfile != routeProfile {
+			rec.UserGroup = userGroup
+			rec.RouteProfile = routeProfile
+			updated = true
+		}
+	}
+	if updated && h.store != nil {
+		if err := h.store.Upsert(rec); err != nil {
+			log.Printf("account store user sync failed user=%d group=%s: %v", rec.UserID, rec.UserGroup, err)
+		}
+	}
+	return rec
 }
 
 func (h *Handler) clientIP(r *http.Request) string {
@@ -413,19 +626,190 @@ func bearerToken(header string) string {
 	return ""
 }
 
-func supportID(userID int, username string) string {
-	if userID > 0 {
-		return fmt.Sprintf("yole-%d", userID)
+func supportID(username string) string {
+	if strings.TrimSpace(username) != "" {
+		return strings.TrimSpace(username)
 	}
-	return username
+	return "yole-support"
 }
 
-func topUpMessage(creditUSD float64, wechat string) string {
-	amount := fmt.Sprintf("%.0f", creditUSD)
-	if strings.TrimSpace(wechat) == "" {
-		return fmt.Sprintf("AI 余额不足。联系客服可追加 %s 美元体验额度。", amount)
+func normalizePoints(points PointsConfig) PointsConfig {
+	if points.PerUSD <= 0 {
+		points.PerUSD = 100
 	}
-	return fmt.Sprintf("AI 余额不足。联系客服可追加 %s 美元体验额度。微信号：%s", amount, wechat)
+	if strings.TrimSpace(points.Unit) == "" {
+		points.Unit = "积分"
+	} else {
+		points.Unit = strings.TrimSpace(points.Unit)
+	}
+	return points
+}
+
+func normalizeRouting(routing RoutingConfig) RoutingConfig {
+	if strings.TrimSpace(routing.Version) == "" {
+		routing.Version = "2026-06-14.1"
+	}
+	if strings.TrimSpace(routing.DefaultProfile) == "" {
+		routing.DefaultProfile = "yole_standard"
+	}
+	if len(routing.Profiles) == 0 {
+		routing.Profiles = defaultRouteProfiles()
+	}
+	if len(routing.Models) == 0 {
+		routing.Models = defaultRouteModels()
+	}
+	if _, ok := routing.Profiles[routing.DefaultProfile]; !ok {
+		routing.DefaultProfile = firstProfileID(routing.Profiles, "yole_standard")
+	}
+	return routing
+}
+
+func firstProfileID(profiles map[string]RouteProfile, fallback string) string {
+	if _, ok := profiles[fallback]; ok {
+		return fallback
+	}
+	for id := range profiles {
+		return id
+	}
+	return fallback
+}
+
+func defaultRouteProfiles() map[string]RouteProfile {
+	return map[string]RouteProfile{
+		"yole_standard": {
+			NewAPIGroup:     "yole",
+			Conversation:    []string{"deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash", "qwen3.6-plus"},
+			Vision:          []string{"qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+			ImageGeneration: []string{"gpt-image-2"},
+			ImageEditing:    []string{"gpt-image-2"},
+		},
+		"yole_vip": {
+			NewAPIGroup:     "vip",
+			Conversation:    []string{"gpt-5.5", "deepseek-v4-pro", "qwen3.7-plus", "kimi-k2.6", "mimo-v2.5-pro", "deepseek-v4-flash"},
+			Vision:          []string{"gpt-5.5", "qwen3.7-plus", "kimi-k2.6", "qwen3.6-plus"},
+			ImageGeneration: []string{"gpt-image-2"},
+			ImageEditing:    []string{"gpt-image-2"},
+		},
+	}
+}
+
+func defaultRouteModels() map[string]ModelMetadata {
+	enabled := true
+	return map[string]ModelMetadata{
+		"deepseek-v4-pro":   textModel(true, &enabled),
+		"deepseek-v4-flash": textModel(true, &enabled),
+		"mimo-v2.5-pro":     textModel(true, &enabled),
+		"qwen3.7-plus":      visionTextModel(true, &enabled),
+		"qwen3.6-plus":      visionTextModel(true, &enabled),
+		"kimi-k2.6":         visionTextModel(true, &enabled),
+		"gpt-5.5":           visionTextModel(true, &enabled),
+		"gpt-image-2": {
+			InputModalities:  []string{"text", "image"},
+			OutputModalities: []string{"image"},
+			Enabled:          &enabled,
+		},
+	}
+}
+
+func textModel(toolCalling bool, enabled *bool) ModelMetadata {
+	return ModelMetadata{
+		InputModalities:  []string{"text"},
+		OutputModalities: []string{"text"},
+		ToolCalling:      toolCalling,
+		Enabled:          enabled,
+	}
+}
+
+func visionTextModel(toolCalling bool, enabled *bool) ModelMetadata {
+	return ModelMetadata{
+		InputModalities:  []string{"text", "image"},
+		OutputModalities: []string{"text"},
+		ToolCalling:      toolCalling,
+		Enabled:          enabled,
+	}
+}
+
+func (h *Handler) pointsFromUSD(usd float64) float64 {
+	if usd <= 0 {
+		return 0
+	}
+	return math.Round(usd*h.points.PerUSD*10) / 10
+}
+
+func (h *Handler) profileForGroup(group string) string {
+	group = strings.TrimSpace(group)
+	for id, profile := range h.routing.Profiles {
+		if strings.EqualFold(strings.TrimSpace(profile.NewAPIGroup), group) {
+			return id
+		}
+	}
+	return h.routing.DefaultProfile
+}
+
+func (h *Handler) routeForRecord(rec accountstore.Record) *RouteResponse {
+	profileID := strings.TrimSpace(rec.RouteProfile)
+	if profileID == "" {
+		profileID = h.profileForGroup(rec.UserGroup)
+	}
+	profile, ok := h.routing.Profiles[profileID]
+	if !ok {
+		profileID = h.routing.DefaultProfile
+		profile = h.routing.Profiles[profileID]
+	}
+	models := make(map[string]ModelResponse, len(h.routing.Models))
+	for id, model := range h.routing.Models {
+		enabled := true
+		if model.Enabled != nil {
+			enabled = *model.Enabled
+		}
+		models[id] = ModelResponse{
+			DisplayName:      strings.TrimSpace(model.DisplayName),
+			InputModalities:  cleanStringList(model.InputModalities),
+			OutputModalities: cleanStringList(model.OutputModalities),
+			ToolCalling:      model.ToolCalling,
+			Enabled:          enabled,
+		}
+	}
+	return &RouteResponse{
+		SchemaVersion:   1,
+		RouteVersion:    h.routing.Version,
+		ProfileID:       profileID,
+		Models:          models,
+		Conversation:    cleanStringList(profile.Conversation),
+		Vision:          cleanStringList(profile.Vision),
+		ImageGeneration: cleanStringList(profile.ImageGeneration),
+		ImageEditing:    cleanStringList(profile.ImageEditing),
+	}
+}
+
+func topUpMessage(points float64, unit string, wechat string) string {
+	amount := formatPointAmount(points)
+	unit = strings.TrimSpace(unit)
+	if unit == "" {
+		unit = "积分"
+	}
+	if strings.TrimSpace(wechat) == "" {
+		return fmt.Sprintf("AI %s不足。联系客服可追加 %s %s体验额度。", unit, amount, unit)
+	}
+	return fmt.Sprintf("AI %s不足。联系客服可追加 %s %s体验额度。微信号：%s", unit, amount, unit, wechat)
+}
+
+func formatPointAmount(points float64) string {
+	if math.Abs(points-math.Round(points)) < 0.05 {
+		return fmt.Sprintf("%.0f", points)
+	}
+	return fmt.Sprintf("%.1f", points)
+}
+
+func cleanStringList(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func nonempty(value string, fallback string) string {

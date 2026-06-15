@@ -80,10 +80,9 @@ export async function listManagedModelOptions(
 export async function testManagedModelConnection(
   input: ManagedModelProbeInput,
 ): Promise<ManagedModelConnectionResult> {
-  return invoke<ManagedModelConnectionResult>(
-    "test_managed_model_connection",
-    { input },
-  );
+  return invoke<ManagedModelConnectionResult>("test_managed_model_connection", {
+    input,
+  });
 }
 
 export async function startChatGptCodexLogin(): Promise<CodexDeviceLoginStart> {
@@ -110,8 +109,7 @@ export async function logoutChatGptCodexProvider(
   });
 }
 
-export interface TimedManagedModelConnectionResult
-  extends ManagedModelConnectionResult {
+export interface TimedManagedModelConnectionResult extends ManagedModelConnectionResult {
   latencyMs: number;
 }
 
@@ -136,16 +134,66 @@ export interface YoleAccountStatus {
   username: string;
   balanceUsd: number;
   quotaPoints: number;
+  balancePoints: number;
+  initialGrantPoints: number;
+  lowBalancePoints: number;
+  pointsUnit: string;
   lowBalance: boolean;
   contact: YoleContactInfo;
+}
+
+export interface YoleRouteModel {
+  displayName?: string | null;
+  inputModalities: string[];
+  outputModalities: string[];
+  toolCalling: boolean;
+  enabled: boolean;
+}
+
+export interface YoleModelRoute {
+  schemaVersion: number;
+  routeVersion: string;
+  profileId: string;
+  models: Record<string, YoleRouteModel>;
+  conversation: string[];
+  vision: string[];
+  imageGeneration: string[];
+  imageEditing: string[];
 }
 
 export async function ensureYoleTrialModel(): Promise<YoleProvisioningResult> {
   return invoke<YoleProvisioningResult>("ensure_yole_trial_model");
 }
 
-export async function getYoleAccountStatus(): Promise<YoleAccountStatus | null> {
-  return invoke<YoleAccountStatus | null>("get_yole_account_status");
+export async function getYoleAccountStatus(
+  force = false,
+): Promise<YoleAccountStatus | null> {
+  return invoke<YoleAccountStatus | null>("get_yole_account_status", { force });
+}
+
+export async function getStoredYoleAccountStatus(): Promise<YoleAccountStatus | null> {
+  return invoke<YoleAccountStatus | null>("get_stored_yole_account_status");
+}
+
+export async function refreshYoleRuntimeRoute(
+  force = false,
+): Promise<YoleModelRoute | null> {
+  return invoke<YoleModelRoute | null>("refresh_yole_runtime_route", { force });
+}
+
+export async function getStoredYoleRuntimeRoute(): Promise<YoleModelRoute | null> {
+  return invoke<YoleModelRoute | null>("get_stored_yole_runtime_route");
+}
+
+export function normalizeTelegramUsername(value?: string | null): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  return trimmed
+    .replace(/^telegram(?:username|user|id)?\s*[:：]\s*/i, "")
+    .replace(/^telegram\s*[:：]\s*/i, "")
+    .replace(/^tg\s*[:：]\s*/i, "")
+    .replace(/^@/, "")
+    .trim();
 }
 
 export async function testManagedModelConnectionWithLatency(

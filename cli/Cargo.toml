@@ -1,6 +1,6 @@
 [package]
 name = "yole-cli"
-version = "0.0.1"
+version = "0.0.7"
 edition = "2021"
 description = "Yole CLI — agent-first interface to Yole Core (B1 M4+: 6 read commands)"
 # Workspace root lives at ../core (not in an ancestor of this crate),

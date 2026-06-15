@@ -13,6 +13,11 @@ import { setPref } from "@/lib/db";
 import { copyForLanguage } from "@/lib/i18n";
 import { resolveLanguagePreference } from "@/lib/language";
 import {
+  getStoredYoleRuntimeRoute,
+  refreshYoleRuntimeRoute,
+  type YoleModelRoute,
+} from "@/lib/managed-models";
+import {
   DEFAULT_LLM_DISPLAY_NAME,
   DEFAULT_LLMS,
   DEFAULT_RUNTIME_INFO,
@@ -162,6 +167,8 @@ interface RuntimeActions {
    * fail loudly when no live bridge is available; quiet background sync
    * commands remain best-effort. */
   sendIPCCommand: (sid: string, cmd: IPCCommand) => Promise<void>;
+  /** Refresh Yole managed route and push it into every live managed bridge. */
+  syncYoleRuntimeRoute: (force?: boolean) => Promise<YoleModelRoute | null>;
   /** True only when this JS runtime has a live client/listener handle. */
   hasBridgeClient: (sid: string) => boolean;
   /**
@@ -246,6 +253,12 @@ const LRU_CAP = 20;
 const BRIDGE_CLIENT_WAIT_MS = 15_000;
 const CONNECTED_CLIENT_WAIT_MS = 1_000;
 const BRIDGE_READY_WAIT_MS = 30_000;
+const YOLE_ROUTE_CACHE_TTL_MS = 10_000;
+
+let _lastYoleRuntimeRoute: YoleModelRoute | null = null;
+let _lastYoleRuntimeRouteAt = 0;
+let _pendingYoleRuntimeRouteRefresh: Promise<YoleModelRoute | null> | null =
+  null;
 
 function currentCopy() {
   return copyForLanguage(
@@ -343,6 +356,70 @@ function actionableBridgeCrashMessage(message: string): string {
 
 function shouldFailWhenBridgeMissing(cmd: IPCCommand): boolean {
   return cmd.kind === "user_message" || cmd.kind === "ask_user_response";
+}
+
+function isYoleManagedSession(sessionId: string): boolean {
+  const session = useSessionsStore
+    .getState()
+    .sessions.find((candidate) => candidate.id === sessionId);
+  return session?.gaRuntimeKind === "managed";
+}
+
+async function sendModelRouteToBridge(
+  sessionId: string,
+  client: BridgeClient,
+  route: YoleModelRoute,
+): Promise<void> {
+  if (!isYoleManagedSession(sessionId)) return;
+  await client
+    .send({
+      kind: "set_model_route",
+      routeJson: JSON.stringify(route),
+    })
+    .catch((error) => {
+      console.warn("[runtime] set_model_route failed:", error);
+    });
+}
+
+async function pushModelRouteToManagedBridges(
+  route: YoleModelRoute,
+): Promise<void> {
+  await Promise.all(
+    [..._bridgeClients.entries()].map(([sid, client]) =>
+      sendModelRouteToBridge(sid, client, route),
+    ),
+  );
+}
+
+function refreshYoleRuntimeRouteInBackground(): void {
+  if (_pendingYoleRuntimeRouteRefresh) return;
+  _pendingYoleRuntimeRouteRefresh = refreshYoleRuntimeRoute(false)
+    .then(async (route) => {
+      if (!route) return _lastYoleRuntimeRoute;
+      _lastYoleRuntimeRoute = route;
+      _lastYoleRuntimeRouteAt = Date.now();
+      await pushModelRouteToManagedBridges(route);
+      return route;
+    })
+    .catch((error) => {
+      console.warn("[runtime] background Yole route refresh failed:", error);
+      return _lastYoleRuntimeRoute;
+    })
+    .finally(() => {
+      _pendingYoleRuntimeRouteRefresh = null;
+    });
+}
+
+async function getCachedYoleRuntimeRoute(): Promise<YoleModelRoute | null> {
+  if (_lastYoleRuntimeRoute) return _lastYoleRuntimeRoute;
+  const stored = await getStoredYoleRuntimeRoute().catch((error) => {
+    console.debug("[runtime] stored Yole route read failed:", error);
+    return null;
+  });
+  if (!stored) return null;
+  _lastYoleRuntimeRoute = stored;
+  _lastYoleRuntimeRouteAt = Date.now();
+  return stored;
 }
 
 async function _enforceLRUCap(): Promise<void> {
@@ -826,12 +903,19 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
       if (client) {
         await client.shutdown();
       } else {
-        await invoke("shutdown_runner", {
-          sessionId,
-          timeoutMs: 3000,
-        }).catch(() => {
-          // Already gone or owned by a previous dev-HMR listener.
-        });
+        const slot = get().byId[sessionId];
+        const mayHaveCoreRunner =
+          slot?.bridgePid != null ||
+          slot?.bridgeStatus === "connected" ||
+          slot?.bridgeStatus === "spawning";
+        if (mayHaveCoreRunner) {
+          await invoke("shutdown_runner", {
+            sessionId,
+            timeoutMs: 3000,
+          }).catch(() => {
+            // Already gone or owned by a previous dev-HMR listener.
+          });
+        }
       }
     } finally {
       _bridgeClients.delete(sessionId);
@@ -850,16 +934,42 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
 
   sendIPCCommand: async (sessionId, cmd) => {
     const userVisibleCommand = shouldFailWhenBridgeMissing(cmd);
+    const timing =
+      cmd.kind === "user_message"
+        ? {
+            startedAt: performance.now(),
+            routeMs: 0,
+            clientWaitMs: 0,
+            readyWaitMs: 0,
+          }
+        : null;
+    let segmentStartedAt = performance.now();
+    const routeForUserMessage =
+      cmd.kind === "user_message" && isYoleManagedSession(sessionId)
+        ? await get()
+            .syncYoleRuntimeRoute(false)
+            .catch((error) => {
+              console.warn("[runtime] Yole route refresh failed:", error);
+              return null;
+            })
+        : null;
+    if (timing) {
+      timing.routeMs = performance.now() - segmentStartedAt;
+    }
     let client = _bridgeClients.get(sessionId);
     if (!client) {
       const status = get().byId[sessionId]?.bridgeStatus ?? "idle";
       if (status === "spawning" || status === "connected") {
+        segmentStartedAt = performance.now();
         client = await _waitForBridgeClient(
           sessionId,
           status === "connected"
             ? CONNECTED_CLIENT_WAIT_MS
             : BRIDGE_CLIENT_WAIT_MS,
         );
+        if (timing) {
+          timing.clientWaitMs = performance.now() - segmentStartedAt;
+        }
       }
     }
     if (!client) {
@@ -876,7 +986,11 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
       return;
     }
     if (userVisibleCommand) {
+      segmentStartedAt = performance.now();
       const ready = await _waitForBridgeReady(sessionId);
+      if (timing) {
+        timing.readyWaitMs = performance.now() - segmentStartedAt;
+      }
       if (!ready) {
         const slot = get().byId[sessionId];
         if (slot?.bridgeError) {
@@ -895,7 +1009,63 @@ export const useRuntimeStore = create<RuntimeStore>((set, get) => ({
         );
       }
     }
+    if (cmd.kind === "user_message" && routeForUserMessage) {
+      await sendModelRouteToBridge(sessionId, client, routeForUserMessage);
+    }
+    segmentStartedAt = performance.now();
     await client.send(cmd);
+    if (timing) {
+      console.info("[runtime] user_message dispatch timing", {
+        sessionId,
+        routeMs: Math.round(timing.routeMs),
+        clientWaitMs: Math.round(timing.clientWaitMs),
+        readyWaitMs: Math.round(timing.readyWaitMs),
+        sendMs: Math.round(performance.now() - segmentStartedAt),
+        totalMs: Math.round(performance.now() - timing.startedAt),
+      });
+    }
+  },
+
+  syncYoleRuntimeRoute: async (force = false) => {
+    const cachedRoute = _lastYoleRuntimeRoute;
+    const cachedRouteIsFresh =
+      cachedRoute !== null &&
+      Date.now() - _lastYoleRuntimeRouteAt < YOLE_ROUTE_CACHE_TTL_MS;
+    if (!force && cachedRouteIsFresh) {
+      await pushModelRouteToManagedBridges(cachedRoute);
+      return cachedRoute;
+    }
+
+    if (!force) {
+      const cached = await getCachedYoleRuntimeRoute();
+      if (cached) {
+        refreshYoleRuntimeRouteInBackground();
+        await pushModelRouteToManagedBridges(cached);
+        return cached;
+      }
+    }
+
+    if (!force && _pendingYoleRuntimeRouteRefresh) {
+      return _lastYoleRuntimeRoute;
+    }
+
+    if (!force) {
+      refreshYoleRuntimeRouteInBackground();
+      return _lastYoleRuntimeRoute;
+    }
+
+    _pendingYoleRuntimeRouteRefresh = refreshYoleRuntimeRoute(force)
+      .then(async (route) => {
+        if (!route) return _lastYoleRuntimeRoute;
+        _lastYoleRuntimeRoute = route;
+        _lastYoleRuntimeRouteAt = Date.now();
+        await pushModelRouteToManagedBridges(route);
+        return route;
+      })
+      .finally(() => {
+        _pendingYoleRuntimeRouteRefresh = null;
+      });
+    return _pendingYoleRuntimeRouteRefresh;
   },
 
   hasBridgeClient: (sid) => _bridgeClients.has(sid),

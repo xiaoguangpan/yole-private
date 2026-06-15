@@ -37,7 +37,6 @@ export type AppUpdateStatus =
 
 interface CheckOptions {
   silent?: boolean;
-  downloadIfAvailable?: boolean;
 }
 
 interface AppUpdateStore {
@@ -55,7 +54,7 @@ const PREF_PREPARED_VERSION = "app_update_prepared_version";
 const PREF_READY_TOAST_VERSION = "app_update_ready_toast_version";
 const PREF_COMPLETED_TOAST_VERSION = "app_update_completed_toast_version";
 const APP_UPDATE_MANUAL_DOWNLOAD_URL =
-  "https://na.itxgp.com/yole-downloads/windows/Yole_0.0.1_x64-setup.exe";
+  "https://na.itxgp.com/yole-downloads/windows/Yole_latest_x64-setup.exe";
 
 export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
   status: { kind: "idle" },
@@ -72,17 +71,12 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
         set({ status: { kind: "idle" } });
         return;
       }
-      const shouldPrepare =
-        result.kind === "available" &&
-        (options?.downloadIfAvailable === true || options?.silent !== true);
       set({
         status: statusFromCheckResult(result),
         lastCheckedAt: new Date().toISOString(),
       });
-      if (shouldPrepare && hasRunningSessions()) {
-        ensureAutoPrepareOnIdleWatcher();
-      } else if (shouldPrepare) {
-        await get().downloadAndInstall();
+      if (result.kind === "available") {
+        notifyUpdateAvailable(result.version);
       }
     } catch (error) {
       if (options?.silent) {
@@ -100,9 +94,7 @@ export const useAppUpdateStore = create<AppUpdateStore>((set, get) => ({
     const current = get().status;
     if (current.kind === "checking" || current.kind === "downloading") return;
     if (hasRunningSessions()) {
-      if (current.kind === "available") {
-        ensureAutoPrepareOnIdleWatcher();
-      }
+      notifyUpdateBlockedByRunningTask();
       return;
     }
 
@@ -179,34 +171,49 @@ function statusFromCheckResult(result: AppUpdateCheckResult): AppUpdateStatus {
 }
 
 function hasRunningSessions(): boolean {
-  return hasRunningSessionsInState(useMessagesStore.getState());
+  return Object.values(useMessagesStore.getState().byId).some(
+    (messages) => messages.agentRunning,
+  );
 }
 
-function hasRunningSessionsInState(
-  state: ReturnType<typeof useMessagesStore.getState>,
-): boolean {
-  return Object.values(state.byId).some((messages) => messages.agentRunning);
+function notifyUpdateAvailable(version: string): void {
+  const copy = updateCopy();
+  useUiStore.getState().pushToast(
+    makeAppError({
+      id: `app-update-available-${version}`,
+      category: "business",
+      severity: "info",
+      title: copy.toasts.updateAvailable,
+      message: copy.toasts.updateAvailableMessage,
+      hint: null,
+      retryable: false,
+      context: "app_update_available",
+      traceback: null,
+      action: {
+        kind: "install_app_update",
+        label: copy.updates.installNow,
+      },
+      autoDismissMs: 0,
+    }),
+  );
 }
 
-let autoPrepareOnIdleWatcherStarted = false;
-
-function ensureAutoPrepareOnIdleWatcher(): void {
-  if (!autoPrepareOnIdleWatcherStarted) {
-    autoPrepareOnIdleWatcherStarted = true;
-    useMessagesStore.subscribe((state, previousState) => {
-      if (hasRunningSessionsInState(state)) return;
-      if (!hasRunningSessionsInState(previousState)) return;
-
-      const status = useAppUpdateStore.getState().status;
-      if (status.kind !== "available") return;
-      void useAppUpdateStore.getState().downloadAndInstall();
-    });
-  }
-
-  const status = useAppUpdateStore.getState().status;
-  if (status.kind === "available" && !hasRunningSessions()) {
-    void useAppUpdateStore.getState().downloadAndInstall();
-  }
+function notifyUpdateBlockedByRunningTask(): void {
+  const copy = updateCopy();
+  useUiStore.getState().pushToast(
+    makeAppError({
+      id: "app-update-wait-running-task",
+      category: "business",
+      severity: "warning",
+      title: copy.updates.waitForTasks,
+      message: copy.updates.waitForTasksMessage,
+      hint: null,
+      retryable: false,
+      context: "app_update_wait_running_task",
+      traceback: null,
+      autoDismissMs: 5200,
+    }),
+  );
 }
 
 async function notifyUpdateReady(version: string): Promise<void> {

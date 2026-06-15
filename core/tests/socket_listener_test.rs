@@ -21,7 +21,6 @@
 
 #![cfg(unix)]
 
-use yole_core_lib::socket_listener::{SocketResponse, SCHEMA_VERSION};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -29,6 +28,7 @@ use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::time::timeout;
+use yole_core_lib::socket_listener::{SocketResponse, SCHEMA_VERSION};
 
 /// Spin up a listener bound to a tempdir path + return both the path and
 /// a handle for spawned tasks. The accept loop here mirrors what

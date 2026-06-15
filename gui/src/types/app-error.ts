@@ -59,6 +59,10 @@ export interface AppError {
         kind: "restart_app_update";
         label: string;
       }
+    | {
+        kind: "install_app_update";
+        label: string;
+      }
     | null;
   /** Per-toast override. Useful for short positive confirmations. */
   autoDismissMs?: number;

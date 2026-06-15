@@ -102,6 +102,10 @@ class TMWebDriver:
                     return json.dumps({'r': result}, ensure_ascii=False)
                 except Exception as e:
                     return json.dumps({'r': {'error': str(e)}}, ensure_ascii=False)
+            if data.get('cmd') == 'create_tab':
+                url = data.get('url')
+                active = data.get('active', True)
+                return json.dumps({'r': self.create_tab(url, active=active)}, ensure_ascii=False)
             return 'ok'
         def run():
             from wsgiref.simple_server import make_server, WSGIServer, WSGIRequestHandler
@@ -252,6 +256,29 @@ class TMWebDriver:
         if newtabs: rr['newTabs'] = newtabs
         return rr
 
+    def create_tab(self, url, active=True, timeout=10):
+        if self.is_remote:
+            response = self._remote_cmd({"cmd": "create_tab", "url": url, "active": active}).get('r', {})
+            if response.get('error'): raise Exception(response['error'])
+            return response
+        if not self.extension_client:
+            raise RuntimeError("Browser extension is not connected")
+        exec_id = str(uuid.uuid4())
+        payload = json.dumps({
+            'id': exec_id,
+            'code': json.dumps({'cmd': 'tabs', 'method': 'create', 'url': url, 'active': active})
+        })
+        self.extension_client.send_message(payload)
+        start_time = time.time()
+        while exec_id not in self.results:
+            time.sleep(0.2)
+            if time.time() - start_time > timeout:
+                raise TimeoutError("No response creating browser tab")
+        result = self.results.pop(exec_id)
+        if exec_id in self.acks: self.acks.pop(exec_id)
+        if not result['success']: raise Exception(result['data'])
+        return {'data': result['data'], 'newTabs': result.get('newTabs', [])}
+
     def _remote_cmd(self, cmd):
         try: return requests.post(self.remote, headers={"Content-Type": "application/json"}, json=cmd, timeout=30).json()
         except (ConnectionError, requests.exceptions.ConnectionError):
@@ -299,7 +326,13 @@ class TMWebDriver:
         print(f"成功设置默认会话: {self.default_session_id}: {info['url']}")
         return self.default_session_id
 
-    def jump(self, url, timeout=10): self.execute_js(f"window.location.href='{url}'", timeout=timeout)
+    def jump(self, url, timeout=10):
+        try:
+            return self.create_tab(url, active=True, timeout=timeout)
+        except Exception as e:
+            print(f"Create-tab failed, replacing current tab instead: {e}")
+            safe_url = json.dumps(str(url))
+            return self.execute_js(f"window.location.href={safe_url}", timeout=timeout)
 
 if __name__ == "__main__":
     driver = TMWebDriver(host='127.0.0.1', port=18765)

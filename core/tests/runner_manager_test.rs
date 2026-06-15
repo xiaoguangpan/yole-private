@@ -26,8 +26,6 @@
 //! actions/setup-python step (`release.yml` already invokes it for the
 //! bundled Python build).
 
-use yole_core_lib::ipc::{IpcCommand, IpcEvent};
-use yole_core_lib::runner_manager::{BroadcastItem, RunnerManager, SpawnArgs};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command as StdCommand, Stdio};
@@ -35,6 +33,8 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::time::timeout;
+use yole_core_lib::ipc::{IpcCommand, IpcEvent};
+use yole_core_lib::runner_manager::{BroadcastItem, RunnerManager, SpawnArgs};
 
 /// Find an executable named `python3` or `python` on PATH-like locations.
 /// Returns absolute path. None = test should silently skip.

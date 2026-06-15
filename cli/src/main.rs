@@ -21,15 +21,15 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::Serialize;
+use serde_json::Value;
 use yole_core_lib::api::{
-    YoleApi, MessageBrief, ProjectBrief, RuntimeKind, SearchScope, SessionBrief, SessionFilter,
-    SessionId, SessionStatus,
+    MessageBrief, ProjectBrief, RuntimeKind, SearchScope, SessionBrief, SessionFilter, SessionId,
+    SessionStatus, YoleApi,
 };
 use yole_core_lib::db::SqliteYole;
 use yole_core_lib::error::YoleError;
 use yole_core_lib::socket_listener::socket_path;
-use serde::Serialize;
-use serde_json::Value;
 
 const SCHEMA_VERSION: u32 = 1;
 const PROJECT_FOLLOW_IDLE_QUIET_WINDOW: Duration = Duration::from_millis(1500);
@@ -774,12 +774,8 @@ async fn session_snapshot_payload(
     })
 }
 
-async fn find_project(
-    yole: &SqliteYole,
-    project_id: &str,
-) -> Result<ProjectBrief, YoleError> {
-    yole
-        .list_projects()
+async fn find_project(yole: &SqliteYole, project_id: &str) -> Result<ProjectBrief, YoleError> {
+    yole.list_projects()
         .await?
         .into_iter()
         .find(|p| p.id.as_str() == project_id)
@@ -793,14 +789,13 @@ async fn project_sessions(
     project_id: &str,
     all: bool,
 ) -> Result<Vec<SessionBrief>, YoleError> {
-    yole
-        .list_sessions(SessionFilter {
-            project_id: Some(project_id.to_string()),
-            status: None,
-            archived: if all { None } else { Some(false) },
-            runtime_kind: None,
-        })
-        .await
+    yole.list_sessions(SessionFilter {
+        project_id: Some(project_id.to_string()),
+        status: None,
+        archived: if all { None } else { Some(false) },
+        runtime_kind: None,
+    })
+    .await
 }
 
 fn status_key(status: SessionStatus) -> &'static str {
@@ -1090,12 +1085,11 @@ async fn open_watch_lines(id: &str) -> Result<WatchLines, YoleError> {
         let path_str = path.to_str().ok_or_else(|| YoleError::Internal {
             message: "named pipe path not UTF-8".into(),
         })?;
-        let stream =
-            ClientOptions::new()
-                .open(path_str)
-                .map_err(|e| YoleError::DbUnavailable {
-                    message: format!("Yole Core not running (pipe {}: {})", path_str, e),
-                })?;
+        let stream = ClientOptions::new()
+            .open(path_str)
+            .map_err(|e| YoleError::DbUnavailable {
+                message: format!("Yole Core not running (pipe {}: {})", path_str, e),
+            })?;
         let (read_half, write_half) = tokio::io::split(stream);
         (Box::new(read_half), Box::new(write_half))
     };

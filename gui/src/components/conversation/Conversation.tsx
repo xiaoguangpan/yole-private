@@ -11,7 +11,7 @@ import { SystemMessageBubble } from "@/components/conversation/SystemMessageBubb
 import { ToolCallout } from "@/components/conversation/ToolCallout";
 import { useCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { AgentTurn, Turn } from "@/types/conversation";
+import type { AgentTurn, Turn, UserTurn } from "@/types/conversation";
 import type { ApprovalDecision } from "@/types/ipc";
 
 const THINKING_ELAPSED_VISIBLE_AFTER_SEC = 3;
@@ -28,6 +28,8 @@ export interface ConversationProps {
    * threaded down to ToolCallout → ApprovalForm so the "Always
    * allow in {projectName}" button reflects context. */
   projectName?: string;
+  canEditLastUserMessage?: boolean;
+  onEditLastUserMessage?: (turn: UserTurn) => void;
 }
 
 /**
@@ -49,7 +51,12 @@ export function Conversation({
   approvalDecisions,
   onApprove,
   projectName,
+  canEditLastUserMessage = false,
+  onEditLastUserMessage,
 }: ConversationProps) {
+  const lastUserIndex = canEditLastUserMessage
+    ? findLastEditableUserTurnIndex(turns)
+    : -1;
   return (
     <div>
       {turns.map((t, i) => (
@@ -57,8 +64,11 @@ export function Conversation({
           {t.role === "user" ? (
             <MessageUser
               content={t.content}
+              imagePaths={t.imagePaths}
               origin={t.origin}
               createdAt={t.createdAt}
+              canEdit={i === lastUserIndex}
+              onEdit={() => onEditLastUserMessage?.(t)}
             />
           ) : t.role === "system" ? (
             <SystemMessageBubble content={t.content} variant={t.variant} />
@@ -80,6 +90,16 @@ export function Conversation({
       ))}
     </div>
   );
+}
+
+function findLastEditableUserTurnIndex(turns: Turn[]): number {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i];
+    if (turn.role === "user" && turn.turnIndex !== undefined) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 function AgentTurnView({

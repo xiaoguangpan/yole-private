@@ -20,7 +20,7 @@ use crate::api::{
 };
 use crate::credential_store;
 use crate::db::{SqliteYole, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata};
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 
 pub const CODEX_PROVIDER_ID: &str = "mp_chatgpt_codex";
 pub const CODEX_MODEL_ID: &str = "mm_chatgpt_codex_gpt_55";
@@ -449,10 +449,9 @@ async fn token_response_to_secret(
             },
         });
     }
-    let token: TokenResponse =
-        serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
-            message: format!("ChatGPT / Codex token response is invalid JSON: {e}"),
-        })?;
+    let token: TokenResponse = serde_json::from_str(&body).map_err(|e| YoleError::InvalidArgs {
+        message: format!("ChatGPT / Codex token response is invalid JSON: {e}"),
+    })?;
     let access_token = nonempty(token.access_token, "access_token")?;
     let refresh_token = token
         .refresh_token

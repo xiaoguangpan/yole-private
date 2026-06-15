@@ -1,7 +1,9 @@
 import { create } from "zustand";
 
 import {
+  getStoredYoleAccountStatus,
   getYoleAccountStatus,
+  normalizeTelegramUsername,
   type YoleAccountStatus,
 } from "@/lib/managed-models";
 import { useMessagesStore } from "@/stores/messages";
@@ -16,6 +18,7 @@ interface YoleAccountState {
 
 interface YoleAccountActions {
   setStatus: (status: YoleAccountStatus | null) => void;
+  loadCached: () => Promise<YoleAccountStatus | null>;
   refresh: () => Promise<YoleAccountStatus | null>;
   notifyLowBalanceInActiveChat: () => void;
   notifyQuotaExceeded: (sessionId: string) => void;
@@ -36,18 +39,37 @@ export const useYoleAccountStore = create<
     }
   },
 
+  loadCached: async () => {
+    try {
+      const status = await getStoredYoleAccountStatus();
+      if (status) {
+        set({ status, error: null });
+        if (status.lowBalance) {
+          get().notifyLowBalanceInActiveChat();
+        }
+      }
+      return status;
+    } catch (e) {
+      console.debug("[yole-account] cached status read failed:", e);
+      return get().status;
+    }
+  },
+
   refresh: async () => {
     set({ loading: true, error: null });
+    if (!get().status) {
+      await get().loadCached();
+    }
+
     try {
-      const status = await getYoleAccountStatus();
+      const status = await getYoleAccountStatus(true);
       set({ status, loading: false, error: null });
       if (status?.lowBalance) {
         get().notifyLowBalanceInActiveChat();
       }
       return status;
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      set({ loading: false, error: message });
+      set({ loading: false, error: extractErrorMessage(e) });
       return get().status;
     }
   },
@@ -78,29 +100,49 @@ export const useYoleAccountStore = create<
       variant: "system",
       content: status
         ? yoleAccountSupportMessage(status, "empty")
-        : "AI 余额不足。联系客服可追加 50 美元体验额度。",
+        : "AI 积分不足。联系客服可追加 3000 积分体验额度。",
     });
   },
 }));
+
+function extractErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export function yoleAccountSupportMessage(
   status: YoleAccountStatus,
   kind: "low" | "empty",
 ): string {
+  const unit = status.pointsUnit?.trim() || "积分";
+  const grant = formatPointAmount(status.initialGrantPoints || 3000);
   const fallback =
     kind === "empty"
-      ? "AI 余额不足。联系客服可追加 50 美元体验额度。"
-      : "AI 余额较低，可提前联系客服追加体验额度。";
-  const lines = [kind === "empty" ? (status.contact.topUpMessage ?? fallback) : fallback];
+      ? `AI ${unit}不足。联系客服可追加 ${grant} ${unit}体验额度。`
+      : `AI ${unit}较低，可提前联系客服追加体验${unit}。`;
+  const lines = [
+    kind === "empty" ? (status.contact.topUpMessage ?? fallback) : fallback,
+  ];
   if (status.contact.wechatId) {
     lines.push(`微信号：${status.contact.wechatId}`);
   }
   if (status.contact.wechatQrUrl) {
     lines.push(`![微信客服二维码](${status.contact.wechatQrUrl})`);
   }
-  if (status.contact.overseas) {
-    lines.push(`海外联系方式：${status.contact.overseas}`);
+  const telegram = normalizeTelegramUsername(status.contact.overseas);
+  if (telegram) {
+    lines.push(`Telegram：${telegram}`);
   }
   lines.push(`支持ID：${status.supportId}`);
   return lines.join("\n\n");
+}
+
+function formatPointAmount(value: number): string {
+  if (!Number.isFinite(value)) return "3000";
+  if (Math.abs(value - Math.round(value)) < 0.05) {
+    return Math.round(value).toLocaleString("zh-CN");
+  }
+  return value.toLocaleString("zh-CN", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }

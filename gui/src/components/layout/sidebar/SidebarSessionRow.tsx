@@ -32,7 +32,9 @@ export function SidebarSessionRow({
   onArchive,
   onTogglePin,
   onAssignToProject,
+  onRemoveFromProject,
   isEditing = false,
+  nestedProject = false,
   onRequestRename,
   onConfirmRename,
   onCancelRename,
@@ -56,8 +58,12 @@ export function SidebarSessionRow({
   onTogglePin?: () => void;
   /** Assign / remove from project. `null` = unassign. */
   onAssignToProject?: (projectId: string | null) => void;
+  /** Direct project-scope removal, used by nested project rows. */
+  onRemoveFromProject?: () => void;
   /** When true, replace the title span with an inline input. */
   isEditing?: boolean;
+  /** Render as a project-nested row while keeping the shared status UI. */
+  nestedProject?: boolean;
   /** Right-click "重命名" handler — flips the row into edit mode.
    * Undefined = no menu item. */
   onRequestRename?: () => void;
@@ -145,7 +151,10 @@ export function SidebarSessionRow({
     <div
       onClick={isEditing ? undefined : onClick}
       className={cn(
-        "relative mx-1.5 grid min-h-[48px] grid-cols-[16px_minmax(0,1fr)_12px] items-start gap-2 overflow-hidden rounded-sm px-3 py-1.5",
+        "relative mx-1.5 grid grid-cols-[16px_minmax(0,1fr)_12px] items-start gap-2 overflow-hidden rounded-sm py-1.5",
+        nestedProject
+          ? "min-h-[44px] pl-6 pr-2.5"
+          : "min-h-[48px] px-3",
         "transition-[background-color,box-shadow,color]",
         isEditing
           ? "bg-elevated ring-1 ring-brand/30"
@@ -285,7 +294,13 @@ export function SidebarSessionRow({
     </div>
   );
 
-  if (!onArchive && !onTogglePin && !onAssignToProject && !onRequestRename)
+  if (
+    !onArchive &&
+    !onTogglePin &&
+    !onAssignToProject &&
+    !onRemoveFromProject &&
+    !onRequestRename
+  )
     return row;
 
   const sortedProjects = projects;
@@ -394,6 +409,12 @@ export function SidebarSessionRow({
                 </ContextMenu.SubContent>
               </ContextMenu.Portal>
             </ContextMenu.Sub>
+          )}
+          {onRemoveFromProject && (
+            <ContextMenu.Item onSelect={onRemoveFromProject} className={itemClass}>
+              <Folder size={13} weight="thin" />
+              {copy.sidebar.removeFromProject}
+            </ContextMenu.Item>
           )}
           {onArchive && (
             <ContextMenu.Item onSelect={onArchive} className={itemClass}>

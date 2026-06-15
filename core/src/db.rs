@@ -23,14 +23,14 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
 use crate::api::{
-    CreateProjectInput, CreateSessionInput, YoleApi, HealthCheck, HealthReport, HealthStatus,
+    CreateProjectInput, CreateSessionInput, HealthCheck, HealthReport, HealthStatus,
     ManagedModelAuthKind, ManagedModelCredentialStatus, ManagedModelProtocol,
     ManagedModelProviderRecord, ManagedModelRecord, MessageBrief, MessageId, MessageRole, Origin,
     OriginVia, ProjectBrief, ProjectId, ProjectPatch, RuntimeKind, SearchHit, SearchScope,
-    SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary,
+    SessionBrief, SessionFilter, SessionId, SessionStatus, StatusSummary, YoleApi,
 };
 use crate::app_paths;
-use crate::error::{YoleError, Result};
+use crate::error::{Result, YoleError};
 use crate::managed_runtime;
 
 /// Resolve the absolute path of Yole's SQLite database file. Works
@@ -145,6 +145,142 @@ impl SqliteYole {
         self.index_message_fts(&id, session_id.as_str(), "user", turn_index, &content)
             .await;
         Ok(())
+    }
+
+    pub async fn replace_gui_user_message_from_turn(
+        &self,
+        session_id: SessionId,
+        turn_index: u32,
+        content: String,
+        origin: Origin,
+    ) -> Result<SessionBrief> {
+        if turn_index == 0 {
+            return Err(YoleError::InvalidArgs {
+                message: "replace_user_message_from_turn: turn_index must be >= 1".into(),
+            });
+        }
+
+        let mut tx = self.pool.begin().await.map_err(map_sqlx_err)?;
+        let existing: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM messages \
+             WHERE session_id = ? AND turn_index = ? AND role = 'user' \
+             LIMIT 1",
+        )
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+        if existing.is_none() {
+            return Err(YoleError::NotFound {
+                message: format!(
+                    "user message for session {} turn {} not found",
+                    session_id.as_str(),
+                    turn_index
+                ),
+            });
+        }
+
+        let previous_summary: Option<String> = sqlx::query_scalar(
+            "SELECT summary FROM messages \
+             WHERE session_id = ? \
+               AND role = 'assistant' \
+               AND turn_index < ? \
+               AND summary IS NOT NULL \
+               AND TRIM(summary) != '' \
+             ORDER BY turn_index DESC, sequence DESC \
+             LIMIT 1",
+        )
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        sqlx::query(
+            "DELETE FROM messages_fts \
+             WHERE message_id IN ( \
+               SELECT id FROM messages \
+               WHERE session_id = ? AND turn_index >= ? \
+             )",
+        )
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        sqlx::query("DELETE FROM tool_events WHERE session_id = ? AND turn_index >= ?")
+            .bind(session_id.as_str())
+            .bind(i64::from(turn_index))
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx_err)?;
+
+        sqlx::query("DELETE FROM messages WHERE session_id = ? AND turn_index >= ?")
+            .bind(session_id.as_str())
+            .bind(i64::from(turn_index))
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx_err)?;
+
+        let id = format!("msg_{}_{}_user", session_id.as_str(), turn_index);
+        let created_at = chrono_now_iso();
+        sqlx::query(
+            "INSERT INTO messages (
+               id, session_id, turn_index, sequence, role, content,
+               tool_calls, tool_results, thinking, final_answer, created_at,
+               created_via, supervisor, origin_note
+             ) VALUES (?, ?, ?, 0, 'user', ?,
+                       NULL, NULL, NULL, NULL, ?,
+                       ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .bind(&content)
+        .bind(&created_at)
+        .bind(origin.via.as_sql())
+        .bind(&origin.supervisor)
+        .bind(&origin.reason)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        sqlx::query(
+            "INSERT INTO messages_fts (message_id, session_id, role, turn_index, body)
+             VALUES (?, ?, 'user', ?, ?)",
+        )
+        .bind(&id)
+        .bind(session_id.as_str())
+        .bind(i64::from(turn_index))
+        .bind(&content)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        let now = chrono_now_iso();
+        let completed_turns = i64::from(turn_index.saturating_sub(1));
+        sqlx::query(
+            "UPDATE sessions SET \
+                turn_count = ?, \
+                summary = ?, \
+                last_activity_at = ?, \
+                updated_at = ?, \
+                has_unread = 0 \
+             WHERE id = ?",
+        )
+        .bind(completed_turns)
+        .bind(&previous_summary)
+        .bind(&now)
+        .bind(&now)
+        .bind(session_id.as_str())
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        tx.commit().await.map_err(map_sqlx_err)?;
+        self.session_brief(session_id).await
     }
 
     pub async fn persist_gui_assistant_message(&self, p: PersistAssistantMessage) -> Result<()> {

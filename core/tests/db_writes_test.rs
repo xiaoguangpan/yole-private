@@ -7,19 +7,19 @@
 //! `tests/*.rs` as its own crate root — sharing across files needs a
 //! `tests/common/mod.rs` scaffold that adds noise for two test files.
 
+use sqlx::SqlitePool;
 use yole_core_lib::api::{
-    CreateProjectInput, CreateSessionInput, YoleApi, ManagedModelAuthKind,
-    ManagedModelCredentialStatus,
+    CreateProjectInput, CreateSessionInput, ManagedModelAuthKind, ManagedModelCredentialStatus,
     ManagedModelProtocol, Origin, ProjectId, ProjectPatch, RuntimeKind, SessionFilter, SessionId,
-    SessionStatus,
+    SessionStatus, YoleApi,
 };
 use yole_core_lib::credential_store;
 use yole_core_lib::db::{
-    SqliteYole, UpsertManagedModelMetadata, UpsertManagedModelProviderMetadata,
+    PersistAssistantMessage, SqliteYole, UpsertManagedModelMetadata,
+    UpsertManagedModelProviderMetadata,
 };
 use yole_core_lib::error::YoleError;
 use yole_core_lib::managed_runtime;
-use sqlx::SqlitePool;
 
 // Migration SQL — keep in sync with `core/src/lib.rs::run()`.
 const MIG_001: &str = include_str!("../migrations/001_init.sql");
@@ -208,33 +208,30 @@ async fn managed_model_order_drives_default_model() {
     let pool = fresh_pool().await;
     let yole = SqliteYole::from_pool(pool);
 
-    yole
-        .upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
-            id: "mp_test".into(),
-            display_name: "OpenAI".into(),
-            protocol: ManagedModelProtocol::Openai,
-            auth_kind: ManagedModelAuthKind::ApiKey,
-            api_base: "https://api.openai.com".into(),
-            api_key_ref: "managed-provider:mp_test".into(),
+    yole.upsert_managed_model_provider_metadata(UpsertManagedModelProviderMetadata {
+        id: "mp_test".into(),
+        display_name: "OpenAI".into(),
+        protocol: ManagedModelProtocol::Openai,
+        auth_kind: ManagedModelAuthKind::ApiKey,
+        api_base: "https://api.openai.com".into(),
+        api_key_ref: "managed-provider:mp_test".into(),
+    })
+    .await
+    .expect("upsert managed provider metadata");
+    for (idx, id) in ["mm_a", "mm_b", "mm_c"].iter().enumerate() {
+        yole.upsert_managed_model_metadata(UpsertManagedModelMetadata {
+            id: (*id).into(),
+            provider_id: "mp_test".into(),
+            display_name: format!("Model {idx}"),
+            model: format!("model-{idx}"),
+            advanced_options: serde_json::json!({}),
+            make_default: idx == 0,
         })
         .await
-        .expect("upsert managed provider metadata");
-    for (idx, id) in ["mm_a", "mm_b", "mm_c"].iter().enumerate() {
-        yole
-            .upsert_managed_model_metadata(UpsertManagedModelMetadata {
-                id: (*id).into(),
-                provider_id: "mp_test".into(),
-                display_name: format!("Model {idx}"),
-                model: format!("model-{idx}"),
-                advanced_options: serde_json::json!({}),
-                make_default: idx == 0,
-            })
-            .await
-            .expect("upsert managed model metadata");
+        .expect("upsert managed model metadata");
     }
 
-    yole
-        .reorder_managed_models(vec!["mm_c".into(), "mm_a".into(), "mm_b".into()])
+    yole.reorder_managed_models(vec!["mm_c".into(), "mm_a".into(), "mm_b".into()])
         .await
         .expect("reorder managed models");
     let models = yole
@@ -253,17 +250,16 @@ async fn managed_model_order_drives_default_model() {
     assert_eq!(models[1].sort_order, 1);
     assert_eq!(models[2].sort_order, 2);
 
-    yole
-        .upsert_managed_model_metadata(UpsertManagedModelMetadata {
-            id: "mm_b".into(),
-            provider_id: "mp_test".into(),
-            display_name: "Model 2".into(),
-            model: "model-2".into(),
-            advanced_options: serde_json::json!({}),
-            make_default: true,
-        })
-        .await
-        .expect("set default managed model");
+    yole.upsert_managed_model_metadata(UpsertManagedModelMetadata {
+        id: "mm_b".into(),
+        provider_id: "mp_test".into(),
+        display_name: "Model 2".into(),
+        model: "model-2".into(),
+        advanced_options: serde_json::json!({}),
+        make_default: true,
+    })
+    .await
+    .expect("set default managed model");
     let models = yole
         .list_managed_models()
         .await
@@ -365,23 +361,22 @@ async fn create_session_can_snapshot_explicit_external_runtime() {
 async fn create_session_persists_origin_creation_triple() {
     let pool = fresh_pool().await;
     let yole = SqliteYole::from_pool(pool.clone());
-    yole
-        .create_session(
-            CreateSessionInput {
-                id: "sess_cli_1".into(),
-                title: "From CLI".into(),
-                project_id: None,
-                selected_llm_index: None,
-                selected_llm_key: None,
-                selected_llm_display_name: None,
-                ga_runtime_kind: None,
-                ga_runtime_id: None,
-                prompt_profile: None,
-            },
-            Origin::cli(Some("ga-test-1".into()), Some("auto-trigger".into())),
-        )
-        .await
-        .expect("create session");
+    yole.create_session(
+        CreateSessionInput {
+            id: "sess_cli_1".into(),
+            title: "From CLI".into(),
+            project_id: None,
+            selected_llm_index: None,
+            selected_llm_key: None,
+            selected_llm_display_name: None,
+            ga_runtime_kind: None,
+            ga_runtime_id: None,
+            prompt_profile: None,
+        },
+        Origin::cli(Some("ga-test-1".into()), Some("auto-trigger".into())),
+    )
+    .await
+    .expect("create session");
     let row: (String, Option<String>, Option<String>) = sqlx::query_as(
         "SELECT created_via, created_by_supervisor, created_origin_note \
          FROM sessions WHERE id = ?",
@@ -498,8 +493,7 @@ async fn unarchive_session_flips_back_to_idle() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     let yole = SqliteYole::from_pool(pool);
-    yole
-        .archive_session(sid("s1"), Origin::gui())
+    yole.archive_session(sid("s1"), Origin::gui())
         .await
         .unwrap();
     let brief = yole
@@ -584,8 +578,7 @@ async fn set_session_pinned_rejects_archived() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     let yole = SqliteYole::from_pool(pool);
-    yole
-        .archive_session(sid("s1"), Origin::gui())
+    yole.archive_session(sid("s1"), Origin::gui())
         .await
         .unwrap();
     let err = yole
@@ -613,8 +606,7 @@ async fn delete_session_removes_row() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     let yole = SqliteYole::from_pool(pool.clone());
-    yole
-        .delete_session(sid("s1"), Origin::gui())
+    yole.delete_session(sid("s1"), Origin::gui())
         .await
         .expect("delete");
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE id = ?")
@@ -640,8 +632,7 @@ async fn delete_session_cascades_messages() {
     .await
     .unwrap();
     let yole = SqliteYole::from_pool(pool.clone());
-    yole
-        .delete_session(sid("s1"), Origin::gui())
+    yole.delete_session(sid("s1"), Origin::gui())
         .await
         .expect("delete");
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE session_id = ?")
@@ -661,6 +652,102 @@ async fn delete_session_not_found() {
         .await
         .expect_err("missing id");
     assert!(matches!(err, YoleError::NotFound { .. }));
+}
+
+#[tokio::test]
+async fn replace_user_message_from_turn_truncates_later_history() {
+    let pool = fresh_pool().await;
+    seed_session_idle(&pool, "s_edit").await;
+    sqlx::query("UPDATE sessions SET turn_count = 4, summary = ? WHERE id = ?")
+        .bind("stale later summary")
+        .bind("s_edit")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let yole = SqliteYole::from_pool(pool.clone());
+
+    yole.persist_gui_user_message(sid("s_edit"), 1, "first".into(), Origin::gui())
+        .await
+        .unwrap();
+    yole.persist_gui_assistant_message(PersistAssistantMessage {
+        session_id: sid("s_edit"),
+        turn_index: 1,
+        content: "first answer".into(),
+        tool_calls: None,
+        tool_results: None,
+        thinking: None,
+        final_answer: Some("first answer".into()),
+        summary: Some("first summary".into()),
+        preamble: None,
+    })
+    .await
+    .unwrap();
+    yole.persist_gui_user_message(sid("s_edit"), 3, "old prompt".into(), Origin::gui())
+        .await
+        .unwrap();
+    yole.persist_gui_assistant_message(PersistAssistantMessage {
+        session_id: sid("s_edit"),
+        turn_index: 3,
+        content: "old answer".into(),
+        tool_calls: None,
+        tool_results: None,
+        thinking: None,
+        final_answer: Some("old answer".into()),
+        summary: Some("old summary".into()),
+        preamble: None,
+    })
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO tool_events (id, session_id, turn_index, tool_name, status, started_at) \
+         VALUES ('tool_old', 's_edit', 3, 'code_run', 'success', '2026-05-19T00:00:00Z')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let brief = yole
+        .replace_gui_user_message_from_turn(sid("s_edit"), 3, "new prompt".into(), Origin::gui())
+        .await
+        .unwrap();
+
+    assert_eq!(brief.turn_count, Some(2));
+    assert_eq!(brief.summary.as_deref(), Some("first summary"));
+
+    let rows: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT turn_index, role, content FROM messages \
+         WHERE session_id = ? ORDER BY turn_index, sequence",
+    )
+    .bind("s_edit")
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (1, "user".into(), "first".into()),
+            (1, "assistant".into(), "first answer".into()),
+            (3, "user".into(), "new prompt".into()),
+        ],
+    );
+
+    let old_fts_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM messages_fts WHERE body MATCH 'old'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(old_fts_count, 0);
+    let new_fts_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM messages_fts WHERE body MATCH 'new'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(new_fts_count, 1);
+    let tool_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tool_events")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(tool_count, 0);
 }
 
 // ---------------- assign_session_to_project ----------------
@@ -812,8 +899,7 @@ async fn bump_session_after_turn_empty_summary_keeps_previous() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     let yole = SqliteYole::from_pool(pool);
-    yole
-        .bump_session_after_turn(sid("s1"), Some("first recap".into()), Some(1), false)
+    yole.bump_session_after_turn(sid("s1"), Some("first recap".into()), Some(1), false)
         .await
         .unwrap();
     // Second bump with empty summary — turn_count goes up, summary
@@ -865,8 +951,7 @@ async fn clear_session_unread_zeroes_flag() {
         .await
         .unwrap();
     let yole = SqliteYole::from_pool(pool);
-    yole
-        .clear_session_unread(sid("s1"))
+    yole.clear_session_unread(sid("s1"))
         .await
         .expect("clear unread");
     let brief = yole.session_brief(sid("s1")).await.unwrap();
@@ -878,8 +963,7 @@ async fn clear_session_unread_already_zero_is_success() {
     let pool = fresh_pool().await;
     seed_session_idle(&pool, "s1").await;
     let yole = SqliteYole::from_pool(pool);
-    yole
-        .clear_session_unread(sid("s1"))
+    yole.clear_session_unread(sid("s1"))
         .await
         .expect("idempotent");
 }
@@ -1270,8 +1354,7 @@ async fn delete_project_detaches_sessions_via_fk() {
         .await
         .unwrap();
     let yole = SqliteYole::from_pool(pool.clone());
-    yole
-        .delete_project(pid("proj_1"), Origin::gui())
+    yole.delete_project(pid("proj_1"), Origin::gui())
         .await
         .expect("delete project");
     // FK ON DELETE SET NULL → session's project_id is now NULL.
@@ -1394,24 +1477,23 @@ async fn tx_drop_without_commit_rolls_back() {
     let yole = SqliteYole::from_pool(pool.clone());
     {
         let mut tx = yole.begin_tx().await.expect("begin");
-        yole
-            .create_session_in_tx(
-                &mut tx,
-                CreateSessionInput {
-                    id: "sess_tx_doomed".into(),
-                    title: "Will be rolled back".into(),
-                    project_id: None,
-                    selected_llm_index: None,
-                    selected_llm_key: None,
-                    selected_llm_display_name: None,
-                    ga_runtime_kind: None,
-                    ga_runtime_id: None,
-                    prompt_profile: None,
-                },
-                Origin::gui(),
-            )
-            .await
-            .expect("create in tx");
+        yole.create_session_in_tx(
+            &mut tx,
+            CreateSessionInput {
+                id: "sess_tx_doomed".into(),
+                title: "Will be rolled back".into(),
+                project_id: None,
+                selected_llm_index: None,
+                selected_llm_key: None,
+                selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
+            },
+            Origin::gui(),
+        )
+        .await
+        .expect("create in tx");
         // Intentionally drop `tx` without calling .commit(). sqlx
         // issues ROLLBACK in Transaction's Drop impl.
     }
@@ -1436,24 +1518,23 @@ async fn tx_second_call_fails_first_rolls_back_when_dropped() {
     let yole = SqliteYole::from_pool(pool.clone());
     {
         let mut tx = yole.begin_tx().await.expect("begin");
-        yole
-            .create_session_in_tx(
-                &mut tx,
-                CreateSessionInput {
-                    id: "sess_atomic_1".into(),
-                    title: "Atomic create".into(),
-                    project_id: None,
-                    selected_llm_index: None,
-                    selected_llm_key: None,
-                    selected_llm_display_name: None,
-                    ga_runtime_kind: None,
-                    ga_runtime_id: None,
-                    prompt_profile: None,
-                },
-                Origin::gui(),
-            )
-            .await
-            .expect("create in tx");
+        yole.create_session_in_tx(
+            &mut tx,
+            CreateSessionInput {
+                id: "sess_atomic_1".into(),
+                title: "Atomic create".into(),
+                project_id: None,
+                selected_llm_index: None,
+                selected_llm_key: None,
+                selected_llm_display_name: None,
+                ga_runtime_kind: None,
+                ga_runtime_id: None,
+                prompt_profile: None,
+            },
+            Origin::gui(),
+        )
+        .await
+        .expect("create in tx");
         let err = yole
             .send_message_in_tx(
                 &mut tx,

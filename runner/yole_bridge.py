@@ -16,6 +16,7 @@ Lines stream clean, we capture the original stdout fd at startup and route
 sys.stdout to /dev/null. All bridge events go through self._emit() which
 writes to the captured fd.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -52,6 +53,7 @@ from runner.ipc import (
     RunCompleteEvent,
     SetApprovalRulesCommand,
     SetLLMCommand,
+    SetModelRouteCommand,
     SetYoloModeCommand,
     ShutdownCommand,
     SystemMessageEvent,
@@ -85,8 +87,7 @@ def _silence_python_stdout() -> None:
 
 
 _TAG_PATS = [
-    r"<" + t + r">.*?</" + t + r">"
-    for t in ("thinking", "summary", "tool_use", "file_content")
+    r"<" + t + r">.*?</" + t + r">" for t in ("thinking", "summary", "tool_use", "file_content")
 ]
 _FILE_REF_RE = re.compile(r"\[FILE:[^\]]+\]")
 
@@ -116,6 +117,66 @@ def _to_json_safe(obj: Any) -> Any:
     if isinstance(obj, (list, tuple, set, frozenset)):
         return [_to_json_safe(x) for x in obj]
     return str(obj)
+
+
+def _image_model_from_route(route: dict[str, Any]) -> str:
+    image_models = route.get("imageGeneration") or route.get("image_generation") or []
+    if not isinstance(image_models, list) or not image_models:
+        return ""
+    return str(image_models[0]).strip()
+
+
+def _route_primary_conversation_model(route: dict[str, Any]) -> str:
+    models = route.get("conversation") or []
+    if not isinstance(models, list):
+        return ""
+    enabled = route.get("models") if isinstance(route.get("models"), dict) else {}
+    for model in models:
+        name = str(model).strip()
+        if not name:
+            continue
+        meta = enabled.get(name, {}) if isinstance(enabled, dict) else {}
+        if not isinstance(meta, dict) or bool(meta.get("enabled", True)):
+            return name
+    return ""
+
+
+def _normalized_model_identity(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).lower()
+
+
+def _route_model_display_name(route: dict[str, Any], model: str) -> str:
+    models = route.get("models") if isinstance(route.get("models"), dict) else {}
+    meta = models.get(model, {}) if isinstance(models, dict) else {}
+    if not isinstance(meta, dict):
+        return ""
+    return str(meta.get("displayName") or meta.get("display_name") or "").strip()
+
+
+def _llm_matches_route_model(
+    agent: Any, index: int, raw_name: str, route: dict[str, Any], model: str
+) -> bool:
+    wanted = {
+        _normalized_model_identity(model),
+        _normalized_model_identity(_route_model_display_name(route, model)),
+    }
+    wanted.discard("")
+
+    values = {
+        _normalized_model_identity(raw_name),
+        _normalized_model_identity(raw_name.split("/", 1)[-1]),
+        _normalized_model_identity(_llm_display_name(raw_name)),
+    }
+    try:
+        client = getattr(agent, "llmclients", [])[index]
+        backend = getattr(client, "backend", None)
+        if backend is not None:
+            values.add(_normalized_model_identity(getattr(backend, "model", "")))
+            values.add(_normalized_model_identity(getattr(backend, "name", "")))
+    except Exception:
+        pass
+    values.discard("")
+    return bool(wanted & values)
 
 
 def _compact_args(args: dict[str, Any], max_len: int = 200) -> str:
@@ -794,9 +855,7 @@ class Bridge:
             summary = str(ctx.get("summary") or "")
             turn = int(ctx.get("turn") or 0)
             exit_reason = ctx.get("exit_reason") or None
-            response_content = (
-                getattr(response, "content", "") if response is not None else ""
-            )
+            response_content = getattr(response, "content", "") if response is not None else ""
             self.current_turn = turn
             # GA may stash its internal response/outcome objects inside
             # exit_reason.data. Coerce to JSON-safe shape before emit.
@@ -807,13 +866,9 @@ class Bridge:
                     sessionId=self.session_id,
                     turnIndex=turn,
                     summary=summary,
-                    toolCalls=[
-                        _to_json_safe(self._serialize_tool_call(tc))
-                        for tc in tool_calls
-                    ],
+                    toolCalls=[_to_json_safe(self._serialize_tool_call(tc)) for tc in tool_calls],
                     toolResults=[
-                        _to_json_safe(self._serialize_tool_result(tr))
-                        for tr in tool_results
+                        _to_json_safe(self._serialize_tool_result(tr)) for tr in tool_results
                     ],
                     responseContent=response_content,
                     exitReason=safe_exit,
@@ -923,9 +978,7 @@ class Bridge:
             # handler import.
             text = cmd.text.lstrip()
             if self._btw_handler is not None and (
-                text == "/btw"
-                or text.startswith("/btw ")
-                or text.startswith("/btw\t")
+                text == "/btw" or text.startswith("/btw ") or text.startswith("/btw\t")
             ):
                 self._handle_btw_command(cmd.text)
                 return
@@ -935,9 +988,7 @@ class Bridge:
             # turn 1.
             self._last_emitted_turn = 0
             self.run_in_progress.set()
-            display_queue = self.agent.put_task(
-                cmd.text, source="yole", images=cmd.images
-            )
+            display_queue = self.agent.put_task(cmd.text, source="yole", images=cmd.images)
             self._start_progress_drain(display_queue)
         elif isinstance(cmd, ApprovalResponseCommand):
             ok = self.state.resolve_pending(cmd.approvalId, cmd.decision)
@@ -998,6 +1049,8 @@ class Bridge:
             # assignment takes effect on the next tool dispatch — no
             # need to rebuild the handler or notify it explicitly.
             self.state.yolo_mode = cmd.enabled
+        elif isinstance(cmd, SetModelRouteCommand):
+            self._handle_set_model_route(cmd)
         elif isinstance(cmd, SetLLMCommand):
             self._handle_set_llm(cmd)
         elif isinstance(cmd, ReinjectToolsCommand):
@@ -1010,6 +1063,67 @@ class Bridge:
             # Make sure pet subprocess + hook don't leak on shutdown.
             self._handle_detach_pet(silent=True)
             self.shutdown_event.set()
+
+    def _handle_set_model_route(self, cmd: SetModelRouteCommand) -> None:
+        try:
+            route = json.loads(cmd.routeJson)
+            if not isinstance(route, dict):
+                raise ValueError("route must be a JSON object")
+            os.environ["YOLE_MODEL_ROUTE_JSON"] = json.dumps(route, ensure_ascii=False)
+            image_model = _image_model_from_route(route)
+            if image_model:
+                os.environ["YOLE_IMAGE_MODEL"] = image_model
+            else:
+                os.environ.pop("YOLE_IMAGE_MODEL", None)
+            self._switch_to_route_default_model(route)
+        except Exception as e:
+            self._emit_error(
+                f"set_model_route failed: {e}",
+                traceback.format_exc(),
+                category="bridge",
+                severity="warning",
+                context="set_model_route",
+            )
+
+    def _switch_to_route_default_model(self, route: dict[str, Any]) -> None:
+        if self.run_in_progress.is_set():
+            return
+        target = _route_primary_conversation_model(route)
+        if not target:
+            return
+        try:
+            available = list(self.agent.list_llms())
+        except Exception as e:
+            self._emit_error(
+                f"list_llms for route switch failed: {e}",
+                traceback.format_exc(),
+                context="set_model_route",
+            )
+            return
+        for index, raw_name, is_current in available:
+            if not _llm_matches_route_model(self.agent, index, raw_name, route, target):
+                continue
+            if is_current:
+                return
+            try:
+                self.agent.next_llm(index)
+            except Exception as e:
+                self._emit_error(
+                    f"route default switch to {target} failed: {e}",
+                    traceback.format_exc(),
+                    context="set_model_route",
+                )
+                return
+            current_raw = self.agent.get_llm_name()
+            self._emit(
+                LLMChangedEvent(
+                    sessionId=self.session_id,
+                    index=index,
+                    name=current_raw,
+                    displayName=_llm_display_name(current_raw),
+                )
+            )
+            return
 
     def _handle_set_llm(self, cmd: SetLLMCommand) -> None:
         """Switch the agent's active LLM. Should only be called when the
@@ -1189,9 +1303,7 @@ class Bridge:
                 )
             )
 
-        threading.Thread(
-            target=worker, daemon=True, name=f"btw-{self.session_id}"
-        ).start()
+        threading.Thread(target=worker, daemon=True, name=f"btw-{self.session_id}").start()
 
     # ---------------- Desktop Pet ----------------
 
@@ -1284,9 +1396,7 @@ class Bridge:
         try:
             if not hasattr(self.agent, "_turn_end_hooks"):
                 self.agent._turn_end_hooks = {}
-            self.agent._turn_end_hooks[
-                f"yole_pet_{self.session_id}"
-            ] = _pet_hook
+            self.agent._turn_end_hooks[f"yole_pet_{self.session_id}"] = _pet_hook
         except Exception as e:
             # Hook registration failed — kill the orphan pet subprocess.
             self._handle_detach_pet(silent=True)
@@ -1377,9 +1487,7 @@ class Bridge:
             try:
                 self.dispatch_command(cmd)
             except Exception as e:
-                self._emit_error(
-                    f"command dispatch failed: {e}", traceback.format_exc()
-                )
+                self._emit_error(f"command dispatch failed: {e}", traceback.format_exc())
 
         # Brief grace period for any in-flight emit to drain.
         self.run_in_progress.wait(timeout=2.0)

@@ -5,6 +5,7 @@ import { ApprovalDock } from "@/components/conversation/ApprovalDock";
 import { AskUserBubble } from "@/components/conversation/AskUserBubble";
 import {
   Composer,
+  type ComposerHandle,
   type ComposerLLMOption,
 } from "@/components/conversation/Composer";
 import {
@@ -29,6 +30,7 @@ import type {
   PendingApproval,
   PendingAskUser,
   Turn,
+  UserTurn,
 } from "@/types/conversation";
 import type { ApprovalDecision } from "@/types/ipc";
 
@@ -46,7 +48,8 @@ export interface MainViewProps {
    * component doesn't read or display the id, just uses identity
    * change as the trigger. Undefined during pre-session screens. */
   activeSessionId?: string;
-  onSubmit?: (text: string) => void;
+  onSubmit?: (text: string, images?: string[]) => void;
+  onBeginEditLastUserMessage?: (turn: UserTurn) => void;
   onApprove?: (approvalId: string, decision: ApprovalDecision) => void;
   onStop?: () => void;
   /** When true, the agent is mid-run; the Composer hides Submit and
@@ -84,6 +87,8 @@ export interface MainViewProps {
   requiresModelConfig?: boolean;
   /** Fallback for pre-bridge / dev when `llms` is empty. */
   onOpenLLMSwitcher?: () => void;
+  /** Hide model switching/config affordances for simplified commercial UI. */
+  hideModelPicker?: boolean;
   /**
    * GA-initiated question waiting for a user reply. When non-null,
    * the AskUserBubble renders at the conversation tail (with chip
@@ -135,6 +140,7 @@ export function MainView({
   projectName,
   activeSessionId,
   onSubmit,
+  onBeginEditLastUserMessage,
   onApprove,
   onStop,
   isRunning = false,
@@ -147,12 +153,14 @@ export function MainView({
   onConfigureModels,
   requiresModelConfig = false,
   onOpenLLMSwitcher,
+  hideModelPicker = false,
   pendingAskUser,
   conversationWidth = "compact",
 }: MainViewProps) {
   const copy = useCopy();
   const stillWaiting = pendingApprovals.length > 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<ComposerHandle>(null);
   const pendingApprovalRefs = useRef(new Map<string, HTMLDivElement>());
   // Stripped partial — empty when nothing renderable yet (e.g. only
   // `<thinking>...` partial has come through). We hide the
@@ -191,12 +199,20 @@ export function MainView({
   const [atBottom, setAtBottom] = useState(true);
   const [isScrollingToBottom, setIsScrollingToBottom] = useState(false);
   const scrollToBottomRafRef = useRef<number | null>(null);
+  const atBottomRef = useRef(atBottom);
+  const userPinnedAwayRef = useRef(false);
+  useEffect(() => {
+    atBottomRef.current = atBottom;
+  }, [atBottom]);
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const onScroll = () => {
       const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      setAtBottom(distFromBottom < 24);
+      const nextAtBottom = distFromBottom < 24;
+      atBottomRef.current = nextAtBottom;
+      userPinnedAwayRef.current = !nextAtBottom;
+      setAtBottom(nextAtBottom);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -225,7 +241,7 @@ export function MainView({
   //
   // scrollTop assignment is O(1) so re-firing per render is fine.
   useLayoutEffect(() => {
-    if (!atBottom) return;
+    if (!atBottomRef.current || userPinnedAwayRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
@@ -250,6 +266,7 @@ export function MainView({
     if (!el) return;
 
     stopMonitoringScrollToBottom();
+    userPinnedAwayRef.current = false;
     setIsScrollingToBottom(true);
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 
@@ -259,6 +276,7 @@ export function MainView({
       const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (distFromBottom < 24) {
         stopMonitoringScrollToBottom();
+        userPinnedAwayRef.current = false;
         setAtBottom(true);
         return;
       }
@@ -267,6 +285,7 @@ export function MainView({
       const timedOut = performance.now() - startedAt > 1600;
       if (userPulledAway || timedOut) {
         stopMonitoringScrollToBottom();
+        userPinnedAwayRef.current = true;
         setAtBottom(false);
         return;
       }
@@ -306,15 +325,6 @@ export function MainView({
     }, 180);
   };
 
-  // atBottom mirror for use inside async callbacks (ResizeObserver
-  // below) where the captured closure would otherwise see a stale
-  // boolean. The effect-based sync (rather than a render-phase
-  // assignment) keeps the react-hooks lint rule happy.
-  const atBottomRef = useRef(atBottom);
-  useEffect(() => {
-    atBottomRef.current = atBottom;
-  }, [atBottom]);
-
   // Scroll-to-bottom on session switch. Three compounding races make
   // a single scrollTop assignment unreliable:
   //
@@ -351,6 +361,7 @@ export function MainView({
     if (!el) return;
 
     const rafId = requestAnimationFrame(() => {
+      userPinnedAwayRef.current = false;
       el.scrollTop = el.scrollHeight;
       setAtBottom(true);
     });
@@ -510,6 +521,11 @@ export function MainView({
               approvalDecisions={approvalDecisions}
               onApprove={onApprove}
               projectName={projectName}
+              canEditLastUserMessage={!isRunning && pendingAskUser === null}
+              onEditLastUserMessage={(turn) => {
+                onBeginEditLastUserMessage?.(turn);
+                composerRef.current?.prefillText(turn.content);
+              }}
             />
             {/* In-flight pending approvals — rendered after the
               completed turns. The agent has emitted tool_call_pending
@@ -688,6 +704,7 @@ export function MainView({
           />
 
           <Composer
+            ref={composerRef}
             llmDisplayName={llmDisplayName}
             placeholder={
               copy.composer[
@@ -710,6 +727,7 @@ export function MainView({
             onConfigureModels={onConfigureModels}
             requiresModelConfig={requiresModelConfig}
             onOpenLLMSwitcher={onOpenLLMSwitcher}
+            hideModelPicker={hideModelPicker}
           />
 
           <div className="mt-1.5 text-[11px] text-ink-muted">
@@ -733,7 +751,10 @@ function compactLiveStepStatus(text?: string): string | undefined {
   if (!normalized) return undefined;
   const chars = Array.from(normalized);
   if (chars.length <= LIVE_STEP_STATUS_MAX_CHARS) return normalized;
-  return `${chars.slice(0, LIVE_STEP_STATUS_MAX_CHARS - 1).join("").trimEnd()}…`;
+  return `${chars
+    .slice(0, LIVE_STEP_STATUS_MAX_CHARS - 1)
+    .join("")
+    .trimEnd()}…`;
 }
 
 /**

@@ -40,10 +40,11 @@ func main() {
 
 	limiter := ratelimit.NewMemoryLimiter(cfg.RateLimit.PerIPPerHour, cfg.RateLimit.PerIPPerDay)
 	handler := register.NewHandler(register.HandlerConfig{
-		NewAPI:     client,
-		Store:      accounts,
-		Limiter:    limiter,
-		PublicBase: cfg.NewAPI.PublicV1BaseURL,
+		NewAPI:           client,
+		Store:            accounts,
+		Limiter:          limiter,
+		PublicBase:       cfg.NewAPI.PublicV1BaseURL,
+		PublicServerBase: cfg.Server.PublicBaseURL,
 		Trial: register.TrialConfig{
 			TokenPrefix:      cfg.Trial.TokenPrefix,
 			InitialCreditUSD: cfg.Trial.InitialCreditUSD,
@@ -53,6 +54,11 @@ func main() {
 			DefaultModel:     cfg.Trial.DefaultModel,
 			AllowedModels:    cfg.Trial.AllowedModels,
 		},
+		Points: register.PointsConfig{
+			PerUSD: cfg.Points.PerUSD,
+			Unit:   cfg.Points.Unit,
+		},
+		Routing: toRegisterRouting(cfg.Routing),
 		Contact: register.ContactConfig{
 			WeChatID:     cfg.Contact.WeChatID,
 			WeChatQRPath: cfg.Contact.WeChatQRPath,
@@ -97,5 +103,34 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("shutdown: %v", err)
+	}
+}
+
+func toRegisterRouting(src config.RoutingConfig) register.RoutingConfig {
+	profiles := make(map[string]register.RouteProfile, len(src.Profiles))
+	for id, profile := range src.Profiles {
+		profiles[id] = register.RouteProfile{
+			NewAPIGroup:     profile.NewAPIGroup,
+			Conversation:    profile.Conversation,
+			Vision:          profile.Vision,
+			ImageGeneration: profile.ImageGeneration,
+			ImageEditing:    profile.ImageEditing,
+		}
+	}
+	models := make(map[string]register.ModelMetadata, len(src.Models))
+	for id, model := range src.Models {
+		models[id] = register.ModelMetadata{
+			DisplayName:      model.DisplayName,
+			InputModalities:  model.InputModalities,
+			OutputModalities: model.OutputModalities,
+			ToolCalling:      model.ToolCalling,
+			Enabled:          model.Enabled,
+		}
+	}
+	return register.RoutingConfig{
+		Version:        src.Version,
+		DefaultProfile: src.DefaultProfile,
+		Profiles:       profiles,
+		Models:         models,
 	}
 }

@@ -97,6 +97,23 @@ export async function persistUserMessage(
   });
 }
 
+export interface ReplaceUserMessageFromTurnParams {
+  sessionId: string;
+  turnIndex: number;
+  content: string;
+}
+
+export async function replaceUserMessageFromTurn(
+  p: ReplaceUserMessageFromTurnParams,
+): Promise<void> {
+  await invoke("replace_user_message_from_turn", {
+    sessionId: p.sessionId,
+    turnIndex: p.turnIndex,
+    content: p.content,
+    origin: { via: "gui" },
+  });
+}
+
 /**
  * One-time backfill of messages_fts from existing messages rows.
  * Runs on hydrate when the FTS table is empty but `messages` has
@@ -273,7 +290,6 @@ export async function loadToolEventsBySession(
 ): Promise<ToolEventRow[]> {
   return invoke<ToolEventRow[]>("load_tool_events_by_session", { sessionId });
 }
-
 
 // ---------------- prefs ----------------
 //

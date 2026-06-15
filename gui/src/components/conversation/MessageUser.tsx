@@ -1,7 +1,16 @@
-import { CaretDown, CaretUp, Check, Copy, Robot } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  CaretUp,
+  Check,
+  Copy,
+  PencilSimple,
+  Robot,
+} from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ImageLightbox } from "@/components/conversation/ImageLightbox";
 import { IconTooltip } from "@/components/ui/tooltip";
+import { localImagePathToPreviewUrl } from "@/lib/conversation-images";
 import { useCopy, type AppCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Origin } from "@/types/conversation";
@@ -101,6 +110,7 @@ function formatRelativeTime(
 
 export interface MessageUserProps {
   content: string;
+  imagePaths?: string[];
   /**
    * Audit origin for this user message (B4 M7). When `origin.via ===
    * "supervisor"`, a small robot provenance icon renders by the left
@@ -115,9 +125,18 @@ export interface MessageUserProps {
    * data don't have to plumb it; the tooltip omits time when absent.
    */
   createdAt?: string;
+  canEdit?: boolean;
+  onEdit?: () => void;
 }
 
-export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
+export function MessageUser({
+  content,
+  imagePaths = [],
+  origin,
+  createdAt,
+  canEdit = false,
+  onEdit,
+}: MessageUserProps) {
   const copy = useCopy();
   const lineCount = useMemo(() => content.split("\n").length, [content]);
   const isLong =
@@ -130,8 +149,30 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{
+    src: string;
+    alt: string;
+  } | null>(null);
   const hideTimer = useRef<number | null>(null);
   const copyTimer = useRef<number | null>(null);
+  const imagePreviews = useMemo(
+    () =>
+      imagePaths
+        .map((path, index) => {
+          const clean = path.trim();
+          if (!clean) return null;
+          return {
+            path: clean,
+            src: localImagePathToPreviewUrl(clean),
+            alt: copy.composer.pastedImageAlt(index + 1),
+          };
+        })
+        .filter(
+          (item): item is { path: string; src: string; alt: string } =>
+            item !== null,
+        ),
+    [copy, imagePaths],
+  );
 
   const supervisorTooltip =
     origin?.via === "supervisor"
@@ -177,7 +218,9 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
   };
 
   const copyLabel = copied ? copy.conversation.copied : copy.conversation.copy;
+  const editLabel = copy.conversation.edit;
   const copyVisible = actionsVisible || copied;
+  const editVisible = actionsVisible && canEdit;
 
   return (
     <div
@@ -211,7 +254,8 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
       <div
         data-role="user-msg"
         className={cn(
-          "relative rounded-r-sm border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 pr-12 text-[15px] font-medium leading-[1.65] text-ink",
+          "relative rounded-r-sm border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 text-[15px] font-medium leading-[1.65] text-ink",
+          canEdit ? "pr-20" : "pr-12",
           "select-text whitespace-pre-wrap break-words",
           isLong && collapsed && "overflow-hidden",
         )}
@@ -219,7 +263,48 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
           isLong && collapsed ? { maxHeight: COLLAPSED_MAX_H_PX } : undefined
         }
       >
+        {imagePreviews.length > 0 && (
+          <div className={cn("mb-2 flex flex-wrap gap-2", !content && "mb-0")}>
+            {imagePreviews.map((image) => (
+              <button
+                key={image.path}
+                type="button"
+                onClick={() => setPreviewImage(image)}
+                className="size-24 overflow-hidden rounded-sm border border-brand-strong/20 bg-elevated shadow-card"
+                aria-label={copy.composer.previewPastedImage}
+              >
+                <img
+                  src={image.src}
+                  alt={image.alt}
+                  className="size-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        )}
         {content}
+        {canEdit && (
+          <IconTooltip text={editLabel}>
+            <button
+              type="button"
+              onClick={() => {
+                showActions();
+                onEdit?.();
+              }}
+              aria-hidden={!editVisible}
+              aria-label={editLabel}
+              tabIndex={editVisible ? 0 : -1}
+              className={cn(
+                "absolute right-8 top-1.5 z-10 inline-flex size-6 items-center justify-center rounded-sm",
+                "transition-[color,background-color,opacity,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:translate-y-[0.5px] active:duration-[45ms]",
+                editVisible ? "opacity-100" : "pointer-events-none opacity-0",
+                "text-ink-muted hover:bg-elevated hover:text-ink-soft focus-visible:bg-elevated focus-visible:text-ink-soft focus-visible:outline-none",
+              )}
+            >
+              <PencilSimple size={14} weight="thin" />
+            </button>
+          </IconTooltip>
+        )}
         <IconTooltip text={copyLabel}>
           <button
             type="button"
@@ -279,6 +364,14 @@ export function MessageUser({ content, origin, createdAt }: MessageUserProps) {
           </button>
         </div>
       )}
+      <ImageLightbox
+        src={previewImage?.src ?? ""}
+        alt={previewImage?.alt ?? copy.composer.previewPastedImage}
+        open={previewImage !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImage(null);
+        }}
+      />
     </div>
   );
 }

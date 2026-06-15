@@ -27,6 +27,7 @@ export function SettingsUpdateControl({
   const copy = useCopy();
   const updateStatus = useAppUpdateStore((s) => s.status);
   const checkUpdate = useAppUpdateStore((s) => s.check);
+  const installUpdate = useAppUpdateStore((s) => s.downloadAndInstall);
   const restart = useAppUpdateStore((s) => s.restart);
 
   const handleUpdateAction = async () => {
@@ -39,6 +40,10 @@ export function SettingsUpdateControl({
     if (updateStatus.kind === "ready") {
       if (hasRunningSessions) return;
       await restart();
+      return;
+    }
+    if (updateStatus.kind === "available") {
+      await installUpdate();
       return;
     }
     await checkUpdate({ silent: false });
@@ -190,15 +195,10 @@ function updateActionView(
       };
     case "available":
       return {
-        kind: "status",
-        label: hasRunningSessions
-          ? copy.updates.foundAfterTasks
-          : copy.updates.preparing,
-        Icon: hasRunningSessions ? Warning : CircleNotch,
-        className: hasRunningSessions
-          ? "border-warning/30 bg-warning/10 text-warning"
-          : "border-line bg-elevated text-brand-strong",
-        spin: !hasRunningSessions,
+        kind: "button",
+        label: copy.updates.installNow,
+        Icon: ArrowSquareOut,
+        disabled: false,
       };
     case "downloading":
       return {
@@ -279,6 +279,13 @@ function updateInlineStatusView(
     case "idle":
     case "checking":
     case "available":
+      return {
+        message: hasRunningSessions
+          ? copy.updates.foundAfterTasks
+          : copy.updates.foundAvailable,
+        Icon: hasRunningSessions ? Warning : Info,
+        className: hasRunningSessions ? "text-warning" : "text-ink-muted",
+      };
     case "downloading":
     case "ready":
       return null;

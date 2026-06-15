@@ -4,11 +4,11 @@
 //! the GUI runs in production. Each test sets up its own DB to keep
 //! cases isolated.
 
+use sqlx::SqlitePool;
 use yole_core_lib::api::{
-    YoleApi, OriginVia, RuntimeKind, SearchScope, SessionFilter, SessionId, SessionStatus,
+    OriginVia, RuntimeKind, SearchScope, SessionFilter, SessionId, SessionStatus, YoleApi,
 };
 use yole_core_lib::db::SqliteYole;
-use sqlx::SqlitePool;
 
 // Migration SQL — same files Tauri's tauri-plugin-sql runs in
 // production via core/src/lib.rs's `run()`. Included by relative path

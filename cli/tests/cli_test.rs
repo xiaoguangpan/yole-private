@@ -43,8 +43,8 @@ async fn seeded_db_at(path: &std::path::Path) -> SqlitePool {
         .create_if_missing(true);
     let pool = SqlitePool::connect_with(opts).await.expect("open db");
     for sql in [
-        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008,
-        MIG_009, MIG_010, MIG_011, MIG_012, MIG_013,
+        MIG_001, MIG_002, MIG_003, MIG_004, MIG_005, MIG_006, MIG_007, MIG_008, MIG_009, MIG_010,
+        MIG_011, MIG_012, MIG_013,
     ] {
         sqlx::raw_sql(sql)
             .execute(&pool)
@@ -146,10 +146,7 @@ fn search_session_ids(stdout: &str) -> Vec<String> {
 }
 
 fn assert_search_session_ids(stdout: &str, expected: &[&str]) {
-    let expected = expected
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<_>>();
+    let expected = expected.iter().map(|id| id.to_string()).collect::<Vec<_>>();
     assert_eq!(search_session_ids(stdout), expected);
 }
 
@@ -306,13 +303,7 @@ async fn sessions_search_defaults_to_current_runtime() {
 
     let (stdout, code) = run_yole(
         &db,
-        &[
-            "sessions",
-            "search",
-            "sharedtoken",
-            "--runtime",
-            "external",
-        ],
+        &["sessions", "search", "sharedtoken", "--runtime", "external"],
     );
     assert_eq!(code, Some(0), "stdout: {stdout}");
     assert_search_session_ids(&stdout, &["external"]);
@@ -405,8 +396,7 @@ async fn session_send_without_core_running_exits_4() {
     // way, session send should report exit 4. We pre-empt cross-test
     // pollution by setting TMPDIR to the tempdir so any (impossible)
     // existing socket in /tmp doesn't accidentally match.
-    let (stdout, code) =
-        run_yole_with_tmpdir(&db, td.path(), &["session", "send", "s1", "hello"]);
+    let (stdout, code) = run_yole_with_tmpdir(&db, td.path(), &["session", "send", "s1", "hello"]);
     assert_eq!(code, Some(4), "exit code: stdout = {stdout}");
     let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["error"], "db_unavailable");
@@ -461,20 +451,31 @@ async fn session_watch_socket_error_emits_single_cli_error() {
     assert_eq!(parsed.get("ok"), None);
 }
 
-/// Variant of run_yole that also sets TMPDIR so the CLI's
-/// `socket_path()` helper resolves to a tempdir-relative socket — keeps
-/// these tests from accidentally picking up a real Yole Core socket
-/// on the dev machine.
+/// Variant of run_yole that isolates the CLI's local transport path.
+///
+/// On Unix, `socket_path()` follows TMPDIR. On Windows, it follows
+/// USERNAME / USER for the named-pipe suffix. Set both so these tests do
+/// not accidentally talk to a real Yole Core instance running on the dev
+/// machine.
 fn run_yole_with_tmpdir(
     db: &std::path::Path,
     tmp: &std::path::Path,
     args: &[&str],
 ) -> (String, Option<i32>) {
     let bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_yole"));
+    let isolated_user = format!(
+        "test_{}",
+        tmp.file_name()
+            .map(|name| name.to_string_lossy())
+            .unwrap_or_else(|| "yole_cli".into())
+            .replace(['\\', '/', '.'], "_")
+    );
     let out = Command::new(&bin)
         .args(args)
         .env("YOLE_DB_PATH", db)
         .env("TMPDIR", tmp)
+        .env("USERNAME", &isolated_user)
+        .env("USER", &isolated_user)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()

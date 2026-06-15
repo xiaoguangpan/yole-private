@@ -4,7 +4,7 @@ index 7bc7259..a9706cb 100644
 +++ b/agentmain.py
 @@ -14,6 +14,10 @@ except Exception: pass
  from ga import GenericAgentHandler, smart_format, get_global_memory, format_error, consume_file
-
+ 
  script_dir = os.path.dirname(os.path.abspath(__file__))
 +state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 +def state_path(*parts):
@@ -15,7 +15,7 @@ index 7bc7259..a9706cb 100644
      TS = open(os.path.join(script_dir, f'assets/tools_schema{suffix}.json'), 'r', encoding='utf-8').read()
 @@ -21,7 +25,7 @@ def load_tool_schema(suffix=''):
  load_tool_schema()
-
+ 
  lang_suffix = '_en' if os.environ.get('GA_LANG', '') == 'en' else ''
 -mem_dir = os.path.join(script_dir, 'memory')
 +mem_dir = state_path('memory')
@@ -23,7 +23,7 @@ index 7bc7259..a9706cb 100644
  mem_txt = os.path.join(mem_dir, 'global_mem.txt')
  if not os.path.exists(mem_txt): open(mem_txt, 'w', encoding='utf-8').write('# [Global Memory - L2]\n')
 @@ -45,7 +49,7 @@ def get_system_prompt():
-
+ 
  class GenericAgent:
      def __init__(self):
 -        os.makedirs(os.path.join(script_dir, 'temp'), exist_ok=True)
@@ -39,7 +39,7 @@ index 7bc7259..a9706cb 100644
 -        self.log_path = os.path.join(script_dir, f'temp/model_responses/model_responses_{logid}.txt')
 +        self.log_path = state_path('temp', 'model_responses', f'model_responses_{logid}.txt')
          self.load_llm_sessions()
-
+ 
      def load_llm_sessions(self):
 @@ -115,7 +119,7 @@ class GenericAgent:
          if not raw_query.startswith('/'): return raw_query
@@ -60,7 +60,7 @@ index 7bc7259..a9706cb 100644
                  raw_query = f'Long user prompt saved to {task_file}. Read and execute.'
              rquery = smart_format(raw_query.replace('\n', ' '), max_str_len=200)
 @@ -146,7 +150,7 @@ class GenericAgent:
-
+ 
              sys_prompt = get_system_prompt() + getattr(self.llmclient.backend, 'extra_sys_prompt', '')
              if self.peer_hint: sys_prompt += f"\n[Peer] 用户提及其他会话/后台任务状态时: temp/model_responses/ (只找近期修改的文件尾部)\n"
 -            handler = GenericAgentHandler(self, self.history, os.path.join(script_dir, 'temp'))
@@ -100,14 +100,14 @@ index 57b1870..77552bf 100644
 --- a/ga.py
 +++ b/ga.py
 @@ -8,6 +8,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+ 
  from agent_loop import BaseHandler, StepOutcome, json_default
  script_dir = os.path.dirname(os.path.abspath(__file__))
 +state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 +def state_path(*parts):
 +    return os.path.join(state_dir, *parts)
 +
-
+ 
  def safe_print(*args, **kwargs):
      try: print(*args, **kwargs)
 @@ -20,7 +24,7 @@ def code_run(code, code_type="python", timeout=60, cwd=None, code_cwd=None, stop
@@ -120,7 +120,7 @@ index 57b1870..77552bf 100644
          tmp_file = tempfile.NamedTemporaryFile(suffix=".ai.py", delete=False, mode='w', encoding='utf-8', dir=code_cwd)
          cr_header = os.path.join(script_dir, 'assets', 'code_run_header.py')
 @@ -159,7 +163,7 @@ def format_error(e):
-
+ 
  def log_memory_access(path):
      if 'memory' not in path: return
 -    stats_file = os.path.join(script_dir, 'memory/file_access_stats.json')
@@ -145,7 +145,7 @@ index 4562893..7a9f27a 100644
 --- a/llmcore.py
 +++ b/llmcore.py
 @@ -908,7 +908,8 @@ def _ensure_text_block(blocks):
-
+ 
  def _write_llm_log(label, content, log_path=None):
      if not log_path:
 -        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'temp/model_responses/model_responses_{os.getpid()}.txt')

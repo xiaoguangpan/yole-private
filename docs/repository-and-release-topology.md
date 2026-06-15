@@ -82,8 +82,8 @@ D:\yole\release-package\<version>\
 Current package:
 
 ```text
-D:\yole\release-package\0.0.1\Yole_0.0.1_x64-setup.exe
-D:\yole\release-package\0.0.1\SHA256SUMS.txt
+D:\yole\release-package\0.0.7\Yole_0.0.7_x64-setup.exe
+D:\yole\release-package\0.0.7\SHA256SUMS.txt
 ```
 
 This folder is convenient for local handoff. It is not the canonical updater
@@ -125,6 +125,8 @@ Current public download path:
 ```text
 /opt/static-sites/prototypes/yole-downloads/windows/Yole_<version>_x64-setup.exe
 https://na.itxgp.com/yole-downloads/windows/Yole_<version>_x64-setup.exe
+/opt/static-sites/prototypes/yole-downloads/windows/Yole_latest_x64-setup.exe
+https://na.itxgp.com/yole-downloads/windows/Yole_latest_x64-setup.exe
 ```
 
 Updater signing key paths on the VPS:

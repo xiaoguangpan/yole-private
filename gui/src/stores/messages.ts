@@ -71,6 +71,7 @@ export interface PerSessionMessages {
   approvalDecisions: Record<string, ApprovalDecision>;
   pendingAskUser: PendingAskUser | null;
   turnIndexOffset: number;
+  lastUserSubmitAt: number | null;
 }
 
 export const EMPTY_MESSAGES: PerSessionMessages = Object.freeze({
@@ -82,6 +83,7 @@ export const EMPTY_MESSAGES: PerSessionMessages = Object.freeze({
   approvalDecisions: EMPTY_DECISIONS,
   pendingAskUser: null,
   turnIndexOffset: 0,
+  lastUserSubmitAt: null,
 }) as PerSessionMessages;
 
 function emptyMessages(): PerSessionMessages {
@@ -96,6 +98,7 @@ function emptyMessages(): PerSessionMessages {
     approvalDecisions: {},
     pendingAskUser: null,
     turnIndexOffset: 0,
+    lastUserSubmitAt: null,
   };
 }
 
@@ -148,7 +151,7 @@ interface MessagesActions {
   restoreSessionTurns: (sid: string) => Promise<void>;
 
   // ---- conversation writes ----
-  appendUserTurn: (sid: string, text: string) => void;
+  appendUserTurn: (sid: string, text: string, images?: string[]) => void;
   /**
    * Append a user turn that was persisted out-of-band by Rust core
    * (`socket_listener::dispatch_session_send`). Skips the SQLite write
@@ -179,7 +182,17 @@ interface MessagesActions {
    * Still bumps `userSubmitTick` so the scroll-to-bottom-anchor
    * effect fires — user wants to see their question appear.
    */
-  appendSideQuestionUserTurn: (sid: string, text: string) => void;
+  appendSideQuestionUserTurn: (
+    sid: string,
+    text: string,
+    images?: string[],
+  ) => void;
+  replaceUserTurnFrom: (
+    sid: string,
+    turnIndex: number,
+    text: string,
+    images?: string[],
+  ) => void;
   appendAgentTurn: (sid: string, turn: AgentTurn) => void;
   /**
    * Append a non-agent-loop system message (currently from /btw
@@ -323,7 +336,7 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
 
   // ---- conversation writes ----
 
-  appendUserTurn: (sid, text) => {
+  appendUserTurn: (sid, text, images = []) => {
     // Snapshot turnCount before any state mutation; this is the
     // offset that should map GA's 1-based per-loop turn indices
     // onto absolute session-wide indices.
@@ -348,10 +361,20 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
     const sessionsState = useSessionsStore.getState();
     const currentTurnCount =
       sessionsState.sessions.find((s) => s.id === sid)?.turnCount ?? 0;
+    const nextTurnIndex = currentTurnCount + 1;
+    const imagePaths = cleanImagePaths(images);
     const state = get();
     const { byId, next } = patchMessages(state, sid, (m) => ({
       ...m,
-      turns: [...m.turns, { role: "user", content: text } as UserTurn],
+      turns: [
+        ...m.turns,
+        {
+          role: "user",
+          content: text,
+          turnIndex: nextTurnIndex,
+          imagePaths,
+        } as UserTurn,
+      ],
       // The agent will start running on the bridge shortly. Set
       // synchronously rather than wait for `turn_start` over IPC —
       // the round-trip would re-introduce the latency we're
@@ -368,6 +391,7 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
       // so the conversation reverts to normal running visuals.
       pendingAskUser: null,
       turnIndexOffset: currentTurnCount,
+      lastUserSubmitAt: performance.now(),
     }));
     set({ byId, userSubmitTick: state.userSubmitTick + 1 });
     fireSessionMirror(sid, next);
@@ -381,7 +405,6 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
     // yet — that event arrives after the bridge starts processing
     // user_message and confirms our local guess. The pairing holds
     // because GA always assigns one turn per user message.
-    const nextTurnIndex = currentTurnCount + 1;
     void persistUserMessage({
       sessionId: sid,
       turnIndex: nextTurnIndex,
@@ -402,7 +425,11 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
     const currentTurnCount =
       useSessionsStore.getState().sessions.find((s) => s.id === sid)
         ?.turnCount ?? 0;
-    const userTurn: UserTurn = { role: "user", content: text };
+    const userTurn: UserTurn = {
+      role: "user",
+      content: text,
+      turnIndex: currentTurnCount + 1,
+    };
     if (origin) userTurn.origin = origin;
     if (createdAt) userTurn.createdAt = createdAt;
     const state = get();
@@ -414,22 +441,62 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
       currentTurnIndex: null,
       pendingAskUser: null,
       turnIndexOffset: currentTurnCount,
+      lastUserSubmitAt: performance.now(),
     }));
     set({ byId, userSubmitTick: state.userSubmitTick + 1 });
     fireSessionMirror(sid, next);
     useSessionsStore.getState().maybeDeriveTitle(sid, text);
   },
 
-  appendSideQuestionUserTurn: (sid, text) => {
+  appendSideQuestionUserTurn: (sid, text, images = []) => {
+    const imagePaths = cleanImagePaths(images);
     const state = get();
     const { byId, next } = patchMessages(state, sid, (m) => ({
       ...m,
-      turns: [...m.turns, { role: "user", content: text } as UserTurn],
+      turns: [
+        ...m.turns,
+        { role: "user", content: text, imagePaths } as UserTurn,
+      ],
+      lastUserSubmitAt: performance.now(),
       // Deliberately NOT touching agentRunning / inFlightContent /
       // currentTurnIndex / pendingAskUser — /btw is a side worker
       // path that doesn't interfere with the main agent loop.
     }));
     set({ byId, userSubmitTick: state.userSubmitTick + 1 });
+    fireSessionMirror(sid, next);
+  },
+
+  replaceUserTurnFrom: (sid, turnIndex, text, images = []) => {
+    const state = get();
+    const old = state.byId[sid] ?? emptyMessages();
+    const replaceAt = old.turns.findIndex(
+      (turn) => turn.role === "user" && turn.turnIndex === turnIndex,
+    );
+    if (replaceAt === -1) return;
+    const imagePaths = cleanImagePaths(images);
+    const oldUserTurn = old.turns[replaceAt] as UserTurn;
+    const next: PerSessionMessages = {
+      ...old,
+      turns: [
+        ...old.turns.slice(0, replaceAt),
+        {
+          ...oldUserTurn,
+          content: text,
+          turnIndex,
+          imagePaths,
+        },
+      ],
+      pendingApprovals: [],
+      agentRunning: true,
+      inFlightContent: "",
+      currentTurnIndex: null,
+      pendingAskUser: null,
+      turnIndexOffset: Math.max(0, turnIndex - 1),
+    };
+    set({
+      byId: { ...state.byId, [sid]: next },
+      userSubmitTick: state.userSubmitTick + 1,
+    });
     fireSessionMirror(sid, next);
   },
 
@@ -503,9 +570,18 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
     // [B3-M5-sub-plan §3 T5.3] for why we don't introduce a Rust-side
     // batch here (B3-I4 守 Rust 端不动).
     const state = get();
+    const existing = state.byId[sid] ?? EMPTY_MESSAGES;
+    const isFirstDelta = existing.inFlightContent.length === 0;
+    if (isFirstDelta && existing.lastUserSubmitAt !== null) {
+      console.info("[messages] first assistant delta timing", {
+        sessionId: sid,
+        firstDeltaMs: Math.round(performance.now() - existing.lastUserSubmitAt),
+      });
+    }
     const { byId, next } = patchMessages(state, sid, (m) => ({
       ...m,
       inFlightContent: m.inFlightContent + delta,
+      lastUserSubmitAt: isFirstDelta ? null : m.lastUserSubmitAt,
     }));
     set({ byId });
     fireSessionMirror(sid, next);
@@ -596,6 +672,10 @@ export const useMessagesStore = create<MessagesStore>((set, get) => ({
     });
   },
 }));
+
+function cleanImagePaths(images: string[] = []): string[] {
+  return images.map((image) => image.trim()).filter(Boolean);
+}
 
 // Expose the store on `window.__messagesStore` in dev so the user can
 // inspect / mutate state from the DevTools console.

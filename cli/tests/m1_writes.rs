@@ -138,19 +138,30 @@ async fn seed_pref(pool: &SqlitePool, key: &str, value_json: &str) {
         .expect("seed pref");
 }
 
-/// Run the CLI with the socket path namespaced to a tempdir, so no live
-/// Yole Core on the developer's machine accidentally answers the
-/// "no Core running" tests.
+/// Run the CLI with the local transport path isolated from any live Yole Core
+/// on the developer's machine.
+///
+/// Unix sockets follow TMPDIR. Windows named pipes follow USERNAME / USER, so
+/// set both for the child process.
 fn run_yole_isolated(
     db: &std::path::Path,
     tmp: &std::path::Path,
     args: &[&str],
 ) -> (String, Option<i32>) {
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_yole"));
+    let isolated_user = format!(
+        "test_{}",
+        tmp.file_name()
+            .map(|name| name.to_string_lossy())
+            .unwrap_or_else(|| "yole_m1".into())
+            .replace(['\\', '/', '.'], "_")
+    );
     let out = Command::new(&bin)
         .args(args)
         .env("YOLE_DB_PATH", db)
         .env("TMPDIR", tmp)
+        .env("USERNAME", &isolated_user)
+        .env("USER", &isolated_user)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -230,8 +241,7 @@ async fn session_btw_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) =
-        run_yole_isolated(&db, td.path(), &["session", "btw", "sess_x", "ping?"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["session", "btw", "sess_x", "ping?"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }
 
@@ -663,7 +673,6 @@ async fn llm_set_without_core_exits_4() {
     let td = tempdir();
     let db = td.path().join("test.db");
     drop(seeded_db_at(&db).await);
-    let (stdout, code) =
-        run_yole_isolated(&db, td.path(), &["llm", "set", "sess_x", "glm-4.5-x"]);
+    let (stdout, code) = run_yole_isolated(&db, td.path(), &["llm", "set", "sess_x", "glm-4.5-x"]);
     assert_eq!(code, Some(4), "stdout: {stdout}");
 }

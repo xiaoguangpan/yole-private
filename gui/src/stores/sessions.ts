@@ -323,6 +323,13 @@ interface SessionsActions {
     key: string,
     displayName: string,
   ) => Promise<void>;
+  /** Rewind durable-looking session counters before resending an edited
+   * last user message. Persistence is handled by Core first; this mirrors
+   * the already-applied DB state into the sidebar. */
+  rewindSessionAfterUserEdit: (
+    sessionId: string,
+    completedTurnCount: number,
+  ) => void;
 
   // ---- projects ----
   createProject: (input: {
@@ -535,7 +542,9 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
           ? session?.selectedLlmIndex
           : undefined;
       const restoredLlmKey =
-        !consumePending && !isFreshSession ? session?.selectedLlmKey : undefined;
+        !consumePending && !isFreshSession
+          ? session?.selectedLlmKey
+          : undefined;
       // prefsStore is a leaf in the slice DAG (AD-09) — no cycle
       // concern with the cross-store static import block at the
       // top of this file.
@@ -928,6 +937,25 @@ export const useSessionsStore = create<SessionsStore>((set, get) => ({
     } catch (e) {
       console.debug("[sessions] set_session_llm invoke failed.", e);
     }
+  },
+
+  rewindSessionAfterUserEdit: (sessionId, completedTurnCount) => {
+    const now = new Date().toISOString();
+    set((state) => {
+      const { sessions, changed } = patchSessionInList(
+        state.sessions,
+        sessionId,
+        (s) => ({
+          ...s,
+          turnCount: Math.max(0, completedTurnCount),
+          summary: undefined,
+          lastActivityAt: now,
+          updatedAt: now,
+          hasUnread: false,
+        }),
+      );
+      return changed ? { sessions } : {};
+    });
   },
 
   // ---- projects ----

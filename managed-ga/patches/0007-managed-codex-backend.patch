@@ -11,7 +11,7 @@ index a6a899b..3a51e50 100644
 @@ -394,19 +394,69 @@ def _stream_with_retry(sess, url, headers, payload, parse_fn):
              err = f"\n\n[!!! 流异常中断 {type(e).__name__}: {e} !!!]" if streamed else f"!!!Error: {type(e).__name__}: {e}"
              yield err; return [{"type": "text", "text": err}]
-
+ 
 +def _codex_account_id_from_jwt(access_token):
 +    try:
 +        parts = str(access_token or '').split('.')
