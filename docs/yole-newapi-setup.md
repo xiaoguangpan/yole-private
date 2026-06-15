@@ -85,7 +85,7 @@ Current VPS pricing baseline:
   "CompletionRatio": {
     "deepseek-v4-pro": 1,
     "qwen3.7-plus": 1,
-    "gpt-5.5": 6,
+    "gpt-5.5": 5,
     "gpt-image-2": 1
   },
   "CacheRatio": {
@@ -98,9 +98,9 @@ Current VPS pricing baseline:
 ```
 
 Keep DeepSeek and fixed auxiliary models at a simple 1x ratio unless upstream
-cost changes require an operator decision. `gpt-5.5` is currently 5x input /
-6x completion so users can choose it explicitly and see the higher spend in
-their Yole points.
+cost changes require an operator decision. `gpt-5.5` is currently 5x for both
+input and completion so users can choose it explicitly and see the higher spend
+in their Yole points without another hidden multiplier.
 
 ## Admin Access Token
 
