@@ -78,6 +78,34 @@ pub struct YoleAccountStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct YolePointsLedger {
+    pub account: YoleAccountStatus,
+    pub page: i64,
+    pub page_size: i64,
+    pub total: i64,
+    pub items: Vec<YolePointsLedgerItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YolePointsLedgerItem {
+    pub id: String,
+    pub created_at: i64,
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub points_delta: Option<f64>,
+    pub status: String,
+    #[serde(default)]
+    pub request_id: Option<String>,
+    #[serde(default)]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct YoleAccountMetadata {
     support_id: String,
     user_id: i64,
@@ -187,6 +215,30 @@ struct ProvisionerAccountResponse {
     points_unit: Option<String>,
     low_balance: bool,
     contact: ProvisionerContactResponse,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct ProvisionerLedgerResponse {
+    account: ProvisionerAccountResponse,
+    page: i64,
+    page_size: i64,
+    total: i64,
+    items: Vec<ProvisionerLedgerItem>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct ProvisionerLedgerItem {
+    id: String,
+    created_at: i64,
+    #[serde(rename = "type")]
+    kind: String,
+    model: Option<String>,
+    points_delta: Option<f64>,
+    status: String,
+    request_id: Option<String>,
+    summary: Option<String>,
 }
 
 pub async fn ensure_trial_model<R: Runtime>(app: &AppHandle<R>) -> Result<YoleProvisioningResult> {
@@ -339,6 +391,23 @@ pub async fn stored_account_status_for_current_account() -> Result<Option<YoleAc
     stored_account_status(&yole).await
 }
 
+pub async fn get_points_ledger(page: i64, page_size: i64) -> Result<YolePointsLedger> {
+    let yole = SqliteYole::open().await?;
+    let Some(provisioner_url) = configured_provisioner_url(&yole).await? else {
+        return Err(YoleError::InvalidArgs {
+            message: "Yole provisioner is not configured".into(),
+        });
+    };
+    let account_token = credential_store::get_secret(&yole, ACCOUNT_TOKEN_REF)
+        .await
+        .map_err(|_| YoleError::InvalidArgs {
+            message: "Yole account token is not available".into(),
+        })?;
+    let response = account_ledger(&provisioner_url, &account_token, page, page_size).await?;
+    persist_account(&yole, &response.account).await?;
+    Ok(response.into_ledger())
+}
+
 async fn register(base_url: &str, request: RegisterRequest) -> Result<RegisterResponse> {
     let endpoint = register_endpoint(base_url)?;
     let client = reqwest::Client::builder()
@@ -404,6 +473,48 @@ async fn account_status(base_url: &str, account_token: &str) -> Result<Provision
     }
     serde_json::from_str::<ProvisionerAccountResponse>(&body).map_err(|e| YoleError::RunnerError {
         message: format!("Yole account status response is invalid JSON: {e}"),
+    })
+}
+
+async fn account_ledger(
+    base_url: &str,
+    account_token: &str,
+    page: i64,
+    page_size: i64,
+) -> Result<ProvisionerLedgerResponse> {
+    let endpoint = account_ledger_endpoint(base_url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| YoleError::Internal {
+            message: format!("building Yole provisioner HTTP client failed: {e}"),
+        })?;
+    let page = page.clamp(1, 100_000).to_string();
+    let page_size = page_size.clamp(1, 100).to_string();
+    let resp = client
+        .get(&endpoint)
+        .bearer_auth(account_token)
+        .query(&[("page", page.as_str()), ("page_size", page_size.as_str())])
+        .send()
+        .await
+        .map_err(|e| YoleError::RunnerError {
+            message: format!("Yole points ledger request failed: {e}"),
+        })?;
+    let status = resp.status();
+    let body = resp.text().await.map_err(|e| YoleError::RunnerError {
+        message: format!("reading Yole points ledger response failed: {e}"),
+    })?;
+    if !status.is_success() {
+        return Err(YoleError::RunnerError {
+            message: format!(
+                "Yole points ledger returned HTTP {}: {}",
+                status.as_u16(),
+                compact_body(&body)
+            ),
+        });
+    }
+    serde_json::from_str::<ProvisionerLedgerResponse>(&body).map_err(|e| YoleError::RunnerError {
+        message: format!("Yole points ledger response is invalid JSON: {e}"),
     })
 }
 
@@ -585,6 +696,20 @@ fn account_status_endpoint(base_url: &str) -> Result<String> {
     }
 }
 
+fn account_ledger_endpoint(base_url: &str) -> Result<String> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err(YoleError::InvalidArgs {
+            message: "Yole provisioner URL is empty".into(),
+        });
+    }
+    if trimmed.ends_with("/api/account/ledger") {
+        Ok(trimmed.to_string())
+    } else {
+        Ok(format!("{trimmed}/api/account/ledger"))
+    }
+}
+
 fn nonempty(value: String, field: &str) -> Result<String> {
     let value = value.trim().to_string();
     if value.is_empty() {
@@ -593,6 +718,37 @@ fn nonempty(value: String, field: &str) -> Result<String> {
         });
     }
     Ok(value)
+}
+
+impl ProvisionerLedgerResponse {
+    fn into_ledger(self) -> YolePointsLedger {
+        YolePointsLedger {
+            account: self.account.into_status(),
+            page: self.page,
+            page_size: self.page_size,
+            total: self.total,
+            items: self
+                .items
+                .into_iter()
+                .map(ProvisionerLedgerItem::into_item)
+                .collect(),
+        }
+    }
+}
+
+impl ProvisionerLedgerItem {
+    fn into_item(self) -> YolePointsLedgerItem {
+        YolePointsLedgerItem {
+            id: self.id,
+            created_at: self.created_at,
+            kind: self.kind,
+            model: normalize_optional(self.model),
+            points_delta: self.points_delta,
+            status: self.status,
+            request_id: normalize_optional(self.request_id),
+            summary: normalize_optional(self.summary),
+        }
+    }
 }
 
 impl ProvisionerContactResponse {
@@ -834,6 +990,22 @@ mod tests {
     }
 
     #[test]
+    fn account_ledger_endpoint_accepts_base_or_exact_endpoint() {
+        assert_eq!(
+            account_ledger_endpoint("https://provisioner.example").unwrap(),
+            "https://provisioner.example/api/account/ledger"
+        );
+        assert_eq!(
+            account_ledger_endpoint("https://provisioner.example/api/account/ledger").unwrap(),
+            "https://provisioner.example/api/account/ledger"
+        );
+        assert_eq!(
+            account_ledger_endpoint("https://provisioner.example/yole-provisioner").unwrap(),
+            "https://provisioner.example/yole-provisioner/api/account/ledger"
+        );
+    }
+
+    #[test]
     fn register_wire_format_matches_provisioner_api() {
         let request = RegisterRequest {
             install_id: "install-1".into(),
@@ -912,6 +1084,47 @@ mod tests {
             response.account.contact.wechat_id.as_deref(),
             Some("wx-test")
         );
+    }
+
+    #[test]
+    fn ledger_wire_format_matches_provisioner_api() {
+        let response: ProvisionerLedgerResponse = serde_json::from_str(
+            r#"{
+                "account":{
+                    "support_id":"yole-42",
+                    "user_id":42,
+                    "username":"yole_abcd",
+                    "balance_usd":28.75,
+                    "quota_points":14375000,
+                    "balance_points":2875,
+                    "initial_grant_points":3000,
+                    "low_balance_points":300,
+                    "points_unit":"绉垎",
+                    "low_balance":false,
+                    "contact":{}
+                },
+                "page":1,
+                "page_size":20,
+                "total":1,
+                "items":[{
+                    "id":"101",
+                    "created_at":1710000000,
+                    "type":"consume",
+                    "model":"gpt-5.5",
+                    "points_delta":-125,
+                    "status":"success",
+                    "request_id":"req_1",
+                    "summary":"consume"
+                }]
+            }"#,
+        )
+        .unwrap();
+        let ledger = response.into_ledger();
+        assert_eq!(ledger.account.balance_points, 2875.0);
+        assert_eq!(ledger.total, 1);
+        assert_eq!(ledger.items[0].kind, "consume");
+        assert_eq!(ledger.items[0].points_delta, Some(-125.0));
+        assert_eq!(ledger.items[0].request_id.as_deref(), Some("req_1"));
     }
 
     #[test]

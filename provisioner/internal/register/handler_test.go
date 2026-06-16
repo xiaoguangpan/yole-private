@@ -21,6 +21,7 @@ type fakeNewAPI struct {
 	provisionCount int
 	provisionReq   newapi.ProvisionAccountRequest
 	user           newapi.UserRecord
+	logs           newapi.LogPage
 }
 
 func (f *fakeNewAPI) ProvisionAccount(_ context.Context, req newapi.ProvisionAccountRequest) (newapi.ProvisionedAccount, error) {
@@ -54,6 +55,24 @@ func (f *fakeNewAPI) GetUser(_ context.Context, userID int) (newapi.UserRecord, 
 		f.user = newapi.UserRecord{ID: userID, Username: "yole_test", Quota: newapi.QuotaFromUSD(30)}
 	}
 	return f.user, nil
+}
+
+func (f *fakeNewAPI) GetUserLogsByUsername(_ context.Context, username string, page int, pageSize int) (newapi.LogPage, error) {
+	if f.logs.Page == 0 {
+		f.logs.Page = page
+	}
+	if f.logs.PageSize == 0 {
+		f.logs.PageSize = pageSize
+	}
+	if f.logs.Total == 0 {
+		f.logs.Total = len(f.logs.Items)
+	}
+	for i := range f.logs.Items {
+		if f.logs.Items[i].Username == "" {
+			f.logs.Items[i].Username = username
+		}
+	}
+	return f.logs, nil
 }
 
 func newTestHandler(t *testing.T, limiter ratelimit.Limiter) (*Handler, *fakeNewAPI) {
@@ -372,6 +391,79 @@ func TestAccountStatusRequiresAccountToken(t *testing.T) {
 	handler.accountStatus(rr, httptest.NewRequest(http.MethodGet, "/api/account/status", nil))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestAccountLedgerRequiresAccountToken(t *testing.T) {
+	handler, _ := newTestHandler(t, ratelimit.NewMemoryLimiter(10, 10))
+
+	rr := httptest.NewRecorder()
+	handler.accountLedger(rr, httptest.NewRequest(http.MethodGet, "/api/account/ledger", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestAccountLedgerReturnsCroppedPointRecords(t *testing.T) {
+	handler, api := newTestHandler(t, ratelimit.NewMemoryLimiter(10, 10))
+	body := bytes.NewBufferString(`{"install_id":"install-1"}`)
+	registerResp := httptest.NewRecorder()
+	handler.register(registerResp, httptest.NewRequest(http.MethodPost, "/api/register", body))
+	if registerResp.Code != http.StatusOK {
+		t.Fatalf("expected register to pass, got %d", registerResp.Code)
+	}
+	var registered RegisterResponse
+	if err := json.Unmarshal(registerResp.Body.Bytes(), &registered); err != nil {
+		t.Fatal(err)
+	}
+	api.logs = newapi.LogPage{
+		Page:     1,
+		PageSize: 2,
+		Total:    2,
+		Items: []newapi.LogRecord{
+			{
+				ID:        101,
+				CreatedAt: 1710000000,
+				Type:      2,
+				ModelName: "gpt-5.5",
+				Quota:     newapi.QuotaFromUSD(1.25),
+				RequestID: "req_1",
+				Content:   "consume",
+			},
+			{
+				ID:        102,
+				CreatedAt: 1710000100,
+				Type:      6,
+				ModelName: "gpt-5.5",
+				Quota:     newapi.QuotaFromUSD(0.5),
+				RequestID: "req_2",
+				Content:   "refund",
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/account/ledger?page=1&page_size=2", nil)
+	req.Header.Set("Authorization", "Bearer "+registered.Account.AccountToken)
+	rr := httptest.NewRecorder()
+	handler.accountLedger(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ledger LedgerResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &ledger); err != nil {
+		t.Fatal(err)
+	}
+	if ledger.Account.AccountToken == "" || ledger.Total != 2 || len(ledger.Items) != 2 {
+		t.Fatalf("unexpected ledger response: %+v", ledger)
+	}
+	if ledger.Items[0].Type != "consume" || ledger.Items[0].PointsDelta == nil || *ledger.Items[0].PointsDelta != -125 {
+		t.Fatalf("expected first item to be -125 consume points, got %+v", ledger.Items[0])
+	}
+	if ledger.Items[1].Type != "refund" || ledger.Items[1].PointsDelta == nil || *ledger.Items[1].PointsDelta != 50 {
+		t.Fatalf("expected second item to be +50 refund points, got %+v", ledger.Items[1])
+	}
+	if ledger.Items[0].RequestID != "req_1" || ledger.Items[0].Status != "success" {
+		t.Fatalf("unexpected first item metadata: %+v", ledger.Items[0])
 	}
 }
 

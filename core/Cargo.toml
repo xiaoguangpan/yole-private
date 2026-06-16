@@ -10,7 +10,7 @@ members = [".", "../cli"]
 
 [package]
 name = "yole-core"
-version = "0.0.8"
+version = "0.0.9"
 description = "Yole Desktop Core"
 authors = ["Yole"]
 edition = "2021"
@@ -93,6 +93,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "pr
 anyhow = { version = "1", optional = true }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
 
 # Unsigned beta managed model API keys live in Yole's SQLite DB as
 # encrypted local payloads. Signed builds can add a system credential-store

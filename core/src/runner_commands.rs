@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::broadcast::error::RecvError;
 
 /// JSON-friendly mirror of [`SpawnArgs`]. The TS side sends camelCase keys
@@ -310,6 +310,14 @@ pub(crate) async fn prepare_managed_runtime_context(
         ),
         ("YOLE_MANAGED_MODEL_CONFIG_JSON".into(), runtime_config),
     ];
+    let mut env = env;
+    if let Some(officecli_path) = officecli_path_for_app(app) {
+        env.push((
+            "YOLE_OFFICECLI_PATH".into(),
+            officecli_path.to_string_lossy().into_owned(),
+        ));
+        env.push(("OFFICECLI_SKIP_UPDATE".into(), "1".into()));
+    }
 
     Ok(ManagedRuntimeProcessContext {
         diagnostics,
@@ -317,6 +325,24 @@ pub(crate) async fn prepare_managed_runtime_context(
         env,
         requested_model_index,
     })
+}
+
+fn officecli_path_for_app(app: &AppHandle) -> Option<PathBuf> {
+    let name = if cfg!(target_os = "windows") {
+        "officecli.exe"
+    } else {
+        "officecli"
+    };
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let candidate = resource_dir.join("officecli").join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let repo_candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("officecli")
+        .join(name);
+    repo_candidate.is_file().then_some(repo_candidate)
 }
 
 pub(crate) async fn prepare_managed_spawn_args(

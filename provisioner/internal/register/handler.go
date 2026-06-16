@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 type NewAPIClient interface {
 	ProvisionAccount(ctx context.Context, req newapi.ProvisionAccountRequest) (newapi.ProvisionedAccount, error)
 	GetUser(ctx context.Context, userID int) (newapi.UserRecord, error)
+	GetUserLogsByUsername(ctx context.Context, username string, page int, pageSize int) (newapi.LogPage, error)
 }
 
 type AccountStore interface {
@@ -144,6 +146,25 @@ type ContactResponse struct {
 	TopUpMessage string `json:"top_up_message,omitempty"`
 }
 
+type LedgerResponse struct {
+	Account  AccountResponse `json:"account"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+	Total    int             `json:"total"`
+	Items    []LedgerItem    `json:"items"`
+}
+
+type LedgerItem struct {
+	ID          string   `json:"id"`
+	CreatedAt   int64    `json:"created_at"`
+	Type        string   `json:"type"`
+	Model       string   `json:"model,omitempty"`
+	PointsDelta *float64 `json:"points_delta,omitempty"`
+	Status      string   `json:"status"`
+	RequestID   string   `json:"request_id,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+}
+
 type RouteResponse struct {
 	SchemaVersion   uint32                   `json:"schema_version"`
 	RouteVersion    string                   `json:"route_version"`
@@ -187,6 +208,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", h.health)
 	mux.HandleFunc("POST /api/register", h.register)
 	mux.HandleFunc("GET /api/account/status", h.accountStatus)
+	mux.HandleFunc("GET /api/account/ledger", h.accountLedger)
 	mux.HandleFunc("GET /api/runtime/route", h.runtimeRoute)
 	mux.HandleFunc("GET /assets/contact/wechat-qr", h.wechatQR)
 }
@@ -352,6 +374,57 @@ func (h *Handler) accountStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) accountLedger(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if h.newAPI == nil || h.store == nil {
+		writeError(w, http.StatusInternalServerError, "account_not_configured")
+		return
+	}
+	token := bearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		token = strings.TrimSpace(r.URL.Query().Get("account_token"))
+	}
+	if token == "" {
+		writeError(w, http.StatusUnauthorized, "account_token_required")
+		return
+	}
+	rec, ok := h.store.GetByAccountToken(token)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "account_token_invalid")
+		return
+	}
+	rec = h.refreshRecordFromNewAPI(r.Context(), rec)
+	username := strings.TrimSpace(rec.Username)
+	if username == "" {
+		writeError(w, http.StatusBadGateway, "account_username_missing")
+		return
+	}
+	page := boundedIntQuery(r, "page", 1, 1, 100000)
+	pageSize := boundedIntQuery(r, "page_size", 20, 1, 100)
+	logs, err := h.newAPI.GetUserLogsByUsername(r.Context(), username, page, pageSize)
+	if err != nil {
+		log.Printf("account ledger failed user=%d username=%s: %v", rec.UserID, username, err)
+		writeError(w, http.StatusBadGateway, "account_ledger_failed")
+		return
+	}
+	account, err := h.accountResponse(r, rec, true)
+	if err != nil {
+		log.Printf("account ledger status failed user=%d: %v", rec.UserID, err)
+		writeError(w, http.StatusBadGateway, "account_status_failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, LedgerResponse{
+		Account:  account,
+		Page:     nonzeroInt(logs.Page, page),
+		PageSize: nonzeroInt(logs.PageSize, pageSize),
+		Total:    logs.Total,
+		Items:    h.ledgerItems(logs.Items),
+	})
 }
 
 func (h *Handler) runtimeRoute(w http.ResponseWriter, r *http.Request) {
@@ -534,6 +607,70 @@ func (h *Handler) contactResponse(r *http.Request) ContactResponse {
 	}
 }
 
+func (h *Handler) ledgerItems(logs []newapi.LogRecord) []LedgerItem {
+	items := make([]LedgerItem, 0, len(logs))
+	for _, logRecord := range logs {
+		items = append(items, h.ledgerItem(logRecord))
+	}
+	return items
+}
+
+func (h *Handler) ledgerItem(logRecord newapi.LogRecord) LedgerItem {
+	requestID := strings.TrimSpace(logRecord.RequestID)
+	if requestID == "" {
+		requestID = strings.TrimSpace(logRecord.UpstreamRequestID)
+	}
+	return LedgerItem{
+		ID:          strconv.Itoa(logRecord.ID),
+		CreatedAt:   logRecord.CreatedAt,
+		Type:        ledgerType(logRecord.Type),
+		Model:       strings.TrimSpace(logRecord.ModelName),
+		PointsDelta: h.ledgerPointsDelta(logRecord),
+		Status:      ledgerStatus(logRecord.Type),
+		RequestID:   requestID,
+		Summary:     strings.TrimSpace(logRecord.Content),
+	}
+}
+
+func (h *Handler) ledgerPointsDelta(logRecord newapi.LogRecord) *float64 {
+	if logRecord.Quota == 0 {
+		return nil
+	}
+	points := h.pointsFromUSD(newapi.USDFromQuota(absInt(logRecord.Quota)))
+	if logRecord.Type == 2 {
+		points = -points
+	}
+	return &points
+}
+
+func ledgerType(logType int) string {
+	switch logType {
+	case 1:
+		return "topup"
+	case 2:
+		return "consume"
+	case 3:
+		return "manage"
+	case 4:
+		return "system"
+	case 5:
+		return "error"
+	case 6:
+		return "refund"
+	case 7:
+		return "login"
+	default:
+		return "unknown"
+	}
+}
+
+func ledgerStatus(logType int) string {
+	if logType == 5 {
+		return "error"
+	}
+	return "success"
+}
+
 func (h *Handler) absoluteURL(r *http.Request, path string) string {
 	if h.publicServerBase != "" {
 		return h.publicServerBase + path
@@ -552,6 +689,34 @@ func (h *Handler) absoluteURL(r *http.Request, path string) string {
 		}
 	}
 	return scheme + "://" + r.Host + prefix + path
+}
+
+func boundedIntQuery(r *http.Request, key string, fallback int, min int, max int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get(key)))
+	if err != nil {
+		return fallback
+	}
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func nonzeroInt(value int, fallback int) int {
+	if value == 0 {
+		return fallback
+	}
+	return value
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func (h *Handler) refreshRecordFromNewAPI(ctx context.Context, rec accountstore.Record) accountstore.Record {

@@ -1,5 +1,6 @@
 export type SettingsTab =
   | "runtime"
+  | "points"
   | "models"
   | "approval"
   | "integration"

@@ -1,4 +1,4 @@
-import sys, os, re, json, time, threading, importlib, base64, uuid, requests
+import sys, os, re, json, time, threading, importlib, base64, uuid, requests, mimetypes
 from datetime import datetime
 from pathlib import Path
 import tempfile, traceback, subprocess, itertools, collections, difflib, shutil
@@ -9,7 +9,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from agent_loop import BaseHandler, StepOutcome, json_default
 script_dir = os.path.dirname(os.path.abspath(__file__))
 state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
-YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
+YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.9 (managed-ga)")
+YOLE_OFFICECLI_ALLOWED = {
+    "create", "view", "get", "query", "set", "add", "remove", "move",
+    "swap", "validate", "batch", "dump", "merge", "refresh", "raw",
+    "raw-set", "add-part", "open", "close",
+}
+YOLE_OFFICECLI_FORMATS = {"docx", "xlsx", "pptx"}
+YOLE_OFFICECLI_BLOCKED = {"install", "mcp", "config", "plugins", "watch", "unwatch", "load_skill"}
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):
@@ -21,6 +28,61 @@ def auto_make_url(api_base, path):
     if base.endswith("/v1"):
         return f"{base}/{path}"
     return f"{base}/v1/{path}"
+
+def _coerce_image_path_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        out = []
+        for item in value:
+            out.extend(_coerce_image_path_list(item))
+        return out
+    raw = str(value).strip()
+    return [raw] if raw else []
+
+def _image_input_paths(args, current_images):
+    candidates = []
+    for key in ("image", "images", "image_path", "image_paths", "input_image", "input_images", "input_image_path", "input_image_paths"):
+        candidates.extend(_coerce_image_path_list(args.get(key)))
+    candidates.extend(_coerce_image_path_list(current_images))
+    out = []
+    seen = set()
+    for path in candidates:
+        if path in seen or not os.path.isfile(path):
+            continue
+        seen.add(path)
+        out.append(path)
+    return out
+
+def _post_image_edit(url, headers, image_paths, args, model, prompt, n, size, quality):
+    file_handles = []
+    files = []
+    try:
+        for image_path in image_paths:
+            fh = open(image_path, "rb")
+            file_handles.append(fh)
+            mime = mimetypes.guess_type(image_path)[0] or "image/png"
+            files.append(("image", (os.path.basename(image_path), fh, mime)))
+        mask_path = str(args.get("mask") or args.get("mask_path") or "").strip()
+        if mask_path and os.path.isfile(mask_path):
+            fh = open(mask_path, "rb")
+            file_handles.append(fh)
+            mime = mimetypes.guess_type(mask_path)[0] or "image/png"
+            files.append(("mask", (os.path.basename(mask_path), fh, mime)))
+        payload = {"model": model, "prompt": prompt, "n": str(n), "size": size}
+        if quality:
+            payload["quality"] = quality
+        resp = requests.post(url, headers=headers, data=payload, files=files, timeout=(30, 300))
+        if resp.status_code >= 400:
+            body = resp.text.strip()[:500]
+            raise RuntimeError(f"HTTP {resp.status_code}: {body}")
+        return resp.json()
+    finally:
+        for fh in file_handles:
+            try:
+                fh.close()
+            except Exception:
+                pass
 
 def safe_print(*args, **kwargs):
     try: print(*args, **kwargs)
@@ -370,20 +432,27 @@ class GenericAgentHandler(BaseHandler):
         api_base = getattr(backend, "api_base", "")
         if not api_key or not api_base:
             return StepOutcome("[Error] missing API credentials for image generation.", next_prompt="\n")
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": YOLE_HTTP_USER_AGENT}
-        payload = {"model": model, "prompt": prompt, "n": n, "size": size}
-        if quality:
-            payload["quality"] = quality
-        url = auto_make_url(api_base, "images/generations")
-        yield f"[Action] Generating image with {model} ({size})\n"
+        input_images = _image_input_paths(args, getattr(self.parent, "current_images", []))
+        is_edit = bool(input_images)
+        url = auto_make_url(api_base, "images/edits" if is_edit else "images/generations")
+        headers = {"Authorization": f"Bearer {api_key}", "User-Agent": YOLE_HTTP_USER_AGENT}
+        yield f"[Action] {'Editing' if is_edit else 'Generating'} image with {model} ({size})\n"
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=(30, 300))
-            if resp.status_code >= 400:
-                body = resp.text.strip()[:500]
-                return StepOutcome(f"[Error] Image generation HTTP {resp.status_code}: {body}", next_prompt="\n")
-            data = resp.json()
+            if is_edit:
+                data = _post_image_edit(url, headers, input_images, args, model, prompt, n, size, quality)
+            else:
+                payload = {"model": model, "prompt": prompt, "n": n, "size": size}
+                if quality:
+                    payload["quality"] = quality
+                json_headers = {**headers, "Content-Type": "application/json"}
+                resp = requests.post(url, headers=json_headers, json=payload, timeout=(30, 300))
+                if resp.status_code >= 400:
+                    body = resp.text.strip()[:500]
+                    return StepOutcome(f"[Error] Image generation HTTP {resp.status_code}: {body}", next_prompt="\n")
+                data = resp.json()
         except Exception as e:
-            return StepOutcome(f"[Error] Image generation failed: {e}", next_prompt="\n")
+            action = "editing" if is_edit else "generation"
+            return StepOutcome(f"[Error] Image {action} failed: {e}", next_prompt="\n")
         out_dir = state_path("temp", "generated_images")
         os.makedirs(out_dir, exist_ok=True)
         saved = []
@@ -416,6 +485,81 @@ class GenericAgentHandler(BaseHandler):
             else:
                 lines.append(f"![generated image]({path})\n\n`{path}`")
         return StepOutcome("\n\n".join(lines), next_prompt="\n")
+
+    def do_yole_office_cli(self, args, response):
+        officecli = os.environ.get("YOLE_OFFICECLI_PATH", "").strip()
+        if not officecli or not os.path.isfile(officecli):
+            return StepOutcome(
+                {"status": "error", "msg": "Yole OfficeCLI runtime is not available."},
+                next_prompt="\n",
+            )
+        cli_args = args.get("args", [])
+        if isinstance(cli_args, str):
+            return StepOutcome(
+                {"status": "error", "msg": "args must be an array, not a shell string."},
+                next_prompt="\n",
+            )
+        if not isinstance(cli_args, (list, tuple)) or not cli_args:
+            return StepOutcome(
+                {"status": "error", "msg": "args must be a non-empty array."},
+                next_prompt="\n",
+            )
+        cli_args = [str(item) for item in cli_args]
+        block_reason = self._officecli_block_reason(cli_args)
+        if block_reason:
+            yield f"[Yole Office] Blocked OfficeCLI command: {block_reason}\n"
+            return StepOutcome({"status": "blocked", "msg": block_reason}, next_prompt="\n")
+        cwd = self._get_abs_path(args.get("cwd") or self.cwd)
+        timeout = int(args.get("timeout") or 120)
+        timeout = max(5, min(timeout, 600))
+        yield f"[Yole Office] officecli {' '.join(cli_args[:5])}\n"
+        env = os.environ.copy()
+        env["OFFICECLI_SKIP_UPDATE"] = "1"
+        try:
+            proc = subprocess.run(
+                [officecli] + cli_args,
+                cwd=cwd,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout,
+                stdin=subprocess.DEVNULL,
+            )
+        except subprocess.TimeoutExpired:
+            return StepOutcome(
+                {"status": "error", "msg": f"OfficeCLI timed out after {timeout}s"},
+                next_prompt="\n",
+            )
+        except Exception as e:
+            return StepOutcome({"status": "error", "msg": str(e)}, next_prompt="\n")
+        result = {
+            "status": "success" if proc.returncode == 0 else "error",
+            "exit_code": proc.returncode,
+            "stdout": smart_format(proc.stdout or "", max_str_len=12000),
+            "stderr": smart_format(proc.stderr or "", max_str_len=4000),
+        }
+        next_prompt = self._get_anchor_prompt(skip=args.get('_index', 0) > 0)
+        return StepOutcome(result, next_prompt=next_prompt)
+
+    def _officecli_block_reason(self, cli_args):
+        lower = [str(item).strip().lower() for item in cli_args if str(item).strip()]
+        if not lower:
+            return "empty OfficeCLI command"
+        command = lower[0]
+        if command in YOLE_OFFICECLI_BLOCKED:
+            return f"{command} is not available inside Yole"
+        if command in YOLE_OFFICECLI_ALLOWED:
+            return None
+        if command in YOLE_OFFICECLI_FORMATS and len(lower) >= 2:
+            nested = lower[1]
+            if nested in YOLE_OFFICECLI_BLOCKED:
+                return f"{nested} is not available inside Yole"
+            if nested in YOLE_OFFICECLI_ALLOWED:
+                return None
+        return f"unsupported OfficeCLI command: {command}"
 
     def do_web_scan(self, args, response):
         '''获取当前页面内容和标签页列表。也可用于切换标签页。

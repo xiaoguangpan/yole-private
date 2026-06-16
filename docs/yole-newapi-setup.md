@@ -162,6 +162,9 @@ points:
   per_usd: 100
   unit: "积分"
 
+# Compatibility-only response for older Yole clients. Current 0.0.9 clients use
+# explicit user model selection and do not refresh hidden model routes before
+# each request.
 model_routing:
   version: "2026-06-15.1"
   default_profile: "yole_standard"

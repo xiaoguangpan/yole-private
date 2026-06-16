@@ -54,13 +54,23 @@
   }},
   {"type": "function", "function": {
     "name": "yole_image_generate",
-    "description": "Generate real raster images with Yole's configured image model. Use when the user asks to create images, visual assets, product/ecommerce images, website illustrations, posters, logos drafts, or when a website/app task needs original imagery instead of local placeholder drawing",
+    "description": "Generate or edit real raster images with Yole's configured image model. Use when the user asks to create images, edit an attached image, create visual assets, product/ecommerce images, website illustrations, posters, logos drafts, or when a website/app task needs original imagery instead of local placeholder drawing. If the current user message includes an image and asks to change or restyle it, call this tool with the edit prompt; Yole will pass the attached image to the image editing endpoint.",
     "parameters": {"type": "object", "properties": {
       "prompt": {"type": "string", "description": "Detailed image prompt. Include subject, style, composition, colors, text constraints, and intended use"},
       "size": {"type": "string", "enum": ["1024x1024", "1024x1536", "1536x1024"], "description": "Image size", "default": "1024x1024"},
       "quality": {"type": "string", "description": "Optional provider quality value"},
       "n": {"type": "integer", "description": "Number of images, 1-4", "default": 1},
+      "input_image_paths": {"type": "array", "items": {"type": "string"}, "description": "Optional local input image paths for image editing. Usually omit this; Yole automatically uses images attached to the current user message."},
+      "mask_path": {"type": "string", "description": "Optional local mask image path for image editing"},
       "model": {"type": "string", "description": "Optional image model override; default is configured by Yole"}}}
+  }},
+  {"type": "function", "function": {
+    "name": "yole_office_cli",
+    "description": "Run Yole's bundled OfficeCLI for Office documents. Use for Word, Excel, and PowerPoint work: create, view text/outline/html/screenshot/issues, get/query structure, set/add/remove/move/swap elements, validate, batch, dump, merge, refresh, raw/raw-set, open/close resident sessions. Do not use install, mcp, config, plugins, or watch; Yole blocks commands that write global state or start unmanaged servers.",
+    "parameters": {"type": "object", "properties": {
+      "args": {"type": "array", "items": {"type": "string"}, "description": "OfficeCLI arguments without the executable name, for example ['view','report.docx','text','--json'] or ['add','deck.pptx','/','--type','slide','--prop','title=Hello']"},
+      "cwd": {"type": "string", "description": "Optional working directory; defaults to the session cwd"},
+      "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 120}}}
   }},
   {"type": "function", "function": {
     "name": "update_working_checkpoint",

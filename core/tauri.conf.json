@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Yole",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "identifier": "app.yole",
   "build": {
-    "beforeDevCommand": "node scripts/prepare-cli-sidecar.mjs --profile debug && pnpm --dir gui dev",
+    "beforeDevCommand": "node scripts/prepare-cli-sidecar.mjs --profile debug && node scripts/prepare-officecli.mjs && pnpm --dir gui dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "node scripts/prepare-cli-sidecar.mjs && pnpm --dir gui build",
+    "beforeBuildCommand": "node scripts/prepare-cli-sidecar.mjs && node scripts/prepare-officecli.mjs && pnpm --dir gui build",
     "frontendDist": "../gui/dist"
   },
   "app": {
@@ -65,6 +65,7 @@
     "resources": {
       "../runner": "runner",
       "../managed-ga": "managed-ga",
+      "officecli": "officecli",
       "python-bundle/python": "python"
     },
     "externalBin": ["target/tauri-sidecars/yole"],

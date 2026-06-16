@@ -1106,6 +1106,7 @@ function App() {
             onRefreshYoleAccount={() => {
               void refreshYoleAccount();
             }}
+            onOpenPointsLedger={() => openSettings("points")}
             conversationWidth={conversationWidth}
             onToggleConversationWidth={() => {
               void setConversationWidth(
@@ -1775,9 +1776,12 @@ function normalizeSettingsTab(
 ): SettingsTab {
   if (
     simplifiedUi &&
-    (tab === "models" || tab === "integration" || tab === "shortcuts")
+    (tab === "runtime" ||
+      tab === "models" ||
+      tab === "integration" ||
+      tab === "shortcuts")
   ) {
-    return "runtime";
+    return "points";
   }
   return tab;
 }

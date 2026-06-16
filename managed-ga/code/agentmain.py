@@ -83,6 +83,7 @@ class GenericAgent:
         self.inc_out = False; self.verbose = True; self.show_mode = 'text'
         self.peer_hint = True
         self.force_non_stream = False
+        self.current_images = []
         logid = f'{(time.time_ns() + random.randrange(1_000_000)) % 1_000_000:06d}'
         self.log_path = state_path('temp', 'model_responses', f'model_responses_{logid}.txt')
         self.load_llm_sessions()
@@ -163,8 +164,10 @@ class GenericAgent:
             if isinstance(task, str): break
             raw_query, source, display_queue = task["query"], task["source"], task["output"]
             images = task.get("images") or []
+            self.current_images = images
             raw_query = self._handle_slash_cmd(raw_query, display_queue)
             if raw_query is None:
+                self.current_images = []
                 self.task_queue.task_done(); continue
             self.is_running = True
             initial_user_content = build_user_content(raw_query, images)
@@ -218,6 +221,7 @@ class GenericAgent:
             finally:
                 if self.stop_sig: print('User aborted the task.')
                 self.is_running = self.stop_sig = False
+                self.current_images = []
                 self.task_queue.task_done()
                 if self.handler is not None: self.handler.code_stop_signal.append(1)
 

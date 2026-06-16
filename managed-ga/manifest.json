@@ -16,7 +16,8 @@
       "0005-code-run-noninteractive-stdin.patch",
       "0006-managed-browser-control-recovery.patch",
       "0007-managed-codex-backend.patch",
-      "0008-yole-multimodal-routing-and-image-tools.patch"
+      "0008-yole-multimodal-routing-and-image-tools.patch",
+      "0009-yole-image-edit-and-officecli.patch"
     ]
   },
   "stateSchemaVersion": 1

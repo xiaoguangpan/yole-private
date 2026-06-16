@@ -142,6 +142,25 @@ export interface YoleAccountStatus {
   contact: YoleContactInfo;
 }
 
+export interface YolePointsLedgerItem {
+  id: string;
+  createdAt: number;
+  type: string;
+  model?: string | null;
+  pointsDelta?: number | null;
+  status: string;
+  requestId?: string | null;
+  summary?: string | null;
+}
+
+export interface YolePointsLedger {
+  account: YoleAccountStatus;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: YolePointsLedgerItem[];
+}
+
 export async function ensureYoleTrialModel(): Promise<YoleProvisioningResult> {
   return invoke<YoleProvisioningResult>("ensure_yole_trial_model");
 }
@@ -154,6 +173,16 @@ export async function getYoleAccountStatus(
 
 export async function getStoredYoleAccountStatus(): Promise<YoleAccountStatus | null> {
   return invoke<YoleAccountStatus | null>("get_stored_yole_account_status");
+}
+
+export async function getYolePointsLedger(
+  page: number,
+  pageSize: number,
+): Promise<YolePointsLedger> {
+  return invoke<YolePointsLedger>("get_yole_points_ledger", {
+    page,
+    pageSize,
+  });
 }
 
 export function normalizeTelegramUsername(value?: string | null): string {

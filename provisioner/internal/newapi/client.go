@@ -124,6 +124,31 @@ type TokenRecord struct {
 	Group              string `json:"group"`
 }
 
+type LogRecord struct {
+	ID                int    `json:"id"`
+	UserID            int    `json:"user_id"`
+	CreatedAt         int64  `json:"created_at"`
+	Type              int    `json:"type"`
+	Content           string `json:"content"`
+	Username          string `json:"username"`
+	TokenName         string `json:"token_name"`
+	ModelName         string `json:"model_name"`
+	Quota             int    `json:"quota"`
+	PromptTokens      int    `json:"prompt_tokens"`
+	CompletionTokens  int    `json:"completion_tokens"`
+	UseTime           int    `json:"use_time"`
+	IsStream          bool   `json:"is_stream"`
+	RequestID         string `json:"request_id"`
+	UpstreamRequestID string `json:"upstream_request_id"`
+}
+
+type LogPage struct {
+	Page     int
+	PageSize int
+	Total    int
+	Items    []LogRecord
+}
+
 type pageData[T any] struct {
 	Page     int `json:"page"`
 	PageSize int `json:"page_size"`
@@ -348,6 +373,40 @@ func (c *Client) GetTokenKeyForSession(ctx context.Context, session UserSession,
 		return "", errors.New("newapi returned empty token key")
 	}
 	return resp.Data.Key, nil
+}
+
+func (c *Client) GetUserLogsByUsername(ctx context.Context, username string, page int, pageSize int) (LogPage, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return LogPage{}, errors.New("username is required")
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	query := url.Values{}
+	query.Set("username", username)
+	query.Set("p", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+
+	var resp apiResponse[pageData[LogRecord]]
+	if err := c.doJSON(ctx, http.MethodGet, "/api/log/", query, nil, &resp); err != nil {
+		return LogPage{}, err
+	}
+	if !resp.Success {
+		return LogPage{}, fmt.Errorf("newapi user logs failed: %s", emptyMessage(resp.Message))
+	}
+	return LogPage{
+		Page:     resp.Data.Page,
+		PageSize: resp.Data.PageSize,
+		Total:    resp.Data.Total,
+		Items:    resp.Data.Items,
+	}, nil
 }
 
 func (c *Client) CreateUser(ctx context.Context, user UserCreateRequest) error {

@@ -11,6 +11,7 @@ the GA installation path on sys.path before importing this module.
 from __future__ import annotations
 
 import inspect
+import re
 from collections.abc import Callable, Generator
 from typing import Any
 
@@ -83,11 +84,53 @@ APPROVAL_REASONS: dict[str, str] = {
     "start_long_term_update": "Updates GA's long-term memory files.",
 }
 
+_DISASTER_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)(?:sudo\s+)?rm\s+-[^\n;&|]*r[^\n;&|]*f[^\n;&|]*\s+(?:--no-preserve-root\s+)?(?:/|/\*|['\"]/{1}['\"])(?:\s|$|[;&|])"
+    ),
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)remove-item\b(?=[^\n;&|]*-recurse\b)(?=[^\n;&|]*-force\b)[^\n;&|]*(?:\bc:\\(?:\s|$|[;&|])|\$env:systemdrive\\(?:\s|$|[;&|]))"
+    ),
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)del\b(?=[^\n;&|]*(?:/s|-s)\b)(?=[^\n;&|]*(?:/q|-q)\b)[^\n;&|]*\bc:\\(?:\s|$|[;&|])"
+    ),
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)format\b[^\n;&|]*\bc:\s*(?:/|$|[;&|])"
+    ),
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)mkfs(?:\.[a-z0-9_+-]+)?\b[^\n;&|]*/dev/(?:sd[a-z]|nvme\d+n\d+|vd[a-z])(?:\s|$|[;&|])"
+    ),
+    re.compile(
+        r"(?is)(?:^|[;&|]\s*)dd\b(?=[^\n;&|]*\bof=/dev/(?:sd[a-z]|nvme\d+n\d+|vd[a-z])\b)(?=[^\n;&|]*(?:if=/dev/zero|if=/dev/random|if=/dev/urandom))"
+    ),
+)
+
 
 # Approval callable signature. Bridge entrypoint constructs this and injects it.
 # It must block until the desktop responds. Decision strings:
 #   "allow_once" | "deny" | "always_allow_project" | "always_allow_global"
 ApprovalRequester = Callable[[str, dict[str, Any]], str]
+
+
+def disaster_command_reason(tool_name: str, args: dict[str, Any]) -> str | None:
+    if tool_name != "code_run":
+        return None
+    command = _extract_command_text(args)
+    if not command:
+        return None
+    compact = " ".join(command.strip().split())
+    for pattern in _DISASTER_PATTERNS:
+        if pattern.search(command):
+            return f"Blocked disaster-level command: {compact[:240]}"
+    return None
+
+
+def _extract_command_text(args: dict[str, Any]) -> str:
+    for key in ("command", "cmd", "script", "code"):
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
 
 
 class YoleHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no stubs
@@ -231,6 +274,13 @@ class YoleHandler(GenericAgentHandler):  # type: ignore[misc]  # GA has no stubs
         # only takes 4 positional args, so we feature-detect and drop
         # the kwarg when unsupported. See module-level
         # _BASE_DISPATCH_SUPPORTS_TOOL_NUM for rationale.
+        disaster_reason = disaster_command_reason(tool_name, args)
+        if disaster_reason is not None:
+            yield f"[Yole Safety] {disaster_reason}\n"
+            return StepOutcome(
+                {"status": "blocked", "msg": disaster_reason},
+                next_prompt="\n",
+            )
         if self.needs_approval(tool_name):
             # Defensive copy: super().dispatch mutates args (adds _index,
             # and _tool_num on newer GA). Approval Cards in the desktop

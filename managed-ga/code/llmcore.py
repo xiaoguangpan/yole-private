@@ -2,7 +2,7 @@ import os, json, re, time, requests, sys, threading, urllib3, base64, importlib,
 from datetime import datetime
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 _RESP_CACHE_KEY = str(uuid.uuid4())
-_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
+_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.9 (managed-ga)")
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path: sys.path.append(_ROOT)
 

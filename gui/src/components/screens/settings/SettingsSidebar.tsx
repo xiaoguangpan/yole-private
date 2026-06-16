@@ -1,5 +1,6 @@
 import {
   ChatCircleText,
+  Coins,
   Cpu,
   Info,
   Keyboard,
@@ -31,6 +32,7 @@ export function SettingsSidebar({
   resolvedTheme,
   onChangeThemePreference,
   showImTab,
+  hideRuntimeTab = false,
   simplifiedUi = false,
 }: {
   tab: SettingsTab;
@@ -42,6 +44,7 @@ export function SettingsSidebar({
   resolvedTheme: ResolvedTheme;
   onChangeThemePreference: (preference: ThemePreference) => void;
   showImTab: boolean;
+  hideRuntimeTab?: boolean;
   simplifiedUi?: boolean;
 }) {
   const copy = useCopy();
@@ -50,12 +53,21 @@ export function SettingsSidebar({
   return (
     <nav className="flex w-[180px] shrink-0 flex-col border-r border-line bg-app py-3">
       <div>
+        {!hideRuntimeTab && (
+          <SettingsTabButton
+            active={tab === "runtime"}
+            Icon={Cpu}
+            label={tabCopy.runtime.label}
+            subLabel={showChineseHelpers ? tabCopy.runtime.helper : undefined}
+            onClick={() => onChange("runtime")}
+          />
+        )}
         <SettingsTabButton
-          active={tab === "runtime"}
-          Icon={Cpu}
-          label={tabCopy.runtime.label}
-          subLabel={showChineseHelpers ? tabCopy.runtime.helper : undefined}
-          onClick={() => onChange("runtime")}
+          active={tab === "points"}
+          Icon={Coins}
+          label="积分记录"
+          subLabel={showChineseHelpers ? "明细" : "Ledger"}
+          onClick={() => onChange("points")}
         />
         {!simplifiedUi && (
           <SettingsTabButton

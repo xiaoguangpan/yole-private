@@ -7,6 +7,7 @@ import { SettingsApproval } from "@/components/screens/settings/SettingsApproval
 import { SettingsIM } from "@/components/screens/settings/SettingsIM";
 import { SettingsIntegration } from "@/components/screens/settings/SettingsIntegration";
 import { SettingsModels } from "@/components/screens/settings/SettingsModels";
+import { SettingsPointsLedger } from "@/components/screens/settings/SettingsPointsLedger";
 import { SettingsRuntime } from "@/components/screens/settings/SettingsRuntime";
 import { SettingsSidebar } from "@/components/screens/settings/SettingsSidebar";
 import { SettingsShortcuts } from "@/components/screens/settings/SettingsShortcuts";
@@ -125,21 +126,28 @@ export function Settings({
   const tab = controlledTab ?? uncontrolledTab;
   const setTab = onTabChange ?? setUncontrolledTab;
   const showImTab = activeRuntimeKind === "managed";
+  const hideRuntimeTab = simplifiedUi;
   const visibleTab =
     simplifiedUi &&
-    (tab === "models" || tab === "integration" || tab === "shortcuts")
-      ? "runtime"
+    (tab === "runtime" ||
+      tab === "models" ||
+      tab === "integration" ||
+      tab === "shortcuts")
+      ? "points"
       : tab;
 
   useEffect(() => {
-    if (!showImTab && tab === "im") setTab("runtime");
+    if (!showImTab && tab === "im") setTab(hideRuntimeTab ? "points" : "runtime");
     if (
       simplifiedUi &&
-      (tab === "models" || tab === "integration" || tab === "shortcuts")
+      (tab === "runtime" ||
+        tab === "models" ||
+        tab === "integration" ||
+        tab === "shortcuts")
     ) {
-      setTab("runtime");
+      setTab("points");
     }
-  }, [setTab, showImTab, simplifiedUi, tab]);
+  }, [setTab, showImTab, hideRuntimeTab, simplifiedUi, tab]);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -178,6 +186,7 @@ export function Settings({
             resolvedTheme={resolvedTheme}
             onChangeThemePreference={onChangeThemePreference}
             showImTab={showImTab}
+            hideRuntimeTab={hideRuntimeTab}
             simplifiedUi={simplifiedUi}
           />
 
@@ -202,6 +211,7 @@ export function Settings({
                   simplifiedUi={simplifiedUi}
                 />
               )}
+              {visibleTab === "points" && <SettingsPointsLedger />}
               {visibleTab === "models" && (
                 <SettingsModels activeRuntimeKind={activeRuntimeKind} />
               )}
@@ -231,6 +241,7 @@ export function Settings({
                   gaBaseline={runtimeInfo.gaBaseline}
                   managedRuntime={runtimeInfo.managedRuntime}
                   hasRunningSessions={hasRunningSessions}
+                  hideManagedRuntimeDetails={simplifiedUi}
                 />
               )}
             </div>

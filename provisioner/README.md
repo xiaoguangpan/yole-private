@@ -11,6 +11,7 @@ registration. The NewAPI admin credential stays only on the provisioner server.
 ```text
 POST /api/register
 GET  /api/account/status
+GET  /api/account/ledger
 GET  /api/runtime/route        # legacy compatibility for old clients
 GET  /assets/contact/wechat-qr
 GET  /healthz
@@ -22,7 +23,7 @@ Register request:
 {
   "install_id": "local-random-id",
   "device_id_hash": "optional-device-hash",
-  "app_version": "0.0.8",
+  "app_version": "0.0.9",
   "os": "windows",
   "arch": "x64"
 }
@@ -66,9 +67,36 @@ Register response:
 }
 ```
 
+`route_version` and `model_routing` are compatibility fields for older
+clients. Current Yole clients expose explicit conversation model selection and
+do not refresh hidden model routes before each request.
+
 `GET /api/account/status` accepts `Authorization: Bearer <account_token>` and
 returns the same `account` shape without exposing any NewAPI password or admin
 credential.
+
+`GET /api/account/ledger` accepts the same bearer token and returns the current
+account plus a cropped, user-safe paginated points ledger:
+
+```json
+{
+  "account": { "...": "same shape as account status" },
+  "page": 1,
+  "page_size": 20,
+  "total": 1,
+  "items": [
+    {
+      "id": "101",
+      "created_at": 1710000000,
+      "type": "consume",
+      "model": "gpt-5.5",
+      "points_delta": -125,
+      "status": "success",
+      "request_id": "req_..."
+    }
+  ]
+}
+```
 
 ## NewAPI Requirements
 

@@ -19,6 +19,7 @@ import pytest
 from runner.handlers import (
     DEFAULT_APPROVAL_TOOLS,
     YoleHandler,
+    disaster_command_reason,
 )
 
 
@@ -284,6 +285,51 @@ def test_yolo_mode_skips_request_for_approval_tools(fake_parent: MagicMock) -> N
     approval.assert_not_called()
     assert ret.data["status"] == "success"
     assert any("code_run ran" in y for y in yielded)
+
+
+def test_disaster_command_blocks_even_in_yolo_mode(fake_parent: MagicMock) -> None:
+    approval = MagicMock()
+    h = _make_handler(fake_parent, approval, yolo_check=lambda: True)
+    yielded, ret = _drain(
+        h.dispatch(
+            "code_run",
+            {"type": "powershell", "command": "Remove-Item -Recurse -Force C:\\"},
+            response=MagicMock(),
+        )
+    )
+    approval.assert_not_called()
+    assert ret.data["status"] == "blocked"
+    assert any("Yole Safety" in y for y in yielded)
+    assert not any("code_run ran" in y for y in yielded)
+
+
+def test_disaster_command_detector_is_narrow() -> None:
+    assert disaster_command_reason(
+        "code_run",
+        {"command": "rm -rf /"},
+    )
+    assert disaster_command_reason(
+        "code_run",
+        {"command": "del /s /q C:\\"},
+    )
+    assert disaster_command_reason(
+        "code_run",
+        {"command": "format C: /fs:NTFS /q"},
+    )
+    assert (
+        disaster_command_reason(
+            "code_run",
+            {"command": "rm -rf ./node_modules && pnpm install"},
+        )
+        is None
+    )
+    assert (
+        disaster_command_reason(
+            "code_run",
+            {"command": "Remove-Item -Recurse -Force .\\dist"},
+        )
+        is None
+    )
 
 
 def test_yolo_mode_does_not_affect_non_approval_tools(fake_parent: MagicMock) -> None:

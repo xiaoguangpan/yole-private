@@ -13,22 +13,15 @@ interface SettingsAboutProps {
   gaBaseline: string;
   managedRuntime?: ManagedRuntimeDiagnostics;
   hasRunningSessions: boolean;
+  hideManagedRuntimeDetails?: boolean;
 }
 
-/**
- * Settings → About tab. DESIGN.md §9 About tab.
- *
- * Structure:
- *   1. Title + tagline
- *   2. Version table (Yole + bundled GenericAgent kernel)
- *   3. Links — Yole website and GenericAgent upstream credit.
- *   4. Footer with product ownership.
- */
 export function SettingsAbout({
   yoleVersion,
   gaBaseline,
   managedRuntime,
   hasRunningSessions,
+  hideManagedRuntimeDetails = false,
 }: SettingsAboutProps) {
   const copy = useCopy();
   const managedKernelCommit =
@@ -58,15 +51,19 @@ export function SettingsAbout({
           />
         </dd>
 
-        <dt className="text-ink-muted">
-          {copy.settings.about.bundledGAVersion}
-        </dt>
-        <dd className="m-0 font-mono text-ink">
-          {managedKernelShort}
-          {managedKernelDate && (
-            <span className="text-ink-muted"> · {managedKernelDate}</span>
-          )}
-        </dd>
+        {!hideManagedRuntimeDetails && (
+          <>
+            <dt className="text-ink-muted">
+              {copy.settings.about.bundledGAVersion}
+            </dt>
+            <dd className="m-0 font-mono text-ink">
+              {managedKernelShort}
+              {managedKernelDate && (
+                <span className="text-ink-muted"> · {managedKernelDate}</span>
+              )}
+            </dd>
+          </>
+        )}
       </dl>
 
       <div className="mt-10">
@@ -77,11 +74,13 @@ export function SettingsAbout({
             label="Yole"
             detail="github.com/xiaoguangpan/yole"
           />
-          <ExternalLink
-            href="https://github.com/lsdefine/GenericAgent"
-            label="GenericAgent"
-            detail="github.com/lsdefine/GenericAgent"
-          />
+          {!hideManagedRuntimeDetails && (
+            <ExternalLink
+              href="https://github.com/lsdefine/GenericAgent"
+              label="GenericAgent"
+              detail="github.com/lsdefine/GenericAgent"
+            />
+          )}
         </div>
       </div>
 

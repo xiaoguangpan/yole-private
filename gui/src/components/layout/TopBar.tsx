@@ -65,6 +65,7 @@ export interface TopBarProps {
   yoleAccountLoading?: boolean;
   yoleAccountError?: string | null;
   onRefreshYoleAccount?: () => void;
+  onOpenPointsLedger?: () => void;
   /**
    * Conversation column width mode. "compact" = 760px (default), "wide"
    * = 1400px. Renders an icon button next to Settings that flips
@@ -154,6 +155,7 @@ export function TopBar({
   yoleAccountLoading = false,
   yoleAccountError = null,
   onRefreshYoleAccount,
+  onOpenPointsLedger,
   conversationWidth = "compact",
   onToggleConversationWidth,
   themePreference = "system",
@@ -239,6 +241,7 @@ export function TopBar({
               loading={yoleAccountLoading}
               error={yoleAccountError}
               onRefresh={onRefreshYoleAccount}
+              onOpenPointsLedger={onOpenPointsLedger}
             />
           )}
           {onChangeThemePreference && (
@@ -308,11 +311,13 @@ function YoleBalanceIndicatorSafe({
   loading,
   error,
   onRefresh,
+  onOpenPointsLedger,
 }: {
   account: YoleAccountStatus | null;
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  onOpenPointsLedger?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<
@@ -338,6 +343,7 @@ function YoleBalanceIndicatorSafe({
 
   return (
     <Popover.Root
+      open={open}
       onOpenChange={(open) => {
         setOpen(open);
       }}
@@ -373,9 +379,21 @@ function YoleBalanceIndicatorSafe({
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[12px] text-ink-muted">AI 积分</div>
-              <div className="mt-0.5 text-[22px] font-semibold leading-none text-ink">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenPointsLedger?.();
+                }}
+                className={cn(
+                  "mt-0.5 block rounded-sm text-left text-[22px] font-semibold leading-none text-ink",
+                  onOpenPointsLedger &&
+                    "underline-offset-4 hover:text-brand-strong hover:underline",
+                )}
+                disabled={!onOpenPointsLedger}
+              >
                 {points}
-              </div>
+              </button>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {account?.lowBalance && (

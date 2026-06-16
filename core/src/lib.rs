@@ -700,6 +700,16 @@ async fn get_stored_yole_account_status(
         .map_err(stringify_error)
 }
 
+#[tauri::command]
+async fn get_yole_points_ledger(
+    page: Option<i64>,
+    page_size: Option<i64>,
+) -> std::result::Result<yole_provisioning::YolePointsLedger, String> {
+    yole_provisioning::get_points_ledger(page.unwrap_or(1), page_size.unwrap_or(20))
+        .await
+        .map_err(stringify_error)
+}
+
 async fn sync_managed_model_config(
     app: &tauri::AppHandle,
     yole: &SqliteYole,
@@ -1258,6 +1268,9 @@ pub fn run() {
     let latest_migration_version: i64 = migrations.iter().map(|m| m.version).max().unwrap_or(0);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -1317,6 +1330,7 @@ pub fn run() {
             ensure_yole_trial_model,
             get_yole_account_status,
             get_stored_yole_account_status,
+            get_yole_points_ledger,
             list_sessions,
             // B3 M4a session writes
             create_session,

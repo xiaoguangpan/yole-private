@@ -461,6 +461,10 @@ const COMPONENTS: Components = {
 
     const match = /language-([\w-]+)/.exec(codeProps.className ?? "");
     const text = String(codeProps.children ?? "").replace(/\n$/, "");
+    const imagePath = match ? null : singleLocalImagePathFromCodeBlock(text);
+    if (imagePath) {
+      return <MarkdownImage src={imagePath} alt="Generated image" />;
+    }
     return <CodeBlock code={text} language={match?.[1] ?? null} />;
   },
   code({ className, children }) {
@@ -776,6 +780,18 @@ function localPathFromMarkdownImageSrc(src: string): string | null {
 
   const path = decodeMarkdownLocalPath(src);
   return isAbsoluteLocalPath(path) ? path : null;
+}
+
+function singleLocalImagePathFromCodeBlock(code: string): string | null {
+  const lines = code
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length !== 1) return null;
+
+  const localPath = localPathFromMarkdownImageSrc(lines[0]);
+  if (!localPath || !RASTER_IMAGE_EXT_RE.test(localPath)) return null;
+  return localPath;
 }
 
 function fileUrlToLocalPath(src: string): string | null {
