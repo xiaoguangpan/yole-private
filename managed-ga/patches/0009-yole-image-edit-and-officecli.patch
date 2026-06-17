@@ -50,7 +50,7 @@ index c637468..2a46216 100644
    }},
 +  {"type": "function", "function": {
 +    "name": "yole_office_cli",
-+    "description": "Run Yole's bundled OfficeCLI for Office documents. Use for Word, Excel, and PowerPoint work: create, view text/outline/html/screenshot/issues, get/query structure, set/add/remove/move/swap elements, validate, batch, dump, merge, refresh, raw/raw-set, open/close resident sessions. Do not use install, mcp, config, plugins, or watch; Yole blocks commands that write global state or start unmanaged servers.",
++    "description": "Run Yole's bundled OfficeCLI for Office documents. For Word, Excel, and PowerPoint tasks, call this before reading SOP files or writing ad hoc Python so you can inspect OfficeCLI's schema and the document structure. Use it to create, view text/outline/html/screenshot/issues, get/query structure, set/add/remove/move/swap elements, validate, batch, dump, import data, merge templates, refresh, raw/raw-set, open/save/close resident sessions, and read help/schema output. Do not use install, mcp, config, plugins, skills, watch, or unwatch; Yole blocks commands that write global state or start unmanaged servers.",
 +    "parameters": {"type": "object", "properties": {
 +      "args": {"type": "array", "items": {"type": "string"}, "description": "OfficeCLI arguments without the executable name, for example ['view','report.docx','text','--json'] or ['add','deck.pptx','/','--type','slide','--prop','title=Hello']"},
 +      "cwd": {"type": "string", "description": "Optional working directory; defaults to the session cwd"},
@@ -69,18 +69,21 @@ index 4ace760..22a19a4 100644
  from datetime import datetime
  from pathlib import Path
  import tempfile, traceback, subprocess, itertools, collections, difflib, shutil
-@@ -10,6 +10,13 @@ from agent_loop import BaseHandler, StepOutcome, json_default
+@@ -10,6 +10,16 @@ from agent_loop import BaseHandler, StepOutcome, json_default
  script_dir = os.path.dirname(os.path.abspath(__file__))
  state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
 -YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
-+YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.9 (managed-ga)")
++YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.10 (managed-ga)")
 +YOLE_OFFICECLI_ALLOWED = {
 +    "create", "view", "get", "query", "set", "add", "remove", "move",
 +    "swap", "validate", "batch", "dump", "merge", "refresh", "raw",
-+    "raw-set", "add-part", "open", "close",
++    "raw-set", "add-part", "open", "close", "save", "import", "new",
++    "help", "--help", "-h", "-?",
 +}
 +YOLE_OFFICECLI_FORMATS = {"docx", "xlsx", "pptx"}
-+YOLE_OFFICECLI_BLOCKED = {"install", "mcp", "config", "plugins", "watch", "unwatch", "load_skill"}
++YOLE_OFFICECLI_BLOCKED = {
++    "install", "mcp", "config", "plugins", "skills", "watch", "unwatch", "load_skill",
++}
  def state_path(*parts):
      return os.path.join(state_dir, *parts)
  def asset_path(*parts):
@@ -276,7 +279,7 @@ diff --git a/llmcore.py b/llmcore.py
  urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
  _RESP_CACHE_KEY = str(uuid.uuid4())
 -_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.8 (managed-ga)")
-+_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.9 (managed-ga)")
++_YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.10 (managed-ga)")
  _ROOT = os.path.dirname(os.path.abspath(__file__))
  if _ROOT not in sys.path: sys.path.append(_ROOT)
  

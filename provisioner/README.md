@@ -23,7 +23,7 @@ Register request:
 {
   "install_id": "local-random-id",
   "device_id_hash": "optional-device-hash",
-  "app_version": "0.0.9",
+  "app_version": "0.0.10",
   "os": "windows",
   "arch": "x64"
 }

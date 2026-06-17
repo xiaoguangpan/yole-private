@@ -6813,7 +6813,7 @@ dependencies = [
 
 [[package]]
 name = "yole-cli"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "clap",
  "serde",
@@ -6826,7 +6826,7 @@ dependencies = [
 
 [[package]]
 name = "yole-core"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "anyhow",
  "async-trait",

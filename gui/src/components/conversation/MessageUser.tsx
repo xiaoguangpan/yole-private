@@ -254,7 +254,7 @@ export function MessageUser({
       <div
         data-role="user-msg"
         className={cn(
-          "relative rounded-r-sm border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 text-[15px] font-medium leading-[1.65] text-ink",
+          "relative rounded-r-sm border-l-[3px] border-brand-strong bg-brand-soft px-4 py-2.5 text-[14.5px] font-medium leading-[1.6] text-ink",
           canEdit ? "pr-20" : "pr-12",
           "select-text whitespace-pre-wrap break-words",
           isLong && collapsed && "overflow-hidden",

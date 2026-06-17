@@ -112,6 +112,9 @@ export async function hydrateApp(): Promise<void> {
   // real API key values.
   const managedConfig = await useManagedModelsStore.getState().load();
   const hasConfiguredManagedModel = managedConfig.models.length > 0;
+  if (activeRuntimeKind === "managed" && !hasConfiguredManagedModel) {
+    console.warn("[hydrate] managed runtime has no configured model after provisioning.");
+  }
 
   // 5. Startup-critical state: sessions/projects. Route through Rust
   // Core so a slow direct-SQL housekeeping pass cannot leave the
@@ -141,8 +144,7 @@ export async function hydrateApp(): Promise<void> {
   }
 
   // 8. Branch on active runtime config.
-  const needsOnboarding =
-    activeRuntimeKind === "managed" ? !hasConfiguredManagedModel : !hasGAConfig;
+  const needsOnboarding = activeRuntimeKind === "external" && !hasGAConfig;
   if (needsOnboarding) {
     useUiStore.getState().setScreen("onboarding");
     return;

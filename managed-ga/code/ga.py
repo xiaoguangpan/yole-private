@@ -9,14 +9,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from agent_loop import BaseHandler, StepOutcome, json_default
 script_dir = os.path.dirname(os.path.abspath(__file__))
 state_dir = os.path.abspath(os.environ.get('YOLE_GA_STATE_ROOT') or script_dir)
-YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.9 (managed-ga)")
+YOLE_HTTP_USER_AGENT = os.environ.get("YOLE_HTTP_USER_AGENT", "Yole/0.0.10 (managed-ga)")
 YOLE_OFFICECLI_ALLOWED = {
     "create", "view", "get", "query", "set", "add", "remove", "move",
     "swap", "validate", "batch", "dump", "merge", "refresh", "raw",
-    "raw-set", "add-part", "open", "close",
+    "raw-set", "add-part", "open", "close", "save", "import", "new",
+    "help", "--help", "-h", "-?",
 }
 YOLE_OFFICECLI_FORMATS = {"docx", "xlsx", "pptx"}
-YOLE_OFFICECLI_BLOCKED = {"install", "mcp", "config", "plugins", "watch", "unwatch", "load_skill"}
+YOLE_OFFICECLI_BLOCKED = {
+    "install", "mcp", "config", "plugins", "skills", "watch", "unwatch", "load_skill",
+}
 def state_path(*parts):
     return os.path.join(state_dir, *parts)
 def asset_path(*parts):

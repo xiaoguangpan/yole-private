@@ -16,25 +16,30 @@ const PAGE_SIZE = 20;
 
 export function SettingsPointsLedger() {
   const [page, setPage] = useState(1);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [ledger, setLedger] = useState<YolePointsLedger | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failedPage, setFailedPage] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const requestedPage = page;
     getYolePointsLedger(page, PAGE_SIZE)
       .then((result) => {
         if (cancelled) return;
         setLedger(result);
         setError(null);
+        setFailedPage(null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setError(errorMessage(err));
+        setFailedPage(requestedPage);
       });
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, refreshNonce]);
 
   const totalPages = useMemo(() => {
     if (!ledger) return 1;
@@ -43,8 +48,8 @@ export function SettingsPointsLedger() {
 
   const account = ledger?.account;
   const unit = account?.pointsUnit?.trim() || "积分";
-  const loading = !ledger || ledger.page !== page;
-  const visibleError = loading ? null : error;
+  const loading = (!ledger || ledger.page !== page) && failedPage !== page;
+  const visibleError = failedPage === page ? error : null;
 
   return (
     <div className="space-y-7">
@@ -85,7 +90,18 @@ export function SettingsPointsLedger() {
 
           {visibleError && (
             <div className="px-4 py-8 text-center text-[13px] text-warning">
-              积分记录加载失败：{visibleError}
+              <div>积分记录加载失败：{visibleError}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFailedPage(null);
+                  setError(null);
+                  setRefreshNonce((value) => value + 1);
+                }}
+                className="mt-3 rounded-sm border border-line px-2.5 py-1 text-[12px] text-ink hover:bg-hover"
+              >
+                重试
+              </button>
             </div>
           )}
 

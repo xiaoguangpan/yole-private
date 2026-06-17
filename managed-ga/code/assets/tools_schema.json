@@ -66,7 +66,7 @@
   }},
   {"type": "function", "function": {
     "name": "yole_office_cli",
-    "description": "Run Yole's bundled OfficeCLI for Office documents. Use for Word, Excel, and PowerPoint work: create, view text/outline/html/screenshot/issues, get/query structure, set/add/remove/move/swap elements, validate, batch, dump, merge, refresh, raw/raw-set, open/close resident sessions. Do not use install, mcp, config, plugins, or watch; Yole blocks commands that write global state or start unmanaged servers.",
+    "description": "Run Yole's bundled OfficeCLI for Office documents. For Word, Excel, and PowerPoint tasks, call this before reading SOP files or writing ad hoc Python so you can inspect OfficeCLI's schema and the document structure. Use it to create, view text/outline/html/screenshot/issues, get/query structure, set/add/remove/move/swap elements, validate, batch, dump, import data, merge templates, refresh, raw/raw-set, open/save/close resident sessions, and read help/schema output. Do not use install, mcp, config, plugins, skills, watch, or unwatch; Yole blocks commands that write global state or start unmanaged servers.",
     "parameters": {"type": "object", "properties": {
       "args": {"type": "array", "items": {"type": "string"}, "description": "OfficeCLI arguments without the executable name, for example ['view','report.docx','text','--json'] or ['add','deck.pptx','/','--type','slide','--prop','title=Hello']"},
       "cwd": {"type": "string", "description": "Optional working directory; defaults to the session cwd"},

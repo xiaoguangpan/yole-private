@@ -61,13 +61,17 @@ status; Yole's setup check owns it.
 
 ## Office Documents
 
-For Word, Excel, and PowerPoint files, prefer Yole's bundled Office capability
-through `yole_office_cli` instead of writing ad hoc Python scripts. Use it to
-create, read, inspect structure, render HTML/screenshots, validate/issues,
-modify elements, batch changes, merge templates, dump reusable structure, and
-repair documents. Pass arguments as an array, not as a shell command. Do not
-use OfficeCLI self-installation, MCP registration, global config, plugins
-management, or watch-server commands; Yole owns packaging and integration.
+For Word, Excel, and PowerPoint tasks, first use Yole's bundled Office capability
+through `yole_office_cli` to inspect OfficeCLI help/schema output and the
+document structure. Do this before searching SOP files or writing ad hoc Python.
+Use it to create, read, inspect structure, render HTML/screenshots,
+validate/issues, modify elements, batch changes, import tabular data, merge
+templates, dump reusable structure, and repair documents. If the user asks for
+polished visual styling that OfficeCLI cannot express well, use OfficeCLI for
+structure/preview/validation and then use Python libraries for deeper styling.
+Pass arguments as an array, not as a shell command. Do not use OfficeCLI
+self-installation, MCP registration, global config, skills/plugins management,
+or watch-server commands; Yole owns packaging and integration.
 
 ## Image Generation
 
